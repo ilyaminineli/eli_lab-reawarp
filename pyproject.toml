@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eli-lab-reawarp"
+version = "0.1.0"
+description = "Deterministic mathematical IDM loop and stem generator"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "ELI LAB" }]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+audio = ["soundfile>=0.12", "scipy>=1.10"]
+ui = ["PySide6>=6.6", "pyqtgraph>=0.13"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+reawarp = "reawarp.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
