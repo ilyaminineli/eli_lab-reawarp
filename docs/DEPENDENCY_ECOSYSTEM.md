@@ -102,8 +102,8 @@ No external project should be copied into Reawarp merely because it is useful. P
 
 - **M3 — complete:** dependency-free break analysis/transformation and profile-based percussion synthesis.
 - **M4 — implemented:** PySide6 Generator, Break Lab, and Stem Mixer workspaces, SoundDevice audition, waveform/spectrogram views, asynchronous rendering, and stem controls.
-- **M5 — next:** universal event representation, Mido import/export, and an extensible tuning interface.
-- **M6 — later:** MusPy-based research utilities, sample/stem catalogue, metadata, and similarity search.
+- **M5 — implemented:** universal score/event model, rational beat time, tempo/meter maps, automation lanes, tuning interface, project score conversion, and Mido MIDI 1.0 import/export.
+- **M6 — next:** searchable sample/stem catalogue, metadata indexing, similarity features, collections, variation genealogy, and MusPy-based research utilities.
 - **M7 — later:** optional Pyo/Pippi/Csound/SuperCollider backends, advanced mathematical composition, and curated dataset experiments.
 
 The project should grow through small, testable adapters. Its identity remains in its mathematics, event model, and deterministic renderer.
