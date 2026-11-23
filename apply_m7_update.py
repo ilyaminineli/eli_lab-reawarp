@@ -844,13 +844,13 @@ def main() -> int:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / name, target)
     for name, content in changes.items():
-        (ROOT / name).write_text(content, encoding="utf-8", newline="\\n")
+        (ROOT / name).write_text(content, encoding="utf-8", newline="\n")
     for name, content in new_files.items():
         target = ROOT / name
         if target.exists():
             continue  # The bundle itself may already have overlaid this exact file.
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(content, encoding="utf-8", newline="\\n")
+        target.write_text(content, encoding="utf-8", newline="\n")
     print("M7 update applied.")
     print(f"Original files backed up to: {backup}")
     print('Install: python -m pip install -e ".[dev,audio,m4,midi]"')
