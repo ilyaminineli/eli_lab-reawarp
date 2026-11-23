@@ -12,6 +12,7 @@ import numpy as np
 from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
 from reawarp.core.random_streams import RandomStreams, derive_seed
+from reawarp.composition.director import build_composition_plan, section_for_time
 from reawarp.generators.melody import build_melody_events
 from reawarp.generators.percussion import build_percussion_events
 from reawarp.samples.io import read_sample
@@ -129,6 +130,14 @@ class ReawarpEngine:
 
         frame_count = config.frame_count
         sample_rate = config.sample_rate
+        composition_plan = build_composition_plan(
+            duration_seconds=config.duration,
+            bpm=config.bpm,
+            seed=config.seed,
+            structure=config.structure,
+            energy=config.composition_energy,
+            variation=config.composition_variation,
+        )
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
         stems: dict[str, np.ndarray] = {}
@@ -192,6 +201,8 @@ class ReawarpEngine:
             auto_choices=AUTO_KICK_PROFILES,
         )
         for event in percussion["kick"]:
+            if not section_for_time(composition_plan, event.time).kick:
+                continue
             profile = kick_profile
             signal = render_kick(
                 sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
@@ -206,6 +217,9 @@ class ReawarpEngine:
             auto_choices=AUTO_SNARE_PROFILES,
         )
         for event in percussion["snare"]:
+            section = section_for_time(composition_plan, event.time)
+            if section.density < 0.14 and event.velocity < 0.70:
+                continue
             profile = snare_profile
             signal = render_snare(
                 sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
@@ -220,6 +234,9 @@ class ReawarpEngine:
             auto_choices=AUTO_HAT_PROFILES,
         )
         for event in percussion["hat"]:
+            section = section_for_time(composition_plan, event.time)
+            if streams.get("section_ornaments").random() > section.percussion_density_scale:
+                continue
             profile = hat_profile
             signal = render_hat(
                 sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
@@ -245,6 +262,11 @@ class ReawarpEngine:
             ),
         }
         for event in percussion["break"]:
+            section = section_for_time(composition_plan, event.time)
+            if event.kind == "kick" and not section.kick:
+                continue
+            if event.kind != "kick" and section.density < 0.16:
+                continue
             break_rng = streams.get("break_synthesis")
             if event.kind == "kick":
                 profile = break_profiles["kick"]
@@ -281,8 +303,12 @@ class ReawarpEngine:
             )
             melody_stem = new_stem("melody")
             for event in melody_events:
+                section = section_for_time(composition_plan, event.time)
+                if not section.melody:
+                    continue
+                effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
                 signal = render_fm_note(
-                    event.frequency,
+                    effective_frequency,
                     sample_rate,
                     streams.get("melody_synthesis"),
                     duration=event.duration,
@@ -310,8 +336,14 @@ class ReawarpEngine:
                 np.concatenate((np.zeros(97, dtype=np.float32), texture[:-97]))
                 if len(texture) > 97 else texture
             )
-            texture_stem[:, 0] += texture * 0.72
-            texture_stem[:, 1] += delayed * 0.72
+            texture_gain = np.zeros(frame_count, dtype=np.float32)
+            for section in composition_plan.sections:
+                start = max(0, int(round(section.start_seconds * sample_rate)))
+                end = min(frame_count, int(round(section.end_seconds * sample_rate)))
+                if end > start and section.texture:
+                    texture_gain[start:end] = 0.45 + 0.55 * section.density
+            texture_stem[:, 0] += texture * texture_gain * 0.72
+            texture_stem[:, 1] += delayed * texture_gain * 0.72
             event_records.append({
                 "lane": "noise_texture",
                 "time": 0.0,
@@ -333,6 +365,13 @@ class ReawarpEngine:
                 root_frequency=root_frequency,
                 amount=config.ambience_level,
             )
+            ambience_gain = np.zeros(frame_count, dtype=np.float32)
+            for section in composition_plan.sections:
+                start = max(0, int(round(section.start_seconds * sample_rate)))
+                end = min(frame_count, int(round(section.end_seconds * sample_rate)))
+                if end > start and section.ambience:
+                    ambience_gain[start:end] = section.space
+            ambience_stem *= ambience_gain[:, None]
             event_records.append({
                 "lane": "ambience",
                 "time": 0.0,
@@ -370,6 +409,13 @@ class ReawarpEngine:
                 applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
             triggers = sample_trigger_patterns[role]
+            if role in {"kick", "break"}:
+                triggers = [event for event in triggers if section_for_time(composition_plan, event.time).kick]
+            elif role == "snare":
+                triggers = [event for event in triggers if section_for_time(composition_plan, event.time).density >= 0.14 or event.velocity >= 0.70]
+            elif role == "hat":
+                sample_ornaments = sample_streams.get("section_ornaments")
+                triggers = [event for event in triggers if sample_ornaments.random() <= section_for_time(composition_plan, event.time).percussion_density_scale]
             slice_ranges: list[tuple[int, int]] = []
             source_bars = 1
             if role == "break":
@@ -484,6 +530,7 @@ class ReawarpEngine:
                     "kick_pattern", "snare_pattern", "hat_pattern", "break_pattern",
                     "kick_synthesis", "snare_synthesis", "hat_synthesis", "break_synthesis",
                     "kick_profile", "snare_profile", "hat_profile", "break_profile",
+                    "section_ornaments",
                     "break_processing",
                     "melody_pattern", "melody_synthesis", "melody_profile",
                     "texture_synthesis", "ambience_synthesis",
@@ -495,6 +542,7 @@ class ReawarpEngine:
             },
             "generator_families": {
                 "percussion": "euclidean + prime-indexed mutation + logistic control",
+                "composition_director": "seeded bar-quantised formal section plan",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
                 "melody": "3:5 Lissajous curve + logistic-map contour + profiled additive/FM synthesis",
                 "texture": "coloured noise with low-frequency amplitude modulation",
@@ -512,6 +560,7 @@ class ReawarpEngine:
                     "hat": len(HAT_PROFILES),
                 },
             },
+            "composition_plan": composition_plan.to_dict(),
             "break_rhythm": {
                 "style": next(
                     (

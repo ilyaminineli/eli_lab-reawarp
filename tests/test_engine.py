@@ -154,3 +154,15 @@ def test_sample_layer_regeneration_is_independent_and_mergeable(tmp_path):
             assert np.array_equal(original.stems[name], merged.stems[name]), name
     assert np.array_equal(candidate.stems["sample_kick"], merged.stems["sample_kick"])
     assert merged.metadata["variation"] == {"stem": "sample_kick", "index": 2}
+
+
+def test_engine_stores_seeded_composition_plan_and_respects_duration():
+    config = small_config(duration=12.0, structure="episodic",
+                          composition_energy=0.7, composition_variation=0.8)
+    project = ReawarpEngine().generate(config)
+    plan = project.metadata["composition_plan"]
+    assert plan["structure"] == "episodic"
+    assert plan["duration_seconds"] == pytest.approx(12.0)
+    assert plan["sections"][0]["start_seconds"] == 0.0
+    assert plan["sections"][-1]["end_seconds"] == pytest.approx(12.0)
+    assert project.frame_count == 12 * 22_050
