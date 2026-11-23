@@ -136,3 +136,13 @@ def test_melody_regeneration_does_not_change_ambience_or_other_stems():
     for name in original.stems:
         if name != "melody":
             assert np.array_equal(original.stems[name], variant.stems[name]), name
+
+
+def test_config_accepts_full_45_second_duration():
+    config = GenerationConfig(duration=45.0)
+    assert config.duration == 45.0
+
+
+def test_config_rejects_duration_above_45_seconds():
+    with pytest.raises(ValueError, match="5 and 45 seconds"):
+        GenerationConfig(duration=45.1)

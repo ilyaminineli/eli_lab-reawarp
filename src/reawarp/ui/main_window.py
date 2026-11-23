@@ -202,10 +202,11 @@ class MainWindow(QMainWindow):
         self.bpm.setValue(137)
         form.addRow("Tempo / BPM", self.bpm)
         self.duration = QDoubleSpinBox()
-        self.duration.setRange(5, 20)
+        self.duration.setRange(5, 45)
+        self.duration.setToolTip("Offline composition duration, up to 45 seconds.")
         self.duration.setDecimals(1)
         self.duration.setSingleStep(0.5)
-        self.duration.setValue(12)
+        self.duration.setValue(24)
         form.addRow("Duration / sec", self.duration)
 
         self.complexity = QSlider(Qt.Orientation.Horizontal)

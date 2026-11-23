@@ -156,7 +156,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 
 - Internal format: NumPy float32, stereo.
 - Default sample rate: 48 kHz.
-- Duration: 5–20 seconds.
+- Duration: 5–45 seconds.
 - BPM: 60–220.
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
