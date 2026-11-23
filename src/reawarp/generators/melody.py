@@ -32,8 +32,8 @@ def midi_to_frequency(note: float, reference: float = 440.0) -> float:
 
 
 def build_melody_events(
-    config: GenerationConfig,
-    rng: np.random.Generator,
+        config: GenerationConfig,
+        rng: np.random.Generator,
 ) -> list[MelodyEvent]:
     if not config.include_melody:
         return []

@@ -25,8 +25,8 @@ class PercussionEvent:
 
 
 def build_percussion_events(
-    config: GenerationConfig,
-    rngs: dict[str, np.random.Generator],
+        config: GenerationConfig,
+        rngs: dict[str, np.random.Generator],
 ) -> dict[str, list[PercussionEvent]]:
     """Build four related but independently controlled percussion lanes."""
     step_seconds = config.sixteenth_seconds
@@ -67,8 +67,8 @@ def build_percussion_events(
         snare_pulses = 3 + int(complexity > 0.55)
         snare_hit = euclidean_rhythm(snare_pulses, 16, rotation=snare_rotation)[position]
         ghost_snare = (
-            position in (2, 6, 10, 14)
-            and snare_rng.random() < complexity * 0.16
+                position in (2, 6, 10, 14)
+                and snare_rng.random() < complexity * 0.16
         )
         if snare_hit or ghost_snare:
             velocity = float(

@@ -29,13 +29,13 @@ def _mono(audio: np.ndarray) -> np.ndarray:
 
 
 def detect_transients(
-    audio: np.ndarray,
-    sample_rate: int,
-    *,
-    threshold: float = 0.22,
-    min_interval_ms: float = 70.0,
-    window_ms: float = 12.0,
-    hop_ms: float = 3.0,
+        audio: np.ndarray,
+        sample_rate: int,
+        *,
+        threshold: float = 0.22,
+        min_interval_ms: float = 70.0,
+        window_ms: float = 12.0,
+        hop_ms: float = 3.0,
 ) -> list[int]:
     """Return onset frame indices using positive short-time energy flux.
 
@@ -58,7 +58,7 @@ def detect_transients(
     padded = np.pad(signal, (0, max(0, (frame_count - 1) * hop + window - signal.size)))
     rms = np.empty(frame_count, dtype=np.float64)
     for index in range(frame_count):
-        frame = padded[index * hop : index * hop + window].astype(np.float64)
+        frame = padded[index * hop: index * hop + window].astype(np.float64)
         rms[index] = np.sqrt(np.mean(frame * frame) + 1e-15)
 
     flux = np.maximum(0.0, np.diff(rms, prepend=rms[0]))
@@ -98,12 +98,12 @@ def slice_audio(audio: np.ndarray, boundaries: list[int] | tuple[int, ...]) -> l
 
 
 def auto_slice(
-    audio: np.ndarray,
-    sample_rate: int,
-    *,
-    threshold: float = 0.22,
-    min_interval_ms: float = 70.0,
-    max_slices: int | None = None,
+        audio: np.ndarray,
+        sample_rate: int,
+        *,
+        threshold: float = 0.22,
+        min_interval_ms: float = 70.0,
+        max_slices: int | None = None,
 ) -> list[AudioSlice]:
     """Detect transients and return ordered, non-overlapping slice ranges."""
     samples = np.asarray(audio)

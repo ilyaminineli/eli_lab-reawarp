@@ -14,16 +14,16 @@ from reawarp.synthesis.profiles import (
 
 
 def render_kick(
-    sample_rate: int,
-    rng: np.random.Generator,
-    velocity: float = 1.0,
-    duration: float = 0.48,
-    start_frequency: float = 155.0,
-    end_frequency: float = 43.0,
-    pitch_decay: float = 0.035,
-    amp_decay: float = 0.23,
-    distortion: float = 1.7,
-    profile: str = "909_punch",
+        sample_rate: int,
+        rng: np.random.Generator,
+        velocity: float = 1.0,
+        duration: float = 0.48,
+        start_frequency: float = 155.0,
+        end_frequency: float = 43.0,
+        pitch_decay: float = 0.035,
+        amp_decay: float = 0.23,
+        distortion: float = 1.7,
+        profile: str = "909_punch",
 ) -> np.ndarray:
     """Render a kick using one of thirteen independently tunable profiles.
 
@@ -44,7 +44,7 @@ def render_kick(
     time = np.arange(length, dtype=np.float64) / sample_rate
     tau = max(float(pitch_tau), 1e-4)
     phase = 2.0 * np.pi * (
-        end * time + (start - end) * tau * (1.0 - np.exp(-time / tau))
+            end * time + (start - end) * tau * (1.0 - np.exp(-time / tau))
     )
     envelope = exponential_decay(length, sample_rate, amp_tau, 0.0015).astype(np.float64)
     body = np.sin(phase) * envelope
@@ -58,11 +58,11 @@ def render_kick(
 
 
 def render_snare(
-    sample_rate: int,
-    rng: np.random.Generator,
-    velocity: float = 1.0,
-    duration: float = 0.30,
-    profile: str = "909_crack",
+        sample_rate: int,
+        rng: np.random.Generator,
+        velocity: float = 1.0,
+        duration: float = 0.30,
+        profile: str = "909_crack",
 ) -> np.ndarray:
     """Render a snare from one of six noise/body/envelope profiles."""
     if profile == "auto":
@@ -86,11 +86,11 @@ def render_snare(
 
 
 def render_hat(
-    sample_rate: int,
-    rng: np.random.Generator,
-    velocity: float = 0.5,
-    duration: float = 0.115,
-    profile: str = "closed",
+        sample_rate: int,
+        rng: np.random.Generator,
+        velocity: float = 0.5,
+        duration: float = 0.115,
+        profile: str = "closed",
 ) -> np.ndarray:
     """Render a hi-hat from one of six noise/metallic spectral profiles."""
     if profile == "auto":
@@ -116,13 +116,13 @@ def render_hat(
 
 
 def render_fm_note(
-    frequency: float,
-    sample_rate: int,
-    rng: np.random.Generator,
-    duration: float = 0.34,
-    velocity: float = 0.65,
-    modulation_ratio: float | None = None,
-    modulation_index: float = 2.4,
+        frequency: float,
+        sample_rate: int,
+        rng: np.random.Generator,
+        duration: float = 0.34,
+        velocity: float = 0.65,
+        modulation_ratio: float | None = None,
+        modulation_index: float = 2.4,
 ) -> np.ndarray:
     length = max(48, int(round(sample_rate * duration)))
     time = np.arange(length, dtype=np.float64) / sample_rate
@@ -143,10 +143,10 @@ def render_fm_note(
 
 
 def render_noise_texture(
-    frame_count: int,
-    sample_rate: int,
-    rng: np.random.Generator,
-    amount: float = 0.11,
+        frame_count: int,
+        sample_rate: int,
+        rng: np.random.Generator,
+        amount: float = 0.11,
 ) -> np.ndarray:
     """Generate slowly evolving coloured noise with subtle resonant components."""
     white = rng.standard_normal(frame_count).astype(np.float64)

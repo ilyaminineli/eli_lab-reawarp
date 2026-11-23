@@ -37,21 +37,21 @@ class ReawarpEngine:
     VERSION = "0.2.0"
 
     def generate_variant(
-        self,
-        config: GenerationConfig,
-        stem: str,
-        variation: int = 1,
+            self,
+            config: GenerationConfig,
+            stem: str,
+            variation: int = 1,
     ) -> ReawarpProject:
         """Regenerate one stem while retaining all unrelated stems bit-identically."""
         return self.generate(config, regenerate=stem, variation=variation)
 
     def generate(
-        self,
-        config: GenerationConfig | None = None,
-        *,
-        regenerate: str | None = None,
-        variation: int = 1,
-        **overrides: Any,
+            self,
+            config: GenerationConfig | None = None,
+            *,
+            regenerate: str | None = None,
+            variation: int = 1,
+            **overrides: Any,
     ) -> ReawarpProject:
         if config is None:
             config = GenerationConfig(**overrides)
@@ -89,10 +89,10 @@ class ReawarpEngine:
             return audio
 
         def place_mono(
-            target: np.ndarray,
-            signal: np.ndarray,
-            start_seconds: float,
-            pan: float = 0.0,
+                target: np.ndarray,
+                signal: np.ndarray,
+                start_seconds: float,
+                pan: float = 0.0,
         ) -> None:
             start = max(0, int(round(start_seconds * sample_rate)))
             if start >= frame_count or signal.size == 0:
@@ -101,15 +101,15 @@ class ReawarpEngine:
             angle = (float(np.clip(pan, -1.0, 1.0)) + 1.0) * (math.pi / 4.0)
             left_gain, right_gain = math.cos(angle), math.sin(angle)
             mono_signal = np.asarray(signal, dtype=np.float32).reshape(-1)
-            target[start : start + count, 0] += mono_signal[:count] * left_gain
-            target[start : start + count, 1] += mono_signal[:count] * right_gain
+            target[start: start + count, 0] += mono_signal[:count] * left_gain
+            target[start: start + count, 1] += mono_signal[:count] * right_gain
 
         def place_sample(
-            target: np.ndarray,
-            sample: np.ndarray,
-            start_seconds: float,
-            velocity: float,
-            pan: float,
+                target: np.ndarray,
+                sample: np.ndarray,
+                start_seconds: float,
+                velocity: float,
+                pan: float,
         ) -> None:
             shaped = sample * float(np.clip(velocity, 0.0, 1.0)) * 0.72
             place_mono(target, shaped, start_seconds, pan)

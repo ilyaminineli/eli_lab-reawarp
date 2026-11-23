@@ -43,12 +43,12 @@ class ReawarpProject:
         return np.clip(master, -1.0, 1.0).astype(np.float32, copy=False)
 
     def export(
-        self,
-        directory: str | Path,
-        *,
-        bit_depth: int = 24,
-        include_stems: bool = True,
-        include_master: bool = True,
+            self,
+            directory: str | Path,
+            *,
+            bit_depth: int = 24,
+            include_stems: bool = True,
+            include_master: bool = True,
     ) -> Path:
         output = Path(directory).expanduser()
         output.mkdir(parents=True, exist_ok=True)

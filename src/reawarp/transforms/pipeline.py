@@ -17,7 +17,6 @@ from reawarp.transforms.effects import (
     time_stretch,
 )
 
-
 BREAK_TRANSFORMS = (
     "slice_rearrange",
     "stutter",
@@ -32,21 +31,21 @@ BREAK_TRANSFORMS = (
 
 
 def apply_break_transforms(
-    audio: np.ndarray,
-    sample_rate: int,
-    transforms: tuple[str, ...] | list[str],
-    rng: np.random.Generator,
-    *,
-    slice_count: int = 16,
-    stutter_repeats: int = 4,
-    dropout_probability: float = 0.18,
-    pitch_semitones: float = 0.0,
-    stretch_factor: float = 1.0,
-    gate_rate_hz: float = 8.0,
-    gate_duty: float = 0.62,
-    grain_size_ms: float = 80.0,
-    grain_density: float = 1.5,
-    freeze_position: float = 0.25,
+        audio: np.ndarray,
+        sample_rate: int,
+        transforms: tuple[str, ...] | list[str],
+        rng: np.random.Generator,
+        *,
+        slice_count: int = 16,
+        stutter_repeats: int = 4,
+        dropout_probability: float = 0.18,
+        pitch_semitones: float = 0.0,
+        stretch_factor: float = 1.0,
+        gate_rate_hz: float = 8.0,
+        gate_duty: float = 0.62,
+        grain_size_ms: float = 80.0,
+        grain_density: float = 1.5,
+        freeze_position: float = 0.25,
 ) -> np.ndarray:
     """Apply named operations in order; the input buffer is never modified."""
     unknown = set(transforms) - set(BREAK_TRANSFORMS)

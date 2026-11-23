@@ -6,10 +6,10 @@ import numpy as np
 
 
 def exponential_decay(
-    length: int,
-    sample_rate: int,
-    decay_seconds: float,
-    attack_seconds: float = 0.001,
+        length: int,
+        sample_rate: int,
+        decay_seconds: float,
+        attack_seconds: float = 0.001,
 ) -> np.ndarray:
     if length <= 0:
         return np.empty(0, dtype=np.float32)
