@@ -3,6 +3,7 @@ import pytest
 
 from reawarp import GenerationConfig, ReawarpEngine
 from reawarp.core.random_streams import RandomStreams
+from reawarp.export.wav import write_wav
 
 
 def small_config(**overrides):
@@ -75,3 +76,30 @@ def test_regenerating_one_stem_preserves_other_stems():
 def test_unknown_stem_variant_is_rejected():
     with pytest.raises(ValueError):
         ReawarpEngine().generate_variant(small_config(), "master", variation=1)
+
+
+
+def test_regenerating_procedural_lane_keeps_imported_sample_overlays_identical(tmp_path):
+    sample = np.sin(np.linspace(0.0, 16.0 * np.pi, 1024)).astype(np.float32) * 0.4
+    kick_path = write_wav(tmp_path / "kick.wav", sample, 22_050, 16)
+    break_path = write_wav(tmp_path / "break.wav", sample, 22_050, 16)
+    config = small_config(sample_paths={
+        "kick": str(kick_path),
+        "break": str(break_path),
+    })
+    engine = ReawarpEngine()
+    original = engine.generate(config)
+
+    kick_variant = engine.generate_variant(config, "kick", variation=3)
+    assert not np.array_equal(original.stems["kick"], kick_variant.stems["kick"])
+    for name in original.stems:
+        if name != "kick":
+            assert np.array_equal(original.stems[name], kick_variant.stems[name]), name
+
+    break_variant = engine.generate_variant(config, "synthetic_break", variation=2)
+    assert not np.array_equal(
+        original.stems["synthetic_break"], break_variant.stems["synthetic_break"]
+    )
+    for name in original.stems:
+        if name != "synthetic_break":
+            assert np.array_equal(original.stems[name], break_variant.stems[name]), name

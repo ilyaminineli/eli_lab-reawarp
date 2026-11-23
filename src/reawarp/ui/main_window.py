@@ -1,0 +1,755 @@
+"""M4 desktop instrument: generation, break lab, playback, and stem mixing."""
+
+from __future__ import annotations
+
+import json
+import secrets
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
+    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
+    QTabWidget, QToolButton, QVBoxLayout, QWidget,
+)
+
+from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
+from reawarp.export.wav import write_wav
+from reawarp.samples.io import read_sample
+from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, SNARE_PROFILES
+from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
+from reawarp.ui.audio_player import AudioPlayer
+from reawarp.ui.theme import APP_STYLE
+from reawarp.ui.visualization import AudioPreview
+from reawarp.ui.workers import RenderWorker
+
+
+class StemRow(QFrame):
+    selected = Signal(str)
+    regenerate = Signal(str)
+    changed = Signal()
+
+    def __init__(self, name: str, can_regenerate: bool, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.name = name
+        self.can_regenerate = can_regenerate
+        self.setObjectName("stemRow")
+        self.setStyleSheet(
+            "QFrame#stemRow { background: #1d242e; border: 1px solid #303b49; border-radius: 6px; }"
+        )
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(9, 5, 9, 5)
+        layout.setSpacing(8)
+
+        name_button = QPushButton(name.replace("_", " ").upper())
+        name_button.setMinimumWidth(145)
+        name_button.clicked.connect(lambda: self.selected.emit(self.name))
+        layout.addWidget(name_button)
+
+        layout.addWidget(QLabel("GAIN"))
+        self.gain = QSlider(Qt.Orientation.Horizontal)
+        self.gain.setRange(0, 150)
+        self.gain.setValue(100)
+        self.gain.setFixedWidth(100)
+        self.gain.valueChanged.connect(self.changed.emit)
+        layout.addWidget(self.gain)
+        self.gain_label = QLabel("1.00")
+        self.gain_label.setFixedWidth(38)
+        self.gain.valueChanged.connect(
+            lambda value: self.gain_label.setText(f"{value / 100:.2f}")
+        )
+        layout.addWidget(self.gain_label)
+
+        layout.addWidget(QLabel("PAN"))
+        self.pan = QSlider(Qt.Orientation.Horizontal)
+        self.pan.setRange(-100, 100)
+        self.pan.setValue(0)
+        self.pan.setFixedWidth(80)
+        self.pan.valueChanged.connect(self.changed.emit)
+        layout.addWidget(self.pan)
+        self.pan_label = QLabel("C")
+        self.pan_label.setFixedWidth(30)
+        self.pan.valueChanged.connect(
+            lambda value: self.pan_label.setText(
+                "C" if value == 0 else f"{abs(value)}{'L' if value < 0 else 'R'}"
+            )
+        )
+        layout.addWidget(self.pan_label)
+
+        self.mute = QToolButton()
+        self.mute.setText("M")
+        self.mute.setCheckable(True)
+        self.mute.setToolTip("Mute in mixer audition and master export")
+        self.mute.toggled.connect(self.changed.emit)
+        layout.addWidget(self.mute)
+
+        self.solo = QToolButton()
+        self.solo.setText("S")
+        self.solo.setCheckable(True)
+        self.solo.setToolTip("Solo this stem; multiple solo stems are allowed")
+        self.solo.toggled.connect(self.changed.emit)
+        layout.addWidget(self.solo)
+
+        self.regen = QPushButton("REGENERATE")
+        self.regen.setEnabled(can_regenerate)
+        if not can_regenerate:
+            self.regen.setToolTip("Sample overlays retain their independent baseline trigger score.")
+        self.regen.clicked.connect(lambda: self.regenerate.emit(self.name))
+        layout.addWidget(self.regen)
+        layout.addStretch(1)
+
+    def state(self) -> dict[str, Any]:
+        return {
+            "gain": self.gain.value(),
+            "pan": self.pan.value(),
+            "mute": self.mute.isChecked(),
+            "solo": self.solo.isChecked(),
+        }
+
+    def restore(self, state: dict[str, Any]) -> None:
+        self.gain.setValue(int(state.get("gain", 100)))
+        self.pan.setValue(int(state.get("pan", 0)))
+        self.mute.setChecked(bool(state.get("mute", False)))
+        self.solo.setChecked(bool(state.get("solo", False)))
+
+
+class MainWindow(QMainWindow):
+    """First production-oriented Reawarp desktop application."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Reawarp — 再変形")
+        self.resize(1440, 920)
+        self.setMinimumSize(1080, 700)
+        self.setStyleSheet(APP_STYLE)
+
+        self.project: ReawarpProject | None = None
+        self._break_path: str | None = None
+        self._break_audio: np.ndarray | None = None
+        self._worker: RenderWorker | None = None
+        self._variation_counts: dict[str, int] = {}
+        self._mix_rows: dict[str, StemRow] = {}
+        self.player = AudioPlayer(self)
+        self.player.finished.connect(self._playback_finished)
+
+        self._build_interface()
+        self._refresh_devices()
+        self._timer = QTimer(self)
+        self._timer.setInterval(100)
+        self._timer.timeout.connect(self._update_transport)
+        self._timer.start()
+
+    def _build_interface(self) -> None:
+        root = QWidget()
+        root_layout = QVBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        header = QFrame()
+        header.setObjectName("header")
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(20, 10, 20, 10)
+        brand = QLabel("再変形")
+        brand.setObjectName("brand")
+        header_layout.addWidget(brand)
+        subtitle = QLabel("REAWARP  /  MATHEMATICAL AUDIO LAB")
+        subtitle.setObjectName("muted")
+        header_layout.addWidget(subtitle)
+        header_layout.addStretch(1)
+        self.header_state = QLabel("OFFLINE RENDER ENGINE")
+        self.header_state.setObjectName("sectionTitle")
+        header_layout.addWidget(self.header_state)
+        root_layout.addWidget(header)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_generator_page(), "GENERATOR")
+        self.tabs.addTab(self._build_break_page(), "BREAK LAB")
+        self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
+        root_layout.addWidget(self.tabs, 1)
+        self.setCentralWidget(root)
+        self.statusBar().showMessage("Ready — define constraints, generate, listen, and select.")
+
+    def _build_generator_page(self) -> QWidget:
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(14)
+
+        panel = QWidget()
+        panel.setMinimumWidth(290)
+        panel.setMaximumWidth(350)
+        panel_layout = QVBoxLayout(panel)
+
+        global_group = QGroupBox("GLOBAL PARAMETERS")
+        form = QFormLayout(global_group)
+        self.bpm = QDoubleSpinBox()
+        self.bpm.setRange(60, 220)
+        self.bpm.setDecimals(1)
+        self.bpm.setSingleStep(0.5)
+        self.bpm.setValue(137)
+        form.addRow("Tempo / BPM", self.bpm)
+        self.duration = QDoubleSpinBox()
+        self.duration.setRange(5, 20)
+        self.duration.setDecimals(1)
+        self.duration.setSingleStep(0.5)
+        self.duration.setValue(12)
+        form.addRow("Duration / sec", self.duration)
+
+        self.complexity = QSlider(Qt.Orientation.Horizontal)
+        self.complexity.setRange(0, 100)
+        self.complexity.setValue(68)
+        self.complexity_label = QLabel("0.68")
+        complexity_row = QHBoxLayout()
+        complexity_row.addWidget(self.complexity, 1)
+        complexity_row.addWidget(self.complexity_label)
+        complexity_widget = QWidget()
+        complexity_widget.setLayout(complexity_row)
+        self.complexity.valueChanged.connect(
+            lambda value: self.complexity_label.setText(f"{value / 100:.2f}")
+        )
+        form.addRow("Complexity", complexity_widget)
+
+        seed_row = QHBoxLayout()
+        self.seed = QLineEdit("20261123")
+        seed_row.addWidget(self.seed, 1)
+        randomize = QPushButton("↻")
+        randomize.setFixedWidth(36)
+        randomize.setToolTip("Generate a new reproducible seed")
+        randomize.clicked.connect(
+            lambda: self.seed.setText(str(secrets.randbelow(2**31 - 1) + 1))
+        )
+        seed_row.addWidget(randomize)
+        seed_widget = QWidget()
+        seed_widget.setLayout(seed_row)
+        form.addRow("Random seed", seed_widget)
+        panel_layout.addWidget(global_group)
+
+        modules = QGroupBox("GENERATOR MODULES")
+        modules_layout = QVBoxLayout(modules)
+        self.melody_enabled = QCheckBox("Geometric / FM melody")
+        self.melody_enabled.setChecked(True)
+        self.texture_enabled = QCheckBox("Evolving noise texture")
+        self.texture_enabled.setChecked(True)
+        modules_layout.addWidget(self.melody_enabled)
+        modules_layout.addWidget(self.texture_enabled)
+        panel_layout.addWidget(modules)
+
+        profiles = QGroupBox("PERCUSSION VOICE CATALOGUE")
+        profile_form = QFormLayout(profiles)
+        self.kick_profile = QComboBox()
+        self.kick_profile.addItems(["auto", *KICK_PROFILES.keys()])
+        profile_form.addRow("Kick", self.kick_profile)
+        self.snare_profile = QComboBox()
+        self.snare_profile.addItems(["auto", *SNARE_PROFILES.keys()])
+        profile_form.addRow("Snare", self.snare_profile)
+        self.hat_profile = QComboBox()
+        self.hat_profile.addItems(["auto", *HAT_PROFILES.keys()])
+        profile_form.addRow("Hi-hat", self.hat_profile)
+        panel_layout.addWidget(profiles)
+
+        source_group = QGroupBox("SOURCE MATERIAL")
+        source_layout = QVBoxLayout(source_group)
+        self.break_path_label = QLabel("No break sample selected")
+        self.break_path_label.setObjectName("muted")
+        self.break_path_label.setWordWrap(True)
+        source_layout.addWidget(self.break_path_label)
+        browse = QPushButton("LOAD BREAK SAMPLE…")
+        browse.clicked.connect(self._choose_break_sample)
+        source_layout.addWidget(browse)
+        panel_layout.addWidget(source_group)
+
+        self.generate_button = QPushButton("GENERATE LOOP")
+        self.generate_button.setObjectName("primaryAction")
+        self.generate_button.clicked.connect(self._generate)
+        panel_layout.addWidget(self.generate_button)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setVisible(False)
+        panel_layout.addWidget(self.progress)
+        panel_layout.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(panel)
+        layout.addWidget(scroll)
+
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addWidget(self._build_transport_bar())
+        self.preview = AudioPreview()
+        right_layout.addWidget(self.preview, 1)
+        self.render_summary = QLabel(
+            "WAITING FOR RENDER  /  48 kHz · FLOAT32 · STEREO\n"
+            "Waveform and time-frequency preview appear here after generation."
+        )
+        self.render_summary.setObjectName("muted")
+        self.render_summary.setWordWrap(True)
+        right_layout.addWidget(self.render_summary)
+        layout.addWidget(right, 1)
+        return page
+
+    def _build_transport_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setStyleSheet(
+            "QFrame { background: #1d242e; border: 1px solid #303b49; border-radius: 6px; }"
+        )
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(9, 7, 9, 7)
+        layout.addWidget(QLabel("AUDITION"))
+        self.preview_source = QComboBox()
+        self.preview_source.addItem("MASTER MIX", "master")
+        self.preview_source.currentIndexChanged.connect(self._refresh_preview)
+        self.preview_source.setMinimumWidth(175)
+        layout.addWidget(self.preview_source)
+        layout.addWidget(QLabel("OUTPUT"))
+        self.output_device = QComboBox()
+        self.output_device.setMinimumWidth(180)
+        layout.addWidget(self.output_device)
+        self.play_button = QPushButton("PLAY")
+        self.play_button.clicked.connect(self._toggle_playback)
+        layout.addWidget(self.play_button)
+        stop = QPushButton("STOP")
+        stop.clicked.connect(self.player.stop)
+        stop.clicked.connect(self._playback_stopped)
+        layout.addWidget(stop)
+        self.transport_position = QLabel("00:00.0 / 00:00.0")
+        self.transport_position.setObjectName("muted")
+        layout.addWidget(self.transport_position)
+        layout.addStretch(1)
+        return bar
+
+    def _build_break_page(self) -> QWidget:
+        page = QWidget()
+        layout = QHBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(14)
+
+        controls = QWidget()
+        controls.setMinimumWidth(310)
+        controls.setMaximumWidth(380)
+        control_layout = QVBoxLayout(controls)
+
+        source = QGroupBox("BREAK SOURCE")
+        source_layout = QVBoxLayout(source)
+        self.break_source_label = QLabel("No source loaded")
+        self.break_source_label.setObjectName("muted")
+        self.break_source_label.setWordWrap(True)
+        source_layout.addWidget(self.break_source_label)
+        choose = QPushButton("CHOOSE AUDIO FILE…")
+        choose.clicked.connect(self._choose_break_sample)
+        source_layout.addWidget(choose)
+        analyze = QPushButton("ANALYZE TRANSIENTS")
+        analyze.clicked.connect(self._analyze_break)
+        source_layout.addWidget(analyze)
+        control_layout.addWidget(source)
+
+        transform_group = QGroupBox("TRANSFORMATION CHAIN")
+        transform_layout = QGridLayout(transform_group)
+        self.break_transform_checks: dict[str, QCheckBox] = {}
+        for index, name in enumerate(BREAK_TRANSFORMS):
+            check = QCheckBox(name.replace("_", " "))
+            check.setToolTip(f"Apply {name.replace('_', ' ')} to the imported break")
+            self.break_transform_checks[name] = check
+            transform_layout.addWidget(check, index // 2, index % 2)
+        control_layout.addWidget(transform_group)
+
+        params = QGroupBox("MUTATION PARAMETERS")
+        param_form = QFormLayout(params)
+        self.slice_count = QSpinBox()
+        self.slice_count.setRange(2, 128)
+        self.slice_count.setValue(16)
+        param_form.addRow("Maximum slices", self.slice_count)
+        self.stutter_repeats = QSpinBox()
+        self.stutter_repeats.setRange(2, 32)
+        self.stutter_repeats.setValue(4)
+        param_form.addRow("Stutter repeats", self.stutter_repeats)
+        self.dropout_probability = QDoubleSpinBox()
+        self.dropout_probability.setRange(0, 1)
+        self.dropout_probability.setSingleStep(0.05)
+        self.dropout_probability.setValue(0.18)
+        param_form.addRow("Dropout probability", self.dropout_probability)
+        self.pitch_semitones = QDoubleSpinBox()
+        self.pitch_semitones.setRange(-24, 24)
+        self.pitch_semitones.setValue(0)
+        param_form.addRow("Pitch shift / semitones", self.pitch_semitones)
+        self.stretch_factor = QDoubleSpinBox()
+        self.stretch_factor.setRange(0.25, 4)
+        self.stretch_factor.setSingleStep(0.05)
+        self.stretch_factor.setValue(1.0)
+        param_form.addRow("Time stretch / ratio", self.stretch_factor)
+        self.gate_rate = QDoubleSpinBox()
+        self.gate_rate.setRange(0.1, 100)
+        self.gate_rate.setValue(8)
+        param_form.addRow("Gate rate / Hz", self.gate_rate)
+        self.gate_duty = QDoubleSpinBox()
+        self.gate_duty.setRange(0.05, 1)
+        self.gate_duty.setSingleStep(0.05)
+        self.gate_duty.setValue(0.62)
+        param_form.addRow("Gate duty", self.gate_duty)
+        self.grain_size = QDoubleSpinBox()
+        self.grain_size.setRange(5, 1000)
+        self.grain_size.setValue(80)
+        param_form.addRow("Grain size / ms", self.grain_size)
+        self.grain_density = QDoubleSpinBox()
+        self.grain_density.setRange(0.25, 4)
+        self.grain_density.setValue(1.5)
+        param_form.addRow("Grain density", self.grain_density)
+        self.freeze_position = QDoubleSpinBox()
+        self.freeze_position.setRange(0, 1)
+        self.freeze_position.setValue(0.25)
+        param_form.addRow("Freeze position", self.freeze_position)
+        control_layout.addWidget(params)
+        control_layout.addStretch(1)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(controls)
+        layout.addWidget(scroll)
+
+        preview_panel = QWidget()
+        preview_layout = QVBoxLayout(preview_panel)
+        self.break_preview = AudioPreview()
+        preview_layout.addWidget(self.break_preview, 1)
+        self.break_analysis_summary = QLabel(
+            "Transient markers appear in amber. Preview is non-destructive; source files are never rewritten."
+        )
+        self.break_analysis_summary.setObjectName("muted")
+        self.break_analysis_summary.setWordWrap(True)
+        preview_layout.addWidget(self.break_analysis_summary)
+        layout.addWidget(preview_panel, 1)
+        return page
+
+    def _build_mixer_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(14, 14, 14, 14)
+        header = QHBoxLayout()
+        title = QLabel("STEM MATRIX")
+        title.setObjectName("sectionTitle")
+        header.addWidget(title)
+        header.addStretch(1)
+        self.export_button = QPushButton("EXPORT STEMS + MASTER…")
+        self.export_button.setEnabled(False)
+        self.export_button.clicked.connect(self._export_project)
+        header.addWidget(self.export_button)
+        layout.addLayout(header)
+
+        self.mixer_scroll = QScrollArea()
+        self.mixer_scroll.setWidgetResizable(True)
+        self.mixer_content = QWidget()
+        self.mixer_rows_layout = QVBoxLayout(self.mixer_content)
+        self.mixer_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.mixer_rows_layout.setSpacing(6)
+        self.mixer_scroll.setWidget(self.mixer_content)
+        layout.addWidget(self.mixer_scroll, 1)
+
+        note = QLabel(
+            "Gain and pan affect audition and the exported master. Stem WAVs remain the original aligned render buffers. "
+            "Regeneration uses independent deterministic streams."
+        )
+        note.setObjectName("muted")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        return page
+
+    def _choose_break_sample(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select a break sample", str(Path.cwd()),
+            "Audio files (*.wav *.flac *.aiff *.aif *.ogg);;All files (*.*)",
+        )
+        if not path:
+            return
+        try:
+            audio = read_sample(path, 48_000)
+        except Exception as exc:
+            self._show_error(f"Could not read break sample: {exc}")
+            return
+        self._break_path = path
+        self._break_audio = audio
+        self.break_path_label.setText(Path(path).name)
+        self.break_source_label.setText(path)
+        self._analyze_break()
+
+    def _analyze_break(self) -> None:
+        if self._break_audio is None:
+            self.break_analysis_summary.setText("Choose a break sample to analyze it.")
+            return
+        slices = auto_slice(self._break_audio, 48_000, max_slices=self.slice_count.value())
+        markers = [item.start for item in slices[1:]]
+        self.break_preview.set_audio(self._break_audio, 48_000, markers)
+        self.break_analysis_summary.setText(
+            f"{len(slices)} regions · {len(markers)} transient boundaries · "
+            f"{len(self._break_audio) / 48_000:.2f} s · original file untouched"
+        )
+
+    def _read_config(self) -> GenerationConfig:
+        seed_text = self.seed.text().strip() or "20261123"
+        seed: int | str = int(seed_text) if seed_text.lstrip("-+").isdigit() else seed_text
+        transforms = tuple(
+            name for name, checkbox in self.break_transform_checks.items()
+            if checkbox.isChecked()
+        )
+        return GenerationConfig(
+            bpm=self.bpm.value(),
+            duration=self.duration.value(),
+            sample_rate=48_000,
+            seed=seed,
+            complexity=self.complexity.value() / 100.0,
+            include_melody=self.melody_enabled.isChecked(),
+            include_texture=self.texture_enabled.isChecked(),
+            sample_paths={"break": self._break_path} if self._break_path else {},
+            kick_profile=self.kick_profile.currentText(),
+            snare_profile=self.snare_profile.currentText(),
+            hat_profile=self.hat_profile.currentText(),
+            break_transforms=transforms,
+            break_slice_count=self.slice_count.value(),
+            break_stutter_repeats=self.stutter_repeats.value(),
+            break_dropout_probability=self.dropout_probability.value(),
+            break_pitch_semitones=self.pitch_semitones.value(),
+            break_time_stretch=self.stretch_factor.value(),
+            break_gate_rate_hz=self.gate_rate.value(),
+            break_gate_duty=self.gate_duty.value(),
+            break_grain_size_ms=self.grain_size.value(),
+            break_grain_density=self.grain_density.value(),
+            break_spectral_freeze_position=self.freeze_position.value(),
+        )
+
+    def _generate(self) -> None:
+        try:
+            config = self._read_config()
+        except Exception as exc:
+            self._show_error(str(exc))
+            return
+        self._run_render(lambda: ReawarpEngine().generate(config), "Generating full loop…")
+
+    def _regenerate_stem(self, name: str) -> None:
+        if self.project is None:
+            return
+        variation = self._variation_counts.get(name, 0) + 1
+        self._variation_counts[name] = variation
+        config = self.project.config
+        self._run_render(
+            lambda: ReawarpEngine().generate_variant(config, name, variation),
+            f"Regenerating {name} · variation {variation}…",
+        )
+
+    def _run_render(self, operation: Any, message: str) -> None:
+        if self._worker is not None:
+            return
+        self._set_busy(True, message)
+        worker = RenderWorker(operation)
+        self._worker = worker
+        worker.signals.finished.connect(self._render_finished)
+        worker.signals.error.connect(self._render_failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _set_busy(self, busy: bool, message: str = "") -> None:
+        self.generate_button.setEnabled(not busy)
+        self.progress.setVisible(busy)
+        for row in self._mix_rows.values():
+            row.regen.setEnabled(not busy and row.can_regenerate)
+        self.header_state.setText("RENDERING…" if busy else "OFFLINE RENDER ENGINE")
+        if message:
+            self.statusBar().showMessage(message)
+
+    def _render_finished(self, result: object) -> None:
+        self._worker = None
+        if not isinstance(result, ReawarpProject):
+            self._set_busy(False)
+            self._show_error("Render worker returned an unexpected result.")
+            return
+        self.player.stop()
+        self._playback_stopped()
+        self.project = result
+        self._rebuild_mixer()
+        self.preview_source.blockSignals(True)
+        self.preview_source.clear()
+        self.preview_source.addItem("MASTER MIX", "master")
+        for name in result.stems:
+            self.preview_source.addItem(name.replace("_", " ").upper(), name)
+        self.preview_source.blockSignals(False)
+        self.preview_source.setCurrentIndex(0)
+        self.export_button.setEnabled(True)
+        self._refresh_preview()
+        self.render_summary.setText(
+            f"{result.duration:.2f} s · {result.sample_rate:,} Hz · "
+            f"{len(result.stems)} stems · {len(result.events)} events · "
+            f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}"
+        )
+        self.statusBar().showMessage(
+            f"Render complete — {len(result.events)} events, {len(result.stems)} aligned stems",
+            8000,
+        )
+        self._set_busy(False)
+
+    def _render_failed(self, message: str) -> None:
+        self._worker = None
+        self._set_busy(False)
+        self._show_error(message)
+
+    def _show_error(self, message: str) -> None:
+        self.statusBar().showMessage(message, 10000)
+        QMessageBox.warning(self, "Reawarp", message)
+
+    def _rebuild_mixer(self) -> None:
+        previous = {name: row.state() for name, row in self._mix_rows.items()}
+        while self.mixer_rows_layout.count():
+            item = self.mixer_rows_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+        self._mix_rows.clear()
+        if self.project is None:
+            return
+        supported = {"kick", "snare", "hats", "synthetic_break", "melody", "noise_texture"}
+        for name in self.project.stems:
+            row = StemRow(name, name in supported)
+            if name in previous:
+                row.restore(previous[name])
+            row.selected.connect(self._select_stem)
+            row.regenerate.connect(self._regenerate_stem)
+            row.changed.connect(self._refresh_preview)
+            self._mix_rows[name] = row
+            self.mixer_rows_layout.addWidget(row)
+        self.mixer_rows_layout.addStretch(1)
+
+    def _select_stem(self, name: str) -> None:
+        index = self.preview_source.findData(name)
+        if index >= 0:
+            self.preview_source.setCurrentIndex(index)
+        self.tabs.setCurrentIndex(0)
+
+    def _processed_stem(self, name: str) -> np.ndarray:
+        assert self.project is not None
+        audio = self.project.stems[name]
+        row = self._mix_rows.get(name)
+        if row is None:
+            return audio
+        solo_active = any(item.solo.isChecked() for item in self._mix_rows.values())
+        if row.mute.isChecked() or (solo_active and not row.solo.isChecked()):
+            return np.zeros_like(audio)
+        result = audio.copy() * (row.gain.value() / 100.0)
+        pan = row.pan.value() / 100.0
+        if pan < 0:
+            result[:, 1] *= float(np.cos(abs(pan) * np.pi / 2.0))
+        elif pan > 0:
+            result[:, 0] *= float(np.cos(pan * np.pi / 2.0))
+        return result
+
+    def _render_mix(self) -> np.ndarray | None:
+        if self.project is None:
+            return None
+        master = np.zeros((self.project.frame_count, 2), dtype=np.float32)
+        for name in self.project.stems:
+            master += self._processed_stem(name)
+        peak = float(np.max(np.abs(master))) if master.size else 0.0
+        ceiling = 10.0 ** (-1.0 / 20.0)
+        if peak > ceiling:
+            master *= ceiling / peak
+        return np.clip(master, -1.0, 1.0).astype(np.float32, copy=False)
+
+    def _current_preview_audio(self) -> np.ndarray | None:
+        if self.project is None:
+            return None
+        selection = self.preview_source.currentData()
+        if selection == "master":
+            return self._render_mix()
+        if selection in self.project.stems:
+            return self._processed_stem(selection)
+        return None
+
+    def _refresh_preview(self, *_args: Any) -> None:
+        audio = self._current_preview_audio()
+        self.preview.set_audio(audio, self.project.sample_rate if self.project else 48_000)
+        if self.player.is_playing:
+            self.player.stop()
+            self._playback_stopped()
+
+    def _refresh_devices(self) -> None:
+        self.output_device.clear()
+        self.output_device.addItem("System default", None)
+        for index, name in self.player.devices():
+            self.output_device.addItem(name, index)
+        if not self.player.available:
+            self.output_device.setToolTip(
+                'Install playback support: python -m pip install -e ".[m4]"'
+            )
+
+    def _toggle_playback(self) -> None:
+        if self.player.is_playing:
+            if self.player.is_paused:
+                self.player.resume()
+                self.play_button.setText("PAUSE")
+            else:
+                self.player.pause()
+                self.play_button.setText("RESUME")
+            return
+        audio = self._current_preview_audio()
+        if audio is None or self.project is None:
+            self.statusBar().showMessage("Generate a loop before auditioning audio.")
+            return
+        try:
+            self.player.start(
+                audio, self.project.sample_rate, device=self.output_device.currentData()
+            )
+            self.play_button.setText("PAUSE")
+        except Exception as exc:
+            self._show_error(str(exc))
+
+    def _playback_finished(self) -> None:
+        self.play_button.setText("PLAY")
+        self._update_transport()
+
+    def _playback_stopped(self) -> None:
+        self.play_button.setText("PLAY")
+        self.transport_position.setText("00:00.0 / 00:00.0")
+
+    def _update_transport(self) -> None:
+        if not self.player.is_playing or self.player.duration_frames <= 0:
+            return
+        sample_rate = self.project.sample_rate if self.project else 48_000
+        position = self.player.position_frames / float(sample_rate)
+        duration = self.player.duration_frames / float(sample_rate)
+        self.transport_position.setText(
+            f"{position // 60:02.0f}:{position % 60:04.1f} / "
+            f"{duration // 60:02.0f}:{duration % 60:04.1f}"
+        )
+
+    def _export_project(self) -> None:
+        if self.project is None:
+            return
+        directory = QFileDialog.getExistingDirectory(
+            self, "Export Reawarp project", str(Path.cwd())
+        )
+        if not directory:
+            return
+        try:
+            output = self.project.export(
+                directory, bit_depth=24, include_stems=True, include_master=True
+            )
+            master = self._render_mix()
+            if master is not None:
+                write_wav(output / "master.wav", master, self.project.sample_rate, 24)
+            mix_data = {
+                "schema_version": 1,
+                "description": (
+                    "Mixer settings are applied to master.wav; stem WAVs remain the original aligned render buffers."
+                ),
+                "stems": {name: row.state() for name, row in self._mix_rows.items()},
+                "master_peak": (
+                    float(np.max(np.abs(master))) if master is not None and master.size else 0.0
+                ),
+            }
+            (output / "mix.json").write_text(
+                json.dumps(mix_data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception as exc:
+            self._show_error(f"Export failed: {exc}")
+            return
+        self.statusBar().showMessage(
+            f"Exported stems, master, and metadata to {output}", 10000
+        )

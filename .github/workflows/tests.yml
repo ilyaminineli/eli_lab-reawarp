@@ -22,8 +22,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
       - name: Install package and test dependencies
-        run: python -m pip install -e ".[dev]"
+        run: python -m pip install -e ".[dev,audio,m4]"
       - name: Run test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q
       - name: Smoke-test CLI
         run: reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-ci
+      - name: Smoke-test desktop entry point
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -c "from reawarp.ui.main_window import MainWindow; print('Reawarp UI import OK')"

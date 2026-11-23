@@ -32,25 +32,25 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - 16-bit and 24-bit PCM WAV export.
 - JSON project metadata and event provenance.
 
-The core requires Python 3.10+ and NumPy. SoundFile and SciPy are optional in the `audio` extra; native playback, analysis, and MIDI packages are separate extras.
+The core requires Python 3.10+ and NumPy. SoundFile and SciPy are optional in the `audio` extra; desktop and playback dependencies are grouped in the `m4` extra; analysis and MIDI packages remain separate extras.
 
 ## Install
 
 Create a virtual environment, then run:
 
     python -m pip install --upgrade pip
-    python -m pip install -e ".[dev,audio]"
+    python -m pip install -e ".[dev,audio,m4]"
 
 For the minimal core:
 
     python -m pip install -e .
 
-Optional integrations:
+Optional analysis and music integrations:
 
-    python -m pip install -e ".[playback]"  # SoundDevice audition/recording
-    python -m pip install -e ".[analysis]"  # librosa analysis adapters
-    python -m pip install -e ".[midi]"      # Mido MIDI import/export
-    python -m pip install -e ".[theory]"   # music21 symbolic music theory
+    python -m pip install -e ".[analysis]"   # librosa analysis adapters
+    python -m pip install -e ".[midi]"       # Mido MIDI import/export
+    python -m pip install -e ".[theory]"     # music21 symbolic music theory
+    python -m pip install -e ".[soundfont]"  # FluidSynth / SF2 source synthesis
 
 Install extras only when the corresponding feature is needed. Csound, SuperCollider, and FluidSynth also require their native runtimes.
 
@@ -109,7 +109,19 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
 
-The application remains an offline loop/stem generator, not a real-time instrument or full DAW. Playback, interactive PySide6 controls, MIDI export, searchable stem library, and variation genealogy are follow-on milestones.
+The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. It remains an offline loop/stem instrument, not a live event sequencer or full DAW. MIDI, the searchable stem library, and variation genealogy are follow-on milestones.
+
+## Desktop application (M4)
+
+Install the UI and playback dependencies with `python -m pip install -e ".[m4]"` (or use the complete development command above). Launch with:
+
+    reawarp-gui
+
+or:
+
+    python -m reawarp.ui
+
+The main workspaces are Generator, Break Lab, and Stem Mixer. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md).
 
 ## Development
 

@@ -33,7 +33,7 @@ Optional libraries must not replace Reawarp's event model, deterministic random-
 ## Next milestones
 
 - M3: implemented break-transformation and advanced percussion-profile foundation; see docs/M3.md.
-- M4: PySide6 UI, SoundDevice audition, waveform/spectrogram visualization, live parameter adjustment, and per-stem regeneration controls.
+- M4: implemented PySide6 Generator, Break Lab, and Stem Mixer workspaces; SoundDevice audition, waveform/spectrogram visualization, background rendering, faders/pan/mute/solo, and stem regeneration. See docs/M4.md.
 - M5: Mido MIDI import/export and microtonal pitch infrastructure.
 - M6: searchable stem library, similarity features, collections, and project interchange.
 - M7: advanced mathematical composition, optional external synthesis backends, and experimental data-driven generators.
