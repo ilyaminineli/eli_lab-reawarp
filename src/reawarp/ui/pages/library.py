@@ -7,7 +7,7 @@ from typing import Any
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget, QInputDialog,
 )
 
 from reawarp.samples.io import read_sample
@@ -55,10 +55,32 @@ class LibraryPage(QWidget):
             "all", "kick", "snare", "hat", "break", "melody", "ambience", "noise_texture"
         ])
         search_row.addWidget(self.role)
+        self.tags = QLineEdit()
+        self.tags.setPlaceholderText("required tags, comma separated")
+        search_row.addWidget(self.tags)
         search_button = QPushButton("SEARCH")
         search_button.clicked.connect(self._search)
         search_row.addWidget(search_button)
+        self.similar_button = QPushButton("SIMILAR")
+        self.similar_button.setToolTip("Find assets with similar timbral and rhythmic descriptors.")
+        self.similar_button.clicked.connect(self._search_similar)
+        search_row.addWidget(self.similar_button)
         layout.addLayout(search_row)
+
+        collection_row = QHBoxLayout()
+        self.collections = QComboBox()
+        self.collections.setMinimumWidth(180)
+        collection_row.addWidget(self.collections, 1)
+        create_collection = QPushButton("NEW COLLECTION")
+        create_collection.clicked.connect(self._create_collection)
+        collection_row.addWidget(create_collection)
+        add_collection = QPushButton("ADD SELECTED")
+        add_collection.clicked.connect(self._add_to_collection)
+        collection_row.addWidget(add_collection)
+        show_collection = QPushButton("SHOW")
+        show_collection.clicked.connect(self._show_collection)
+        collection_row.addWidget(show_collection)
+        layout.addLayout(collection_row)
 
         self.results = QComboBox()
         self.results.currentIndexChanged.connect(self._preview_selected)
@@ -71,6 +93,7 @@ class LibraryPage(QWidget):
         layout.addWidget(self.details)
         self.preview = AudioPreview()
         layout.addWidget(self.preview, 1)
+        self._refresh_collections()
 
     def _browse_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
@@ -119,35 +142,128 @@ class LibraryPage(QWidget):
         self.index_button.setEnabled(True)
         self.details.setText(f"Library indexing failed: {message}")
 
-    def _search(self) -> None:
+    def _populate_results(self, assets: list[Any], label: str) -> None:
+        self.results.blockSignals(True)
+        self.results.clear()
+        for asset in assets:
+            similarity = (
+                f" · sim {asset.similarity:.3f}"
+                if getattr(asset, "similarity", None) is not None else ""
+            )
+            self.results.addItem(
+                f"{asset.file_name} · {asset.asset_type} · "
+                f"{asset.duration_seconds:.2f}s{similarity}",
+                asset.asset_id,
+            )
+        self.results.blockSignals(False)
+        self.details.setText(f"{len(assets)} {label}")
+        if assets:
+            self.results.setCurrentIndex(0)
+        else:
+            self.preview.set_audio(None)
+
+    def _search(self, similar_to: str | None = None) -> None:
         from reawarp.library.store import SampleLibrary
 
         asset_type = self.asset_type.currentText()
         role = self.role.currentText()
+        tags = tuple(
+            value.strip() for value in self.tags.text().split(",") if value.strip()
+        )
         try:
             with SampleLibrary() as library:
                 assets = library.search(
                     query=self.query.text().strip() or None,
                     asset_type=None if asset_type == "all" else asset_type,
                     role=None if role == "all" else role,
+                    tags=tags,
+                    similar_to=similar_to,
                     limit=100,
                 )
-            self.results.blockSignals(True)
-            self.results.clear()
-            for asset in assets:
-                self.results.addItem(
-                    f"{asset.file_name} · {asset.asset_type} · {asset.duration_seconds:.2f}s",
-                    asset.asset_id,
-                )
-            self.results.blockSignals(False)
-            self.details.setText(f"{len(assets)} matching asset(s)")
-            if assets:
-                self.results.setCurrentIndex(0)
-            else:
-                self.preview.set_audio(None)
+            self._populate_results(
+                assets, "similar asset(s)" if similar_to else "matching asset(s)"
+            )
         except Exception as exc:
-            self.results.blockSignals(False)
             self.details.setText(f"Library search failed: {exc}")
+
+    def _search_similar(self) -> None:
+        asset_id = self.results.currentData()
+        if not asset_id:
+            self.details.setText("Select an indexed asset before searching for similar material.")
+            return
+        self._search(similar_to=str(asset_id))
+
+    def _refresh_collections(self) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        try:
+            with SampleLibrary() as library:
+                collections = library.collections()
+            selected = self.collections.currentText() if hasattr(self, "collections") else ""
+            self.collections.blockSignals(True)
+            self.collections.clear()
+            for collection in collections:
+                self.collections.addItem(
+                    f"{collection['name']} · {collection['asset_count']}",
+                    collection["name"],
+                )
+            if selected:
+                index = self.collections.findData(selected)
+                if index >= 0:
+                    self.collections.setCurrentIndex(index)
+            self.collections.blockSignals(False)
+        except Exception as exc:
+            self.details.setText(f"Could not load collections: {exc}")
+
+    def _create_collection(self) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        name, accepted = QInputDialog.getText(self, "New collection", "Collection name:")
+        if not accepted or not name.strip():
+            return
+        try:
+            with SampleLibrary() as library:
+                library.create_collection(name.strip())
+            self._refresh_collections()
+            index = self.collections.findData(name.strip())
+            if index >= 0:
+                self.collections.setCurrentIndex(index)
+            self.details.setText(f"Created collection: {name.strip()}")
+        except Exception as exc:
+            self.details.setText(f"Could not create collection: {exc}")
+
+    def _add_to_collection(self) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        asset_id = self.results.currentData()
+        collection = self.collections.currentData()
+        if not asset_id or not collection:
+            self.details.setText("Select an asset and a collection first.")
+            return
+        try:
+            with SampleLibrary() as library:
+                added = library.add_to_collection(str(collection), [str(asset_id)])
+            self.details.setText(
+                f"Added selected asset to {collection}." if added
+                else f"Selected asset is already in {collection}."
+            )
+            self._refresh_collections()
+        except Exception as exc:
+            self.details.setText(f"Could not update collection: {exc}")
+
+    def _show_collection(self) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        collection = self.collections.currentData()
+        if not collection:
+            self.details.setText("Create or select a collection first.")
+            return
+        try:
+            with SampleLibrary() as library:
+                assets = library.collection_assets(str(collection))
+            self._populate_results(assets, f"asset(s) in {collection}")
+        except Exception as exc:
+            self.details.setText(f"Could not open collection: {exc}")
 
     def _preview_selected(self, *_args: Any) -> None:
         from reawarp.library.store import SampleLibrary
