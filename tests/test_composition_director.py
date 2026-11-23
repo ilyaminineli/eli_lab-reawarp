@@ -32,3 +32,16 @@ def test_section_lookup_uses_half_open_time_intervals():
 def test_unknown_structure_is_rejected():
     with pytest.raises(ValueError, match="unknown structure"):
         build_composition_plan(duration_seconds=12, bpm=137, seed=211, structure="random")
+
+
+@pytest.mark.parametrize("bpm", [60.0, 137.0, 220.0])
+def test_short_render_sections_never_extend_outside_audio(bpm):
+    plan = build_composition_plan(
+        duration_seconds=5.0, bpm=bpm, seed=211, structure="evolving"
+    )
+    assert plan.sections[0].start_seconds == 0.0
+    assert plan.sections[-1].end_seconds == pytest.approx(5.0)
+    for section in plan.sections:
+        assert 0.0 <= section.start_seconds <= section.end_seconds <= 5.0
+    for left, right in zip(plan.sections, plan.sections[1:]):
+        assert left.end_seconds == pytest.approx(right.start_seconds)

@@ -133,7 +133,16 @@ def build_composition_plan(
     weights /= weights.sum()
 
     bar_seconds = 240.0 / float(bpm)
-    total_bars = max(len(template), int(round(duration_seconds / bar_seconds)))
+    total_bars = max(1, int(round(duration_seconds / bar_seconds)))
+    if total_bars < len(template):
+        if total_bars == 1:
+            selected = 1 if structure in {"evolving", "additive"} else 0
+            template = (template[selected],)
+        else:
+            indices = np.linspace(0, len(template) - 1, total_bars).round().astype(int)
+            template = tuple(template[int(index)] for index in indices)
+        weights = np.asarray([item[1] for item in template], dtype=np.float64)
+        weights /= weights.sum()
     target_bars = weights * total_bars
     bars = np.maximum(1, np.floor(target_bars).astype(int))
     while int(bars.sum()) > total_bars:
