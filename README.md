@@ -16,6 +16,7 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Lissajous-derived melodic contours with profiled synthesis.
 - Independent random streams per generator and synthesis/profile lane.
 - Stem-only regeneration while preserving unrelated stems bit-identically.
+- A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
 
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
@@ -160,7 +161,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
 
-The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. It remains an offline loop/stem instrument, not a live event sequencer or full DAW. The next milestone is the searchable stem/sample library and variation genealogy.
+The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. M6 adds the searchable local sample/stem library, similarity descriptors, collections, and project-variation genealogy. Reawarp remains an offline mathematical sound laboratory, not a live event sequencer or full DAW.
 
 ## Desktop application (M4)
 
@@ -172,7 +173,40 @@ or:
 
     python -m reawarp.ui
 
-The main workspaces are Generator, Break Lab, and Stem Mixer. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md).
+The main workspaces are Generator, Break Lab, and Stem Mixer. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md). The M6 library is currently exposed through the Python API and `reawarp-library` CLI.
+
+## Local sample and stem library (M6)
+
+Create or update the default local library database:
+
+    reawarp-library index samples/
+    reawarp-library index output/
+
+Index one exported project directly (including its stems, master, and referenced source samples):
+
+    reawarp-library index output/my_idm_project/
+
+Search by role, text, or tags:
+
+    reawarp-library search --role kick
+    reawarp-library search --query granular --type sample
+    reawarp-library search --tag percussion --tag idm
+
+Find sounds similar to an indexed asset (the command prints asset IDs for reuse):
+
+    reawarp-library search --similar-to ASSET_ID --limit 12
+
+Create a collection and add selected assets:
+
+    reawarp-library collections create "Metallic Breaks" --description "Bright, inharmonic and percussive sources"
+    reawarp-library collections add "Metallic Breaks" ASSET_ID_1 ASSET_ID_2
+    reawarp-library collections show "Metallic Breaks"
+
+Inspect generated variants from a project family using the `family_id` returned by project indexing:
+
+    reawarp-library genealogy FAMILY_ID
+
+The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--db path/to/library.sqlite3` before the subcommand to use another database. WAV indexing works with the core install. FLAC/AIFF/OGG support uses the optional `soundfile` package from the `audio` extra. Descriptors are calculated locally and source files are never modified.
 
 ## Development
 
@@ -180,4 +214,4 @@ The main workspaces are Generator, Break Lab, and Stem Mixer. The Generator now 
     pytest
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
+The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
