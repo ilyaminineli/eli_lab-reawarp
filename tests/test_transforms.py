@@ -174,3 +174,48 @@ def test_break_sample_processing_is_non_destructive_and_written_to_manifest(tmp_
     assert manifest["frames_after_processing"] > manifest["frames_after_resampling"]
     assert path.read_bytes() == original_bytes
     assert "sample_break" in project.stems
+
+
+
+def test_reverse_preserves_stereo_channel_order():
+    left = np.arange(12, dtype=np.float32)
+    right = left + 100
+    stereo = np.column_stack((left, right))
+    result = reverse_audio(stereo)
+    assert result.shape == stereo.shape
+    assert np.array_equal(result[:, 0], left[::-1])
+    assert np.array_equal(result[:, 1], right[::-1])
+
+
+def test_auto_slice_silence_returns_one_full_length_region():
+    silence = np.zeros(2_048, dtype=np.float32)
+    slices = auto_slice(silence, 8_000)
+    assert len(slices) == 1
+    assert slices[0].start == 0
+    assert slices[0].end == len(silence)
+
+
+def test_rearrange_rejects_non_permutation_order():
+    with pytest.raises(ValueError):
+        rearrange_slices(np.arange(12, dtype=np.float32), [4, 8], order=[0, 0, 2])
+
+
+def test_pitch_time_granular_and_freeze_pipeline_accepts_stereo():
+    sample_rate = 8_000
+    time = np.arange(4_000, dtype=np.float32) / sample_rate
+    source = np.column_stack((
+        np.sin(2 * np.pi * 220 * time),
+        np.sin(2 * np.pi * 440 * time),
+    )).astype(np.float32)
+    result = apply_break_transforms(
+        source,
+        sample_rate,
+        ("pitch_shift", "time_stretch", "granular", "spectral_freeze"),
+        np.random.default_rng(123),
+        pitch_semitones=-5.0,
+        stretch_factor=1.1,
+        grain_size_ms=50.0,
+        grain_density=1.4,
+    )
+    assert result.shape == (4_400, 2)
+    assert np.all(np.isfinite(result))
