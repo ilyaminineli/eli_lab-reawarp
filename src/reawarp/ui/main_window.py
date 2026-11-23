@@ -689,7 +689,8 @@ class MainWindow(QMainWindow):
             self.output_device.addItem(name, index)
         if not self.player.available:
             self.output_device.setToolTip(
-                'Install playback support: python -m pip install -e ".[m4]"'
+                "SoundDevice/PortAudio is unavailable. Reinstall the [m4] extra "
+                "and verify that the system audio runtime is present."
             )
 
     def _toggle_playback(self) -> None:

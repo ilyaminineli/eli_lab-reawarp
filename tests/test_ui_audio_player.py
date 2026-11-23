@@ -103,3 +103,22 @@ def test_audio_player_rejects_invalid_buffers(fake_sounddevice):
     with pytest.raises(ValueError, match="positive"):
         player.start(np.zeros((10, 2), dtype=np.float32), 0)
     player.stop()
+
+
+
+def test_audio_player_treats_missing_portaudio_as_unavailable(monkeypatch):
+    import builtins
+
+    real_import = builtins.__import__
+
+    def blocked_import(name, *args, **kwargs):
+        if name == "sounddevice":
+            raise OSError("PortAudio library not found")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+    player = AudioPlayer()
+    assert player.available is False
+    assert player.devices() == []
+    with pytest.raises(RuntimeError, match="could not load PortAudio"):
+        player.start(np.ones((8, 2), dtype=np.float32), 48_000)

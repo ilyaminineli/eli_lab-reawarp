@@ -60,7 +60,9 @@ class AudioPlayer(QObject):
             import sounddevice  # noqa: F401
 
             return True
-        except ImportError:
+        except Exception:
+            # SoundDevice can be installed while its native PortAudio library
+            # is unavailable (for example, on a headless CI runner).
             return False
 
     @property
@@ -86,6 +88,11 @@ class AudioPlayer(QObject):
         except ImportError as exc:
             raise RuntimeError(
                 'SoundDevice is missing. Install it with: python -m pip install -e ".[m4]"'
+            ) from exc
+        except OSError as exc:
+            raise RuntimeError(
+                f"SoundDevice could not load PortAudio: {exc}. "
+                "Check the installed M4 dependencies and system audio runtime."
             ) from exc
 
         if sample_rate <= 0:
