@@ -44,6 +44,22 @@ class HatProfile:
     drive: float
 
 
+@dataclass(frozen=True, slots=True)
+class MelodyProfile:
+    """A soft additive/FM voice definition; values are stable preset data."""
+
+    partials: tuple[tuple[float, float], ...]
+    attack: float
+    decay: float
+    sustain: float
+    release: float
+    fm_ratio: float
+    fm_index: float
+    detune_cents: float
+    lowpass_hz: float
+    drive: float
+
+
 KICK_PROFILES: dict[str, KickProfile] = {
     "deep_sub": KickProfile(112, 36, 0.055, 0.34, 1.35, 0.42, 0.48, 0.045, 0.005),
     "909_punch": KickProfile(155, 43, 0.035, 0.23, 1.70, 0.24, 0.31, 0.10, 0.0038),
@@ -81,10 +97,47 @@ HAT_PROFILES: dict[str, HatProfile] = {
 }
 
 
-def select_profile_name(profile: str, catalog: dict, rng) -> str:
+MELODY_PROFILES: dict[str, MelodyProfile] = {
+    "soft_keys": MelodyProfile(
+        ((1.0, 0.72), (2.0, 0.22), (3.0, 0.075), (4.0, 0.025)),
+        0.012, 0.16, 0.42, 0.13, 1.50, 0.42, 1.8, 6_500.0, 1.04,
+    ),
+    "glass_bell": MelodyProfile(
+        ((1.0, 0.62), (2.01, 0.25), (3.98, 0.12), (6.01, 0.045)),
+        0.003, 0.46, 0.20, 0.26, 2.35, 0.78, 0.7, 10_500.0, 1.00,
+    ),
+    "soft_pluck": MelodyProfile(
+        ((1.0, 0.78), (2.0, 0.18), (3.0, 0.045)),
+        0.004, 0.12, 0.18, 0.09, 1.08, 0.26, 2.6, 5_500.0, 1.06,
+    ),
+    "reed_pad": MelodyProfile(
+        ((1.0, 0.72), (2.0, 0.34), (3.0, 0.16), (4.0, 0.055), (5.0, 0.018)),
+        0.045, 0.28, 0.68, 0.30, 0.52, 0.34, 3.2, 4_800.0, 1.02,
+    ),
+    "wood_mallet": MelodyProfile(
+        ((1.0, 0.72), (2.7, 0.18), (4.2, 0.075), (6.8, 0.025)),
+        0.003, 0.24, 0.16, 0.18, 1.92, 0.58, 0.5, 8_200.0, 1.00,
+    ),
+}
+
+# Automatic mode favours controlled, mix-friendly voices. More aggressive
+# profiles remain available explicitly rather than appearing unpredictably.
+AUTO_KICK_PROFILES = ("deep_sub", "909_punch", "soft_round", "rubber", "wooden", "long_tail")
+AUTO_SNARE_PROFILES = ("acoustic", "909_crack", "tonal", "soft_brush")
+AUTO_HAT_PROFILES = ("closed", "open", "dark")
+
+
+def select_profile_name(
+        profile: str,
+        catalog: dict,
+        rng,
+        *,
+        auto_choices: tuple[str, ...] | None = None,
+) -> str:
     """Resolve a named profile or select one deterministically for automatic mode."""
     if profile == "auto":
-        return str(rng.choice(tuple(catalog)))
+        choices = auto_choices or tuple(catalog)
+        return str(rng.choice(choices))
     if profile not in catalog:
         raise ValueError(f"unknown profile {profile!r}; choose one of: {', '.join(catalog)}")
     return profile

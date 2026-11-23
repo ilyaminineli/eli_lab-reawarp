@@ -7,11 +7,13 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 ## Current implementation
 
 ### Synthesis and composition
-- Thirteen named kick profiles, six snare profiles, and six hi-hat profiles.
-- Each percussion profile defines its own pitch/body oscillator, noise spectrum, envelope, and saturation characteristics.
-- Deterministic per-hit automatic profile selection or a fixed profile selected from the CLI/API.
-- Euclidean, modular-prime, Fibonacci-accent, and logistic-map rhythm material.
-- Lissajous-derived melodic contours with FM synthesis.
+- Thirteen named kick profiles, six snare profiles, and six hi-hat profiles, with mix-friendly weighted automatic choices.
+- Five profiled additive/FM melody voices with evolving partials, soft detuning, envelopes, low-pass shaping, and release tails.
+- A separate harmonic ambience stem with filtered noise, slow stereo movement, and restrained early reflections.
+- A structured 16-step break grammar (broken funk, half-time, straight, sparse) with density, phrase-cycle, and bounded variation controls.
+- Imported break recordings are transient-sliced and triggered on the groove grid; complete clips are no longer stacked at every trigger.
+- Euclidean, modular-prime, Fibonacci-accent, and logistic-map rhythm material in the other percussion lanes.
+- Lissajous-derived melodic contours with profiled synthesis.
 - Independent random streams per generator and synthesis/profile lane.
 - Stem-only regeneration while preserving unrelated stems bit-identically.
 
@@ -67,9 +69,14 @@ Csound, SuperCollider, and FluidSynth also require their native runtimes when th
 
     reawarp --bpm 137 --duration 12 --seed 20261123 --complexity 0.68 --output output/demo --midi-output output/demo.mid
 
+Shape the break grammar and sound palette:
+
+    reawarp --break-style broken_funk --break-density 0.50 --break-variation 0.25 --break-cycle-bars 2
+    reawarp --melody-profile soft_keys --ambience-level 0.16
+
 Use a fixed or automatically selected percussion profile:
 
-    reawarp --kick-profile deep_sub --snare-profile industrial --hat-profile metallic
+    reawarp --kick-profile deep_sub --snare-profile acoustic --hat-profile dark
 
 Process an imported break sample without modifying the original file:
 
@@ -153,7 +160,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
 
-The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. It remains an offline loop/stem instrument, not a live event sequencer or full DAW. M5 adds the symbolic score and MIDI interchange core; the searchable stem library and variation genealogy remain follow-on work.
+The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. It remains an offline loop/stem instrument, not a live event sequencer or full DAW. The next milestone is the searchable stem/sample library and variation genealogy.
 
 ## Desktop application (M4)
 
@@ -165,7 +172,7 @@ or:
 
     python -m reawarp.ui
 
-The main workspaces are Generator, Break Lab, and Stem Mixer. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md).
+The main workspaces are Generator, Break Lab, and Stem Mixer. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md).
 
 ## Development
 
@@ -173,4 +180,4 @@ The main workspaces are Generator, Break Lab, and Stem Mixer. Rendering runs in 
     pytest
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
+The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.

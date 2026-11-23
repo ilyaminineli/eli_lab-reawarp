@@ -174,6 +174,25 @@ def test_break_sample_processing_is_non_destructive_and_written_to_manifest(tmp_
     assert manifest["frames_after_processing"] > manifest["frames_after_resampling"]
     assert path.read_bytes() == original_bytes
     assert "sample_break" in project.stems
+    assert manifest["trigger_mode"] == "transient_slices"
+    assert manifest["slice_count"] >= 2
+    sample_events = [
+        event for event in project.events
+        if event.get("lane") == "sample_break"
+    ]
+    assert sample_events
+    assert all("slice_index" in event for event in sample_events)
+    assert all(
+        event["source_frame_end"] - event["source_frame_start"]
+        < manifest["frames_after_processing"]
+        for event in sample_events
+    )
+    for current, following in zip(sample_events, sample_events[1:]):
+        current_end = (
+            int(round(current["time"] * sample_rate)) + current["rendered_frames"]
+        )
+        next_start = int(round(following["time"] * sample_rate))
+        assert current_end <= next_start
 
 
 

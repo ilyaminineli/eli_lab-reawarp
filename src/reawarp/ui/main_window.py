@@ -19,7 +19,9 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, SNARE_PROFILES
+from reawarp.synthesis.profiles import (
+    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
+)
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.theme import APP_STYLE
@@ -241,11 +243,24 @@ class MainWindow(QMainWindow):
         self.melody_enabled.setChecked(True)
         self.texture_enabled = QCheckBox("Evolving noise texture")
         self.texture_enabled.setChecked(True)
+        self.ambience_enabled = QCheckBox("Slow harmonic ambience")
+        self.ambience_enabled.setChecked(True)
         modules_layout.addWidget(self.melody_enabled)
         modules_layout.addWidget(self.texture_enabled)
+        modules_layout.addWidget(self.ambience_enabled)
+        ambience_row = QWidget()
+        ambience_layout = QHBoxLayout(ambience_row)
+        ambience_layout.setContentsMargins(0, 0, 0, 0)
+        ambience_layout.addWidget(QLabel("Ambience level"))
+        self.ambience_level = QDoubleSpinBox()
+        self.ambience_level.setRange(0.0, 1.0)
+        self.ambience_level.setSingleStep(0.05)
+        self.ambience_level.setValue(0.16)
+        ambience_layout.addWidget(self.ambience_level)
+        modules_layout.addWidget(ambience_row)
         panel_layout.addWidget(modules)
 
-        profiles = QGroupBox("PERCUSSION VOICE CATALOGUE")
+        profiles = QGroupBox("SYNTH VOICE CATALOGUE")
         profile_form = QFormLayout(profiles)
         self.kick_profile = QComboBox()
         self.kick_profile.addItems(["auto", *KICK_PROFILES.keys()])
@@ -256,7 +271,39 @@ class MainWindow(QMainWindow):
         self.hat_profile = QComboBox()
         self.hat_profile.addItems(["auto", *HAT_PROFILES.keys()])
         profile_form.addRow("Hi-hat", self.hat_profile)
+        self.melody_profile = QComboBox()
+        self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
+        profile_form.addRow("Melody voice", self.melody_profile)
         panel_layout.addWidget(profiles)
+
+        groove = QGroupBox("BREAK RHYTHM GRAMMAR")
+        groove_form = QFormLayout(groove)
+        self.break_style = QComboBox()
+        self.break_style.addItems(["broken_funk", "half_time", "straight", "sparse", "auto"])
+        groove_form.addRow("Pattern", self.break_style)
+        self.break_density = QDoubleSpinBox()
+        self.break_density.setRange(0.0, 1.0)
+        self.break_density.setSingleStep(0.05)
+        self.break_density.setValue(0.50)
+        self.break_density.setToolTip(
+            "Controls the number of supporting events; the metric anchors stay in place."
+        )
+        groove_form.addRow("Density", self.break_density)
+        self.break_variation = QDoubleSpinBox()
+        self.break_variation.setRange(0.0, 1.0)
+        self.break_variation.setSingleStep(0.05)
+        self.break_variation.setValue(0.25)
+        self.break_variation.setToolTip(
+            "Probability of a phrase edit at the end of each cycle; high values may add a second local edit."
+        )
+        groove_form.addRow("Phrase variation", self.break_variation)
+        self.break_cycle_bars = QComboBox()
+        self.break_cycle_bars.addItem("1 bar", 1)
+        self.break_cycle_bars.addItem("2 bars", 2)
+        self.break_cycle_bars.addItem("4 bars", 4)
+        self.break_cycle_bars.setCurrentIndex(1)
+        groove_form.addRow("Repeat cycle", self.break_cycle_bars)
+        panel_layout.addWidget(groove)
 
         source_group = QGroupBox("SOURCE MATERIAL")
         source_layout = QVBoxLayout(source_group)
@@ -509,10 +556,17 @@ class MainWindow(QMainWindow):
             complexity=self.complexity.value() / 100.0,
             include_melody=self.melody_enabled.isChecked(),
             include_texture=self.texture_enabled.isChecked(),
+            include_ambience=self.ambience_enabled.isChecked(),
+            ambience_level=self.ambience_level.value(),
             sample_paths={"break": self._break_path} if self._break_path else {},
             kick_profile=self.kick_profile.currentText(),
             snare_profile=self.snare_profile.currentText(),
             hat_profile=self.hat_profile.currentText(),
+            melody_profile=self.melody_profile.currentText(),
+            break_style=self.break_style.currentText(),
+            break_density=self.break_density.value(),
+            break_variation=self.break_variation.value(),
+            break_cycle_bars=int(self.break_cycle_bars.currentData()),
             break_transforms=transforms,
             break_slice_count=self.slice_count.value(),
             break_stutter_repeats=self.stutter_repeats.value(),
@@ -613,7 +667,9 @@ class MainWindow(QMainWindow):
         self._mix_rows.clear()
         if self.project is None:
             return
-        supported = {"kick", "snare", "hats", "synthetic_break", "melody", "noise_texture"}
+        supported = {
+            "kick", "snare", "hats", "synthetic_break", "melody", "noise_texture", "ambience"
+        }
         for name in self.project.stems:
             row = StemRow(name, name in supported)
             if name in previous:

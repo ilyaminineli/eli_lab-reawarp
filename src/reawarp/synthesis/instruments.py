@@ -8,6 +8,7 @@ from reawarp.synthesis.envelopes import exponential_decay
 from reawarp.synthesis.profiles import (
     HAT_PROFILES,
     KICK_PROFILES,
+    MELODY_PROFILES,
     SNARE_PROFILES,
     select_profile_name,
 )
@@ -115,6 +116,19 @@ def render_hat(
     return (signal * float(np.clip(velocity, 0.0, 1.0)) * 0.35).astype(np.float32)
 
 
+def _spectral_lowpass(
+        signal: np.ndarray,
+        sample_rate: int,
+        cutoff_hz: float,
+) -> np.ndarray:
+    """Apply a smooth offline low-pass without requiring a native DSP package."""
+    spectrum = np.fft.rfft(signal)
+    frequencies = np.fft.rfftfreq(len(signal), 1.0 / float(sample_rate))
+    ratio = frequencies / max(100.0, float(cutoff_hz))
+    response = 1.0 / np.sqrt(1.0 + ratio ** 8)
+    return np.fft.irfft(spectrum * response, n=len(signal))
+
+
 def render_fm_note(
         frequency: float,
         sample_rate: int,
@@ -122,24 +136,72 @@ def render_fm_note(
         duration: float = 0.34,
         velocity: float = 0.65,
         modulation_ratio: float | None = None,
-        modulation_index: float = 2.4,
+        modulation_index: float | None = None,
+        profile: str = "soft_keys",
 ) -> np.ndarray:
-    length = max(48, int(round(sample_rate * duration)))
-    time = np.arange(length, dtype=np.float64) / sample_rate
-    ratio = modulation_ratio if modulation_ratio is not None else float(
-        rng.choice([1.4142, 1.5, 1.618, 2.0, 2.718])
+    """Render a softly evolving additive/FM note with a defined release tail.
+
+    The profile controls its partial spectrum, envelope, detuning, FM depth,
+    filtering, and saturation. FM remains a colour source rather than the
+    entire timbral identity, avoiding the brittle two-oscillator sound.
+    """
+    if sample_rate <= 0 or duration <= 0 or frequency <= 0:
+        raise ValueError("frequency, sample_rate, and duration must be positive")
+    if profile not in MELODY_PROFILES:
+        raise ValueError(
+            f"unknown melody profile: {profile}; choose from {', '.join(MELODY_PROFILES)}"
+        )
+    shape = MELODY_PROFILES[profile]
+    release = max(0.02, float(shape.release))
+    length = max(48, int(round(sample_rate * (duration + release))))
+    time = np.arange(length, dtype=np.float64) / float(sample_rate)
+
+    ratio = float(modulation_ratio if modulation_ratio is not None else shape.fm_ratio)
+    index = float(modulation_index if modulation_index is not None else shape.fm_index)
+    mod_phase = float(rng.uniform(0.0, 2.0 * np.pi))
+    modulator = np.sin(2.0 * np.pi * frequency * ratio * time + mod_phase)
+    index_curve = index * np.exp(-time / max(0.04, duration * 0.55))
+
+    signal = np.zeros(length, dtype=np.float64)
+    for partial_ratio, amplitude in shape.partials:
+        partial_frequency = float(frequency) * float(partial_ratio)
+        if partial_frequency >= sample_rate * 0.46:
+            continue
+        phase_offset = float(rng.uniform(0.0, 2.0 * np.pi))
+        partial_index = index_curve * min(1.0, float(partial_ratio) ** 0.25)
+        phase = (
+            2.0 * np.pi * partial_frequency * time
+            + partial_index * modulator
+            + phase_offset
+        )
+        signal += float(amplitude) * np.sin(phase)
+
+    # A quiet detuned fundamental thickens the voice without chorus smear.
+    detune_ratio = 2.0 ** (float(shape.detune_cents) / 1_200.0)
+    signal += 0.14 * np.sin(
+        2.0 * np.pi * float(frequency) * detune_ratio * time
+        + float(rng.uniform(0.0, 2.0 * np.pi))
     )
-    mod_frequency = max(1.0, frequency * ratio)
-    index_curve = modulation_index * np.exp(-time / max(duration * 0.45, 0.02))
-    phase = 2.0 * np.pi * frequency * time + index_curve * np.sin(
-        2.0 * np.pi * mod_frequency * time
+    transient = rng.standard_normal(length) * np.exp(-time / 0.006) * 0.012
+    signal += transient
+
+    attack = max(0.001, float(shape.attack))
+    decay = max(0.01, float(shape.decay))
+    sustain = float(np.clip(shape.sustain, 0.0, 1.0))
+    attack_curve = 1.0 - np.exp(-time / attack)
+    decay_curve = sustain + (1.0 - sustain) * np.exp(-time / decay)
+    envelope = attack_curve * decay_curve
+    release_mask = time >= float(duration)
+    envelope[release_mask] *= np.exp(
+        -(time[release_mask] - float(duration)) / release
     )
-    envelope = exponential_decay(length, sample_rate, max(duration * 0.48, 0.055), 0.004)
-    carrier = np.sin(phase)
-    upper_partial = 0.22 * np.sin(2.0 * phase + 0.17)
-    low_component = 0.12 * np.sin(2.0 * np.pi * (frequency * 0.503) * time)
-    signal = (carrier + upper_partial + low_component) * envelope
-    return (signal * float(np.clip(velocity, 0.0, 1.0)) * 0.43).astype(np.float32)
+
+    signal *= envelope
+    signal = _spectral_lowpass(signal, sample_rate, shape.lowpass_hz)
+    drive = max(1.0, float(shape.drive))
+    signal = np.tanh(signal * drive) / np.tanh(drive)
+    signal *= float(np.clip(velocity, 0.0, 1.0)) * 0.42
+    return signal.astype(np.float32)
 
 
 def render_noise_texture(

@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, SNARE_PROFILES
+from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
@@ -19,10 +19,17 @@ class GenerationConfig:
     complexity: float = 0.68
     include_melody: bool = True
     include_texture: bool = True
+    include_ambience: bool = True
+    ambience_level: float = 0.16
     sample_paths: dict[str, str] = field(default_factory=dict)
     kick_profile: str = "auto"
     snare_profile: str = "auto"
     hat_profile: str = "auto"
+    melody_profile: str = "auto"
+    break_style: str = "broken_funk"
+    break_density: float = 0.50
+    break_variation: float = 0.25
+    break_cycle_bars: int = 2
     break_transforms: tuple[str, ...] = ()
     break_slice_count: int = 16
     break_stutter_repeats: int = 4
@@ -58,6 +65,20 @@ class GenerationConfig:
             raise ValueError(f"unknown snare profile: {self.snare_profile}")
         if self.hat_profile != "auto" and self.hat_profile not in HAT_PROFILES:
             raise ValueError(f"unknown hi-hat profile: {self.hat_profile}")
+        if self.melody_profile != "auto" and self.melody_profile not in MELODY_PROFILES:
+            raise ValueError(f"unknown melody profile: {self.melody_profile}")
+        if self.break_style not in {
+            "auto", "broken_funk", "half_time", "straight", "sparse"
+        }:
+            raise ValueError("unknown break style")
+        if not 0.0 <= float(self.break_density) <= 1.0:
+            raise ValueError("break_density must be between 0.0 and 1.0")
+        if not 0.0 <= float(self.break_variation) <= 1.0:
+            raise ValueError("break_variation must be between 0.0 and 1.0")
+        if int(self.break_cycle_bars) not in (1, 2, 4):
+            raise ValueError("break_cycle_bars must be 1, 2, or 4")
+        if not 0.0 <= float(self.ambience_level) <= 1.0:
+            raise ValueError("ambience_level must be between 0.0 and 1.0")
 
         transforms = tuple(self.break_transforms)
         unknown_transforms = set(transforms) - set(BREAK_TRANSFORMS)
