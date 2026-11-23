@@ -142,3 +142,24 @@ def test_default_project_has_audible_ambience_and_break_provenance():
     assert np.max(np.abs(project.stems["ambience"])) > 0.001
     assert project.metadata["break_rhythm"]["grid"].startswith("16-step")
     assert project.metadata["synthesis_profiles"]["melody"] in MELODY_PROFILES
+
+
+
+def test_auto_timbres_remain_coherent_within_each_lane():
+    project = ReawarpEngine().generate(GenerationConfig(
+        duration=5.0, sample_rate=22_050, seed=518
+    ))
+    for lane in ("kick", "snare", "hat"):
+        selected = {
+            event["sound_profile"]
+            for event in project.events
+            if event.get("lane") == lane
+        }
+        assert len(selected) == 1
+    for voice in ("kick", "snare", "hat"):
+        selected = {
+            event["sound_profile"]
+            for event in project.events
+            if event.get("lane") == "break" and event.get("kind") == voice
+        }
+        assert len(selected) <= 1

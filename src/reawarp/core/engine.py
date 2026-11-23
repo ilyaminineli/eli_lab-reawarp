@@ -26,6 +26,7 @@ from reawarp.synthesis.instruments import (
 from reawarp.synthesis.profiles import (
     AUTO_HAT_PROFILES,
     AUTO_KICK_PROFILES,
+    AUTO_MELODY_PROFILES,
     AUTO_SNARE_PROFILES,
     HAT_PROFILES,
     KICK_PROFILES,
@@ -70,7 +71,9 @@ class ReawarpEngine:
             "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
             "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
             "hats": ("hat_pattern", "hat_synthesis", "hat_profile"),
-            "synthetic_break": ("break_pattern", "break_synthesis", "break_processing"),
+            "synthetic_break": (
+                "break_pattern", "break_synthesis", "break_profile", "break_processing"
+            ),
             "melody": ("melody_pattern", "melody_synthesis", "melody_profile"),
             "noise_texture": ("texture_synthesis",),
             "ambience": ("ambience_synthesis",),
@@ -144,11 +147,12 @@ class ReawarpEngine:
         hat_stem = new_stem("hats")
         break_stem = new_stem("synthetic_break")
 
+        kick_profile = select_profile_name(
+            config.kick_profile, KICK_PROFILES, streams.get("kick_profile"),
+            auto_choices=AUTO_KICK_PROFILES,
+        )
         for event in percussion["kick"]:
-            profile = select_profile_name(
-                config.kick_profile, KICK_PROFILES, streams.get("kick_profile"),
-                auto_choices=AUTO_KICK_PROFILES,
-            )
+            profile = kick_profile
             signal = render_kick(
                 sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
             )
@@ -157,11 +161,12 @@ class ReawarpEngine:
             record["sound_profile"] = profile
             event_records.append(record)
 
+        snare_profile = select_profile_name(
+            config.snare_profile, SNARE_PROFILES, streams.get("snare_profile"),
+            auto_choices=AUTO_SNARE_PROFILES,
+        )
         for event in percussion["snare"]:
-            profile = select_profile_name(
-                config.snare_profile, SNARE_PROFILES, streams.get("snare_profile"),
-                auto_choices=AUTO_SNARE_PROFILES,
-            )
+            profile = snare_profile
             signal = render_snare(
                 sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
             )
@@ -170,11 +175,12 @@ class ReawarpEngine:
             record["sound_profile"] = profile
             event_records.append(record)
 
+        hat_profile = select_profile_name(
+            config.hat_profile, HAT_PROFILES, streams.get("hat_profile"),
+            auto_choices=AUTO_HAT_PROFILES,
+        )
         for event in percussion["hat"]:
-            profile = select_profile_name(
-                config.hat_profile, HAT_PROFILES, streams.get("hat_profile"),
-                auto_choices=AUTO_HAT_PROFILES,
-            )
+            profile = hat_profile
             signal = render_hat(
                 sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
             )
@@ -183,13 +189,25 @@ class ReawarpEngine:
             record["sound_profile"] = profile
             event_records.append(record)
 
+        break_profile_rng = streams.get("break_profile")
+        break_profiles = {
+            "kick": select_profile_name(
+                config.kick_profile, KICK_PROFILES, break_profile_rng,
+                auto_choices=AUTO_KICK_PROFILES,
+            ),
+            "snare": select_profile_name(
+                config.snare_profile, SNARE_PROFILES, break_profile_rng,
+                auto_choices=AUTO_SNARE_PROFILES,
+            ),
+            "hat": select_profile_name(
+                config.hat_profile, HAT_PROFILES, break_profile_rng,
+                auto_choices=AUTO_HAT_PROFILES,
+            ),
+        }
         for event in percussion["break"]:
             break_rng = streams.get("break_synthesis")
             if event.kind == "kick":
-                profile = select_profile_name(
-                    config.kick_profile, KICK_PROFILES, break_rng,
-                    auto_choices=AUTO_KICK_PROFILES,
-                )
+                profile = break_profiles["kick"]
                 signal = render_kick(
                     sample_rate,
                     break_rng,
@@ -199,18 +217,12 @@ class ReawarpEngine:
                     profile=profile,
                 )
             elif event.kind == "snare":
-                profile = select_profile_name(
-                    config.snare_profile, SNARE_PROFILES, break_rng,
-                    auto_choices=AUTO_SNARE_PROFILES,
-                )
+                profile = break_profiles["snare"]
                 signal = render_snare(
                     sample_rate, break_rng, event.velocity * 0.78, duration=0.22, profile=profile
                 )
             else:
-                profile = select_profile_name(
-                    config.hat_profile, HAT_PROFILES, break_rng,
-                    auto_choices=AUTO_HAT_PROFILES,
-                )
+                profile = break_profiles["hat"]
                 signal = render_hat(
                     sample_rate, break_rng, event.velocity * 0.9, duration=0.075, profile=profile
                 )
@@ -225,6 +237,7 @@ class ReawarpEngine:
                 config.melody_profile,
                 MELODY_PROFILES,
                 streams.get("melody_profile"),
+                auto_choices=AUTO_MELODY_PROFILES,
             )
             melody_stem = new_stem("melody")
             for event in melody_events:
@@ -428,7 +441,8 @@ class ReawarpEngine:
                 for name in (
                     "kick_pattern", "snare_pattern", "hat_pattern", "break_pattern",
                     "kick_synthesis", "snare_synthesis", "hat_synthesis", "break_synthesis",
-                    "kick_profile", "snare_profile", "hat_profile", "break_processing",
+                    "kick_profile", "snare_profile", "hat_profile", "break_profile",
+                    "break_processing",
                     "melody_pattern", "melody_synthesis", "melody_profile",
                     "texture_synthesis", "ambience_synthesis",
                 )
