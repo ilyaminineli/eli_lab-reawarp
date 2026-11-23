@@ -409,8 +409,20 @@ class ReawarpEngine:
                 applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
             triggers = sample_trigger_patterns[role]
-            if role in {"kick", "break"}:
-                triggers = [event for event in triggers if section_for_time(composition_plan, event.time).kick]
+            if role == "kick":
+                triggers = [
+                    event for event in triggers
+                    if section_for_time(composition_plan, event.time).kick
+                ]
+            elif role == "break":
+                triggers = [
+                    event for event in triggers
+                    if (
+                        section_for_time(composition_plan, event.time).kick
+                        if event.kind == "kick"
+                        else section_for_time(composition_plan, event.time).density >= 0.16
+                    )
+                ]
             elif role == "snare":
                 triggers = [event for event in triggers if section_for_time(composition_plan, event.time).density >= 0.14 or event.velocity >= 0.70]
             elif role == "hat":
