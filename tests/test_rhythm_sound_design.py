@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from reawarp import GenerationConfig, ReawarpEngine
 from reawarp.core.random_streams import RandomStreams
