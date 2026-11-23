@@ -314,6 +314,8 @@ class ReawarpEngine:
                     duration=event.duration,
                     velocity=event.velocity,
                     profile=melody_profile,
+                    brightness=section.brightness,
+                    instability=section.instability,
                 )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()

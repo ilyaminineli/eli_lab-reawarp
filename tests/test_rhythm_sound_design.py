@@ -170,3 +170,34 @@ def test_auto_timbres_remain_coherent_within_each_lane():
     }
     assert len(melody_profiles) == 1
     assert melody_profiles.issubset({"soft_keys", "soft_pluck", "reed_pad", "wood_mallet"})
+
+
+def test_fm_brightness_and_instability_controls_are_deterministic_and_bounded():
+    from reawarp.synthesis.instruments import render_fm_note
+
+    def render(brightness, instability):
+        return render_fm_note(
+            220.0, 22_050, np.random.default_rng(211),
+            duration=0.16, profile="soft_keys",
+            brightness=brightness, instability=instability,
+        )
+
+    neutral = render(0.5, 0.0)
+    darker = render(0.1, 0.0)
+    brighter = render(0.9, 0.0)
+    unstable = render(0.5, 1.0)
+    assert np.array_equal(neutral, render(0.5, 0.0))
+    assert not np.array_equal(neutral, darker)
+    assert not np.array_equal(neutral, brighter)
+    assert not np.array_equal(neutral, unstable)
+    assert all(np.all(np.isfinite(item)) for item in (neutral, darker, brighter, unstable))
+    assert all(np.max(np.abs(item)) <= 1.0 for item in (neutral, darker, brighter, unstable))
+
+
+def test_fm_macro_controls_reject_out_of_range_values():
+    from reawarp.synthesis.instruments import render_fm_note
+
+    with pytest.raises(ValueError, match="brightness"):
+        render_fm_note(220.0, 22_050, np.random.default_rng(1), brightness=1.1)
+    with pytest.raises(ValueError, match="instability"):
+        render_fm_note(220.0, 22_050, np.random.default_rng(1), instability=-0.1)

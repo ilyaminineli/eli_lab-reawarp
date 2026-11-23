@@ -138,6 +138,8 @@ def render_fm_note(
         modulation_ratio: float | None = None,
         modulation_index: float | None = None,
         profile: str = "soft_keys",
+        brightness: float = 0.5,
+        instability: float = 0.0,
 ) -> np.ndarray:
     """Render a softly evolving additive/FM note with a defined release tail.
 
@@ -147,6 +149,10 @@ def render_fm_note(
     """
     if sample_rate <= 0 or duration <= 0 or frequency <= 0:
         raise ValueError("frequency, sample_rate, and duration must be positive")
+    if not 0.0 <= brightness <= 1.0:
+        raise ValueError("brightness must be between zero and one")
+    if not 0.0 <= instability <= 1.0:
+        raise ValueError("instability must be between zero and one")
     if profile not in MELODY_PROFILES:
         raise ValueError(
             f"unknown melody profile: {profile}; choose from {', '.join(MELODY_PROFILES)}"
@@ -160,7 +166,10 @@ def render_fm_note(
     index = float(modulation_index if modulation_index is not None else shape.fm_index)
     mod_phase = float(rng.uniform(0.0, 2.0 * np.pi))
     modulator = np.sin(2.0 * np.pi * frequency * ratio * time + mod_phase)
-    index_curve = index * np.exp(-time / max(0.04, duration * 0.55))
+    bounded_drift = 1.0 + 0.16 * float(instability) * np.sin(
+        2.0 * np.pi * 0.19 * time + mod_phase * 0.37
+    )
+    index_curve = index * bounded_drift * np.exp(-time / max(0.04, duration * 0.55))
 
     signal = np.zeros(length, dtype=np.float64)
     for partial_ratio, amplitude in shape.partials:
@@ -177,7 +186,8 @@ def render_fm_note(
         signal += float(amplitude) * np.sin(phase)
 
     # A quiet detuned fundamental thickens the voice without chorus smear.
-    detune_ratio = 2.0 ** (float(shape.detune_cents) / 1_200.0)
+    detune_cents = float(shape.detune_cents) + 8.0 * float(instability)
+    detune_ratio = 2.0 ** (detune_cents / 1_200.0)
     signal += 0.14 * np.sin(
         2.0 * np.pi * float(frequency) * detune_ratio * time
         + float(rng.uniform(0.0, 2.0 * np.pi))
@@ -197,7 +207,9 @@ def render_fm_note(
     )
 
     signal *= envelope
-    signal = _spectral_lowpass(signal, sample_rate, shape.lowpass_hz)
+    brightness_scale = 0.55 + 0.90 * float(brightness)
+    cutoff = min(sample_rate * 0.45, shape.lowpass_hz * brightness_scale)
+    signal = _spectral_lowpass(signal, sample_rate, cutoff)
     drive = max(1.0, float(shape.drive))
     signal = np.tanh(signal * drive) / np.tanh(drive)
     signal *= float(np.clip(velocity, 0.0, 1.0)) * 0.42
