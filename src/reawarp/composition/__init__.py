@@ -1,6 +1,6 @@
-"""Composition-level planning and formal state."""
-
+"""Composition-level formal planning."""
 from reawarp.composition.director import (
+    STRUCTURES,
     CompositionPlan,
     SectionPlan,
     build_composition_plan,
@@ -8,6 +8,7 @@ from reawarp.composition.director import (
 )
 
 __all__ = [
+    "STRUCTURES",
     "CompositionPlan",
     "SectionPlan",
     "build_composition_plan",
