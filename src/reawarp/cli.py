@@ -20,6 +20,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--bpm", type=float, default=137.0, help="tempo in BPM (60–220)")
     parser.add_argument("--duration", type=float, default=24.0, help="duration in seconds (5–45)")
+    parser.add_argument("--structure", choices=("evolving", "additive", "subtractive", "episodic", "drift"), default="evolving", help="formal composition trajectory")
+    parser.add_argument("--energy", type=float, default=0.62, help="composition energy target, not output gain (0–1)")
+    parser.add_argument("--variation", type=float, default=0.45, help="bounded formal variation (0–1)")
     parser.add_argument("--seed", default="20261123", help="integer or text seed")
     parser.add_argument("--complexity", type=float, default=0.68, help="complexity (0–1)")
     parser.add_argument("--sample-rate", type=int, default=48_000, help="render sample rate")
@@ -99,6 +102,9 @@ def main() -> None:
     config = GenerationConfig(
         bpm=args.bpm,
         duration=args.duration,
+        structure=args.structure,
+        composition_energy=args.energy,
+        composition_variation=args.variation,
         sample_rate=args.sample_rate,
         seed=seed,
         complexity=args.complexity,
