@@ -30,6 +30,12 @@ class ReawarpProject:
     def duration(self) -> float:
         return self.frame_count / float(self.sample_rate)
 
+    def to_score(self, *, title: str | None = None):
+        """Return the synthesizer-independent symbolic score for this render."""
+        from reawarp.score.conversion import project_to_score
+
+        return project_to_score(self, title=title)
+
     def render_master(self) -> np.ndarray:
         if not self.stems:
             return np.zeros((self.config.frame_count, 2), dtype=np.float32)
@@ -63,7 +69,7 @@ class ReawarpProject:
         project_record = {
             "schema_version": 1,
             "application": "eli_lab-reawarp",
-            "application_version": "0.3.0",
+            "application_version": "0.4.0",
             "python_version": platform.python_version(),
             "sample_rate": self.sample_rate,
             "duration_seconds": self.duration,
@@ -80,4 +86,5 @@ class ReawarpProject:
             json.dumps({"schema_version": 1, "events": self.events}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        self.to_score().save(output / "score.json")
         return output

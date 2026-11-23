@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eli-lab-reawarp"
-version = "0.3.0"
+version = "0.4.0"
 description = "Deterministic mathematical IDM loop, break transformation, and desktop audio instrument"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,6 +26,8 @@ dev = ["pytest>=8", "ruff>=0.5"]
 [project.scripts]
 reawarp = "reawarp.cli:main"
 reawarp-gui = "reawarp.ui.__main__:main"
+reawarp-midi-export = "reawarp.cli_midi:export_main"
+reawarp-midi-import = "reawarp.cli_midi:import_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

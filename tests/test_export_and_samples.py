@@ -41,6 +41,9 @@ def test_project_export_writes_stems_master_and_metadata(tmp_path):
     assert project_data["sample_rate"] == 22_050
     assert "kick" in project_data["stems"]
     assert len(events_data["events"]) == len(project.events)
+    score_data = json.loads((output / "score.json").read_text(encoding="utf-8"))
+    assert score_data["format"] == "eli_lab_reawarp_score"
+    assert len(score_data["events"]) == len(project.events)
     with wave.open(str(output / "master.wav"), "rb") as wav:
         assert wav.getframerate() == 22_050
         assert wav.getsampwidth() == 3

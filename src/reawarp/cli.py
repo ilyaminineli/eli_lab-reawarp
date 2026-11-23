@@ -22,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-rate", type=int, default=48_000, help="render sample rate")
     parser.add_argument("--output", type=Path, default=Path("output/reawarp"), help="export directory")
     parser.add_argument("--bit-depth", type=int, choices=(16, 24), default=24)
+    parser.add_argument("--midi-output", type=Path, help="optional MIDI export path for the generated score")
     parser.add_argument("--kick-sample", type=Path, help="optional custom kick WAV")
     parser.add_argument("--snare-sample", type=Path, help="optional custom snare WAV")
     parser.add_argument("--hat-sample", type=Path, help="optional custom hat WAV")
@@ -107,6 +108,9 @@ def main() -> None:
     if transforms:
         print(f"Break transforms: {', '.join(transforms)}")
     print(f"Output: {output.resolve()}")
+    if args.midi_output is not None:
+        midi_path = project.to_score().export_midi(args.midi_output)
+        print(f"MIDI: {midi_path.resolve()}")
 
 
 if __name__ == "__main__":

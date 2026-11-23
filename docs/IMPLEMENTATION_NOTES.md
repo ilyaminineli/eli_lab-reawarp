@@ -34,7 +34,8 @@ Optional libraries must not replace Reawarp's event model, deterministic random-
 
 - M3: implemented break-transformation and advanced percussion-profile foundation; see docs/M3.md.
 - M4: implemented PySide6 Generator, Break Lab, and Stem Mixer workspaces; SoundDevice audition, waveform/spectrogram visualization, background rendering, faders/pan/mute/solo, and stem regeneration. See docs/M4.md.
-- M5: Mido MIDI import/export and microtonal pitch infrastructure.
+- M5: a synthesizer-independent symbolic score with rational timing, step/linear tempo maps, meter maps, automation, tuning/pitch contracts, project-to-score conversion, and optional Mido MIDI 1.0 import/export. See docs/M5.md.
+- M5: universal score/event model, rational beat time, tempo and meter maps, automation lanes, tuning interface, Mido MIDI 1.0 import/export, and score conversion from existing renders; see docs/M5.md.
 - M6: searchable stem library, similarity features, collections, and project interchange.
 - M7: advanced mathematical composition, optional external synthesis backends, and experimental data-driven generators.
 
