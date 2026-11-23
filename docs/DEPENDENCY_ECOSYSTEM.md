@@ -86,7 +86,8 @@ The installable extras in `pyproject.toml` are deliberately limited to adapters 
 | `midi` | Mido | MIDI import/export |
 | `theory` | music21 | Symbolic music-theory analysis |
 | `soundfont` | pyFluidSynth | Optional SF2 source synthesis |
-| `ui` | PySide6, pyqtgraph | Desktop interface and visual analysis |
+| `ui` | PySide6, pyqtgraph 0.14.x | Desktop interface and visual analysis |
+| `m4` | PySide6, pyqtgraph 0.14.x, SoundDevice | Combined desktop and playback installation |
 | `dev` | pytest, Ruff | Tests and development checks |
 
 Pyo, Pippi, ctcsound, SuperCollider, Essentia, aubio, Xenharmlib, MusPy, and dataset repositories are not added as unconditional dependencies. Some require native software, have platform restrictions, are experimental, or have licensing implications that need a dedicated release review.
@@ -100,7 +101,7 @@ No external project should be copied into Reawarp merely because it is useful. P
 ## 7. Implementation sequence
 
 - **M3 — complete:** dependency-free break analysis/transformation and profile-based percussion synthesis.
-- **M4 — next:** SoundDevice audition, waveform/spectrogram views, and the PySide6 production interface.
+- **M4 — implemented:** PySide6 Generator, Break Lab, and Stem Mixer workspaces, SoundDevice audition, waveform/spectrogram views, asynchronous rendering, and stem controls.
 - **M5 — next:** universal event representation, Mido import/export, and an extensible tuning interface.
 - **M6 — later:** MusPy-based research utilities, sample/stem catalogue, metadata, and similarity search.
 - **M7 — later:** optional Pyo/Pippi/Csound/SuperCollider backends, advanced mathematical composition, and curated dataset experiments.

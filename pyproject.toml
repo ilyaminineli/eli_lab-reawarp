@@ -1,29 +1,31 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "eli-lab-reawarp"
-version = "0.2.0"
-description = "Deterministic mathematical IDM loop, break transformation, and stem generator"
+version = "0.3.0"
+description = "Deterministic mathematical IDM loop, break transformation, and desktop audio instrument"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "ELI LAB" }]
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 audio = ["soundfile>=0.12", "scipy>=1.10"]
-playback = ["sounddevice>=0.4"]
+playback = ["sounddevice>=0.5.3"]
 analysis = ["librosa>=0.10"]
 midi = ["mido>=1.3"]
 theory = ["music21>=8"]
 soundfont = ["pyfluidsynth>=1.3"]
-ui = ["PySide6>=6.6", "pyqtgraph>=0.13"]
+ui = ["PySide6>=6.8,<7", "pyqtgraph>=0.14,<0.15"]
+m4 = ["PySide6>=6.8,<7", "pyqtgraph>=0.14,<0.15", "sounddevice>=0.5.3"]
 dev = ["pytest>=8", "ruff>=0.5"]
 
 [project.scripts]
 reawarp = "reawarp.cli:main"
+reawarp-gui = "reawarp.ui.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

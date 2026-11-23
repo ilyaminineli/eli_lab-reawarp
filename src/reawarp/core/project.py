@@ -63,7 +63,7 @@ class ReawarpProject:
         project_record = {
             "schema_version": 1,
             "application": "eli_lab-reawarp",
-            "application_version": "0.2.0",
+            "application_version": "0.3.0",
             "python_version": platform.python_version(),
             "sample_rate": self.sample_rate,
             "duration_seconds": self.duration,

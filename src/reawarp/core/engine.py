@@ -34,7 +34,7 @@ from reawarp.transforms.pipeline import apply_break_transforms
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.2.0"
+    VERSION = "0.3.0"
 
     def generate_variant(
             self,
@@ -79,6 +79,7 @@ class ReawarpEngine:
 
         frame_count = config.frame_count
         sample_rate = config.sample_rate
+        sample_streams = RandomStreams(config.seed)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
         stems: dict[str, np.ndarray] = {}
         event_records: list[dict[str, Any]] = []
@@ -121,6 +122,14 @@ class ReawarpEngine:
             "break": streams.get("break_pattern"),
         }
         percussion = build_percussion_events(config, percussion_rngs)
+        # Imported sample overlays keep their own baseline trigger score. A
+        # procedural lane variation must not mutate a separate sample stem.
+        sample_trigger_patterns = build_percussion_events(config, {
+            "kick": sample_streams.get("kick_pattern"),
+            "snare": sample_streams.get("snare_pattern"),
+            "hat": sample_streams.get("hat_pattern"),
+            "break": sample_streams.get("break_pattern"),
+        })
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
 
         kick_stem = new_stem("kick")
@@ -246,7 +255,7 @@ class ReawarpEngine:
                     sample,
                     sample_rate,
                     config.break_transforms,
-                    streams.get("break_processing"),
+                    sample_streams.get("break_processing"),
                     slice_count=config.break_slice_count,
                     stutter_repeats=config.break_stutter_repeats,
                     dropout_probability=config.break_dropout_probability,
@@ -260,7 +269,7 @@ class ReawarpEngine:
                 )
                 applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
-            triggers = percussion[role]
+            triggers = sample_trigger_patterns[role]
             for event in triggers:
                 place_sample(sample_stem, sample, event.time, event.velocity, event.pan)
                 event_records.append({
@@ -306,6 +315,10 @@ class ReawarpEngine:
                     "kick_profile", "snare_profile", "hat_profile", "break_processing",
                     "melody_pattern", "melody_synthesis", "texture_synthesis",
                 )
+            },
+            "sample_trigger_seed_streams": {
+                name: sample_streams.seed_for(name)
+                for name in ("kick_pattern", "snare_pattern", "hat_pattern", "break_pattern", "break_processing")
             },
             "generator_families": {
                 "percussion": "euclidean + prime-indexed mutation + logistic control",
