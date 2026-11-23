@@ -117,4 +117,4 @@ The application remains an offline loop/stem generator, not a real-time instrume
     pytest
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The IDM Field Guide, Advanced Composition Appendix, and M3 implementation note in `docs/` provide the musical and technical reference.
+The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.

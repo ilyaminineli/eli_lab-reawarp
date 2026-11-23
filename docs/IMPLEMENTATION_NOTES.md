@@ -45,3 +45,5 @@ Optional libraries must not replace Reawarp's event model, deterministic random-
 - Keep individual stems time-aligned with identical frame counts.
 - Apply peak attenuation per stem, not across all stems, so regenerating one layer cannot alter other lanes.
 - Store the generator algorithm version and complete configuration with each project.
+
+See [DEPENDENCY_ECOSYSTEM.md](DEPENDENCY_ECOSYSTEM.md) for the role, adoption status, platform notes, and licensing considerations for the libraries and datasets from the architecture review.
