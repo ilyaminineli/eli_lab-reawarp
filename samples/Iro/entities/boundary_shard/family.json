@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "boundary_shard",
+    "synthesis_approach": "wavefolding_and_harmonic_clipping",
+    "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics.",
+    "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+    "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      1.3166,
+      1.7439
+    ],
+    "source_feature_indices": [
+      130,
+      147,
+      164,
+      181,
+      198,
+      215
+    ]
+  },
+  "entities": [
+    {
+      "name": "boundary_shard_01",
+      "family": "boundary_shard",
+      "variation": 1,
+      "file": "entities/boundary_shard/boundary_shard_01.wav",
+      "seed": 6752,
+      "source_feature_index": 130,
+      "source_features": {
+        "phase": 3.44959193,
+        "envelope": 0.91055831,
+        "interference": -0.84057282,
+        "carrier_2": 0.71101609,
+        "spectral": 0.08213655,
+        "coordinate": 0.625,
+        "phase_field": -0.23892372,
+        "amplitude": 0.33928936
+      },
+      "duration_seconds": 1.316644,
+      "frequency_hz": 182.12394,
+      "rms": 0.221057,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    },
+    {
+      "name": "boundary_shard_02",
+      "family": "boundary_shard",
+      "variation": 2,
+      "file": "entities/boundary_shard/boundary_shard_02.wav",
+      "seed": 6900,
+      "source_feature_index": 147,
+      "source_features": {
+        "phase": 5.54398704,
+        "envelope": 0.98548591,
+        "interference": -0.26812678,
+        "carrier_2": 0.85790669,
+        "spectral": 0.69863086,
+        "coordinate": 0.3125,
+        "phase_field": -0.00529661,
+        "amplitude": 0.55298044
+      },
+      "duration_seconds": 1.458095,
+      "frequency_hz": 104.25264,
+      "rms": 0.276825,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    },
+    {
+      "name": "boundary_shard_03",
+      "family": "boundary_shard",
+      "variation": 3,
+      "file": "entities/boundary_shard/boundary_shard_03.wav",
+      "seed": 7048,
+      "source_feature_index": 164,
+      "source_features": {
+        "phase": 1.35519683,
+        "envelope": 0.99587787,
+        "interference": 0.91923085,
+        "carrier_2": -0.28431065,
+        "spectral": 0.41645354,
+        "coordinate": 0.0,
+        "phase_field": 0.17567981,
+        "amplitude": 0.70182411
+      },
+      "duration_seconds": 1.546576,
+      "frequency_hz": 28.2,
+      "rms": 0.300868,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    },
+    {
+      "name": "boundary_shard_04",
+      "family": "boundary_shard",
+      "variation": 4,
+      "file": "entities/boundary_shard/boundary_shard_04.wav",
+      "seed": 7196,
+      "source_feature_index": 181,
+      "source_features": {
+        "phase": 3.44959193,
+        "envelope": 0.93966865,
+        "interference": 0.35449424,
+        "carrier_2": -0.99931706,
+        "spectral": 0.10220297,
+        "coordinate": 0.70833333,
+        "phase_field": -0.14491456,
+        "amplitude": 0.3986399
+      },
+      "duration_seconds": 1.743855,
+      "frequency_hz": 499.43163,
+      "rms": 0.232937,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    },
+    {
+      "name": "boundary_shard_05",
+      "family": "boundary_shard",
+      "variation": 5,
+      "file": "entities/boundary_shard/boundary_shard_05.wav",
+      "seed": 7344,
+      "source_feature_index": 198,
+      "source_features": {
+        "phase": 5.54398704,
+        "envelope": 0.82785904,
+        "interference": -0.95466456,
+        "carrier_2": -0.21272945,
+        "spectral": 0.62843422,
+        "coordinate": 0.39583333,
+        "phase_field": -0.00321256,
+        "amplitude": 0.18966514
+      },
+      "duration_seconds": 1.732154,
+      "frequency_hz": 308.68172,
+      "rms": 0.215015,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    },
+    {
+      "name": "boundary_shard_06",
+      "family": "boundary_shard",
+      "variation": 6,
+      "file": "entities/boundary_shard/boundary_shard_06.wav",
+      "seed": 7492,
+      "source_feature_index": 215,
+      "source_features": {
+        "phase": 1.35519683,
+        "envelope": 0.68100617,
+        "interference": 0.99367986,
+        "carrier_2": 0.89350974,
+        "spectral": 0.25290507,
+        "coordinate": 0.08333333,
+        "phase_field": 0.10655519,
+        "amplitude": 0.60820794
+      },
+      "duration_seconds": 1.691746,
+      "frequency_hz": 99.40261,
+      "rms": 0.226721,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "u=sum_j a_j*sin(j*phi); y=E*(2/pi)*asin(sin(gain*u+fold*c1))",
+      "description": "A wavefolded carrier clipped at envelope boundaries, with short spectral splinters",
+      "synthesis_approach": "wavefolding_and_harmonic_clipping",
+      "sonic_identity": "Wavefolding, asymmetric drive and short boundary gates produce dense transient harmonics."
+    }
+  ]
+}

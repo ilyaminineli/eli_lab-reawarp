@@ -1,0 +1,623 @@
+{
+  "format": "IRO_MATH_SOUND_PACK_1",
+  "seed": 211,
+  "source_release": "C:\\Users\\photo\\OneDrive\\Документы\\GitHub\\eli_lab-math-cover-generator\\output\\releases\\るもらをぬてふ_24-73-41-25-23-57-54",
+  "sample_rate": 22050,
+  "bpm": 113,
+  "bars": 4,
+  "backends": {
+    "numba": true,
+    "sympy": true,
+    "pretty_midi": true,
+    "music21": true,
+    "pyo": true
+  },
+  "equation": {
+    "backend": "sympy",
+    "equation": "Eq(y, (a*sin(2*pi*f*r*t + psi) + sin(2*pi*f*t))*exp(-a*t))",
+    "symbols": ["t", "f", "a", "r", "psi"]
+  },
+  "one_shots": [
+    {
+      "name": "glitch_synth_01",
+      "preset": "glitch_synth",
+      "file": "one-shots/glitch_synth/glitch_synth_01.wav",
+      "duration_seconds": 0.8289,
+      "source_feature_index": 183,
+      "source_features": {
+        "phase": 3.69599136,
+        "envelope": 0.92906913,
+        "interference": 0.13465603,
+        "spectral": 0.11382825,
+        "coordinate": 0.79166667,
+        "amplitude": 0.34425634
+      },
+      "equation": "Phase-fractured, gated inharmonic synth"
+    },
+    {
+      "name": "glitch_synth_02",
+      "preset": "glitch_synth",
+      "file": "one-shots/glitch_synth/glitch_synth_02.wav",
+      "duration_seconds": 0.67,
+      "source_feature_index": 212,
+      "source_features": {
+        "phase": 0.9855977,
+        "envelope": 0.70840424,
+        "interference": 0.82199377,
+        "spectral": 0.39843032,
+        "coordinate": 0.97916667,
+        "amplitude": 0.58993774
+      },
+      "equation": "Phase-fractured, gated inharmonic synth"
+    },
+    {
+      "name": "glitch_synth_03",
+      "preset": "glitch_synth",
+      "file": "one-shots/glitch_synth/glitch_synth_03.wav",
+      "duration_seconds": 0.4785,
+      "source_feature_index": 241,
+      "source_features": {
+        "phase": 4.55838934,
+        "envelope": 0.44241828,
+        "interference": -0.85698252,
+        "spectral": 0.10505165,
+        "coordinate": 0.14583333,
+        "amplitude": 0.12412596
+      },
+      "equation": "Phase-fractured, gated inharmonic synth"
+    },
+    {
+      "name": "glitch_synth_04",
+      "preset": "glitch_synth",
+      "file": "one-shots/glitch_synth/glitch_synth_04.wav",
+      "duration_seconds": 0.2212,
+      "source_feature_index": 14,
+      "source_features": {
+        "phase": 1.72479597,
+        "envelope": 0.08509298,
+        "interference": 0.78409521,
+        "spectral": 0.02020522,
+        "coordinate": 0.89583333,
+        "amplitude": 0.052053
+      },
+      "equation": "Phase-fractured, gated inharmonic synth"
+    },
+    {
+      "name": "hybrid_bass_01",
+      "preset": "hybrid_bass",
+      "file": "one-shots/hybrid_bass/hybrid_bass_01.wav",
+      "duration_seconds": 0.985,
+      "source_feature_index": 220,
+      "source_features": {
+        "phase": 1.97119539,
+        "envelope": 0.63465761,
+        "interference": 0.76433721,
+        "spectral": 0.11312586,
+        "coordinate": 0.29166667,
+        "amplitude": 0.53673122
+      },
+      "equation": "FM/sub hybrid bass with feature-driven saturation"
+    },
+    {
+      "name": "hybrid_bass_02",
+      "preset": "hybrid_bass",
+      "file": "one-shots/hybrid_bass/hybrid_bass_02.wav",
+      "duration_seconds": 0.6477,
+      "source_feature_index": 249,
+      "source_features": {
+        "phase": 5.54398704,
+        "envelope": 0.37512789,
+        "interference": -0.15599143,
+        "spectral": 0.26593573,
+        "coordinate": 0.47916667,
+        "amplitude": 0.14097617
+      },
+      "equation": "FM/sub hybrid bass with feature-driven saturation"
+    },
+    {
+      "name": "hybrid_bass_03",
+      "preset": "hybrid_bass",
+      "file": "one-shots/hybrid_bass/hybrid_bass_03.wav",
+      "duration_seconds": 0.3043,
+      "source_feature_index": 22,
+      "source_features": {
+        "phase": 2.71039366,
+        "envelope": 0.11102319,
+        "interference": -0.24107813,
+        "spectral": 0.01056737,
+        "coordinate": 0.20833333,
+        "amplitude": 0.03021573
+      },
+      "equation": "FM/sub hybrid bass with feature-driven saturation"
+    },
+    {
+      "name": "hybrid_bass_04",
+      "preset": "hybrid_bass",
+      "file": "one-shots/hybrid_bass/hybrid_bass_04.wav",
+      "duration_seconds": 0.4933,
+      "source_feature_index": 51,
+      "source_features": {
+        "phase": 0.0,
+        "envelope": 0.25637576,
+        "interference": 0.08762076,
+        "spectral": 0.25613315,
+        "coordinate": 0.39583333,
+        "amplitude": 0.17513182
+      },
+      "equation": "FM/sub hybrid bass with feature-driven saturation"
+    },
+    {
+      "name": "drum_mutation_01",
+      "preset": "drum_mutation",
+      "file": "one-shots/drum_mutation/drum_mutation_01.wav",
+      "duration_seconds": 0.1985,
+      "source_feature_index": 1,
+      "source_features": {
+        "phase": 0.12319971,
+        "envelope": 0.05346934,
+        "interference": 0.16382884,
+        "spectral": 0.05263407,
+        "coordinate": 0.35416667,
+        "amplitude": 0.03124821
+      },
+      "equation": "Transient mutations from the release's rhythmic features"
+    },
+    {
+      "name": "drum_mutation_02",
+      "preset": "drum_mutation",
+      "file": "one-shots/drum_mutation/drum_mutation_02.wav",
+      "duration_seconds": 0.2627,
+      "source_feature_index": 30,
+      "source_features": {
+        "phase": 3.69599136,
+        "envelope": 0.1426715,
+        "interference": -0.9457793,
+        "spectral": 0.01456952,
+        "coordinate": 0.54166667,
+        "amplitude": 0.01386333
+      },
+      "equation": "Transient mutations from the release's rhythmic features"
+    },
+    {
+      "name": "drum_mutation_03",
+      "preset": "drum_mutation",
+      "file": "one-shots/drum_mutation/drum_mutation_03.wav",
+      "duration_seconds": 0.3845,
+      "source_feature_index": 59,
+      "source_features": {
+        "phase": 0.9855977,
+        "envelope": 0.31180885,
+        "interference": 0.67963463,
+        "spectral": 0.19180667,
+        "coordinate": 0.72916667,
+        "amplitude": 0.2729878
+      },
+      "equation": "Transient mutations from the release's rhythmic features"
+    },
+    {
+      "name": "drum_mutation_04",
+      "preset": "drum_mutation",
+      "file": "one-shots/drum_mutation/drum_mutation_04.wav",
+      "duration_seconds": 0.5619,
+      "source_feature_index": 88,
+      "source_features": {
+        "phase": 4.55838934,
+        "envelope": 0.55815965,
+        "interference": -0.71713354,
+        "spectral": 0.15303001,
+        "coordinate": 0.91666667,
+        "amplitude": 0.10692329
+      },
+      "equation": "Transient mutations from the release's rhythmic features"
+    },
+    {
+      "name": "spectral_ping_01",
+      "preset": "spectral_ping",
+      "file": "one-shots/spectral_ping/spectral_ping_01.wav",
+      "duration_seconds": 0.29,
+      "source_feature_index": 38,
+      "source_features": {
+        "phase": 4.68158905,
+        "envelope": 0.1805778,
+        "interference": -0.87024508,
+        "spectral": 0.04976795,
+        "coordinate": 0.875,
+        "amplitude": 0.03957463
+      },
+      "equation": "Short spectral resonator with unstable partials"
+    },
+    {
+      "name": "spectral_ping_02",
+      "preset": "spectral_ping",
+      "file": "one-shots/spectral_ping/spectral_ping_02.wav",
+      "duration_seconds": 0.4289,
+      "source_feature_index": 67,
+      "source_features": {
+        "phase": 1.97119539,
+        "envelope": 0.37351108,
+        "interference": 0.993774,
+        "spectral": 0.0779607,
+        "coordinate": 0.04166667,
+        "amplitude": 0.33384615
+      },
+      "equation": "Short spectral resonator with unstable partials"
+    },
+    {
+      "name": "spectral_ping_03",
+      "preset": "spectral_ping",
+      "file": "one-shots/spectral_ping/spectral_ping_03.wav",
+      "duration_seconds": 0.6156,
+      "source_feature_index": 96,
+      "source_features": {
+        "phase": 5.54398704,
+        "envelope": 0.63279266,
+        "interference": -0.90779201,
+        "spectral": 0.48035782,
+        "coordinate": 0.22916667,
+        "amplitude": 0.08093727
+      },
+      "equation": "Short spectral resonator with unstable partials"
+    },
+    {
+      "name": "spectral_ping_04",
+      "preset": "spectral_ping",
+      "file": "one-shots/spectral_ping/spectral_ping_04.wav",
+      "duration_seconds": 0.7922,
+      "source_feature_index": 125,
+      "source_features": {
+        "phase": 2.83359337,
+        "envelope": 0.87808826,
+        "interference": -0.31325159,
+        "spectral": 0.0792076,
+        "coordinate": 0.41666667,
+        "amplitude": 0.41166829
+      },
+      "equation": "Short spectral resonator with unstable partials"
+    },
+    {
+      "name": "interference_noise_01",
+      "preset": "interference_noise",
+      "file": "one-shots/interference_noise/interference_noise_01.wav",
+      "duration_seconds": 0.4773,
+      "source_feature_index": 75,
+      "source_features": {
+        "phase": 2.95679309,
+        "envelope": 0.44067876,
+        "interference": 0.75658686,
+        "spectral": 0.04629002,
+        "coordinate": 0.375,
+        "amplitude": 0.31479201
+      },
+      "equation": "Interference-shaped noise burst"
+    },
+    {
+      "name": "interference_noise_02",
+      "preset": "interference_noise",
+      "file": "one-shots/interference_noise/interference_noise_02.wav",
+      "duration_seconds": 0.6687,
+      "source_feature_index": 104,
+      "source_features": {
+        "phase": 0.24639942,
+        "envelope": 0.70659084,
+        "interference": 0.15293251,
+        "spectral": 0.67325716,
+        "coordinate": 0.5625,
+        "amplitude": 0.30144926
+      },
+      "equation": "Interference-shaped noise burst"
+    },
+    {
+      "name": "interference_noise_03",
+      "preset": "interference_noise",
+      "file": "one-shots/interference_noise/interference_noise_03.wav",
+      "duration_seconds": 0.8281,
+      "source_feature_index": 133,
+      "source_features": {
+        "phase": 3.81919107,
+        "envelope": 0.92796732,
+        "interference": -0.981387,
+        "spectral": 0.1032689,
+        "coordinate": 0.75,
+        "amplitude": 0.33039414
+      },
+      "equation": "Interference-shaped noise burst"
+    },
+    {
+      "name": "interference_noise_04",
+      "preset": "interference_noise",
+      "file": "one-shots/interference_noise/interference_noise_04.wav",
+      "duration_seconds": 0.8787,
+      "source_feature_index": 162,
+      "source_features": {
+        "phase": 1.10879741,
+        "envelope": 0.99819677,
+        "interference": 0.84177944,
+        "spectral": 0.54397999,
+        "coordinate": 0.9375,
+        "amplitude": 0.70903342
+      },
+      "equation": "Interference-shaped noise burst"
+    },
+    {
+      "name": "granular_shiver_01",
+      "preset": "granular_shiver",
+      "file": "one-shots/granular_shiver/granular_shiver_01.wav",
+      "duration_seconds": 1.1702,
+      "source_feature_index": 112,
+      "source_features": {
+        "phase": 1.23199712,
+        "envelope": 0.77710221,
+        "interference": 0.99445712,
+        "spectral": 0.33355641,
+        "coordinate": 0.89583333,
+        "amplitude": 0.53943077
+      },
+      "equation": "Micro-sliced and pitch-fractured texture"
+    },
+    {
+      "name": "granular_shiver_02",
+      "preset": "granular_shiver",
+      "file": "one-shots/granular_shiver/granular_shiver_02.wav",
+      "duration_seconds": 1.4156,
+      "source_feature_index": 141,
+      "source_features": {
+        "phase": 4.80478876,
+        "envelope": 0.96589689,
+        "interference": -0.75709503,
+        "spectral": 0.3092314,
+        "coordinate": 0.0625,
+        "amplitude": 0.42788924
+      },
+      "equation": "Micro-sliced and pitch-fractured texture"
+    },
+    {
+      "name": "granular_shiver_03",
+      "preset": "granular_shiver",
+      "file": "one-shots/granular_shiver/granular_shiver_03.wav",
+      "duration_seconds": 1.4383,
+      "source_feature_index": 170,
+      "source_features": {
+        "phase": 2.0943951,
+        "envelope": 0.98333656,
+        "interference": 0.99371788,
+        "spectral": 0.18070165,
+        "coordinate": 0.25,
+        "amplitude": 0.64101215
+      },
+      "equation": "Micro-sliced and pitch-fractured texture"
+    },
+    {
+      "name": "granular_shiver_04",
+      "preset": "granular_shiver",
+      "file": "one-shots/granular_shiver/granular_shiver_04.wav",
+      "duration_seconds": 1.2259,
+      "source_feature_index": 199,
+      "source_features": {
+        "phase": 5.66718675,
+        "envelope": 0.81995949,
+        "interference": -0.89893602,
+        "spectral": 0.6782328,
+        "coordinate": 0.4375,
+        "amplitude": 0.21011268
+      },
+      "equation": "Micro-sliced and pitch-fractured texture"
+    },
+    {
+      "name": "phase_pluck_01",
+      "preset": "phase_pluck",
+      "file": "one-shots/phase_pluck/phase_pluck_01.wav",
+      "duration_seconds": 0.8729,
+      "source_feature_index": 149,
+      "source_features": {
+        "phase": 5.79038646,
+        "envelope": 0.99022165,
+        "interference": -0.08964566,
+        "spectral": 0.83972602,
+        "coordinate": 0.39583333,
+        "amplitude": 0.59211929
+      },
+      "equation": "Inharmonic pluck with a moving spectral envelope"
+    },
+    {
+      "name": "phase_pluck_02",
+      "preset": "phase_pluck",
+      "file": "one-shots/phase_pluck/phase_pluck_02.wav",
+      "duration_seconds": 0.8469,
+      "source_feature_index": 178,
+      "source_features": {
+        "phase": 3.0799928,
+        "envelope": 0.95409535,
+        "interference": 0.63336249,
+        "spectral": 0.09847741,
+        "coordinate": 0.58333333,
+        "amplitude": 0.4775903
+      },
+      "equation": "Inharmonic pluck with a moving spectral envelope"
+    },
+    {
+      "name": "phase_pluck_03",
+      "preset": "phase_pluck",
+      "file": "one-shots/phase_pluck/phase_pluck_03.wav",
+      "duration_seconds": 0.7021,
+      "source_feature_index": 207,
+      "source_features": {
+        "phase": 0.36959914,
+        "envelope": 0.75295659,
+        "interference": 0.14540171,
+        "spectral": 0.68249138,
+        "coordinate": 0.77083333,
+        "amplitude": 0.46517786
+      },
+      "equation": "Inharmonic pluck with a moving spectral envelope"
+    },
+    {
+      "name": "phase_pluck_04",
+      "preset": "phase_pluck",
+      "file": "one-shots/phase_pluck/phase_pluck_04.wav",
+      "duration_seconds": 0.5104,
+      "source_feature_index": 236,
+      "source_features": {
+        "phase": 3.94239078,
+        "envelope": 0.48670621,
+        "interference": -0.99668508,
+        "spectral": 0.05987557,
+        "coordinate": 0.95833333,
+        "amplitude": 0.14614385
+      },
+      "equation": "Inharmonic pluck with a moving spectral envelope"
+    },
+    {
+      "name": "sub_pulse_01",
+      "preset": "sub_pulse",
+      "file": "one-shots/sub_pulse/sub_pulse_01.wav",
+      "duration_seconds": 1.3453,
+      "source_feature_index": 186,
+      "source_features": {
+        "phase": 4.06559049,
+        "envelope": 0.91176926,
+        "interference": -0.22213401,
+        "spectral": 0.14879661,
+        "coordinate": 0.91666667,
+        "amplitude": 0.26596963
+      },
+      "equation": "Deep modulated sub pulse"
+    },
+    {
+      "name": "sub_pulse_02",
+      "preset": "sub_pulse",
+      "file": "one-shots/sub_pulse/sub_pulse_02.wav",
+      "duration_seconds": 1.0453,
+      "source_feature_index": 215,
+      "source_features": {
+        "phase": 1.35519683,
+        "envelope": 0.68100617,
+        "interference": 0.99367986,
+        "spectral": 0.25290507,
+        "coordinate": 0.08333333,
+        "amplitude": 0.60820794
+      },
+      "equation": "Deep modulated sub pulse"
+    },
+    {
+      "name": "sub_pulse_03",
+      "preset": "sub_pulse",
+      "file": "one-shots/sub_pulse/sub_pulse_03.wav",
+      "duration_seconds": 0.7016,
+      "source_feature_index": 244,
+      "source_features": {
+        "phase": 4.92798848,
+        "envelope": 0.416616,
+        "interference": -0.63253704,
+        "spectral": 0.15471856,
+        "coordinate": 0.27083333,
+        "amplitude": 0.12686286
+      },
+      "equation": "Deep modulated sub pulse"
+    },
+    {
+      "name": "sub_pulse_04",
+      "preset": "sub_pulse",
+      "file": "one-shots/sub_pulse/sub_pulse_04.wav",
+      "duration_seconds": 0.2824,
+      "source_feature_index": 17,
+      "source_features": {
+        "phase": 2.0943951,
+        "envelope": 0.09418608,
+        "interference": 0.44051119,
+        "spectral": 0.0146903,
+        "coordinate": 0.0,
+        "amplitude": 0.04603542
+      },
+      "equation": "Deep modulated sub pulse"
+    }
+  ],
+  "loops": [
+    {
+      "name": "glitch_loop",
+      "file": "loops/glitch_loop_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 26,
+      "clock": 3,
+      "equation": "Eq(y, (a*sin(2*pi*f*r*t + psi) + sin(2*pi*f*t))*exp(-a*t))"
+    },
+    {
+      "name": "hybrid_bass_loop",
+      "file": "loops/hybrid_bass_loop_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 12,
+      "clock": 5,
+      "equation": "Eq(y, (a*sin(2*pi*f*r*t + psi) + sin(2*pi*f*t))*exp(-a*t))"
+    },
+    {
+      "name": "drum_mutation_loop",
+      "file": "loops/drum_mutation_loop_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 10,
+      "clock": 7,
+      "equation": "Eq(y, (a*sin(2*pi*f*r*t + psi) + sin(2*pi*f*t))*exp(-a*t))"
+    },
+    {
+      "name": "spectral_texture_loop",
+      "file": "loops/spectral_texture_loop_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 17,
+      "clock": 11,
+      "equation": "Eq(y, (a*sin(2*pi*f*r*t + psi) + sin(2*pi*f*t))*exp(-a*t))"
+    }
+  ],
+  "stems": [
+    {
+      "name": "drums",
+      "file": "stems/drums_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 22
+    },
+    {
+      "name": "bass",
+      "file": "stems/bass_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 19
+    },
+    {
+      "name": "glitch",
+      "file": "stems/glitch_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 15
+    },
+    {
+      "name": "texture",
+      "file": "stems/texture_4bar_113bpm.wav",
+      "bars": 4,
+      "bpm": 113,
+      "events": 13
+    }
+  ],
+  "midi": {
+    "midi": "C:\\Users\\photo\\OneDrive\\Документы\\GitHub\\eli_lab-math-cover-generator\\output\\sound-lab-211\\midi\\math-sound-arrangement.mid",
+    "midi_backend": "pretty_midi",
+    "score": "musicxml",
+    "events": 320
+  },
+  "stats": {
+    "one_shots": 32,
+    "loops": 4,
+    "stems": 4,
+    "source_feature_rows": 256,
+    "raw_csv_sources": [
+      "breaks.csv",
+      "drum-programming.csv",
+      "entity-events.csv",
+      "entity-library.csv",
+      "polyrhythms.csv",
+      "rhythm-events.csv"
+    ],
+    "entity_rows": 48
+  }
+}

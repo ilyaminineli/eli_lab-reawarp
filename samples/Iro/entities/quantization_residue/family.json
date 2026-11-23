@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "quantization_residue",
+    "synthesis_approach": "nonlinear_quantization_error",
+    "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version.",
+    "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+    "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      1.0684,
+      2.0106
+    ],
+    "source_feature_indices": [
+      99,
+      116,
+      133,
+      150,
+      167,
+      184
+    ]
+  },
+  "entities": [
+    {
+      "name": "quantization_residue_01",
+      "family": "quantization_residue",
+      "variation": 1,
+      "file": "entities/quantization_residue/quantization_residue_01.wav",
+      "seed": 5650,
+      "source_feature_index": 99,
+      "source_features": {
+        "phase": 5.91358617,
+        "envelope": 0.66069256,
+        "interference": -0.61359356,
+        "carrier_2": -0.99901662,
+        "spectral": 0.62006466,
+        "coordinate": 0.35416667,
+        "phase_field": 0.12891884,
+        "amplitude": 0.13850825
+      },
+      "duration_seconds": 1.06839,
+      "frequency_hz": 88.84889,
+      "rms": 0.163902,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    },
+    {
+      "name": "quantization_residue_02",
+      "family": "quantization_residue",
+      "variation": 2,
+      "file": "entities/quantization_residue/quantization_residue_02.wav",
+      "seed": 5798,
+      "source_feature_index": 116,
+      "source_features": {
+        "phase": 1.72479597,
+        "envelope": 0.81032558,
+        "interference": 0.85995822,
+        "carrier_2": -0.29138975,
+        "spectral": 0.19241077,
+        "coordinate": 0.04166667,
+        "phase_field": 0.20659501,
+        "amplitude": 0.56069717
+      },
+      "duration_seconds": 1.271111,
+      "frequency_hz": 26.05059,
+      "rms": 0.16712,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    },
+    {
+      "name": "quantization_residue_03",
+      "family": "quantization_residue",
+      "variation": 3,
+      "file": "entities/quantization_residue/quantization_residue_03.wav",
+      "seed": 5946,
+      "source_feature_index": 133,
+      "source_features": {
+        "phase": 3.81919107,
+        "envelope": 0.92796732,
+        "interference": -0.981387,
+        "carrier_2": 0.85408525,
+        "spectral": 0.1032689,
+        "coordinate": 0.75,
+        "phase_field": -0.26725329,
+        "amplitude": 0.33039414
+      },
+      "duration_seconds": 1.61093,
+      "frequency_hz": 412.22401,
+      "rms": 0.195019,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    },
+    {
+      "name": "quantization_residue_04",
+      "family": "quantization_residue",
+      "variation": 4,
+      "file": "entities/quantization_residue/quantization_residue_04.wav",
+      "seed": 6094,
+      "source_feature_index": 150,
+      "source_features": {
+        "phase": 5.91358617,
+        "envelope": 0.99224476,
+        "interference": -0.00109662,
+        "carrier_2": 0.71619448,
+        "spectral": 0.89938585,
+        "coordinate": 0.4375,
+        "phase_field": 0.07819323,
+        "amplitude": 0.61020507
+      },
+      "duration_seconds": 1.743628,
+      "frequency_hz": 266.89319,
+      "rms": 0.211694,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    },
+    {
+      "name": "quantization_residue_05",
+      "family": "quantization_residue",
+      "variation": 5,
+      "file": "entities/quantization_residue/quantization_residue_05.wav",
+      "seed": 6242,
+      "source_feature_index": 167,
+      "source_features": {
+        "phase": 1.72479597,
+        "envelope": 0.99064475,
+        "interference": 0.98861358,
+        "carrier_2": -0.4978646,
+        "spectral": 0.27160398,
+        "coordinate": 0.125,
+        "phase_field": 0.12530621,
+        "amplitude": 0.67859594
+      },
+      "duration_seconds": 1.822313,
+      "frequency_hz": 97.24824,
+      "rms": 0.203402,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    },
+    {
+      "name": "quantization_residue_06",
+      "family": "quantization_residue",
+      "variation": 6,
+      "file": "entities/quantization_residue/quantization_residue_06.wav",
+      "seed": 6390,
+      "source_feature_index": 184,
+      "source_features": {
+        "phase": 3.81919107,
+        "envelope": 0.92348548,
+        "interference": 0.01781101,
+        "carrier_2": -0.96382226,
+        "spectral": 0.12286427,
+        "coordinate": 0.83333333,
+        "phase_field": -0.16209731,
+        "amplitude": 0.31737396
+      },
+      "duration_seconds": 2.010567,
+      "frequency_hz": 1072.65477,
+      "rms": 0.194278,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "Q(phi)=round(sin(phi)*N)/N; N=2^b; b=3+floor(5*coordinate); y=E*(Q(phi)-sin(phi))",
+      "description": "A phase-quantized waveform with bit depth and staircase size controlled by coordinates",
+      "synthesis_approach": "nonlinear_quantization_error",
+      "sonic_identity": "The signal is the difference between a smooth phase carrier and its coordinate-controlled quantized version."
+    }
+  ]
+}

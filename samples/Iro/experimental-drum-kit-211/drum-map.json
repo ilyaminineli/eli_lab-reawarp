@@ -1,0 +1,583 @@
+{
+  "format": "IRO_DRUM_MAP_1",
+  "seed": 211,
+  "sample_rate": 22050,
+  "instruments": [
+    {
+      "name": "kick",
+      "midi_note": 36,
+      "midi_name": "C2",
+      "default_sample": "kick/kick_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "kick/kick_01_core.wav",
+          "sha256": "fd01105ff56d2c118fa52ab1cfa0f33de0ba20fc081ab34e463c9077dc245f28"
+        },
+        {
+          "name": "ghost",
+          "file": "kick/kick_02_ghost.wav",
+          "sha256": "0450823f14b7b3f68714fd3128ab88fda04fcc7b2582f63c7b5c669f10730042"
+        },
+        {
+          "name": "hard_hit",
+          "file": "kick/kick_03_hard_hit.wav",
+          "sha256": "09b680bb3a858b871e38d13fcf5b2d2e2ada4e2c554cbf5cb9d8977d95700dc1"
+        },
+        {
+          "name": "metallic",
+          "file": "kick/kick_04_metallic.wav",
+          "sha256": "09c6c093f81214b4c45c1c8bc783b38625deca5685e8c1269ea638ee60fdb3eb"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "kick/kick_05_phase_fracture.wav",
+          "sha256": "d16236c78e7cb93d06e9671b45bfbbb4e8f9834276745657f155dfbdb3e2244b"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "kick/kick_06_granular_hybrid.wav",
+          "sha256": "8bd309c7b6f823e7262745502f3d2d4c5abc153c4d7c3ba2f47e8c1014fe530a"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "kick/kick_07_quantized_residue.wav",
+          "sha256": "343a3070cd19f2490f48b752a1317ac2921f4dca7b23d21f6c024df9e7a5a678"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "kick/kick_08_reverse_tail.wav",
+          "sha256": "91a9896cf6502f97c75c471a46dfba1fe0f11cc63a9a18474f45c34754e21dab"
+        }
+      ]
+    },
+    {
+      "name": "sub_kick",
+      "midi_note": 35,
+      "midi_name": "B1",
+      "default_sample": "sub_kick/sub_kick_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "sub_kick/sub_kick_01_core.wav",
+          "sha256": "0b4386a2291cdb0439f37f89e8fe504fef2ed6b692268870a35ce2858ef39b6d"
+        },
+        {
+          "name": "ghost",
+          "file": "sub_kick/sub_kick_02_ghost.wav",
+          "sha256": "68464db78e8c787d100f53d6854981f15af59f56772a1c35e18b43fe6baeafd7"
+        },
+        {
+          "name": "hard_hit",
+          "file": "sub_kick/sub_kick_03_hard_hit.wav",
+          "sha256": "02eb9ce93540ccb863c413687eddd7f871baffc7123d19f87abdc968c1cad9f3"
+        },
+        {
+          "name": "metallic",
+          "file": "sub_kick/sub_kick_04_metallic.wav",
+          "sha256": "e7ead132910b4196fa1aa4b7e0d533329cb93de365d3d96b0eefd94209adb348"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "sub_kick/sub_kick_05_phase_fracture.wav",
+          "sha256": "a5c1924d2effc69b4c4ff6fcb91b68b1ab559a0a9bab99b304f1bffac9446879"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "sub_kick/sub_kick_06_granular_hybrid.wav",
+          "sha256": "b08b416eed96b5071e3016545b54f648a98c284c582c276f224f77dc8c42823c"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "sub_kick/sub_kick_07_quantized_residue.wav",
+          "sha256": "4e2413c13aeac5ccf3cb8f71c74d601fc3390cc23ae9c9392c0af9b6849aa4db"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "sub_kick/sub_kick_08_reverse_tail.wav",
+          "sha256": "4550ef1cfaddd3961222d05093dc02fbc206b5cad8e79fab6725645586f33724"
+        }
+      ]
+    },
+    {
+      "name": "snare",
+      "midi_note": 38,
+      "midi_name": "D2",
+      "default_sample": "snare/snare_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "snare/snare_01_core.wav",
+          "sha256": "311b606bf6ad44c81da6fcee20f41bbade95889d21c2c230954ce2b0b3cd5b21"
+        },
+        {
+          "name": "ghost",
+          "file": "snare/snare_02_ghost.wav",
+          "sha256": "fbe09a2ee89f5c6ce0140664d1ea83ce0eb6f6a94a71de100f8261375077985f"
+        },
+        {
+          "name": "hard_hit",
+          "file": "snare/snare_03_hard_hit.wav",
+          "sha256": "83e9b51ba4ca8dd18b36f63c7b5a29be7abda8654c75d48958ba7c68f8fb8472"
+        },
+        {
+          "name": "metallic",
+          "file": "snare/snare_04_metallic.wav",
+          "sha256": "256c248b503e3826b2838834c0687fabf1fa12997ee165524676c2ebca722f37"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "snare/snare_05_phase_fracture.wav",
+          "sha256": "2c50f3f0b5ab9f03fdfe5b075dd161e699ff16ae864c6133c76283bb31a366b6"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "snare/snare_06_granular_hybrid.wav",
+          "sha256": "1b6a8fc7a116459be9035ef127bacf4a9ff885f65f9c69754d78e61e73e74e31"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "snare/snare_07_quantized_residue.wav",
+          "sha256": "88830c64140034181b6c6f98e74e751e6de7d0d4ca22c8417779ef977c3b4ad5"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "snare/snare_08_reverse_tail.wav",
+          "sha256": "fb833ed0182cd6ac6d4f652724541a6e9a4b5ebf7a6d2da0985927781d08ff2b"
+        }
+      ]
+    },
+    {
+      "name": "rim_click",
+      "midi_note": 37,
+      "midi_name": "C#2",
+      "default_sample": "rim_click/rim_click_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "rim_click/rim_click_01_core.wav",
+          "sha256": "502dfcc07e5338ba95c3643441c63847329bffb86b1c4bf6a94f4527e229a717"
+        },
+        {
+          "name": "ghost",
+          "file": "rim_click/rim_click_02_ghost.wav",
+          "sha256": "f11e4a2a3cad30cec11378f6640882bd24ef2971eed31dd9ac6e80c660b857b9"
+        },
+        {
+          "name": "hard_hit",
+          "file": "rim_click/rim_click_03_hard_hit.wav",
+          "sha256": "05939d0c481e9caadab652b6c30bf76153206e4060296b5ba6a6084b2de0ea25"
+        },
+        {
+          "name": "metallic",
+          "file": "rim_click/rim_click_04_metallic.wav",
+          "sha256": "5001626aaefea6564d526ebd9b6b8b8332402bebc9607159c84eed788ad22080"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "rim_click/rim_click_05_phase_fracture.wav",
+          "sha256": "e163d32923531ee36a1b8852590e0183944eccf70f8af9d02f23939fdbef6292"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "rim_click/rim_click_06_granular_hybrid.wav",
+          "sha256": "d0bdcbab9ebf1cf87aff9a0c00add9ea9e76b3b1830b55505907ba5a9366ab62"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "rim_click/rim_click_07_quantized_residue.wav",
+          "sha256": "5d3f1418411d32112e1533de56403590ec072b4f321937421043736557c3e443"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "rim_click/rim_click_08_reverse_tail.wav",
+          "sha256": "a8c9eb2d088c33b474cd77760e0863f401e5d7eaa24a8a9ca64deb636d41fa8f"
+        }
+      ]
+    },
+    {
+      "name": "closed_hat",
+      "midi_note": 42,
+      "midi_name": "F#2",
+      "default_sample": "closed_hat/closed_hat_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "closed_hat/closed_hat_01_core.wav",
+          "sha256": "2b6002aca64a909b8a525cb2ec40ae93ccefaebbbf8bf4aaed2308ff3136f6d3"
+        },
+        {
+          "name": "ghost",
+          "file": "closed_hat/closed_hat_02_ghost.wav",
+          "sha256": "cb85c7b7fa8b1516fa3e61721fccac0b52b15d77b4dd1be212c087fe2f32f60a"
+        },
+        {
+          "name": "hard_hit",
+          "file": "closed_hat/closed_hat_03_hard_hit.wav",
+          "sha256": "c4ac6b870955b1364c42df04a3eb8d03609ab53cc0540a218d256432ab7b61bd"
+        },
+        {
+          "name": "metallic",
+          "file": "closed_hat/closed_hat_04_metallic.wav",
+          "sha256": "ff2f520347688e07bd078967c60180713521437831f6ea8cd1a76fcc4db62ad0"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "closed_hat/closed_hat_05_phase_fracture.wav",
+          "sha256": "3d041c764572b7ef33c44382bbd15ef4f2d534af630698c8a81f7a7584d67198"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "closed_hat/closed_hat_06_granular_hybrid.wav",
+          "sha256": "fea2ed4d4595d8753f995c22a8ea5338a1300d449ddbf36aee09a2a63b2250e3"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "closed_hat/closed_hat_07_quantized_residue.wav",
+          "sha256": "3a6ccf22dc7da7672e1611356f13f1e4ba4e2441d47faf4bda1d30f99586ed0c"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "closed_hat/closed_hat_08_reverse_tail.wav",
+          "sha256": "2d92c01bbcfeb2dbe02046d53e0e268489be34087dffc92b80f85b56b7204ed2"
+        }
+      ]
+    },
+    {
+      "name": "open_hat",
+      "midi_note": 46,
+      "midi_name": "A#2",
+      "default_sample": "open_hat/open_hat_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "open_hat/open_hat_01_core.wav",
+          "sha256": "8e42ad3e08f5578d4d4a421c5844ac982642af8e5e7e6bc6dc8c3b29fc5eb02d"
+        },
+        {
+          "name": "ghost",
+          "file": "open_hat/open_hat_02_ghost.wav",
+          "sha256": "f8764cb8d2612bfded1acca99ce4ea52082f805e1f095e906f9cb5013d544322"
+        },
+        {
+          "name": "hard_hit",
+          "file": "open_hat/open_hat_03_hard_hit.wav",
+          "sha256": "2a1a5beb50c8685501de3887d126736293b9ded063f09bfb9a5aeb6e50be95a1"
+        },
+        {
+          "name": "metallic",
+          "file": "open_hat/open_hat_04_metallic.wav",
+          "sha256": "7eae89e928cba4ecd8355607670eaf32cea5a9cbc76d2bac244b6615560f1924"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "open_hat/open_hat_05_phase_fracture.wav",
+          "sha256": "ecf19340396e756742e9bd3a3e63bfcd66cce36a91029d19e6e3bda37bb8e2a5"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "open_hat/open_hat_06_granular_hybrid.wav",
+          "sha256": "6fd2cae864388412c53892e3d58921c27938d9edc89deb254877a20add174afc"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "open_hat/open_hat_07_quantized_residue.wav",
+          "sha256": "ace79e0b9c7f014d22f92203691ceda0ed27e4152ce36333f59602ecf000dc45"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "open_hat/open_hat_08_reverse_tail.wav",
+          "sha256": "0a9edfea4fa09aacf52af99ac59a90bf73e468bd4e3ed9ab4cd8791832f1ca7e"
+        }
+      ]
+    },
+    {
+      "name": "metallic_ping",
+      "midi_note": 51,
+      "midi_name": "D#3",
+      "default_sample": "metallic_ping/metallic_ping_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "metallic_ping/metallic_ping_01_core.wav",
+          "sha256": "76513424ad470b594a0d49a330049ae2ad80710c21a84f3ccedc9fde48d918bd"
+        },
+        {
+          "name": "ghost",
+          "file": "metallic_ping/metallic_ping_02_ghost.wav",
+          "sha256": "447b3dcf7563a93b8d63e9c5596fdd53502f4cc780c3a260b2eff7990c1ac1c2"
+        },
+        {
+          "name": "hard_hit",
+          "file": "metallic_ping/metallic_ping_03_hard_hit.wav",
+          "sha256": "f3c98ab016e4bb015a0d9c68c7a274e79e4b42b44e630a290de853344e49509c"
+        },
+        {
+          "name": "metallic",
+          "file": "metallic_ping/metallic_ping_04_metallic.wav",
+          "sha256": "70ef2cc01660682c0b2f19aea2cfb016ce79a79cd9d827e1b4da2f16e5d4ff43"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "metallic_ping/metallic_ping_05_phase_fracture.wav",
+          "sha256": "7d22b4f5aed4db72a00a9fe2854376fc90f680076db51cb2d120323ffffa2c6e"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "metallic_ping/metallic_ping_06_granular_hybrid.wav",
+          "sha256": "1748fe2a91bdaaff5c52e675e892597b5d74a765c1396665b0da5ffff1a4588a"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "metallic_ping/metallic_ping_07_quantized_residue.wav",
+          "sha256": "c21d8f9756350c66e6b33da04b4f9926f415062ec450d5e8a13b23b4e1c8b3b2"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "metallic_ping/metallic_ping_08_reverse_tail.wav",
+          "sha256": "7dc3d68816b028f744f952e576afdeb3c496de50fb3cea2da26189f86ba736a8"
+        }
+      ]
+    },
+    {
+      "name": "glitch_tom",
+      "midi_note": 45,
+      "midi_name": "A2",
+      "default_sample": "glitch_tom/glitch_tom_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "glitch_tom/glitch_tom_01_core.wav",
+          "sha256": "54b5e0a0c2c7f4bac43d784268b9be9c87a254295411c891d0dd77a0972c8108"
+        },
+        {
+          "name": "ghost",
+          "file": "glitch_tom/glitch_tom_02_ghost.wav",
+          "sha256": "7d43f6a407ebaf90e88d36d2d26a43ddb44e6ea6125d501e3d3cf5532882e383"
+        },
+        {
+          "name": "hard_hit",
+          "file": "glitch_tom/glitch_tom_03_hard_hit.wav",
+          "sha256": "8ac812e685f26e0a0b25f95698b2de395f53ee37774267b2f96cd11637842fa2"
+        },
+        {
+          "name": "metallic",
+          "file": "glitch_tom/glitch_tom_04_metallic.wav",
+          "sha256": "ec80906ed6790dbd186592f9a38218ef2ae279926c4f14b89c144a7e41c2a7fc"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "glitch_tom/glitch_tom_05_phase_fracture.wav",
+          "sha256": "1348336367ad6cc0ac5895dda81f346768b573d1b93aa6f256f7f201ca62bb9d"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "glitch_tom/glitch_tom_06_granular_hybrid.wav",
+          "sha256": "578f4bc593c8847b590dd5daf3f83507391631e60e581d2261a2cebfc4552bdc"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "glitch_tom/glitch_tom_07_quantized_residue.wav",
+          "sha256": "d60fc8246dc66fa5d56888e5756637958637f10dbe1588785e531c476f1a1bb1"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "glitch_tom/glitch_tom_08_reverse_tail.wav",
+          "sha256": "9ca3acac379f595f93cefbffa565d007f30820c0d9915546123d8ba34f2222e4"
+        }
+      ]
+    },
+    {
+      "name": "phase_click",
+      "midi_note": 39,
+      "midi_name": "D#2",
+      "default_sample": "phase_click/phase_click_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "phase_click/phase_click_01_core.wav",
+          "sha256": "86c133c820244552b8e416e3690f6dcdfab53a50d80ceff6a864a22a913b29e9"
+        },
+        {
+          "name": "ghost",
+          "file": "phase_click/phase_click_02_ghost.wav",
+          "sha256": "d11cba548cc8a3a200f170c14ecb615002557cfc6d39dd62b06bd59f379ad0e0"
+        },
+        {
+          "name": "hard_hit",
+          "file": "phase_click/phase_click_03_hard_hit.wav",
+          "sha256": "b8b4290e43ec9e9b0034404cdfa23915b90f251736b054acabe013bacf5e9567"
+        },
+        {
+          "name": "metallic",
+          "file": "phase_click/phase_click_04_metallic.wav",
+          "sha256": "751392c2acc0ad006e93e95f155fcfe17bc7b26bf16f0c8b14cead8a8f915d74"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "phase_click/phase_click_05_phase_fracture.wav",
+          "sha256": "321edd1bdb864709170ed6b6f6680b4ff3b15a0bc6a768dbb7e0373a35f2e294"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "phase_click/phase_click_06_granular_hybrid.wav",
+          "sha256": "c943781dccc5a6875232b10d97d88904e869dc5f969d437ff4759e562d16c732"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "phase_click/phase_click_07_quantized_residue.wav",
+          "sha256": "4b28c36fc2794608bfea972c6b7abc0f703dbfd00046f3493814d30e01d1bc13"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "phase_click/phase_click_08_reverse_tail.wav",
+          "sha256": "89e2ff4c491173504f311780e0b23a9649ed3be75179e4c2aefba89f579dff2b"
+        }
+      ]
+    },
+    {
+      "name": "granular_shaker",
+      "midi_note": 70,
+      "midi_name": "A#4",
+      "default_sample": "granular_shaker/granular_shaker_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "granular_shaker/granular_shaker_01_core.wav",
+          "sha256": "6f27caf51ad8d6e1d2d3af2d4623d7223ce0ef09b67dc981639e0a1acf63032e"
+        },
+        {
+          "name": "ghost",
+          "file": "granular_shaker/granular_shaker_02_ghost.wav",
+          "sha256": "e705d213fe924595f6e0a295e235a07c2d277031c94bb63f142c81a051ef17c5"
+        },
+        {
+          "name": "hard_hit",
+          "file": "granular_shaker/granular_shaker_03_hard_hit.wav",
+          "sha256": "07b829a814499a2c58be237abc5e7c55c00e911c503cb1b05064d8af46e9946c"
+        },
+        {
+          "name": "metallic",
+          "file": "granular_shaker/granular_shaker_04_metallic.wav",
+          "sha256": "362c3482ec566a274f22e363e8f7e485aded620ae8004df9f734677a54ba4359"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "granular_shaker/granular_shaker_05_phase_fracture.wav",
+          "sha256": "d5978cccfd255570c18be67078115f2137f1a81bc60cb56921845323f486878c"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "granular_shaker/granular_shaker_06_granular_hybrid.wav",
+          "sha256": "67187c8349f4dcd10dc2fca5e781d4afdb4397e0c8f58a8d7afadca3f8d68be2"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "granular_shaker/granular_shaker_07_quantized_residue.wav",
+          "sha256": "51672a449f40a0a22863d93c136d10f13247dd773c5b3507d90fdad2c3a6e28a"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "granular_shaker/granular_shaker_08_reverse_tail.wav",
+          "sha256": "dce97ed499910afac32d406462aba60431c7120e0f0e8342a3bcb0f8142dd361"
+        }
+      ]
+    },
+    {
+      "name": "residue_snap",
+      "midi_note": 75,
+      "midi_name": "D#5",
+      "default_sample": "residue_snap/residue_snap_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "residue_snap/residue_snap_01_core.wav",
+          "sha256": "19e363848778fb5a52fb0310aee608d70f909125d53cf9525db8a062b4131771"
+        },
+        {
+          "name": "ghost",
+          "file": "residue_snap/residue_snap_02_ghost.wav",
+          "sha256": "829736e833a909cce6a0f470e51c1eb5da5937e93385f4d4214cc8ead0c4cc07"
+        },
+        {
+          "name": "hard_hit",
+          "file": "residue_snap/residue_snap_03_hard_hit.wav",
+          "sha256": "638d1ae09911a3d70139b8b3d19f1d7153a98b95b0656e09cfc79dd01bcd9f7d"
+        },
+        {
+          "name": "metallic",
+          "file": "residue_snap/residue_snap_04_metallic.wav",
+          "sha256": "c69330382a7f303e460cf0584b826394a2206fd7150a80e65cdc3854fb669d04"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "residue_snap/residue_snap_05_phase_fracture.wav",
+          "sha256": "6cb97c5f93df5adf65f7fa4709c3123b337527db3a53fb315448838af3f2ce87"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "residue_snap/residue_snap_06_granular_hybrid.wav",
+          "sha256": "4f219389443c780cc3bcb8a09a247ea2d794e3c60c3df8217fa81121a79b24d0"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "residue_snap/residue_snap_07_quantized_residue.wav",
+          "sha256": "be9286222badd52403114f33b1c759258c1f491542de7f70873922921829e28f"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "residue_snap/residue_snap_08_reverse_tail.wav",
+          "sha256": "dffddaf1c487da23abb542b1c29afab400f4c51219475b856edb31dfa39addcd"
+        }
+      ]
+    },
+    {
+      "name": "hybrid_percussion",
+      "midi_note": 60,
+      "midi_name": "C4",
+      "default_sample": "hybrid_percussion/hybrid_percussion_01_core.wav",
+      "articulations": [
+        {
+          "name": "core",
+          "file": "hybrid_percussion/hybrid_percussion_01_core.wav",
+          "sha256": "c54a09aa36d451605b3c8ceda39d2a04c85c94dfe4c5c2439e3d5d16b80ba901"
+        },
+        {
+          "name": "ghost",
+          "file": "hybrid_percussion/hybrid_percussion_02_ghost.wav",
+          "sha256": "1caf9c8829eadfbb1e104eb40eb1aeba0e8f35c56b9e700a0e12989fbe9fae48"
+        },
+        {
+          "name": "hard_hit",
+          "file": "hybrid_percussion/hybrid_percussion_03_hard_hit.wav",
+          "sha256": "8de81abfe3600861796636d805e50d58d29d307f6eadbcb2a0b7edf6298d087c"
+        },
+        {
+          "name": "metallic",
+          "file": "hybrid_percussion/hybrid_percussion_04_metallic.wav",
+          "sha256": "a15148fb013becb81df54669a2bb7984a7ff01f8009cf8011e31aec21377c710"
+        },
+        {
+          "name": "phase_fracture",
+          "file": "hybrid_percussion/hybrid_percussion_05_phase_fracture.wav",
+          "sha256": "a2284005e273340c25dbea6014f3670fdb4a2bef5116770f25355cf3106ed88a"
+        },
+        {
+          "name": "granular_hybrid",
+          "file": "hybrid_percussion/hybrid_percussion_06_granular_hybrid.wav",
+          "sha256": "0409b7d85bd989ad6bcfec0bf0e69054da73c8cf466f0e08dd2f0dbd3db56c79"
+        },
+        {
+          "name": "quantized_residue",
+          "file": "hybrid_percussion/hybrid_percussion_07_quantized_residue.wav",
+          "sha256": "edd8b1fa8d3b4bf0a9e427e9e5793af693428b19c3c16bd826638a80c0434da2"
+        },
+        {
+          "name": "reverse_tail",
+          "file": "hybrid_percussion/hybrid_percussion_08_reverse_tail.wav",
+          "sha256": "fa53b40969e91d7c577ea5183631898397c5730f64cabd103b6500fbf6dcc01a"
+        }
+      ]
+    }
+  ]
+}

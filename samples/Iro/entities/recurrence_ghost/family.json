@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "recurrence_ghost",
+    "synthesis_approach": "granular_recurrence_with_irrational_delays",
+    "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay.",
+    "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+    "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      1.4325,
+      1.5976
+    ],
+    "source_feature_indices": [
+      161,
+      178,
+      195,
+      212,
+      229,
+      246
+    ]
+  },
+  "entities": [
+    {
+      "name": "recurrence_ghost_01",
+      "family": "recurrence_ghost",
+      "variation": 1,
+      "file": "entities/recurrence_ghost/recurrence_ghost_01.wav",
+      "seed": 7854,
+      "source_feature_index": 161,
+      "source_features": {
+        "phase": 0.9855977,
+        "envelope": 0.99900254,
+        "interference": 0.79465201,
+        "carrier_2": -0.05541147,
+        "spectral": 0.61452825,
+        "coordinate": 0.89583333,
+        "phase_field": 0.2045142,
+        "amplitude": 0.71009371
+      },
+      "duration_seconds": 1.432472,
+      "frequency_hz": 296.05413,
+      "rms": 0.081189,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    },
+    {
+      "name": "recurrence_ghost_02",
+      "family": "recurrence_ghost",
+      "variation": 2,
+      "file": "entities/recurrence_ghost/recurrence_ghost_02.wav",
+      "seed": 8002,
+      "source_feature_index": 178,
+      "source_features": {
+        "phase": 3.0799928,
+        "envelope": 0.95409535,
+        "interference": 0.63336249,
+        "carrier_2": -0.98087531,
+        "spectral": 0.09847741,
+        "coordinate": 0.58333333,
+        "phase_field": -0.10640593,
+        "amplitude": 0.4775903
+      },
+      "duration_seconds": 1.475646,
+      "frequency_hz": 225.91654,
+      "rms": 0.086347,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    },
+    {
+      "name": "recurrence_ghost_03",
+      "family": "recurrence_ghost",
+      "variation": 3,
+      "file": "entities/recurrence_ghost/recurrence_ghost_03.wav",
+      "seed": 8150,
+      "source_feature_index": 195,
+      "source_features": {
+        "phase": 5.1743879,
+        "envelope": 0.85080487,
+        "interference": -0.99023539,
+        "carrier_2": -0.43245606,
+        "spectral": 0.46365691,
+        "coordinate": 0.27083333,
+        "phase_field": -0.05647015,
+        "amplitude": 0.1547833
+      },
+      "duration_seconds": 1.470975,
+      "frequency_hz": 115.88748,
+      "rms": 0.060171,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    },
+    {
+      "name": "recurrence_ghost_04",
+      "family": "recurrence_ghost",
+      "variation": 4,
+      "file": "entities/recurrence_ghost/recurrence_ghost_04.wav",
+      "seed": 8298,
+      "source_feature_index": 212,
+      "source_features": {
+        "phase": 0.9855977,
+        "envelope": 0.70840424,
+        "interference": 0.82199377,
+        "carrier_2": 0.76578041,
+        "spectral": 0.39843032,
+        "coordinate": 0.97916667,
+        "phase_field": 0.12404413,
+        "amplitude": 0.58993774
+      },
+      "duration_seconds": 1.597551,
+      "frequency_hz": 776.57153,
+      "rms": 0.065296,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    },
+    {
+      "name": "recurrence_ghost_05",
+      "family": "recurrence_ghost",
+      "variation": 5,
+      "file": "entities/recurrence_ghost/recurrence_ghost_05.wav",
+      "seed": 8446,
+      "source_feature_index": 229,
+      "source_features": {
+        "phase": 3.0799928,
+        "envelope": 0.55073837,
+        "interference": -0.49521533,
+        "carrier_2": 0.81333975,
+        "spectral": 0.0470431,
+        "coordinate": 0.66666667,
+        "phase_field": -0.06453846,
+        "amplitude": 0.27082189
+      },
+      "duration_seconds": 1.548254,
+      "frequency_hz": 602.77918,
+      "rms": 0.048973,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    },
+    {
+      "name": "recurrence_ghost_06",
+      "family": "recurrence_ghost",
+      "variation": 6,
+      "file": "entities/recurrence_ghost/recurrence_ghost_06.wav",
+      "seed": 8594,
+      "source_feature_index": 246,
+      "source_features": {
+        "phase": 5.1743879,
+        "envelope": 0.39978134,
+        "interference": -0.45010598,
+        "carrier_2": -0.36124167,
+        "spectral": 0.19719643,
+        "coordinate": 0.35416667,
+        "phase_field": -0.03425088,
+        "amplitude": 0.13187274
+      },
+      "duration_seconds": 1.504444,
+      "frequency_hz": 355.39557,
+      "rms": 0.038864,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=sum_k (-1)^k*a_k*g(t-k*delta_k); delta_k=T*(0.13+fract(k*sqrt(2)+coordinate))",
+      "description": "Feature-indexed microfragments recur at irrationally spaced delays with changing polarity",
+      "synthesis_approach": "granular_recurrence_with_irrational_delays",
+      "sonic_identity": "Short grains recur at irrationally offset delays with changing polarity and spectral decay."
+    }
+  ]
+}

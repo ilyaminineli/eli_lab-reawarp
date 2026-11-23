@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "ratio_orbit",
+    "synthesis_approach": "rational_ratio_additive_synthesis",
+    "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset.",
+    "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+    "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      0.7962,
+      2.0274
+    ],
+    "source_feature_indices": [
+      68,
+      85,
+      102,
+      119,
+      136,
+      153
+    ]
+  },
+  "entities": [
+    {
+      "name": "ratio_orbit_01",
+      "family": "ratio_orbit",
+      "variation": 1,
+      "file": "entities/ratio_orbit/ratio_orbit_01.wav",
+      "seed": 4548,
+      "source_feature_index": 68,
+      "source_features": {
+        "phase": 2.0943951,
+        "envelope": 0.38162917,
+        "interference": 0.99987581,
+        "carrier_2": 0.77051324,
+        "spectral": 0.07012962,
+        "coordinate": 0.08333333,
+        "phase_field": 0.16655519,
+        "amplitude": 0.33667381
+      },
+      "duration_seconds": 0.796236,
+      "frequency_hz": 24.85065,
+      "rms": 0.187126,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    },
+    {
+      "name": "ratio_orbit_02",
+      "family": "ratio_orbit",
+      "variation": 2,
+      "file": "entities/ratio_orbit/ratio_orbit_02.wav",
+      "seed": 4696,
+      "source_feature_index": 85,
+      "source_features": {
+        "phase": 4.1887902,
+        "envelope": 0.53041912,
+        "interference": -0.37227406,
+        "carrier_2": -0.42577929,
+        "spectral": 0.09747183,
+        "coordinate": 0.79166667,
+        "phase_field": -0.42651112,
+        "amplitude": 0.15934505
+      },
+      "duration_seconds": 1.161587,
+      "frequency_hz": 339.73438,
+      "rms": 0.171185,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    },
+    {
+      "name": "ratio_orbit_03",
+      "family": "ratio_orbit",
+      "variation": 3,
+      "file": "entities/ratio_orbit/ratio_orbit_03.wav",
+      "seed": 4844,
+      "source_feature_index": 102,
+      "source_features": {
+        "phase": 0.0,
+        "envelope": 0.68835073,
+        "interference": -0.17320499,
+        "carrier_2": -0.98228725,
+        "spectral": 0.68769934,
+        "coordinate": 0.47916667,
+        "phase_field": 0.24169186,
+        "amplitude": 0.22958207
+      },
+      "duration_seconds": 1.371111,
+      "frequency_hz": 228.75113,
+      "rms": 0.174302,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    },
+    {
+      "name": "ratio_orbit_04",
+      "family": "ratio_orbit",
+      "variation": 4,
+      "file": "entities/ratio_orbit/ratio_orbit_04.wav",
+      "seed": 4992,
+      "source_feature_index": 119,
+      "source_features": {
+        "phase": 2.0943951,
+        "envelope": 0.8340909,
+        "interference": 0.53795946,
+        "carrier_2": -0.06279052,
+        "spectral": 0.13009398,
+        "coordinate": 0.16666667,
+        "phase_field": 0.10102083,
+        "amplitude": 0.52979232
+      },
+      "duration_seconds": 1.570612,
+      "frequency_hz": 93.65152,
+      "rms": 0.210896,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    },
+    {
+      "name": "ratio_orbit_05",
+      "family": "ratio_orbit",
+      "variation": 5,
+      "file": "entities/ratio_orbit/ratio_orbit_05.wav",
+      "seed": 5140,
+      "source_feature_index": 136,
+      "source_features": {
+        "phase": 4.1887902,
+        "envelope": 0.94369137,
+        "interference": -0.98658174,
+        "carrier_2": 0.95105652,
+        "spectral": 0.14718848,
+        "coordinate": 0.875,
+        "phase_field": -0.25869207,
+        "amplitude": 0.34930154
+      },
+      "duration_seconds": 1.90381,
+      "frequency_hz": 870.78738,
+      "rms": 0.246092,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    },
+    {
+      "name": "ratio_orbit_06",
+      "family": "ratio_orbit",
+      "variation": 6,
+      "file": "entities/ratio_orbit/ratio_orbit_06.wav",
+      "seed": 5288,
+      "source_feature_index": 153,
+      "source_features": {
+        "phase": 0.0,
+        "envelope": 0.99691834,
+        "interference": 0.25484479,
+        "carrier_2": 0.53582679,
+        "spectral": 0.99597496,
+        "coordinate": 0.5625,
+        "phase_field": 0.14659352,
+        "amplitude": 0.65671454
+      },
+      "duration_seconds": 2.027438,
+      "frequency_hz": 634.29651,
+      "rms": 0.365021,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*sum_j a_j*sin(2*pi*f*(p_j/q_j)*t+phi_j); p:q in {(3,2),(4,3),(5,4),(7,4)}",
+      "description": "Coupled oscillators orbiting one of the release polyrhythm ratios",
+      "synthesis_approach": "rational_ratio_additive_synthesis",
+      "sonic_identity": "Multiple oscillators follow non-integer rational relationships, not a tonal bass preset."
+    }
+  ]
+}

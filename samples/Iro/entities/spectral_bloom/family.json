@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "spectral_bloom",
+    "synthesis_approach": "stochastic_noise_plus_additive_partials",
+    "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum.",
+    "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+    "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      0.7472,
+      1.8692
+    ],
+    "source_feature_indices": [
+      37,
+      54,
+      71,
+      88,
+      105,
+      122
+    ]
+  },
+  "entities": [
+    {
+      "name": "spectral_bloom_01",
+      "family": "spectral_bloom",
+      "variation": 1,
+      "file": "entities/spectral_bloom/spectral_bloom_01.wav",
+      "seed": 3446,
+      "source_feature_index": 37,
+      "source_features": {
+        "phase": 4.55838934,
+        "envelope": 0.17548266,
+        "interference": -0.91437311,
+        "carrier_2": -0.14364503,
+        "spectral": 0.04166813,
+        "coordinate": 0.83333333,
+        "phase_field": -0.58844668,
+        "amplitude": 0.03351987
+      },
+      "duration_seconds": 0.747211,
+      "frequency_hz": 268.16369,
+      "rms": 0.15196,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    },
+    {
+      "name": "spectral_bloom_02",
+      "family": "spectral_bloom",
+      "variation": 2,
+      "file": "entities/spectral_bloom/spectral_bloom_02.wav",
+      "seed": 3594,
+      "source_feature_index": 54,
+      "source_features": {
+        "phase": 0.36959914,
+        "envelope": 0.27639443,
+        "interference": 0.32725257,
+        "carrier_2": 0.92281519,
+        "spectral": 0.25939813,
+        "coordinate": 0.52083333,
+        "phase_field": 0.52119992,
+        "amplitude": 0.21347473
+      },
+      "duration_seconds": 0.909932,
+      "frequency_hz": 194.95541,
+      "rms": 0.125982,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    },
+    {
+      "name": "spectral_bloom_03",
+      "family": "spectral_bloom",
+      "variation": 3,
+      "file": "entities/spectral_bloom/spectral_bloom_03.wav",
+      "seed": 3742,
+      "source_feature_index": 71,
+      "source_features": {
+        "phase": 2.46399424,
+        "envelope": 0.40647829,
+        "interference": 0.96006551,
+        "carrier_2": 0.60263464,
+        "spectral": 0.05407953,
+        "coordinate": 0.20833333,
+        "phase_field": -0.01954574,
+        "amplitude": 0.33674979
+      },
+      "duration_seconds": 1.096644,
+      "frequency_hz": 88.14041,
+      "rms": 0.13348,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    },
+    {
+      "name": "spectral_bloom_04",
+      "family": "spectral_bloom",
+      "variation": 4,
+      "file": "entities/spectral_bloom/spectral_bloom_04.wav",
+      "seed": 3890,
+      "source_feature_index": 88,
+      "source_features": {
+        "phase": 4.55838934,
+        "envelope": 0.55815965,
+        "interference": -0.71713354,
+        "carrier_2": -0.62307691,
+        "spectral": 0.15303001,
+        "coordinate": 0.91666667,
+        "phase_field": -0.35691095,
+        "amplitude": 0.10692329
+      },
+      "duration_seconds": 1.464354,
+      "frequency_hz": 709.10756,
+      "rms": 0.101408,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    },
+    {
+      "name": "spectral_bloom_05",
+      "family": "spectral_bloom",
+      "variation": 5,
+      "file": "entities/spectral_bloom/spectral_bloom_05.wav",
+      "seed": 4038,
+      "source_feature_index": 105,
+      "source_features": {
+        "phase": 0.36959914,
+        "envelope": 0.71563655,
+        "interference": 0.31257472,
+        "carrier_2": -0.91254049,
+        "spectral": 0.64866393,
+        "coordinate": 0.60416667,
+        "phase_field": 0.31612373,
+        "amplitude": 0.33840662
+      },
+      "duration_seconds": 1.673469,
+      "frequency_hz": 529.02297,
+      "rms": 0.169252,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    },
+    {
+      "name": "spectral_bloom_06",
+      "family": "spectral_bloom",
+      "variation": 6,
+      "file": "entities/spectral_bloom/spectral_bloom_06.wav",
+      "seed": 4186,
+      "source_feature_index": 122,
+      "source_features": {
+        "phase": 2.46399424,
+        "envelope": 0.85672135,
+        "interference": 0.11562419,
+        "carrier_2": 0.16919773,
+        "spectral": 0.09534029,
+        "coordinate": 0.29166667,
+        "phase_field": -0.01185509,
+        "amplitude": 0.47385275
+      },
+      "duration_seconds": 1.869161,
+      "frequency_hz": 283.79802,
+      "rms": 0.185041,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y=E(t)*(n*brightness+sum_j sin(2*pi*f*r_j*t+phi_j)/j); r_j in {1,1.37,2.11,3.07,4.73}",
+      "description": "An inharmonic partial cloud whose brightness follows the spectral field",
+      "synthesis_approach": "stochastic_noise_plus_additive_partials",
+      "sonic_identity": "Filtered deterministic noise is mixed with a sparse inharmonic additive spectrum."
+    }
+  ]
+}

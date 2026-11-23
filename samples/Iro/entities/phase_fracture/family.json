@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "phase_fracture",
+    "synthesis_approach": "phase_modulation_with_discontinuities",
+    "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture.",
+    "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+    "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      0.8986,
+      1.505
+    ],
+    "source_feature_indices": [
+      231,
+      248,
+      9,
+      26,
+      43,
+      60
+    ]
+  },
+  "entities": [
+    {
+      "name": "phase_fracture_01",
+      "family": "phase_fracture",
+      "variation": 1,
+      "file": "entities/phase_fracture/phase_fracture_01.wav",
+      "seed": 2010,
+      "source_feature_index": 231,
+      "source_features": {
+        "phase": 3.32639222,
+        "envelope": 0.53226019,
+        "interference": -0.72203053,
+        "carrier_2": 0.71361015,
+        "spectral": 0.04630275,
+        "coordinate": 0.75,
+        "phase_field": -0.0814609,
+        "amplitude": 0.22269117
+      },
+      "duration_seconds": 1.02644,
+      "frequency_hz": 232.42417,
+      "rms": 0.227578,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    },
+    {
+      "name": "phase_fracture_02",
+      "family": "phase_fracture",
+      "variation": 2,
+      "file": "entities/phase_fracture/phase_fracture_02.wav",
+      "seed": 2158,
+      "source_feature_index": 248,
+      "source_features": {
+        "phase": 5.42078732,
+        "envelope": 0.38326292,
+        "interference": -0.25506251,
+        "carrier_2": -0.50106656,
+        "spectral": 0.24340697,
+        "coordinate": 0.4375,
+        "phase_field": -0.01275395,
+        "amplitude": 0.13789761
+      },
+      "duration_seconds": 0.984263,
+      "frequency_hz": 156.23016,
+      "rms": 0.2247,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    },
+    {
+      "name": "phase_fracture_03",
+      "family": "phase_fracture",
+      "variation": 3,
+      "file": "entities/phase_fracture/phase_fracture_03.wav",
+      "seed": 1538,
+      "source_feature_index": 9,
+      "source_features": {
+        "phase": 1.10879741,
+        "envelope": 0.07150625,
+        "interference": 0.99430401,
+        "carrier_2": -0.73400883,
+        "spectral": 0.03527122,
+        "coordinate": 0.6875,
+        "phase_field": 0.88598224,
+        "amplitude": 0.05199026
+      },
+      "duration_seconds": 0.898594,
+      "frequency_hz": 366.7049,
+      "rms": 0.173887,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    },
+    {
+      "name": "phase_fracture_04",
+      "family": "phase_fracture",
+      "variation": 4,
+      "file": "entities/phase_fracture/phase_fracture_04.wav",
+      "seed": 1686,
+      "source_feature_index": 26,
+      "source_features": {
+        "phase": 3.20319251,
+        "envelope": 0.12609563,
+        "interference": -0.68979989,
+        "carrier_2": -0.84034407,
+        "spectral": 0.01077087,
+        "coordinate": 0.375,
+        "phase_field": -0.54416206,
+        "amplitude": 0.01854642
+      },
+      "duration_seconds": 1.023356,
+      "frequency_hz": 220.82558,
+      "rms": 0.177893,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    },
+    {
+      "name": "phase_fracture_05",
+      "family": "phase_fracture",
+      "variation": 5,
+      "file": "entities/phase_fracture/phase_fracture_05.wav",
+      "seed": 1834,
+      "source_feature_index": 43,
+      "source_features": {
+        "phase": 5.29758761,
+        "envelope": 0.20761993,
+        "interference": -0.55724989,
+        "carrier_2": 0.31603868,
+        "spectral": 0.11677242,
+        "coordinate": 0.0625,
+        "phase_field": -0.17421077,
+        "amplitude": 0.08111135
+      },
+      "duration_seconds": 1.170204,
+      "frequency_hz": 66.2161,
+      "rms": 0.18444,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    },
+    {
+      "name": "phase_fracture_06",
+      "family": "phase_fracture",
+      "variation": 6,
+      "file": "entities/phase_fracture/phase_fracture_06.wav",
+      "seed": 1982,
+      "source_feature_index": 60,
+      "source_features": {
+        "phase": 1.10879741,
+        "envelope": 0.31919131,
+        "interference": 0.73926723,
+        "carrier_2": 0.99753532,
+        "spectral": 0.17394735,
+        "coordinate": 0.77083333,
+        "phase_field": 0.53737539,
+        "amplitude": 0.28350082
+      },
+      "duration_seconds": 1.505034,
+      "frequency_hz": 964.79807,
+      "rms": 0.178132,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "phi[n+1]=phi[n]+omega*(1+0.7*c2); if |phase_field[n]|>threshold, phi[n]+=fracture; y=E*sin(phi)",
+      "description": "A phase trajectory interrupted by envelope-driven discontinuities",
+      "synthesis_approach": "phase_modulation_with_discontinuities",
+      "sonic_identity": "Phase modulation and discontinuous phase resets; variation spans smooth drift through unstable fracture."
+    }
+  ]
+}

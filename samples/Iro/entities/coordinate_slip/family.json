@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "coordinate_slip",
+    "synthesis_approach": "modal_resonator_and_impulse_train",
+    "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails.",
+    "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+    "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      0.6127,
+      1.6039
+    ],
+    "source_feature_indices": [
+      6,
+      23,
+      40,
+      57,
+      74,
+      91
+    ]
+  },
+  "entities": [
+    {
+      "name": "coordinate_slip_01",
+      "family": "coordinate_slip",
+      "variation": 1,
+      "file": "entities/coordinate_slip/coordinate_slip_01.wav",
+      "seed": 2344,
+      "source_feature_index": 6,
+      "source_features": {
+        "phase": 0.73919827,
+        "envelope": 0.06423583,
+        "interference": 0.8318264,
+        "carrier_2": -0.55748944,
+        "spectral": 0.04553808,
+        "coordinate": 0.5625,
+        "phase_field": 0.93666868,
+        "amplitude": 0.04612133
+      },
+      "duration_seconds": 0.612653,
+      "frequency_hz": 158.57413,
+      "rms": 0.055993,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    },
+    {
+      "name": "coordinate_slip_02",
+      "family": "coordinate_slip",
+      "variation": 2,
+      "file": "entities/coordinate_slip/coordinate_slip_02.wav",
+      "seed": 2492,
+      "source_feature_index": 23,
+      "source_features": {
+        "phase": 2.83359337,
+        "envelope": 0.11465418,
+        "interference": -0.3676904,
+        "carrier_2": -0.94274426,
+        "spectral": 0.01034233,
+        "coordinate": 0.25,
+        "phase_field": -0.31727271,
+        "amplitude": 0.02693668
+      },
+      "duration_seconds": 0.734014,
+      "frequency_hz": 81.40496,
+      "rms": 0.078046,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    },
+    {
+      "name": "coordinate_slip_03",
+      "family": "coordinate_slip",
+      "variation": 3,
+      "file": "entities/coordinate_slip/coordinate_slip_03.wav",
+      "seed": 2640,
+      "source_feature_index": 40,
+      "source_features": {
+        "phase": 4.92798848,
+        "envelope": 0.19108009,
+        "interference": -0.76097636,
+        "carrier_2": 0.08858751,
+        "spectral": 0.07096136,
+        "coordinate": 0.95833333,
+        "phase_field": -0.40258689,
+        "amplitude": 0.05403465
+      },
+      "duration_seconds": 1.04,
+      "frequency_hz": 576.12183,
+      "rms": 0.025258,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    },
+    {
+      "name": "coordinate_slip_04",
+      "family": "coordinate_slip",
+      "variation": 4,
+      "file": "entities/coordinate_slip/coordinate_slip_04.wav",
+      "seed": 2788,
+      "source_feature_index": 57,
+      "source_features": {
+        "phase": 0.73919827,
+        "envelope": 0.29734044,
+        "interference": 0.54818486,
+        "carrier_2": 0.9868059,
+        "spectral": 0.22571344,
+        "coordinate": 0.64583333,
+        "phase_field": 0.56811827,
+        "amplitude": 0.25032465
+      },
+      "duration_seconds": 1.20712,
+      "frequency_hz": 441.44931,
+      "rms": 0.03445,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    },
+    {
+      "name": "coordinate_slip_05",
+      "family": "coordinate_slip",
+      "variation": 5,
+      "file": "entities/coordinate_slip/coordinate_slip_05.wav",
+      "seed": 2936,
+      "source_feature_index": 74,
+      "source_features": {
+        "phase": 2.83359337,
+        "envelope": 0.43202167,
+        "interference": 0.82419465,
+        "carrier_2": 0.40222978,
+        "spectral": 0.0469888,
+        "coordinate": 0.33333333,
+        "phase_field": -0.19243563,
+        "amplitude": 0.32278048
+      },
+      "duration_seconds": 1.397551,
+      "frequency_hz": 251.25125,
+      "rms": 0.030716,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    },
+    {
+      "name": "coordinate_slip_06",
+      "family": "coordinate_slip",
+      "variation": 6,
+      "file": "entities/coordinate_slip/coordinate_slip_06.wav",
+      "seed": 3084,
+      "source_feature_index": 91,
+      "source_features": {
+        "phase": 4.92798848,
+        "envelope": 0.58609779,
+        "interference": -0.94489547,
+        "carrier_2": -0.78674494,
+        "spectral": 0.2450928,
+        "coordinate": 0.02083333,
+        "phase_field": -0.24418129,
+        "amplitude": 0.07112078
+      },
+      "duration_seconds": 1.6039,
+      "frequency_hz": 68.39654,
+      "rms": 0.031322,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "t_k=quantize(k*T*(0.35+coordinate)); y=sum_k a_k*exp(-lambda_k*(t-t_k))*sin(2*pi*f_k*(t-t_k))",
+      "description": "Uneven coordinate-triggered impulses with resonant, nonuniform tails",
+      "synthesis_approach": "modal_resonator_and_impulse_train",
+      "sonic_identity": "Impulse trains excite multiple damped resonant modes with uneven spacing and tails."
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+﻿lane,variant,file,duration_seconds,sample_rate,channels,sha256,seed,source_feature_index,equation
+kick,1,kick/kick_01.wav,0.327596,44100,1,51d447e461613378cd57e2ae38e2d5f7f2f43bff0793472b24dc62c5363f336f,212899,211,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,2,kick/kick_02.wav,0.356984,44100,1,c5ccbeee1055cfee1225bc82e19f8feda3dc763fb00a0842818111bbb3a90385,212916,228,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,3,kick/kick_03.wav,0.386395,44100,1,9529cce2fea4126c42c887637fbaade6cc1aa2b4baab7196e679d03ec1df2f56,212933,245,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,4,kick/kick_04.wav,0.415782,44100,1,ae4cb9c9099fd9c2924eb96bfbcc3845b2fc1862312e03157aefe85d770285bf,212950,6,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,5,kick/kick_05.wav,0.445193,44100,1,41c79f467f63a3e22b55307e6a37425dc16690d8a6b05793c8ec004e4acc1a8a,212967,23,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,6,kick/kick_06.wav,0.327596,44100,1,667a260ad6c53cb16058dac99dc296879ce2ed92ca38fbdab72f82ca12d6fa55,212984,40,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,7,kick/kick_07.wav,0.356984,44100,1,d538606007c7abdacaab36491c2a1a7a9b3c55c893aa60746c2d93f0199b8f7e,213001,57,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+kick,8,kick/kick_08.wav,0.386395,44100,1,22d1ee54bfc1fbc11927ce70d3f9c3554043e4a2dea907f80e14b8d4698bac3f,213018,74,y=sin(phase)*exp(-decay*t)+noise*exp(-95t); f(t)=f0*(1+5*exp(-28t))
+snare,1,snare/snare_01.wav,0.327596,44100,1,6380fe1aa5cb0433b74e718ab0df0b5cf94a003a31f136af3a462fac5e176621,213030,240,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,2,snare/snare_02.wav,0.356984,44100,1,355edc24efcacc316e3b6679a029320a91840004c96f0c9f01a54bbc01f111ee,213047,1,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,3,snare/snare_03.wav,0.386395,44100,1,60fa540d54f4e2fb095088433f5d7c19de6d54aa78e1b2ddbfa835e6a45e26f5,213064,18,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,4,snare/snare_04.wav,0.415782,44100,1,78fe320be2632cfc4fc4aee9652ba26fe4498c65ade6c3a375143ff672ee18f2,213081,35,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,5,snare/snare_05.wav,0.445193,44100,1,48f204b68db6093a0f3c4af44ddbe1aa867d6da12e6aa45be0f05afaf366aafe,213098,52,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,6,snare/snare_06.wav,0.327596,44100,1,9de7529837a2cf232f66bea92cde008236b433d77b927c9f79b2d2e142dbc0a8,213115,69,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,7,snare/snare_07.wav,0.356984,44100,1,34d7292a16d559162d13c3ed6b8909431fcee79179c9488f6710d5e29fcbebaf,213132,86,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+snare,8,snare/snare_08.wav,0.386395,44100,1,433a0717fc18aedba4cd67c6735b956231424c12cd0a6a9603a769c34a8adb8d,213149,103,y=(noise*highpass + inharmonic_body)*exp(-decay*t)
+hat,1,hat/hat_01.wav,0.327596,44100,1,767b3018359c6f34907cb68d5db2652a8fa68affaf921b9b4ea8278ecde5329a,213161,13,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,2,hat/hat_02.wav,0.356984,44100,1,34caa2b4a44959aa0ef7026246ba9ad44155345c2270801b1722a817afe85531,213178,30,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,3,hat/hat_03.wav,0.386395,44100,1,b7138255fc5b1719b5e416b3e71d572448cbe5dd9928eef454cacaf0a3efcbe3,213195,47,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,4,hat/hat_04.wav,0.415782,44100,1,9dfac06eb9571b4e4e52aab87223e84af050c8a7bd666f3d159b7189b94d7f33,213212,64,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,5,hat/hat_05.wav,0.445193,44100,1,42abe18c33608b74c74bff65c691a9c80056053d9e8f98ab25b5fd2b90629331,213229,81,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,6,hat/hat_06.wav,0.327596,44100,1,9363e1de198ff4b4baf2d61fcb3d4b339b6b0918812d15d6953309ba74a07a19,213246,98,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,7,hat/hat_07.wav,0.356984,44100,1,7e8de5667d67c322c8a55518188f3ca006d5fc40552c320673ac07fbfc6064b6,213263,115,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+hat,8,hat/hat_08.wav,0.386395,44100,1,fe30b59023add29348e697a35c21a6cd2820cdf130815a69ce950bae27252516,213280,132,y=highpass(noise*phase_gate + inharmonic_partials)*exp(-decay*t)
+metal,1,metal/metal_01.wav,0.327596,44100,1,6036e74bf7ac4b128c3a6a90f10b24720645f1cb06f6f96aa787f3c929b300bd,213292,42,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,2,metal/metal_02.wav,0.356984,44100,1,1501b8ec4c05041111293ca4f27fc9072a6c5ce15135a573dcd1c8a9061ed91a,213309,59,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,3,metal/metal_03.wav,0.386395,44100,1,f8fb471cd14b9febe6775aba94e34abac6e85d13bacfbf12adc2a2cb87f004eb,213326,76,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,4,metal/metal_04.wav,0.415782,44100,1,da68dbaae30ad05f0b39e972b6fc9ae2fe4d8cb1607a9c2178be6c89cd886924,213343,93,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,5,metal/metal_05.wav,0.445193,44100,1,a0ee63f4bb2d338e34d7b67d10263edac6ea4182ade4a1e5447bd2e3b4e39655,213360,110,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,6,metal/metal_06.wav,0.327596,44100,1,5b68f508a3658f44cdec9fe3d9fc945121e4ff6c539e4e7ba3dcea45bebe1e6d,213377,127,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,7,metal/metal_07.wav,0.356984,44100,1,76b509e5df92694b0c08db05f4951075eab525cf5dc2bed6ee6d1b12fbda8498,213394,144,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+metal,8,metal/metal_08.wav,0.386395,44100,1,f7d18fa3142d53df912c0d7a76b0c274f28c9e4b7e1fc47f8b72a9bcb9a4e894,213411,161,y=sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phase_2))*envelope
+tom,1,tom/tom_01.wav,0.327596,44100,1,d44682b6250397a536db28224a6d86e90a5acd35542b8b6d00bb79ede78f4b56,213423,71,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,2,tom/tom_02.wav,0.356984,44100,1,3d116fed71feb70c93b9c51db64c4ad362f1a8da4d62bda0febfcc3134d92d7e,213440,88,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,3,tom/tom_03.wav,0.386395,44100,1,c2673006fb6b5cba57104ad3793a62bf3a75abd101bfc0eef591c3319ae2c85e,213457,105,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,4,tom/tom_04.wav,0.415782,44100,1,f41de6f9e6499c21a229a61951cce88ccf66b444b2a6bb3a95fca211e86119ee,213474,122,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,5,tom/tom_05.wav,0.445193,44100,1,7bc36279a61c970523b00d220009ec5a1e5122de6edcee49eb8e854ca13abd6a,213491,139,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,6,tom/tom_06.wav,0.327596,44100,1,a475d19d91eb0040d300530b00cfb35e9a73b1437457888be7fe3512a4c01b02,213508,156,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,7,tom/tom_07.wav,0.356984,44100,1,35490d994ddacbec7c37814194b45a7725db56f1f4093ab9aacf3457244b4b01,213525,173,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+tom,8,tom/tom_08.wav,0.386395,44100,1,aac67b518e0b434cde10e278a0519afd121d84845cd66cc595c24d66f7594847,213542,190,y=sin(phase(t))*exp(-decay*t); f(t)=f0*(1+depth*exp(-rate*t))
+click,1,click/click_01.wav,0.327596,44100,1,9ff50bb0c85bc48d6898a5e34717c39aba2924c7e56394af567f88ac10727609,213554,100,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,2,click/click_02.wav,0.356984,44100,1,c461bb6201a04e2f3427c572173f6edea82253791298a7ab06f68273ab612dfe,213571,117,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,3,click/click_03.wav,0.386395,44100,1,7e29019099e5b4acde1f77f2dfab4730aadad636c621afcfa09acf0f0f423f98,213588,134,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,4,click/click_04.wav,0.415782,44100,1,9f1a1a80fea0b5f00ead5fa2bc34e33486e81fa36a22ff663c96f6af5f230739,213605,151,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,5,click/click_05.wav,0.445193,44100,1,6a4faa7bc6844f950dc4d73fcf74eabb59d4cffa4351cc5061c445318939ca1e,213622,168,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,6,click/click_06.wav,0.327596,44100,1,16fca28c0fc613eb489b40b50130159b2a2631dfdd6d940032dc822edd27de79,213639,185,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,7,click/click_07.wav,0.356984,44100,1,52543de67588cbaff356f91dd7361217caa79b14699e32976795a5ee8cb66fbd,213656,202,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+click,8,click/click_08.wav,0.386395,44100,1,51a4f20cc0d4f1a21ff926a815d1a939c4806dbde78fa9c7171fba6830444a9d,213673,219,"y=quantize(noise, bits)*exp(-decay*t)*phase_gate"
+texture,1,texture/texture_01.wav,0.327596,44100,1,ee559b46f7a8d80678bd64c60d302ad31ffcead96133aba449fb2351aa5aba62,213685,129,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,2,texture/texture_02.wav,0.356984,44100,1,aa0a209ec57085299c730c787e5b07daca916bbb6a9bf0a14284b2c766cac50f,213702,146,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,3,texture/texture_03.wav,0.386395,44100,1,5b58a89212cc095b2945c96adc011019cca01a7bcb1431427291bb71c603fe81,213719,163,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,4,texture/texture_04.wav,0.415782,44100,1,254c0acbff908ecfd55088c53ac390b7f206129c226c66d17e988335705e3da2,213736,180,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,5,texture/texture_05.wav,0.445193,44100,1,1ddb482add6dec074287312a509a39c537bf81fad0f32cda953ffa9789c68599,213753,197,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,6,texture/texture_06.wav,0.327596,44100,1,29f31d974b5a75cc5ccaef5901fc38041a69c339908d7ffd7098b72c3d178a8f,213770,214,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,7,texture/texture_07.wav,0.356984,44100,1,482db5beead6e2f22de99d4d8c9362b5d252e3741aa951cf9c530991b746f051,213787,231,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+texture,8,texture/texture_08.wav,0.386395,44100,1,eb429e5104b79e660af21d2380c2cbdb895e805b17f784be35db35aa619d039d,213804,248,"y=granular(noise, coordinate, phase_field)*spectral_envelope"
+hybrid,1,hybrid/hybrid_01.wav,0.327596,44100,1,4e52308eb52257052151d5d97d907a1cb80deec66a9de9b5794be30a99d6007f,213816,158,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,2,hybrid/hybrid_02.wav,0.356984,44100,1,3cc8cfffcca5fc816952ddcc4f57cb2d3139fdeace0d3344dde0094bc9cbcdcf,213833,175,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,3,hybrid/hybrid_03.wav,0.386395,44100,1,67cc6275e0383c723ffbff6d76470978aafd788f6343ef1d5e7ad0b09447b8d3,213850,192,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,4,hybrid/hybrid_04.wav,0.415782,44100,1,58184bf888f1df78fae29d2cdfb6687269abb8f6b25aca564b50b699f6a56087,213867,209,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,5,hybrid/hybrid_05.wav,0.445193,44100,1,05af49c7af6270250510e51acb7be728f08ab0be25dbbb52246c1bfb6b65b998,213884,226,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,6,hybrid/hybrid_06.wav,0.327596,44100,1,6793459c7de4c30fbccee1f222f8a6f43c1dc52f7f39104e7873949eb977b542,213901,243,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,7,hybrid/hybrid_07.wav,0.356984,44100,1,8d6f5b8644526a37f5375bb80e713fcbe44bb674349ca8e6d0fe0bd16d791948,213918,4,y=tanh(drive*(kick+noise+FM+metal))*release_envelope
+hybrid,8,hybrid/hybrid_08.wav,0.386395,44100,1,792205c644bf185776fd2b0089266027f4a2e24ae87c618970d250e690895cd2,213935,21,y=tanh(drive*(kick+noise+FM+metal))*release_envelope

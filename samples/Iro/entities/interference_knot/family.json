@@ -1,0 +1,198 @@
+{
+  "format": "IRO_IDM_ENTITY_FAMILY_1",
+  "release_code": "24-73-41-25-23-57-54",
+  "family": {
+    "name": "interference_knot",
+    "synthesis_approach": "additive_inharmonic_cross_modulation",
+    "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands.",
+    "description": "Inharmonic carrier crossings shaped by the two interference fields",
+    "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}"
+  },
+  "variation_range": {
+    "count": 6,
+    "register_ratios": [
+      0.53,
+      0.72,
+      0.94,
+      1.23,
+      1.61,
+      2.12
+    ],
+    "duration_seconds": [
+      1.1699,
+      1.3135
+    ],
+    "source_feature_indices": [
+      200,
+      217,
+      234,
+      251,
+      12,
+      29
+    ]
+  },
+  "entities": [
+    {
+      "name": "interference_knot_01",
+      "family": "interference_knot",
+      "variation": 1,
+      "file": "entities/interference_knot/interference_knot_01.wav",
+      "seed": 908,
+      "source_feature_index": 200,
+      "source_features": {
+        "phase": 5.79038646,
+        "envelope": 0.81194261,
+        "interference": -0.82169902,
+        "carrier_2": -0.0591014,
+        "spectral": 0.72108813,
+        "coordinate": 0.47916667,
+        "phase_field": 0.03126673,
+        "amplitude": 0.23451883
+      },
+      "duration_seconds": 1.212426,
+      "frequency_hz": 128.9767,
+      "rms": 0.187445,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    },
+    {
+      "name": "interference_knot_02",
+      "family": "interference_knot",
+      "variation": 2,
+      "file": "entities/interference_knot/interference_knot_02.wav",
+      "seed": 1056,
+      "source_feature_index": 217,
+      "source_features": {
+        "phase": 1.60159625,
+        "envelope": 0.66254539,
+        "interference": 0.97700047,
+        "carrier_2": 0.95219214,
+        "spectral": 0.1826001,
+        "coordinate": 0.16666667,
+        "phase_field": 0.08736732,
+        "amplitude": 0.59351854
+      },
+      "duration_seconds": 1.169932,
+      "frequency_hz": 54.8204,
+      "rms": 0.196545,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    },
+    {
+      "name": "interference_knot_03",
+      "family": "interference_knot",
+      "variation": 3,
+      "file": "entities/interference_knot/interference_knot_03.wav",
+      "seed": 1204,
+      "source_feature_index": 234,
+      "source_features": {
+        "phase": 3.69599136,
+        "envelope": 0.50479952,
+        "interference": -0.94021579,
+        "carrier_2": 0.53270251,
+        "spectral": 0.05154979,
+        "coordinate": 0.875,
+        "phase_field": -0.09635843,
+        "amplitude": 0.16921667
+      },
+      "duration_seconds": 1.2839,
+      "frequency_hz": 508.41002,
+      "rms": 0.164702,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    },
+    {
+      "name": "interference_knot_04",
+      "family": "interference_knot",
+      "variation": 4,
+      "file": "entities/interference_knot/interference_knot_04.wav",
+      "seed": 1352,
+      "source_feature_index": 251,
+      "source_features": {
+        "phase": 5.79038646,
+        "envelope": 0.35911639,
+        "interference": 0.03989457,
+        "carrier_2": -0.68723669,
+        "spectral": 0.30453725,
+        "coordinate": 0.5625,
+        "phase_field": 0.01896423,
+        "amplitude": 0.14680124
+      },
+      "duration_seconds": 1.244444,
+      "frequency_hz": 368.01165,
+      "rms": 0.152725,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    },
+    {
+      "name": "interference_knot_05",
+      "family": "interference_knot",
+      "variation": 5,
+      "file": "entities/interference_knot/interference_knot_05.wav",
+      "seed": 732,
+      "source_feature_index": 12,
+      "source_features": {
+        "phase": 1.47839654,
+        "envelope": 0.07942972,
+        "interference": 0.93459142,
+        "carrier_2": -0.87091125,
+        "spectral": 0.02542939,
+        "coordinate": 0.8125,
+        "phase_field": 0.72125835,
+        "amplitude": 0.05362594
+      },
+      "duration_seconds": 1.185125,
+      "frequency_hz": 786.98869,
+      "rms": 0.119654,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    },
+    {
+      "name": "interference_knot_06",
+      "family": "interference_knot",
+      "variation": 6,
+      "file": "entities/interference_knot/interference_knot_06.wav",
+      "seed": 880,
+      "source_feature_index": 29,
+      "source_features": {
+        "phase": 3.57279165,
+        "envelope": 0.13838293,
+        "interference": -0.90180982,
+        "carrier_2": -0.69258765,
+        "spectral": 0.01317151,
+        "coordinate": 0.5,
+        "phase_field": -0.68627078,
+        "amplitude": 0.01411953
+      },
+      "duration_seconds": 1.313469,
+      "frequency_hz": 544.69856,
+      "rms": 0.120246,
+      "peak": 0.86,
+      "sample_rate": 22050,
+      "equation": "y(t)=E(t)*sum_k a_k*sin(2*pi*f_k*t + beta*sin(2*pi*f_m*t+phi_2)); f_k/f_0={1,1+|c1|,1.5+c2/3,2.01}",
+      "description": "Inharmonic carrier crossings shaped by the two interference fields",
+      "synthesis_approach": "additive_inharmonic_cross_modulation",
+      "sonic_identity": "Crossing inharmonic partials; variation spans low beating through dense sidebands."
+    }
+  ]
+}
