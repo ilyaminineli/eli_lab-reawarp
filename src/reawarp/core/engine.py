@@ -281,8 +281,10 @@ class ReawarpEngine:
 
         if config.include_ambience:
             ambience_stem = new_stem("ambience")
-            root_frequency = (
-                float(melody_events[0].frequency) if melody_events else 110.0
+            # Keep the ambience pitch anchor independent of the melody lane,
+            # so regenerating melody cannot alter an unrelated stem.
+            root_frequency = 55.0 * (
+                2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
             )
             ambience_stem[:] = render_ambience(
                 frame_count,

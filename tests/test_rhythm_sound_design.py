@@ -163,3 +163,10 @@ def test_auto_timbres_remain_coherent_within_each_lane():
             if event.get("lane") == "break" and event.get("kind") == voice
         }
         assert len(selected) <= 1
+    melody_profiles = {
+        event["synthesis_profile"]
+        for event in project.events
+        if event.get("lane") == "melody"
+    }
+    assert len(melody_profiles) == 1
+    assert melody_profiles.issubset({"soft_keys", "soft_pluck", "reed_pad", "wood_mallet"})

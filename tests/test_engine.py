@@ -124,3 +124,15 @@ def test_ambience_can_be_disabled_without_changing_other_stems():
     assert "ambience" not in project.stems
     assert "melody" in project.stems
     assert "noise_texture" in project.stems
+
+
+
+def test_melody_regeneration_does_not_change_ambience_or_other_stems():
+    engine = ReawarpEngine()
+    config = small_config()
+    original = engine.generate(config)
+    variant = engine.generate_variant(config, "melody", variation=4)
+    assert not np.array_equal(original.stems["melody"], variant.stems["melody"])
+    for name in original.stems:
+        if name != "melody":
+            assert np.array_equal(original.stems[name], variant.stems[name]), name
