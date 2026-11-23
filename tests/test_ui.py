@@ -43,9 +43,9 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     assert config.break_cycle_bars == 2
     assert config.include_ambience is True
     assert config.ambience_level == pytest.approx(0.16)
-    assert window.tabs.count() == 3
-    assert [window.tabs.tabText(i) for i in range(3)] == [
-        "GENERATOR", "BREAK LAB", "STEM MIXER"
+    assert window.tabs.count() == 4
+    assert [window.tabs.tabText(i) for i in range(4)] == [
+        "GENERATOR", "BREAK LAB", "STEM MIXER", "LIBRARY"
     ]
     window.close()
 

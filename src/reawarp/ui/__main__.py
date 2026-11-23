@@ -14,6 +14,7 @@ def main() -> int:
     app.setApplicationName("Reawarp")
     app.setOrganizationName("ELI LAB")
     window = MainWindow()
+    app.setQuitOnLastWindowClosed(not window._tray_available)
     window.show()
     return app.exec()
 

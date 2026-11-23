@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool
+from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool, QEvent
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
-    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
+    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
     QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QTabWidget, QToolButton, QVBoxLayout, QWidget,
+    QSystemTrayIcon, QTabWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
@@ -135,10 +136,14 @@ class MainWindow(QMainWindow):
         self._worker: RenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
         self._mix_rows: dict[str, StemRow] = {}
+        self._library_worker: RenderWorker | None = None
+        self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
+        self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
         self.player.finished.connect(self._playback_finished)
 
         self._build_interface()
+        self._build_tray_icon()
         self._refresh_devices()
 
         # Coalesce rapid mixer changes so the visual analysis is not rebuilt for
@@ -179,6 +184,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_generator_page(), "GENERATOR")
         self.tabs.addTab(self._build_break_page(), "BREAK LAB")
         self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
+        self.tabs.addTab(self._build_library_page(), "LIBRARY")
         root_layout.addWidget(self.tabs, 1)
         self.setCentralWidget(root)
         self.statusBar().showMessage("Ready — define constraints, generate, listen, and select.")
@@ -377,6 +383,217 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.render_summary)
         layout.addWidget(right, 1)
         return page
+
+    def _build_library_page(self) -> QWidget:
+        from reawarp.library.store import default_database_path
+
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        header = QLabel("LOCAL MATERIAL / STEM LIBRARY")
+        header.setObjectName("sectionTitle")
+        layout.addWidget(header)
+        self.library_database = QLabel(str(default_database_path()))
+        self.library_database.setObjectName("muted")
+        layout.addWidget(self.library_database)
+
+        folder_row = QHBoxLayout()
+        self.library_folder = QLineEdit()
+        self.library_folder.setPlaceholderText("Choose a sample or project folder to index")
+        folder_row.addWidget(self.library_folder, 1)
+        browse = QPushButton("BROWSE…")
+        browse.clicked.connect(self._browse_library_folder)
+        folder_row.addWidget(browse)
+        self.library_index_button = QPushButton("INDEX")
+        self.library_index_button.clicked.connect(self._index_library)
+        folder_row.addWidget(self.library_index_button)
+        layout.addLayout(folder_row)
+
+        search_row = QHBoxLayout()
+        self.library_query = QLineEdit()
+        self.library_query.setPlaceholderText("Find by filename, path, metadata, or tags")
+        search_row.addWidget(self.library_query, 1)
+        self.library_type = QComboBox()
+        self.library_type.addItems(["all", "sample", "stem", "master"])
+        search_row.addWidget(self.library_type)
+        self.library_role = QComboBox()
+        self.library_role.addItems([
+            "all", "kick", "snare", "hat", "break", "melody", "ambience", "noise_texture"
+        ])
+        search_row.addWidget(self.library_role)
+        search = QPushButton("SEARCH")
+        search.clicked.connect(self._search_library)
+        search_row.addWidget(search)
+        layout.addLayout(search_row)
+
+        self.library_results = QComboBox()
+        self.library_results.currentIndexChanged.connect(self._preview_library_asset)
+        layout.addWidget(self.library_results)
+        self.library_details = QLabel(
+            "Index an audio folder to search your samples, generated stems, and project masters."
+        )
+        self.library_details.setObjectName("muted")
+        self.library_details.setWordWrap(True)
+        layout.addWidget(self.library_details)
+        self.library_preview = AudioPreview()
+        layout.addWidget(self.library_preview, 1)
+        return page
+
+    def _browse_library_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(
+            self, "Choose material folder", self.library_folder.text() or str(Path.cwd())
+        )
+        if folder:
+            self.library_folder.setText(folder)
+
+    @staticmethod
+    def _index_library_folder(folder: str) -> dict[str, Any]:
+        from reawarp.library.store import SampleLibrary
+
+        with SampleLibrary() as library:
+            return library.index_directory(folder)
+
+    def _index_library(self) -> None:
+        folder = self.library_folder.text().strip()
+        if not folder:
+            self._show_error("Choose a folder before indexing.")
+            return
+        if self._library_worker is not None:
+            return
+        self.library_index_button.setEnabled(False)
+        worker = RenderWorker(lambda: self._index_library_folder(folder))
+        self._library_worker = worker
+        worker.signals.finished.connect(self._library_index_finished)
+        worker.signals.error.connect(self._library_index_failed)
+        QThreadPool.globalInstance().start(worker)
+        self.statusBar().showMessage("Indexing audio assets in the local library…")
+
+    def _library_index_finished(self, result: object) -> None:
+        self._library_worker = None
+        self.library_index_button.setEnabled(True)
+        if not isinstance(result, dict):
+            self.library_details.setText("Indexing finished with an unexpected result.")
+            return
+        self.library_details.setText(
+            f"Indexed {result.get('assets_indexed', 0)} assets across "
+            f"{result.get('projects_indexed', 0)} projects; "
+            f"{len(result.get('errors', []))} file error(s)."
+        )
+        self.statusBar().showMessage("Library indexing completed.", 6000)
+        self._search_library()
+
+    def _library_index_failed(self, message: str) -> None:
+        self._library_worker = None
+        self.library_index_button.setEnabled(True)
+        self._show_error(f"Library indexing failed: {message}")
+
+    def _search_library(self) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        asset_type = self.library_type.currentText()
+        role = self.library_role.currentText()
+        try:
+            with SampleLibrary() as library:
+                results = library.search(
+                    query=self.library_query.text().strip() or None,
+                    asset_type=None if asset_type == "all" else asset_type,
+                    role=None if role == "all" else role,
+                    limit=100,
+                )
+            self.library_results.blockSignals(True)
+            self.library_results.clear()
+            for asset in results:
+                label = (
+                    f"{asset.file_name} · {asset.asset_type} · "
+                    f"{asset.duration_seconds:.2f}s"
+                )
+                self.library_results.addItem(label, asset.asset_id)
+            self.library_results.blockSignals(False)
+            self.library_details.setText(f"{len(results)} matching asset(s)")
+            if results:
+                self.library_results.setCurrentIndex(0)
+            else:
+                self.library_preview.set_audio(None)
+        except Exception as exc:
+            self.library_results.blockSignals(False)
+            self._show_error(f"Library search failed: {exc}")
+
+    def _preview_library_asset(self, *_args: Any) -> None:
+        from reawarp.library.store import SampleLibrary
+
+        asset_id = self.library_results.currentData()
+        if not asset_id:
+            return
+        try:
+            with SampleLibrary() as library:
+                asset = library.get_asset(str(asset_id))
+            if asset is None:
+                return
+            self.library_details.setText(
+                f"{asset.file_name} · {asset.asset_type} · {asset.role or 'unassigned'} · "
+                f"{asset.duration_seconds:.2f}s · "
+                f"{asset.features.get('spectral_centroid_hz', 0.0):.0f} Hz centroid"
+            )
+            audio = read_sample(asset.path, asset.analysis_sample_rate)
+            self.library_preview.set_audio(audio, asset.analysis_sample_rate)
+        except Exception as exc:
+            self.library_details.setText(f"Preview failed: {exc}")
+
+    def _build_tray_icon(self) -> None:
+        icon_path = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
+        icon = QIcon(str(icon_path)) if icon_path.is_file() else QIcon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
+        if not self._tray_available or icon.isNull():
+            return
+        self._tray_icon = QSystemTrayIcon(icon, self)
+        self._tray_icon.setToolTip("Reawarp — 再変形")
+        menu = QMenu(self)
+        show_action = QAction("Show Reawarp", self)
+        show_action.triggered.connect(self._restore_from_tray)
+        menu.addAction(show_action)
+        menu.addSeparator()
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(self._quit_from_tray)
+        menu.addAction(quit_action)
+        self._tray_icon.setContextMenu(menu)
+        self._tray_icon.activated.connect(self._tray_activated)
+        self._tray_icon.show()
+
+    def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            self._restore_from_tray()
+
+    def _restore_from_tray(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self) -> None:
+        self.player.stop()
+        if self._tray_icon is not None:
+            self._tray_icon.hide()
+        QApplication.instance().quit()
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if (
+            event.type() == QEvent.Type.WindowStateChange
+            and self.isMinimized()
+            and self._tray_available
+            and self._tray_icon is not None
+        ):
+            QTimer.singleShot(0, self.hide)
+
+    def closeEvent(self, event) -> None:
+        if self._tray_available and self._tray_icon is not None:
+            event.ignore()
+            self.hide()
+            return
+        self.player.stop()
+        super().closeEvent(event)
 
     def _build_transport_bar(self) -> QWidget:
         bar = QFrame()
@@ -628,8 +845,11 @@ class MainWindow(QMainWindow):
         variation = self._variation_counts.get(name, 0) + 1
         self._variation_counts[name] = variation
         config = self.project.config
+        base_project = self.project
         self._run_render(
-            lambda: ReawarpEngine().generate_variant(config, name, variation),
+            lambda: ReawarpEngine().generate_variant(
+                config, name, variation, base_project=base_project
+            ),
             f"Regenerating {name} · variation {variation}…",
         )
 
@@ -701,9 +921,7 @@ class MainWindow(QMainWindow):
         self._mix_rows.clear()
         if self.project is None:
             return
-        supported = {
-            "kick", "snare", "hats", "synthetic_break", "melody", "noise_texture", "ambience"
-        }
+        supported = set(ReawarpEngine._stream_groups())
         for name in self.project.stems:
             row = StemRow(name, name in supported)
             if name in previous:
