@@ -154,6 +154,10 @@ def test_sample_layer_regeneration_is_independent_and_mergeable(tmp_path):
             assert np.array_equal(original.stems[name], merged.stems[name]), name
     assert np.array_equal(candidate.stems["sample_kick"], merged.stems["sample_kick"])
     assert merged.metadata["variation"] == {"stem": "sample_kick", "index": 2}
+    assert merged.metadata["event_count"] == len(merged.events)
+    assert merged.metadata["sample_sources"]["kick"]["trigger_count"] == sum(
+        event.get("lane") == "sample_kick" for event in merged.events
+    )
 
 
 def test_engine_stores_seeded_composition_plan_and_respects_duration():

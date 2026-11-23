@@ -74,6 +74,22 @@ class ReawarpEngine:
         gains = dict(base_project.metadata.get("stem_headroom_gains", {}))
         gains[stem] = variant.metadata.get("stem_headroom_gains", {}).get(stem, 1.0)
         metadata["stem_headroom_gains"] = gains
+        metadata["event_count"] = len(merged_events)
+        metadata["seed_streams"] = dict(variant.metadata.get("seed_streams", {}))
+        metadata["sample_trigger_seed_streams"] = dict(
+            variant.metadata.get("sample_trigger_seed_streams", {})
+        )
+        metadata["sample_sources"] = dict(variant.metadata.get("sample_sources", {}))
+        if stem.startswith("sample_"):
+            role = stem.removeprefix("sample_")
+            source_records = dict(metadata["sample_sources"])
+            if role in source_records:
+                role_record = dict(source_records[role])
+                role_record["trigger_count"] = sum(
+                    event.get("lane") == stem for event in merged_events
+                )
+                source_records[role] = role_record
+                metadata["sample_sources"] = source_records
         return ReawarpProject(
             config=config, sample_rate=base_project.sample_rate,
             stems=merged_stems, events=merged_events, metadata=metadata,
