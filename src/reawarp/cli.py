@@ -6,7 +6,10 @@ import argparse
 from pathlib import Path
 
 from reawarp import GenerationConfig, ReawarpEngine
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, SNARE_PROFILES
+from reawarp.generators.percussion import BREAK_STYLE_NAMES
+from reawarp.synthesis.profiles import (
+    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES
+)
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
@@ -29,6 +32,23 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--break-sample", type=Path, help="optional custom break WAV")
     parser.add_argument("--no-melody", action="store_true", help="disable geometric FM melody")
     parser.add_argument("--no-texture", action="store_true", help="disable noise texture")
+    parser.add_argument("--no-ambience", action="store_true", help="disable harmonic ambience")
+    parser.add_argument("--ambience-level", type=float, default=0.16,
+                        help="ambient stem level (0–1)")
+    parser.add_argument(
+        "--melody-profile", choices=("auto", *MELODY_PROFILES), default="auto",
+        help="profiled additive/FM melody voice",
+    )
+    parser.add_argument(
+        "--break-style", choices=("auto", *BREAK_STYLE_NAMES), default="broken_funk",
+        help="16-step break rhythm grammar",
+    )
+    parser.add_argument("--break-density", type=float, default=0.50,
+                        help="break events per bar, from sparse to full (0–1)")
+    parser.add_argument("--break-variation", type=float, default=0.25,
+                        help="probability of bounded phrase mutation (0–1)")
+    parser.add_argument("--break-cycle-bars", type=int, choices=(1, 2, 4), default=2,
+                        help="break phrase length before a variation")
     parser.add_argument(
         "--kick-profile", choices=("auto", *KICK_PROFILES), default="auto",
         help="fixed kick timbre or deterministic per-hit profile selection",
@@ -84,10 +104,17 @@ def main() -> None:
         complexity=args.complexity,
         include_melody=not args.no_melody,
         include_texture=not args.no_texture,
+        include_ambience=not args.no_ambience,
+        ambience_level=args.ambience_level,
         sample_paths=sample_paths,
         kick_profile=args.kick_profile,
         snare_profile=args.snare_profile,
         hat_profile=args.hat_profile,
+        melody_profile=args.melody_profile,
+        break_style=args.break_style,
+        break_density=args.break_density,
+        break_variation=args.break_variation,
+        break_cycle_bars=args.break_cycle_bars,
         break_transforms=transforms,
         break_slice_count=args.break_slice_count,
         break_stutter_repeats=args.break_stutter_repeats,

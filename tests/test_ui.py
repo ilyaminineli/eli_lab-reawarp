@@ -32,6 +32,12 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     assert config.duration == 12
     assert config.sample_rate == 48_000
     assert config.complexity == pytest.approx(0.68)
+    assert config.break_style == "broken_funk"
+    assert config.break_density == pytest.approx(0.50)
+    assert config.break_variation == pytest.approx(0.25)
+    assert config.break_cycle_bars == 2
+    assert config.include_ambience is True
+    assert config.ambience_level == pytest.approx(0.16)
     assert window.tabs.count() == 3
     assert [window.tabs.tabText(i) for i in range(3)] == [
         "GENERATOR", "BREAK LAB", "STEM MIXER"

@@ -22,6 +22,7 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         "synthetic_break": "break_pattern",
         "melody": "melody_pattern",
         "noise_texture": "texture_synthesis",
+        "ambience": "ambience_synthesis",
         "break": "break_pattern",
     }
     events: list[MusicalEvent] = []
@@ -32,7 +33,8 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         source_kind = str(source.get("kind", "hit"))
         is_note = source.get("midi_note") is not None or source.get("frequency") is not None
         kind = "note" if is_note else (
-            "trigger" if source_kind == "sample_trigger" else "hit"
+            "trigger" if source_kind == "sample_trigger" else
+            "grain" if source_kind in {"coloured_noise", "harmonic_ambient_bed"} else "hit"
         )
         duration_seconds = float(source.get("duration", 0.0))
         duration = (

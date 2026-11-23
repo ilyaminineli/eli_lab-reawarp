@@ -15,7 +15,9 @@ def small_config(**overrides):
 def test_render_has_expected_stems_and_exact_frame_count():
     project = ReawarpEngine().generate(small_config())
     assert project.frame_count == 5 * 22_050
-    assert set(("kick", "snare", "hats", "synthetic_break", "melody", "noise_texture")).issubset(project.stems)
+    assert set((
+        "kick", "snare", "hats", "synthetic_break", "melody", "noise_texture", "ambience"
+    )).issubset(project.stems)
     assert all(stem.shape == (project.frame_count, 2) for stem in project.stems.values())
     assert all(stem.dtype == np.float32 for stem in project.stems.values())
 
@@ -103,3 +105,34 @@ def test_regenerating_procedural_lane_keeps_imported_sample_overlays_identical(t
     for name in original.stems:
         if name != "synthetic_break":
             assert np.array_equal(original.stems[name], break_variant.stems[name]), name
+
+
+
+def test_ambience_regeneration_changes_only_its_own_stem():
+    engine = ReawarpEngine()
+    config = small_config()
+    original = engine.generate(config)
+    variant = engine.generate_variant(config, "ambience", variation=2)
+    assert not np.array_equal(original.stems["ambience"], variant.stems["ambience"])
+    for name in original.stems:
+        if name != "ambience":
+            assert np.array_equal(original.stems[name], variant.stems[name]), name
+
+
+def test_ambience_can_be_disabled_without_changing_other_stems():
+    project = ReawarpEngine().generate(small_config(include_ambience=False))
+    assert "ambience" not in project.stems
+    assert "melody" in project.stems
+    assert "noise_texture" in project.stems
+
+
+
+def test_melody_regeneration_does_not_change_ambience_or_other_stems():
+    engine = ReawarpEngine()
+    config = small_config()
+    original = engine.generate(config)
+    variant = engine.generate_variant(config, "melody", variation=4)
+    assert not np.array_equal(original.stems["melody"], variant.stems["melody"])
+    for name in original.stems:
+        if name != "melody":
+            assert np.array_equal(original.stems[name], variant.stems[name]), name
