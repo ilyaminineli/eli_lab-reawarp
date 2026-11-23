@@ -36,7 +36,7 @@ def prepare_changes() -> dict[str, str]:
 
     p = "src/reawarp/config.py"
     s = read(p)
-    s = replace_once(s, '    duration: float = 12.0\n',
+    s = replace_once(s, '    duration: float = 24.0\n',
         '    duration: float = 12.0\n    structure: str = "evolving"\n'
         '    composition_energy: float = 0.62\n    composition_variation: float = 0.45\n', p)
     s = replace_once(s,
