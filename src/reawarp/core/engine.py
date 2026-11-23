@@ -22,12 +22,19 @@ from reawarp.synthesis.instruments import (
     render_noise_texture,
     render_snare,
 )
+from reawarp.synthesis.profiles import (
+    HAT_PROFILES,
+    KICK_PROFILES,
+    SNARE_PROFILES,
+    select_profile_name,
+)
+from reawarp.transforms.pipeline import apply_break_transforms
 
 
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.1.0"
+    VERSION = "0.2.0"
 
     def generate_variant(
         self,
@@ -54,10 +61,10 @@ class ReawarpEngine:
         if variation < 1:
             raise ValueError("variation must be a positive integer")
         stream_groups = {
-            "kick": ("kick_pattern", "kick_synthesis"),
-            "snare": ("snare_pattern", "snare_synthesis"),
-            "hats": ("hat_pattern", "hat_synthesis"),
-            "synthetic_break": ("break_pattern", "break_synthesis"),
+            "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
+            "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
+            "hats": ("hat_pattern", "hat_synthesis", "hat_profile"),
+            "synthetic_break": ("break_pattern", "break_synthesis", "break_processing"),
             "melody": ("melody_pattern", "melody_synthesis"),
             "noise_texture": ("texture_synthesis",),
         }
@@ -81,17 +88,29 @@ class ReawarpEngine:
             stems[name] = audio
             return audio
 
-        def place_mono(target: np.ndarray, signal: np.ndarray, start_seconds: float, pan: float = 0.0) -> None:
+        def place_mono(
+            target: np.ndarray,
+            signal: np.ndarray,
+            start_seconds: float,
+            pan: float = 0.0,
+        ) -> None:
             start = max(0, int(round(start_seconds * sample_rate)))
             if start >= frame_count or signal.size == 0:
                 return
             count = min(int(signal.size), frame_count - start)
             angle = (float(np.clip(pan, -1.0, 1.0)) + 1.0) * (math.pi / 4.0)
             left_gain, right_gain = math.cos(angle), math.sin(angle)
-            target[start : start + count, 0] += signal[:count] * left_gain
-            target[start : start + count, 1] += signal[:count] * right_gain
+            mono_signal = np.asarray(signal, dtype=np.float32).reshape(-1)
+            target[start : start + count, 0] += mono_signal[:count] * left_gain
+            target[start : start + count, 1] += mono_signal[:count] * right_gain
 
-        def place_sample(target: np.ndarray, sample: np.ndarray, start_seconds: float, velocity: float, pan: float) -> None:
+        def place_sample(
+            target: np.ndarray,
+            sample: np.ndarray,
+            start_seconds: float,
+            velocity: float,
+            pan: float,
+        ) -> None:
             shaped = sample * float(np.clip(velocity, 0.0, 1.0)) * 0.72
             place_mono(target, shaped, start_seconds, pan)
 
@@ -110,32 +129,73 @@ class ReawarpEngine:
         break_stem = new_stem("synthetic_break")
 
         for event in percussion["kick"]:
-            signal = render_kick(sample_rate, streams.get("kick_synthesis"), event.velocity)
+            profile = select_profile_name(
+                config.kick_profile, KICK_PROFILES, streams.get("kick_profile")
+            )
+            signal = render_kick(
+                sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
+            )
             place_mono(kick_stem, signal, event.time, event.pan)
-            event_records.append(event.to_dict())
+            record = event.to_dict()
+            record["sound_profile"] = profile
+            event_records.append(record)
 
         for event in percussion["snare"]:
-            signal = render_snare(sample_rate, streams.get("snare_synthesis"), event.velocity)
+            profile = select_profile_name(
+                config.snare_profile, SNARE_PROFILES, streams.get("snare_profile")
+            )
+            signal = render_snare(
+                sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
+            )
             place_mono(snare_stem, signal, event.time, event.pan)
-            event_records.append(event.to_dict())
+            record = event.to_dict()
+            record["sound_profile"] = profile
+            event_records.append(record)
 
         for event in percussion["hat"]:
-            signal = render_hat(sample_rate, streams.get("hat_synthesis"), event.velocity)
+            profile = select_profile_name(
+                config.hat_profile, HAT_PROFILES, streams.get("hat_profile")
+            )
+            signal = render_hat(
+                sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
+            )
             place_mono(hat_stem, signal, event.time, event.pan)
-            event_records.append(event.to_dict())
+            record = event.to_dict()
+            record["sound_profile"] = profile
+            event_records.append(record)
 
         for event in percussion["break"]:
             break_rng = streams.get("break_synthesis")
             if event.kind == "kick":
+                profile = select_profile_name(
+                    config.kick_profile, KICK_PROFILES, break_rng
+                )
                 signal = render_kick(
-                    sample_rate, break_rng, event.velocity * 0.82, duration=0.31, amp_decay=0.16
+                    sample_rate,
+                    break_rng,
+                    event.velocity * 0.82,
+                    duration=0.31,
+                    amp_decay=0.16,
+                    profile=profile,
                 )
             elif event.kind == "snare":
-                signal = render_snare(sample_rate, break_rng, event.velocity * 0.78, duration=0.22)
+                profile = select_profile_name(
+                    config.snare_profile, SNARE_PROFILES, break_rng
+                )
+                signal = render_snare(
+                    sample_rate, break_rng, event.velocity * 0.78, duration=0.22, profile=profile
+                )
             else:
-                signal = render_hat(sample_rate, break_rng, event.velocity * 0.9, duration=0.075)
+                profile = select_profile_name(
+                    config.hat_profile, HAT_PROFILES, break_rng
+                )
+                signal = render_hat(
+                    sample_rate, break_rng, event.velocity * 0.9, duration=0.075, profile=profile
+                )
             place_mono(break_stem, signal, event.time, event.pan)
-            event_records.append(event.to_dict())
+            record = event.to_dict()
+            record["sound_profile"] = profile
+            event_records.append(record)
 
         if config.include_melody:
             melody_stem = new_stem("melody")
@@ -178,7 +238,27 @@ class ReawarpEngine:
         for role, sample_path in config.sample_paths.items():
             path = Path(sample_path).expanduser()
             sample = read_sample(path, sample_rate)
+            source_frame_count = int(len(sample))
             sample_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            applied_transforms: list[str] = []
+            if role == "break" and config.break_transforms:
+                sample = apply_break_transforms(
+                    sample,
+                    sample_rate,
+                    config.break_transforms,
+                    streams.get("break_processing"),
+                    slice_count=config.break_slice_count,
+                    stutter_repeats=config.break_stutter_repeats,
+                    dropout_probability=config.break_dropout_probability,
+                    pitch_semitones=config.break_pitch_semitones,
+                    stretch_factor=config.break_time_stretch,
+                    gate_rate_hz=config.break_gate_rate_hz,
+                    gate_duty=config.break_gate_duty,
+                    grain_size_ms=config.break_grain_size_ms,
+                    grain_density=config.break_grain_density,
+                    freeze_position=config.break_spectral_freeze_position,
+                )
+                applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
             triggers = percussion[role]
             for event in triggers:
@@ -191,16 +271,18 @@ class ReawarpEngine:
                     "velocity": event.velocity,
                     "pan": event.pan,
                     "kind": "sample_trigger",
+                    "transforms": applied_transforms,
                 })
             sample_manifest[role] = {
                 "path": str(path.resolve()),
                 "sha256": sample_digest,
-                "frames_after_resampling": int(len(sample)),
+                "frames_after_resampling": source_frame_count,
+                "frames_after_processing": int(len(sample)),
+                "duration_after_processing": len(sample) / float(sample_rate),
                 "trigger_count": len(triggers),
+                "transforms": applied_transforms,
             }
 
-        # Apply peak attenuation per stem. A shared gain would make regenerating one
-        # lane alter all other stems, violating the stem-regeneration contract.
         peak_ceiling = 10.0 ** (-1.0 / 20.0)
         stem_headroom_gains: dict[str, float] = {}
         for stem_name, stem_audio in stems.items():
@@ -221,14 +303,26 @@ class ReawarpEngine:
                 for name in (
                     "kick_pattern", "snare_pattern", "hat_pattern", "break_pattern",
                     "kick_synthesis", "snare_synthesis", "hat_synthesis", "break_synthesis",
+                    "kick_profile", "snare_profile", "hat_profile", "break_processing",
                     "melody_pattern", "melody_synthesis", "texture_synthesis",
                 )
             },
             "generator_families": {
                 "percussion": "euclidean + prime-indexed mutation + logistic control",
-                "synthetic_break": "stochastic event grammar with kick/snare/hat resynthesis",
+                "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
                 "melody": "3:5 Lissajous curve + logistic-map contour + FM synthesis",
                 "texture": "coloured noise with low-frequency amplitude modulation",
+                "break_processing": list(config.break_transforms),
+            },
+            "synthesis_profiles": {
+                "kick": config.kick_profile,
+                "snare": config.snare_profile,
+                "hat": config.hat_profile,
+                "catalogue_counts": {
+                    "kick": len(KICK_PROFILES),
+                    "snare": len(SNARE_PROFILES),
+                    "hat": len(HAT_PROFILES),
+                },
             },
             "sample_sources": sample_manifest,
             "event_count": len(event_records),
