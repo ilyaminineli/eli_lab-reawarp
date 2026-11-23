@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
+from reawarp.composition.director import STRUCTURES
 from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
@@ -189,11 +190,16 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
 
         panel = QWidget()
-        panel.setMinimumWidth(290)
-        panel.setMaximumWidth(350)
+        panel.setMinimumWidth(320)
+        panel.setMaximumWidth(410)
         panel_layout = QVBoxLayout(panel)
+        control_tabs = QTabWidget()
+        form_page, voices_page, rhythm_page = QWidget(), QWidget(), QWidget()
+        form_layout = QVBoxLayout(form_page)
+        voices_layout = QVBoxLayout(voices_page)
+        rhythm_layout = QVBoxLayout(rhythm_page)
 
-        global_group = QGroupBox("GLOBAL PARAMETERS")
+        global_group = QGroupBox("COMPOSITION FORM")
         form = QFormLayout(global_group)
         self.bpm = QDoubleSpinBox()
         self.bpm.setRange(60, 220)
@@ -208,6 +214,22 @@ class MainWindow(QMainWindow):
         self.duration.setSingleStep(0.5)
         self.duration.setValue(24)
         form.addRow("Duration / sec", self.duration)
+        self.structure = QComboBox()
+        self.structure.addItems(list(STRUCTURES))
+        self.structure.setCurrentText("evolving")
+        form.addRow("Formal trajectory", self.structure)
+        self.composition_energy = QDoubleSpinBox()
+        self.composition_energy.setRange(0.0, 1.0)
+        self.composition_energy.setSingleStep(0.05)
+        self.composition_energy.setValue(0.62)
+        self.composition_energy.setToolTip("Composition energy is not master output gain.")
+        form.addRow("Composition energy", self.composition_energy)
+        self.composition_variation = QDoubleSpinBox()
+        self.composition_variation.setRange(0.0, 1.0)
+        self.composition_variation.setSingleStep(0.05)
+        self.composition_variation.setValue(0.45)
+        self.composition_variation.setToolTip("Changes section proportions and bounded macro values, not hit probability.")
+        form.addRow("Structural variation", self.composition_variation)
 
         self.complexity = QSlider(Qt.Orientation.Horizontal)
         self.complexity.setRange(0, 100)
@@ -236,7 +258,7 @@ class MainWindow(QMainWindow):
         seed_widget = QWidget()
         seed_widget.setLayout(seed_row)
         form.addRow("Random seed", seed_widget)
-        panel_layout.addWidget(global_group)
+        form_layout.addWidget(global_group)
 
         modules = QGroupBox("GENERATOR MODULES")
         modules_layout = QVBoxLayout(modules)
@@ -259,7 +281,7 @@ class MainWindow(QMainWindow):
         self.ambience_level.setValue(0.16)
         ambience_layout.addWidget(self.ambience_level)
         modules_layout.addWidget(ambience_row)
-        panel_layout.addWidget(modules)
+        voices_layout.addWidget(modules)
 
         profiles = QGroupBox("SYNTH VOICE CATALOGUE")
         profile_form = QFormLayout(profiles)
@@ -275,7 +297,7 @@ class MainWindow(QMainWindow):
         self.melody_profile = QComboBox()
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
-        panel_layout.addWidget(profiles)
+        voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
         groove_form = QFormLayout(groove)
@@ -304,7 +326,7 @@ class MainWindow(QMainWindow):
         self.break_cycle_bars.addItem("4 bars", 4)
         self.break_cycle_bars.setCurrentIndex(1)
         groove_form.addRow("Repeat cycle", self.break_cycle_bars)
-        panel_layout.addWidget(groove)
+        rhythm_layout.addWidget(groove)
 
         source_group = QGroupBox("SOURCE MATERIAL")
         source_layout = QVBoxLayout(source_group)
@@ -315,9 +337,17 @@ class MainWindow(QMainWindow):
         browse = QPushButton("LOAD BREAK SAMPLE…")
         browse.clicked.connect(self._choose_break_sample)
         source_layout.addWidget(browse)
-        panel_layout.addWidget(source_group)
+        rhythm_layout.addWidget(source_group)
 
-        self.generate_button = QPushButton("GENERATE LOOP")
+        form_layout.addStretch(1)
+        voices_layout.addStretch(1)
+        rhythm_layout.addStretch(1)
+        control_tabs.addTab(form_page, "FORM")
+        control_tabs.addTab(voices_page, "VOICES")
+        control_tabs.addTab(rhythm_page, "RHYTHM")
+        panel_layout.addWidget(control_tabs, 1)
+
+        self.generate_button = QPushButton("GENERATE COMPOSITION")
         self.generate_button.setObjectName("primaryAction")
         self.generate_button.clicked.connect(self._generate)
         panel_layout.addWidget(self.generate_button)
@@ -552,6 +582,9 @@ class MainWindow(QMainWindow):
         return GenerationConfig(
             bpm=self.bpm.value(),
             duration=self.duration.value(),
+            structure=self.structure.currentText(),
+            composition_energy=self.composition_energy.value(),
+            composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
             seed=seed,
             complexity=self.complexity.value() / 100.0,

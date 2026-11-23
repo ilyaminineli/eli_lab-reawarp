@@ -30,6 +30,10 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     config = window._read_config()
     assert config.bpm == 137
     assert config.duration == 24
+    assert config.structure == "evolving"
+    assert config.composition_energy == pytest.approx(0.62)
+    assert config.composition_variation == pytest.approx(0.45)
+    assert window.duration.maximum() == 45
     assert window.duration.maximum() == 45
     assert config.sample_rate == 48_000
     assert config.complexity == pytest.approx(0.68)
