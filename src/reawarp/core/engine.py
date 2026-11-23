@@ -41,7 +41,7 @@ from reawarp.transforms.pipeline import apply_break_transforms
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.5.0"
+    VERSION = "0.6.0"
 
     def generate_variant(
             self,

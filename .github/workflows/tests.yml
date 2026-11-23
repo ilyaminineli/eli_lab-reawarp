@@ -36,6 +36,10 @@ jobs:
         run: python -m pytest -q
       - name: Smoke-test CLI
         run: reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-ci
+      - name: Smoke-test local library CLI
+        run: |
+          reawarp-library --db /tmp/reawarp-library.sqlite3 index samples/13_cymbal1_606.wav
+          reawarp-library --db /tmp/reawarp-library.sqlite3 search --role sample
       - name: Smoke-test desktop entry point
         env:
           QT_QPA_PLATFORM: offscreen
