@@ -921,7 +921,11 @@ class MainWindow(QMainWindow):
         self._mix_rows.clear()
         if self.project is None:
             return
-        supported = set(ReawarpEngine._stream_groups())
+        supported = {
+            "kick", "snare", "hats", "synthetic_break", "melody",
+            "noise_texture", "ambience", "sample_kick", "sample_snare",
+            "sample_hat", "sample_break",
+        }
         for name in self.project.stems:
             row = StemRow(name, name in supported)
             if name in previous:
