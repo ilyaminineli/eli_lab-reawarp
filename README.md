@@ -215,3 +215,17 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
 The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
+
+## M7 — Composition Workbench (0.7.0)
+
+M7 adds a deterministic formal section director above the existing mathematical event generators. Available structures are evolving, additive, subtractive, episodic, and drift. Section transitions are quantised to 4/4 bars where the requested duration permits; the final audio buffer still ends at the exact requested duration.
+
+Use the same formal controls in the command line or the desktop Generator:
+
+    reawarp --duration 45 --structure episodic --energy 0.72 --variation 0.8 --seed 211 --sample-rate 22050 --output output/m7-episodic
+
+Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
+
+The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The shared ELI LAB icon is packaged for the application window and system tray.
+
+See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.
