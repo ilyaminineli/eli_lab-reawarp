@@ -14,6 +14,9 @@ from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 class GenerationConfig:
     bpm: float = 137.0
     duration: float = 24.0
+    structure: str = "evolving"
+    composition_energy: float = 0.62
+    composition_variation: float = 0.45
     sample_rate: int = 48_000
     seed: int | str = 20261123
     complexity: float = 0.68
@@ -49,6 +52,12 @@ class GenerationConfig:
             raise ValueError("duration must be between 5 and 45 seconds")
         if not 22_050 <= int(self.sample_rate) <= 192_000:
             raise ValueError("sample_rate must be between 22050 and 192000 Hz")
+        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift"}:
+            raise ValueError("unknown composition structure")
+        if not 0.0 <= float(self.composition_energy) <= 1.0:
+            raise ValueError("composition_energy must be between 0 and 1")
+        if not 0.0 <= float(self.composition_variation) <= 1.0:
+            raise ValueError("composition_variation must be between 0 and 1")
         if not 0.0 <= float(self.complexity) <= 1.0:
             raise ValueError("complexity must be between 0.0 and 1.0")
         allowed_roles = {"kick", "snare", "hat", "break"}
