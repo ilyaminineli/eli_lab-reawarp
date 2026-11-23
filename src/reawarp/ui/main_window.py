@@ -298,7 +298,9 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_tray_icon(self) -> None:
-        icon_path = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
+        packaged_icon = Path(__file__).resolve().parents[1] / "resources" / "icons" / "Icon.ico"
+        source_icon = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
+        icon_path = packaged_icon if packaged_icon.is_file() else source_icon
         icon = QIcon(str(icon_path)) if icon_path.is_file() else QIcon()
         if not icon.isNull():
             self.setWindowIcon(icon)
