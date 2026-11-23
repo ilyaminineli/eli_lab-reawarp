@@ -46,6 +46,8 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     assert [window.tabs.tabText(i) for i in range(4)] == [
         "GENERATOR", "BREAK LAB", "STEM MIXER", "LIBRARY"
     ]
+    assert window.library_page.tags.placeholderText() == "required tags, comma separated"
+    assert window.library_page.results.count() == 0
     window.close()
 
 
