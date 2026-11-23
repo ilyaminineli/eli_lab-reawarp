@@ -41,16 +41,46 @@ from reawarp.transforms.pipeline import apply_break_transforms
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.6.0"
+    VERSION = "0.7.0"
 
     def generate_variant(
             self,
             config: GenerationConfig,
             stem: str,
             variation: int = 1,
+            *,
+            base_project: ReawarpProject | None = None,
     ) -> ReawarpProject:
-        """Regenerate one stem while retaining all unrelated stems bit-identically."""
-        return self.generate(config, regenerate=stem, variation=variation)
+        """Regenerate one layer and optionally merge it into a frozen base project."""
+        variant = self.generate(config, regenerate=stem, variation=variation)
+        if base_project is None:
+            return variant
+        if base_project.config != config:
+            raise ValueError("base_project configuration must match")
+        if stem not in base_project.stems or stem not in variant.stems:
+            raise ValueError(f"layer {stem!r} is not present in both projects")
+        merged_stems = dict(base_project.stems)
+        merged_stems[stem] = variant.stems[stem]
+        target_lane = self._event_lane_for_stem(stem)
+        merged_events = [event for event in base_project.events if event.get("lane") != target_lane]
+        merged_events.extend(event for event in variant.events if event.get("lane") == target_lane)
+        merged_events.sort(
+            key=lambda event: (float(event.get("time", 0.0)), str(event.get("lane", "")))
+        )
+        metadata = dict(base_project.metadata)
+        metadata["variation"] = {"stem": stem, "index": variation}
+        metadata["variation_parent_seed"] = config.seed
+        gains = dict(base_project.metadata.get("stem_headroom_gains", {}))
+        gains[stem] = variant.metadata.get("stem_headroom_gains", {}).get(stem, 1.0)
+        metadata["stem_headroom_gains"] = gains
+        return ReawarpProject(
+            config=config, sample_rate=base_project.sample_rate,
+            stems=merged_stems, events=merged_events, metadata=metadata,
+        )
+
+    @staticmethod
+    def _event_lane_for_stem(stem: str) -> str:
+        return {"hats": "hat", "synthetic_break": "break"}.get(stem, stem)
 
     def generate(
             self,
@@ -71,25 +101,35 @@ class ReawarpEngine:
             "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
             "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
             "hats": ("hat_pattern", "hat_synthesis", "hat_profile"),
-            "synthetic_break": (
-                "break_pattern", "break_synthesis", "break_profile", "break_processing"
-            ),
+            "synthetic_break": ("break_pattern", "break_synthesis", "break_profile", "break_processing"),
             "melody": ("melody_pattern", "melody_synthesis", "melody_profile"),
             "noise_texture": ("texture_synthesis",),
             "ambience": ("ambience_synthesis",),
         }
-        if regenerate is not None and regenerate not in stream_groups:
+        sample_stream_groups = {
+            "sample_kick": ("kick_pattern",),
+            "sample_snare": ("snare_pattern",),
+            "sample_hat": ("hat_pattern",),
+            "sample_break": ("break_pattern", "break_processing"),
+        }
+        if regenerate is not None and regenerate not in stream_groups and regenerate not in sample_stream_groups:
             raise ValueError(f"unknown stem for regeneration: {regenerate}")
         seed_overrides = {}
-        if regenerate is not None:
+        sample_seed_overrides = {}
+        if regenerate in stream_groups:
             for stream_name in stream_groups[regenerate]:
                 seed_overrides[stream_name] = derive_seed(
+                    config.seed, f"variation:{regenerate}:{variation}:{stream_name}"
+                )
+        elif regenerate in sample_stream_groups:
+            for stream_name in sample_stream_groups[regenerate]:
+                sample_seed_overrides[stream_name] = derive_seed(
                     config.seed, f"variation:{regenerate}:{variation}:{stream_name}"
                 )
 
         frame_count = config.frame_count
         sample_rate = config.sample_rate
-        sample_streams = RandomStreams(config.seed)
+        sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
         stems: dict[str, np.ndarray] = {}
         event_records: list[dict[str, Any]] = []

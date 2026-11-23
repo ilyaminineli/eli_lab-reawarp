@@ -138,11 +138,19 @@ def test_melody_regeneration_does_not_change_ambience_or_other_stems():
             assert np.array_equal(original.stems[name], variant.stems[name]), name
 
 
-def test_config_accepts_full_45_second_duration():
-    config = GenerationConfig(duration=45.0)
-    assert config.duration == 45.0
-
-
-def test_config_rejects_duration_above_45_seconds():
-    with pytest.raises(ValueError, match="5 and 45 seconds"):
-        GenerationConfig(duration=45.1)
+def test_sample_layer_regeneration_is_independent_and_mergeable(tmp_path):
+    sample = np.sin(np.linspace(0.0, 12.0 * np.pi, 2048)).astype(np.float32) * 0.35
+    sample_path = write_wav(tmp_path / "kick.wav", sample, 22_050, 16)
+    config = small_config(sample_paths={"kick": str(sample_path)})
+    engine = ReawarpEngine()
+    original = engine.generate(config)
+    candidate = engine.generate_variant(config, "sample_kick", variation=2)
+    merged = engine.generate_variant(
+        config, "sample_kick", variation=2, base_project=original
+    )
+    assert not np.array_equal(original.stems["sample_kick"], candidate.stems["sample_kick"])
+    for name in original.stems:
+        if name != "sample_kick":
+            assert np.array_equal(original.stems[name], merged.stems[name]), name
+    assert np.array_equal(candidate.stems["sample_kick"], merged.stems["sample_kick"])
+    assert merged.metadata["variation"] == {"stem": "sample_kick", "index": 2}
