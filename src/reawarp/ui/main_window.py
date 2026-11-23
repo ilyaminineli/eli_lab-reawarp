@@ -137,6 +137,14 @@ class MainWindow(QMainWindow):
 
         self._build_interface()
         self._refresh_devices()
+
+        # Coalesce rapid mixer changes so the visual analysis is not rebuilt for
+        # every slider tick. The timer runs on the GUI clock, never the audio clock.
+        self._preview_refresh_timer = QTimer(self)
+        self._preview_refresh_timer.setSingleShot(True)
+        self._preview_refresh_timer.setInterval(80)
+        self._preview_refresh_timer.timeout.connect(self._apply_preview_refresh)
+
         self._timer = QTimer(self)
         self._timer.setInterval(100)
         self._timer.timeout.connect(self._update_transport)
@@ -663,11 +671,16 @@ class MainWindow(QMainWindow):
         return None
 
     def _refresh_preview(self, *_args: Any) -> None:
+        """Schedule a preview refresh after rapid control changes settle."""
+        self._preview_refresh_timer.start()
+
+    def _apply_preview_refresh(self) -> None:
         audio = self._current_preview_audio()
         self.preview.set_audio(audio, self.project.sample_rate if self.project else 48_000)
         if self.player.is_playing:
-            self.player.stop()
-            self._playback_stopped()
+            if audio is None or not self.player.replace_audio(audio):
+                self.player.stop()
+                self._playback_stopped()
 
     def _refresh_devices(self) -> None:
         self.output_device.clear()
@@ -676,7 +689,8 @@ class MainWindow(QMainWindow):
             self.output_device.addItem(name, index)
         if not self.player.available:
             self.output_device.setToolTip(
-                'Install playback support: python -m pip install -e ".[m4]"'
+                "SoundDevice/PortAudio is unavailable. Reinstall the [m4] extra "
+                "and verify that the system audio runtime is present."
             )
 
     def _toggle_playback(self) -> None:
@@ -702,7 +716,13 @@ class MainWindow(QMainWindow):
 
     def _playback_finished(self) -> None:
         self.play_button.setText("PLAY")
-        self._update_transport()
+        if self.player.duration_frames > 0:
+            sample_rate = self.project.sample_rate if self.project else 48_000
+            duration = self.player.duration_frames / float(sample_rate)
+            self.transport_position.setText(
+                f"{duration // 60:02.0f}:{duration % 60:04.1f} / "
+                f"{duration // 60:02.0f}:{duration % 60:04.1f}"
+            )
 
     def _playback_stopped(self) -> None:
         self.play_button.setText("PLAY")
