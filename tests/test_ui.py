@@ -29,7 +29,11 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     window = MainWindow()
     config = window._read_config()
     assert config.bpm == 137
-    assert config.duration == 12
+    assert config.duration == 24
+    assert config.structure == "evolving"
+    assert config.composition_energy == pytest.approx(0.62)
+    assert config.composition_variation == pytest.approx(0.45)
+    assert window.duration.maximum() == 45
     assert config.sample_rate == 48_000
     assert config.complexity == pytest.approx(0.68)
     assert config.break_style == "broken_funk"
@@ -38,10 +42,12 @@ def test_main_window_exposes_generator_config_and_three_m4_workspaces(qt_app):
     assert config.break_cycle_bars == 2
     assert config.include_ambience is True
     assert config.ambience_level == pytest.approx(0.16)
-    assert window.tabs.count() == 3
-    assert [window.tabs.tabText(i) for i in range(3)] == [
-        "GENERATOR", "BREAK LAB", "STEM MIXER"
+    assert window.tabs.count() == 4
+    assert [window.tabs.tabText(i) for i in range(4)] == [
+        "GENERATOR", "BREAK LAB", "STEM MIXER", "LIBRARY"
     ]
+    assert window.library_page.tags.placeholderText() == "required tags, comma separated"
+    assert window.library_page.results.count() == 0
     window.close()
 
 

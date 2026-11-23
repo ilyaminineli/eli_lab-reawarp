@@ -8,15 +8,17 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool
+from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool, QEvent
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
-    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow,
+    QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
+    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
     QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QTabWidget, QToolButton, QVBoxLayout, QWidget,
+    QSystemTrayIcon, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
+from reawarp.composition.director import STRUCTURES
 from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
@@ -25,97 +27,10 @@ from reawarp.synthesis.profiles import (
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.theme import APP_STYLE
-from reawarp.ui.visualization import AudioPreview
+from reawarp.ui.pages.library import LibraryPage
+from reawarp.ui.widgets.audio_preview import AudioPreview
+from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import RenderWorker
-
-
-class StemRow(QFrame):
-    selected = Signal(str)
-    regenerate = Signal(str)
-    changed = Signal()
-
-    def __init__(self, name: str, can_regenerate: bool, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.name = name
-        self.can_regenerate = can_regenerate
-        self.setObjectName("stemRow")
-        self.setStyleSheet(
-            "QFrame#stemRow { background: #1d242e; border: 1px solid #303b49; border-radius: 6px; }"
-        )
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(9, 5, 9, 5)
-        layout.setSpacing(8)
-
-        name_button = QPushButton(name.replace("_", " ").upper())
-        name_button.setMinimumWidth(145)
-        name_button.clicked.connect(lambda: self.selected.emit(self.name))
-        layout.addWidget(name_button)
-
-        layout.addWidget(QLabel("GAIN"))
-        self.gain = QSlider(Qt.Orientation.Horizontal)
-        self.gain.setRange(0, 150)
-        self.gain.setValue(100)
-        self.gain.setFixedWidth(100)
-        self.gain.valueChanged.connect(self.changed.emit)
-        layout.addWidget(self.gain)
-        self.gain_label = QLabel("1.00")
-        self.gain_label.setFixedWidth(38)
-        self.gain.valueChanged.connect(
-            lambda value: self.gain_label.setText(f"{value / 100:.2f}")
-        )
-        layout.addWidget(self.gain_label)
-
-        layout.addWidget(QLabel("PAN"))
-        self.pan = QSlider(Qt.Orientation.Horizontal)
-        self.pan.setRange(-100, 100)
-        self.pan.setValue(0)
-        self.pan.setFixedWidth(80)
-        self.pan.valueChanged.connect(self.changed.emit)
-        layout.addWidget(self.pan)
-        self.pan_label = QLabel("C")
-        self.pan_label.setFixedWidth(30)
-        self.pan.valueChanged.connect(
-            lambda value: self.pan_label.setText(
-                "C" if value == 0 else f"{abs(value)}{'L' if value < 0 else 'R'}"
-            )
-        )
-        layout.addWidget(self.pan_label)
-
-        self.mute = QToolButton()
-        self.mute.setText("M")
-        self.mute.setCheckable(True)
-        self.mute.setToolTip("Mute in mixer audition and master export")
-        self.mute.toggled.connect(self.changed.emit)
-        layout.addWidget(self.mute)
-
-        self.solo = QToolButton()
-        self.solo.setText("S")
-        self.solo.setCheckable(True)
-        self.solo.setToolTip("Solo this stem; multiple solo stems are allowed")
-        self.solo.toggled.connect(self.changed.emit)
-        layout.addWidget(self.solo)
-
-        self.regen = QPushButton("REGENERATE")
-        self.regen.setEnabled(can_regenerate)
-        if not can_regenerate:
-            self.regen.setToolTip("Sample overlays retain their independent baseline trigger score.")
-        self.regen.clicked.connect(lambda: self.regenerate.emit(self.name))
-        layout.addWidget(self.regen)
-        layout.addStretch(1)
-
-    def state(self) -> dict[str, Any]:
-        return {
-            "gain": self.gain.value(),
-            "pan": self.pan.value(),
-            "mute": self.mute.isChecked(),
-            "solo": self.solo.isChecked(),
-        }
-
-    def restore(self, state: dict[str, Any]) -> None:
-        self.gain.setValue(int(state.get("gain", 100)))
-        self.pan.setValue(int(state.get("pan", 0)))
-        self.mute.setChecked(bool(state.get("mute", False)))
-        self.solo.setChecked(bool(state.get("solo", False)))
 
 
 class MainWindow(QMainWindow):
@@ -134,10 +49,13 @@ class MainWindow(QMainWindow):
         self._worker: RenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
         self._mix_rows: dict[str, StemRow] = {}
+        self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
+        self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
         self.player.finished.connect(self._playback_finished)
 
         self._build_interface()
+        self._build_tray_icon()
         self._refresh_devices()
 
         # Coalesce rapid mixer changes so the visual analysis is not rebuilt for
@@ -178,6 +96,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_generator_page(), "GENERATOR")
         self.tabs.addTab(self._build_break_page(), "BREAK LAB")
         self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
+        self.library_page = LibraryPage(self)
+        self.tabs.addTab(self.library_page, "LIBRARY")
         root_layout.addWidget(self.tabs, 1)
         self.setCentralWidget(root)
         self.statusBar().showMessage("Ready — define constraints, generate, listen, and select.")
@@ -189,11 +109,16 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
 
         panel = QWidget()
-        panel.setMinimumWidth(290)
-        panel.setMaximumWidth(350)
+        panel.setMinimumWidth(320)
+        panel.setMaximumWidth(410)
         panel_layout = QVBoxLayout(panel)
+        control_tabs = QTabWidget()
+        form_page, voices_page, rhythm_page = QWidget(), QWidget(), QWidget()
+        form_layout = QVBoxLayout(form_page)
+        voices_layout = QVBoxLayout(voices_page)
+        rhythm_layout = QVBoxLayout(rhythm_page)
 
-        global_group = QGroupBox("GLOBAL PARAMETERS")
+        global_group = QGroupBox("COMPOSITION FORM")
         form = QFormLayout(global_group)
         self.bpm = QDoubleSpinBox()
         self.bpm.setRange(60, 220)
@@ -202,11 +127,28 @@ class MainWindow(QMainWindow):
         self.bpm.setValue(137)
         form.addRow("Tempo / BPM", self.bpm)
         self.duration = QDoubleSpinBox()
-        self.duration.setRange(5, 20)
+        self.duration.setRange(5, 45)
+        self.duration.setToolTip("Offline composition duration, up to 45 seconds.")
         self.duration.setDecimals(1)
         self.duration.setSingleStep(0.5)
-        self.duration.setValue(12)
+        self.duration.setValue(24)
         form.addRow("Duration / sec", self.duration)
+        self.structure = QComboBox()
+        self.structure.addItems(list(STRUCTURES))
+        self.structure.setCurrentText("evolving")
+        form.addRow("Formal trajectory", self.structure)
+        self.composition_energy = QDoubleSpinBox()
+        self.composition_energy.setRange(0.0, 1.0)
+        self.composition_energy.setSingleStep(0.05)
+        self.composition_energy.setValue(0.62)
+        self.composition_energy.setToolTip("Composition energy is not master output gain.")
+        form.addRow("Composition energy", self.composition_energy)
+        self.composition_variation = QDoubleSpinBox()
+        self.composition_variation.setRange(0.0, 1.0)
+        self.composition_variation.setSingleStep(0.05)
+        self.composition_variation.setValue(0.45)
+        self.composition_variation.setToolTip("Changes section proportions and bounded macro values, not hit probability.")
+        form.addRow("Structural variation", self.composition_variation)
 
         self.complexity = QSlider(Qt.Orientation.Horizontal)
         self.complexity.setRange(0, 100)
@@ -235,7 +177,7 @@ class MainWindow(QMainWindow):
         seed_widget = QWidget()
         seed_widget.setLayout(seed_row)
         form.addRow("Random seed", seed_widget)
-        panel_layout.addWidget(global_group)
+        form_layout.addWidget(global_group)
 
         modules = QGroupBox("GENERATOR MODULES")
         modules_layout = QVBoxLayout(modules)
@@ -258,7 +200,7 @@ class MainWindow(QMainWindow):
         self.ambience_level.setValue(0.16)
         ambience_layout.addWidget(self.ambience_level)
         modules_layout.addWidget(ambience_row)
-        panel_layout.addWidget(modules)
+        voices_layout.addWidget(modules)
 
         profiles = QGroupBox("SYNTH VOICE CATALOGUE")
         profile_form = QFormLayout(profiles)
@@ -274,7 +216,7 @@ class MainWindow(QMainWindow):
         self.melody_profile = QComboBox()
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
-        panel_layout.addWidget(profiles)
+        voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
         groove_form = QFormLayout(groove)
@@ -303,7 +245,7 @@ class MainWindow(QMainWindow):
         self.break_cycle_bars.addItem("4 bars", 4)
         self.break_cycle_bars.setCurrentIndex(1)
         groove_form.addRow("Repeat cycle", self.break_cycle_bars)
-        panel_layout.addWidget(groove)
+        rhythm_layout.addWidget(groove)
 
         source_group = QGroupBox("SOURCE MATERIAL")
         source_layout = QVBoxLayout(source_group)
@@ -314,9 +256,17 @@ class MainWindow(QMainWindow):
         browse = QPushButton("LOAD BREAK SAMPLE…")
         browse.clicked.connect(self._choose_break_sample)
         source_layout.addWidget(browse)
-        panel_layout.addWidget(source_group)
+        rhythm_layout.addWidget(source_group)
 
-        self.generate_button = QPushButton("GENERATE LOOP")
+        form_layout.addStretch(1)
+        voices_layout.addStretch(1)
+        rhythm_layout.addStretch(1)
+        control_tabs.addTab(form_page, "FORM")
+        control_tabs.addTab(voices_page, "VOICES")
+        control_tabs.addTab(rhythm_page, "RHYTHM")
+        panel_layout.addWidget(control_tabs, 1)
+
+        self.generate_button = QPushButton("GENERATE COMPOSITION")
         self.generate_button.setObjectName("primaryAction")
         self.generate_button.clicked.connect(self._generate)
         panel_layout.addWidget(self.generate_button)
@@ -346,6 +296,65 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.render_summary)
         layout.addWidget(right, 1)
         return page
+
+    def _build_tray_icon(self) -> None:
+        packaged_icon = Path(__file__).resolve().parents[1] / "resources" / "icons" / "Icon.ico"
+        source_icon = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
+        icon_path = packaged_icon if packaged_icon.is_file() else source_icon
+        icon = QIcon(str(icon_path)) if icon_path.is_file() else QIcon()
+        if not icon.isNull():
+            self.setWindowIcon(icon)
+        if not self._tray_available or icon.isNull():
+            return
+        self._tray_icon = QSystemTrayIcon(icon, self)
+        self._tray_icon.setToolTip("Reawarp — 再変形")
+        menu = QMenu(self)
+        show_action = QAction("Show Reawarp", self)
+        show_action.triggered.connect(self._restore_from_tray)
+        menu.addAction(show_action)
+        menu.addSeparator()
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(self._quit_from_tray)
+        menu.addAction(quit_action)
+        self._tray_icon.setContextMenu(menu)
+        self._tray_icon.activated.connect(self._tray_activated)
+        self._tray_icon.show()
+
+    def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
+            self._restore_from_tray()
+
+    def _restore_from_tray(self) -> None:
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+
+    def _quit_from_tray(self) -> None:
+        self.player.stop()
+        if self._tray_icon is not None:
+            self._tray_icon.hide()
+        QApplication.instance().quit()
+
+    def changeEvent(self, event: QEvent) -> None:
+        super().changeEvent(event)
+        if (
+            event.type() == QEvent.Type.WindowStateChange
+            and self.isMinimized()
+            and self._tray_available
+            and self._tray_icon is not None
+        ):
+            QTimer.singleShot(0, self.hide)
+
+    def closeEvent(self, event) -> None:
+        if self._tray_available and self._tray_icon is not None:
+            event.ignore()
+            self.hide()
+            return
+        self.player.stop()
+        super().closeEvent(event)
 
     def _build_transport_bar(self) -> QWidget:
         bar = QFrame()
@@ -551,6 +560,9 @@ class MainWindow(QMainWindow):
         return GenerationConfig(
             bpm=self.bpm.value(),
             duration=self.duration.value(),
+            structure=self.structure.currentText(),
+            composition_energy=self.composition_energy.value(),
+            composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
             seed=seed,
             complexity=self.complexity.value() / 100.0,
@@ -594,8 +606,11 @@ class MainWindow(QMainWindow):
         variation = self._variation_counts.get(name, 0) + 1
         self._variation_counts[name] = variation
         config = self.project.config
+        base_project = self.project
         self._run_render(
-            lambda: ReawarpEngine().generate_variant(config, name, variation),
+            lambda: ReawarpEngine().generate_variant(
+                config, name, variation, base_project=base_project
+            ),
             f"Regenerating {name} · variation {variation}…",
         )
 
@@ -668,7 +683,9 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         supported = {
-            "kick", "snare", "hats", "synthetic_break", "melody", "noise_texture", "ambience"
+            "kick", "snare", "hats", "synthetic_break", "melody",
+            "noise_texture", "ambience", "sample_kick", "sample_snare",
+            "sample_hat", "sample_break",
         }
         for name in self.project.stems:
             row = StemRow(name, name in supported)
