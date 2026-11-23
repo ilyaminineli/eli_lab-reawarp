@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
     QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QSystemTrayIcon, QTabWidget, QToolButton, QVBoxLayout, QWidget,
+    QSystemTrayIcon, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
@@ -27,97 +27,10 @@ from reawarp.synthesis.profiles import (
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.theme import APP_STYLE
-from reawarp.ui.visualization import AudioPreview
+from reawarp.ui.pages.library import LibraryPage
+from reawarp.ui.widgets.audio_preview import AudioPreview
+from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import RenderWorker
-
-
-class StemRow(QFrame):
-    selected = Signal(str)
-    regenerate = Signal(str)
-    changed = Signal()
-
-    def __init__(self, name: str, can_regenerate: bool, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.name = name
-        self.can_regenerate = can_regenerate
-        self.setObjectName("stemRow")
-        self.setStyleSheet(
-            "QFrame#stemRow { background: #1d242e; border: 1px solid #303b49; border-radius: 6px; }"
-        )
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(9, 5, 9, 5)
-        layout.setSpacing(8)
-
-        name_button = QPushButton(name.replace("_", " ").upper())
-        name_button.setMinimumWidth(145)
-        name_button.clicked.connect(lambda: self.selected.emit(self.name))
-        layout.addWidget(name_button)
-
-        layout.addWidget(QLabel("GAIN"))
-        self.gain = QSlider(Qt.Orientation.Horizontal)
-        self.gain.setRange(0, 150)
-        self.gain.setValue(100)
-        self.gain.setFixedWidth(100)
-        self.gain.valueChanged.connect(self.changed.emit)
-        layout.addWidget(self.gain)
-        self.gain_label = QLabel("1.00")
-        self.gain_label.setFixedWidth(38)
-        self.gain.valueChanged.connect(
-            lambda value: self.gain_label.setText(f"{value / 100:.2f}")
-        )
-        layout.addWidget(self.gain_label)
-
-        layout.addWidget(QLabel("PAN"))
-        self.pan = QSlider(Qt.Orientation.Horizontal)
-        self.pan.setRange(-100, 100)
-        self.pan.setValue(0)
-        self.pan.setFixedWidth(80)
-        self.pan.valueChanged.connect(self.changed.emit)
-        layout.addWidget(self.pan)
-        self.pan_label = QLabel("C")
-        self.pan_label.setFixedWidth(30)
-        self.pan.valueChanged.connect(
-            lambda value: self.pan_label.setText(
-                "C" if value == 0 else f"{abs(value)}{'L' if value < 0 else 'R'}"
-            )
-        )
-        layout.addWidget(self.pan_label)
-
-        self.mute = QToolButton()
-        self.mute.setText("M")
-        self.mute.setCheckable(True)
-        self.mute.setToolTip("Mute in mixer audition and master export")
-        self.mute.toggled.connect(self.changed.emit)
-        layout.addWidget(self.mute)
-
-        self.solo = QToolButton()
-        self.solo.setText("S")
-        self.solo.setCheckable(True)
-        self.solo.setToolTip("Solo this stem; multiple solo stems are allowed")
-        self.solo.toggled.connect(self.changed.emit)
-        layout.addWidget(self.solo)
-
-        self.regen = QPushButton("REGENERATE")
-        self.regen.setEnabled(can_regenerate)
-        if not can_regenerate:
-            self.regen.setToolTip("Sample overlays retain their independent baseline trigger score.")
-        self.regen.clicked.connect(lambda: self.regenerate.emit(self.name))
-        layout.addWidget(self.regen)
-        layout.addStretch(1)
-
-    def state(self) -> dict[str, Any]:
-        return {
-            "gain": self.gain.value(),
-            "pan": self.pan.value(),
-            "mute": self.mute.isChecked(),
-            "solo": self.solo.isChecked(),
-        }
-
-    def restore(self, state: dict[str, Any]) -> None:
-        self.gain.setValue(int(state.get("gain", 100)))
-        self.pan.setValue(int(state.get("pan", 0)))
-        self.mute.setChecked(bool(state.get("mute", False)))
-        self.solo.setChecked(bool(state.get("solo", False)))
 
 
 class MainWindow(QMainWindow):
@@ -136,7 +49,6 @@ class MainWindow(QMainWindow):
         self._worker: RenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
         self._mix_rows: dict[str, StemRow] = {}
-        self._library_worker: RenderWorker | None = None
         self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
         self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
@@ -184,7 +96,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_generator_page(), "GENERATOR")
         self.tabs.addTab(self._build_break_page(), "BREAK LAB")
         self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
-        self.tabs.addTab(self._build_library_page(), "LIBRARY")
+        self.library_page = LibraryPage(self)
+        self.tabs.addTab(self.library_page, "LIBRARY")
         root_layout.addWidget(self.tabs, 1)
         self.setCentralWidget(root)
         self.statusBar().showMessage("Ready — define constraints, generate, listen, and select.")
@@ -383,160 +296,6 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.render_summary)
         layout.addWidget(right, 1)
         return page
-
-    def _build_library_page(self) -> QWidget:
-        from reawarp.library.store import default_database_path
-
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        header = QLabel("LOCAL MATERIAL / STEM LIBRARY")
-        header.setObjectName("sectionTitle")
-        layout.addWidget(header)
-        self.library_database = QLabel(str(default_database_path()))
-        self.library_database.setObjectName("muted")
-        layout.addWidget(self.library_database)
-
-        folder_row = QHBoxLayout()
-        self.library_folder = QLineEdit()
-        self.library_folder.setPlaceholderText("Choose a sample or project folder to index")
-        folder_row.addWidget(self.library_folder, 1)
-        browse = QPushButton("BROWSE…")
-        browse.clicked.connect(self._browse_library_folder)
-        folder_row.addWidget(browse)
-        self.library_index_button = QPushButton("INDEX")
-        self.library_index_button.clicked.connect(self._index_library)
-        folder_row.addWidget(self.library_index_button)
-        layout.addLayout(folder_row)
-
-        search_row = QHBoxLayout()
-        self.library_query = QLineEdit()
-        self.library_query.setPlaceholderText("Find by filename, path, metadata, or tags")
-        search_row.addWidget(self.library_query, 1)
-        self.library_type = QComboBox()
-        self.library_type.addItems(["all", "sample", "stem", "master"])
-        search_row.addWidget(self.library_type)
-        self.library_role = QComboBox()
-        self.library_role.addItems([
-            "all", "kick", "snare", "hat", "break", "melody", "ambience", "noise_texture"
-        ])
-        search_row.addWidget(self.library_role)
-        search = QPushButton("SEARCH")
-        search.clicked.connect(self._search_library)
-        search_row.addWidget(search)
-        layout.addLayout(search_row)
-
-        self.library_results = QComboBox()
-        self.library_results.currentIndexChanged.connect(self._preview_library_asset)
-        layout.addWidget(self.library_results)
-        self.library_details = QLabel(
-            "Index an audio folder to search your samples, generated stems, and project masters."
-        )
-        self.library_details.setObjectName("muted")
-        self.library_details.setWordWrap(True)
-        layout.addWidget(self.library_details)
-        self.library_preview = AudioPreview()
-        layout.addWidget(self.library_preview, 1)
-        return page
-
-    def _browse_library_folder(self) -> None:
-        folder = QFileDialog.getExistingDirectory(
-            self, "Choose material folder", self.library_folder.text() or str(Path.cwd())
-        )
-        if folder:
-            self.library_folder.setText(folder)
-
-    @staticmethod
-    def _index_library_folder(folder: str) -> dict[str, Any]:
-        from reawarp.library.store import SampleLibrary
-
-        with SampleLibrary() as library:
-            return library.index_directory(folder)
-
-    def _index_library(self) -> None:
-        folder = self.library_folder.text().strip()
-        if not folder:
-            self._show_error("Choose a folder before indexing.")
-            return
-        if self._library_worker is not None:
-            return
-        self.library_index_button.setEnabled(False)
-        worker = RenderWorker(lambda: self._index_library_folder(folder))
-        self._library_worker = worker
-        worker.signals.finished.connect(self._library_index_finished)
-        worker.signals.error.connect(self._library_index_failed)
-        QThreadPool.globalInstance().start(worker)
-        self.statusBar().showMessage("Indexing audio assets in the local library…")
-
-    def _library_index_finished(self, result: object) -> None:
-        self._library_worker = None
-        self.library_index_button.setEnabled(True)
-        if not isinstance(result, dict):
-            self.library_details.setText("Indexing finished with an unexpected result.")
-            return
-        self.library_details.setText(
-            f"Indexed {result.get('assets_indexed', 0)} assets across "
-            f"{result.get('projects_indexed', 0)} projects; "
-            f"{len(result.get('errors', []))} file error(s)."
-        )
-        self.statusBar().showMessage("Library indexing completed.", 6000)
-        self._search_library()
-
-    def _library_index_failed(self, message: str) -> None:
-        self._library_worker = None
-        self.library_index_button.setEnabled(True)
-        self._show_error(f"Library indexing failed: {message}")
-
-    def _search_library(self) -> None:
-        from reawarp.library.store import SampleLibrary
-
-        asset_type = self.library_type.currentText()
-        role = self.library_role.currentText()
-        try:
-            with SampleLibrary() as library:
-                results = library.search(
-                    query=self.library_query.text().strip() or None,
-                    asset_type=None if asset_type == "all" else asset_type,
-                    role=None if role == "all" else role,
-                    limit=100,
-                )
-            self.library_results.blockSignals(True)
-            self.library_results.clear()
-            for asset in results:
-                label = (
-                    f"{asset.file_name} · {asset.asset_type} · "
-                    f"{asset.duration_seconds:.2f}s"
-                )
-                self.library_results.addItem(label, asset.asset_id)
-            self.library_results.blockSignals(False)
-            self.library_details.setText(f"{len(results)} matching asset(s)")
-            if results:
-                self.library_results.setCurrentIndex(0)
-            else:
-                self.library_preview.set_audio(None)
-        except Exception as exc:
-            self.library_results.blockSignals(False)
-            self._show_error(f"Library search failed: {exc}")
-
-    def _preview_library_asset(self, *_args: Any) -> None:
-        from reawarp.library.store import SampleLibrary
-
-        asset_id = self.library_results.currentData()
-        if not asset_id:
-            return
-        try:
-            with SampleLibrary() as library:
-                asset = library.get_asset(str(asset_id))
-            if asset is None:
-                return
-            self.library_details.setText(
-                f"{asset.file_name} · {asset.asset_type} · {asset.role or 'unassigned'} · "
-                f"{asset.duration_seconds:.2f}s · "
-                f"{asset.features.get('spectral_centroid_hz', 0.0):.0f} Hz centroid"
-            )
-            audio = read_sample(asset.path, asset.analysis_sample_rate)
-            self.library_preview.set_audio(audio, asset.analysis_sample_rate)
-        except Exception as exc:
-            self.library_details.setText(f"Preview failed: {exc}")
 
     def _build_tray_icon(self) -> None:
         icon_path = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
