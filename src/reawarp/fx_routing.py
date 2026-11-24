@@ -188,6 +188,12 @@ def normalise_fx_routing(
             raise ValueError(f"Unknown bus preset for {bus}: {preset}")
         if division not in FX_DELAY_DIVISIONS:
             raise ValueError(f"Unknown {bus} delay division: {division}")
+        if bus == "space" and division != "off":
+            raise ValueError("Tempo-synchronised delay is available on the ECHO bus only")
+        if division != "off" and not any(
+            stage.get("type") == "delay" for stage in FX_PRESETS[preset]
+        ):
+            raise ValueError(f"Bus preset {preset!r} has no delay stage to synchronise")
         buses[bus] = {
             "chain": preset,
             "wet": wet,
