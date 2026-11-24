@@ -289,50 +289,50 @@ def build_percussion_events(
     prime_values = set(primes(max(32, step_count // 3 + 8)))
     fib_values = set(fibonacci(18))
 
+    # Minimal IDM default: a stable low-end anchor, occasional backbeat and
+    # sparse high-frequency punctuation. Complexity enriches the phrase slowly;
+    # it does not mean "fill every sixteenth-note slot".
+    sparse_kick_pulses = 2 + int(round(complexity * 1.4))
+    sparse_snare_pulses = 1 + int(round(complexity * 0.9))
+    sparse_hat_pulses = 2 + int(round(complexity * 2.0))
     for step in range(step_count):
         if step * step_seconds >= config.duration:
             continue
         bar, position = divmod(step, 16)
-        local_rotation = (bar * (1 + int(complexity * 3))) % 16
 
-        kick_pulses = min(7, 3 + int(round(complexity * 2)))
-        kick_pattern = euclidean_rhythm(kick_pulses, 16, rotation=local_rotation)
-        kick_hit = kick_pattern[position]
-        if not kick_hit and (step + 1) in prime_values:
-            kick_hit = bool(kick_rng.random() < 0.05 + complexity * 0.22)
+        kick_rotation = (bar * (1 + int(complexity * 2))) % 16
+        kick_hit = euclidean_rhythm(sparse_kick_pulses, 16, rotation=kick_rotation)[position]
+        # Rare, seed-stable syncopations are ornaments, never a second full groove.
+        if not kick_hit and position in (3, 7, 11, 15):
+            kick_hit = bool(kick_rng.random() < 0.018 + complexity * 0.035)
         if kick_hit:
-            velocity = float(kick_rng.uniform(0.74, 0.98))
+            velocity = float(kick_rng.uniform(0.53, 0.78))
             if position == 0:
-                velocity = min(1.0, velocity + 0.1)
-            if kick_rng.random() < complexity * 0.20:
-                velocity *= float(kick_rng.uniform(0.45, 0.72))
+                velocity = min(0.88, velocity + 0.10)
             lane_events["kick"].append(
                 PercussionEvent("kick", step, step * step_seconds, velocity, 0.0, "synth_kick")
             )
 
-        snare_rotation = (4 + bar * 3 + int(chaos[step] * 4)) % 16
-        snare_pulses = 3 + int(complexity > 0.55)
-        snare_hit = euclidean_rhythm(snare_pulses, 16, rotation=snare_rotation)[position]
-        ghost_snare = (
-                position in (2, 6, 10, 14)
-                and snare_rng.random() < complexity * 0.16
-        )
+        # One clear backbeat event per bar on average; sparse ghost notes only
+        # appear at high complexity and never compete with the main accent.
+        snare_rotation = 4 if bar % 2 == 0 else 12
+        snare_hit = position == snare_rotation
+        ghost_snare = position in (6, 14) and snare_rng.random() < complexity * 0.025
         if snare_hit or ghost_snare:
             velocity = float(
-                snare_rng.uniform(0.48, 0.82)
-                if ghost_snare else snare_rng.uniform(0.72, 1.0)
+                snare_rng.uniform(0.16, 0.30)
+                if ghost_snare else snare_rng.uniform(0.38, 0.62)
             )
             lane_events["snare"].append(
                 PercussionEvent("snare", step, step * step_seconds, velocity, 0.0, "noise_snare")
             )
 
-        hat_pulses = min(16, 8 + int(round(complexity * 6)))
-        hat_pattern = euclidean_rhythm(hat_pulses, 16, rotation=(bar * 5 + 1) % 16)
-        if hat_pattern[position] or hat_rng.random() < complexity * 0.12:
-            velocity = float(hat_rng.uniform(0.16, 0.54))
-            if position in (0, 4, 8, 12):
-                velocity *= 0.65
-            pan = float(np.clip(np.sin(step * 0.71) * (0.18 + complexity * 0.42), -0.7, 0.7))
+        # Hats are punctuation, not a constant eighth-note grid.
+        hat_pattern = euclidean_rhythm(sparse_hat_pulses, 16, rotation=(bar * 3 + 2) % 16)
+        hat_probability = 0.015 + complexity * 0.025
+        if hat_pattern[position] and hat_rng.random() < 0.62 or hat_rng.random() < hat_probability:
+            velocity = float(hat_rng.uniform(0.10, 0.24))
+            pan = float(np.clip(np.sin(step * 0.31) * 0.16, -0.22, 0.22))
             lane_events["hat"].append(
                 PercussionEvent("hat", step, step * step_seconds, velocity, pan, "metal_noise")
             )
