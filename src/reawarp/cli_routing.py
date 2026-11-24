@@ -122,6 +122,11 @@ def main() -> None:
     names = list(manifest.get("stems", []))
     sample_rate = int(manifest["sample_rate"])
     bpm = float(manifest.get("config", {}).get("bpm", 120.0))
+    if not args.validate:
+        source_root = project_dir.resolve()
+        output_root = args.output.expanduser().resolve()
+        if output_root == source_root or source_root in output_root.parents:
+            raise SystemExit("Output must be outside the source project directory.")
 
     if args.audition_matrix and args.routing is not None:
         raise SystemExit("--audition-matrix creates its own routing profiles; omit --routing")
@@ -140,7 +145,7 @@ def main() -> None:
             if routing_path is None:
                 if args.validate:
                     raise SystemExit("--routing is required with --validate")
-                routing_path = args.output / "routing.json"
+                routing_path = args.output / "fx_routing.json"
                 save_fx_routing(routing_path, default_fx_routing(names), names, sample_rate)
             routings = {"custom": load_fx_routing(routing_path, names, sample_rate)}
     except SystemExit:
