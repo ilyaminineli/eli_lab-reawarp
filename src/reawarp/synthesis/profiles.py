@@ -121,10 +121,37 @@ MELODY_PROFILES: dict[str, MelodyProfile] = {
 
 # Automatic mode favours controlled, mix-friendly voices. More aggressive
 # profiles remain available explicitly rather than appearing unpredictably.
+
+# Extended sound-object palette. Renderer selection is explicit and deterministic.
+SYNTH_PALETTES = (
+    "hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical",
+)
+
+# Each voice is a compact, serialisable recipe: its oscillator family, spectral
+# character and temporal envelope. These remain data-driven profiles.
+EXTENDED_MELODY_PROFILES: dict[str, MelodyProfile] = {
+    "inharmonic_mallet": MelodyProfile(
+        ((1.0, .62), (2.76, .27), (5.41, .14), (8.93, .07)),
+        .002, .38, .12, .42, 2.71, .92, .4, 11_500.0, 1.35,
+    ),
+    "metallic_fm": MelodyProfile(
+        ((1.0, .58), (1.414, .23), (2.718, .12), (4.07, .06)),
+        .001, .22, .16, .34, 2.73, 1.25, 1.1, 12_000.0, 1.8,
+    ),
+    "dark_formant": MelodyProfile(
+        ((1.0, .66), (1.48, .21), (2.25, .12), (3.4, .05)),
+        .018, .20, .52, .22, .71, .48, 4.2, 3_200.0, 1.25,
+    ),
+    "soft_spectral_pad": MelodyProfile(
+        ((1.0, .58), (1.997, .22), (3.01, .12), (4.98, .06), (6.03, .03)),
+        .12, .35, .76, .65, .50, .28, 6.0, 5_200.0, 1.02,
+    ),
+}
+
 AUTO_KICK_PROFILES = ("deep_sub", "909_punch", "soft_round", "rubber", "wooden", "long_tail")
 AUTO_SNARE_PROFILES = ("acoustic", "909_crack", "tonal", "soft_brush")
 AUTO_HAT_PROFILES = ("closed", "open", "dark")
-AUTO_MELODY_PROFILES = ("soft_keys", "soft_pluck", "reed_pad", "wood_mallet")
+AUTO_MELODY_PROFILES = ("soft_keys", "soft_pluck", "reed_pad", "wood_mallet", "inharmonic_mallet", "metallic_fm", "dark_formant", "soft_spectral_pad")
 
 
 def select_profile_name(
