@@ -105,7 +105,15 @@ class FXAutomationEditor(QGroupBox):
     def set_project(self, stem_names: list[str] | tuple[str, ...], bpm: float) -> None:
         self._stem_names = tuple(stem_names)
         self._bpm = float(bpm)
-        self._automation = normalise_fx_automation(self._automation, self._stem_names)
+        allowed = set(automation_targets(self._stem_names))
+        kept_lanes = {
+            target: points
+            for target, points in self._automation.get("lanes", {}).items()
+            if target in allowed
+        }
+        self._automation = normalise_fx_automation(
+            {"schema_version": 1, "lanes": kept_lanes}, self._stem_names
+        )
         self.lane.blockSignals(True)
         self.lane.clear()
         for target in automation_targets(self._stem_names):
