@@ -20,6 +20,12 @@ The current IRO release represented in `samples/Iro` is:
 
 The IRO Track 01 project `けれあけ` has its own track seed `312`, tempo `113 BPM`, 392-beat main score and an 8-beat residue coda. These identities must remain separate in project metadata: release provenance is not a track seed.
 
+## Reawarp's actual bundled sample library
+
+The playable drum source library is the repository's `samples/` tree, not the `samples/Iro/` reference manifests. The Generator discovers local kick, snare/clap and hat/cymbal audio, lets the user choose one source per role, and supports custom replacements. The source engine combines these files with the existing Reawarp synthesis profiles using a shared percussion event score.
+
+IRO remains relevant as a cross-repository design vocabulary: release identity, mathematical source families, articulation names, feature-driven sound design and Sonic Pi performance grammar can inform later source classification and synthesis models. They do not need to be copied into a second sample folder to participate in Reawarp.
+
 ## Current checkout limitation
 
 The current Reawarp Git tree contains the IRO manifests, indexes and documentation, but **no `.wav` files anywhere under `samples/Iro`**. Therefore the IRO adapter currently exposes manifest/index entries as metadata-only records (`available=false`); it does not generate substitute audio or fall back to source paths. The drum index contains 96 generated kit entries, the eight entity manifests contain 48 entity variants, the sound-lab manifest lists 32 one-shots/four loops/four stems, and the sound-FX manifest lists 18 event variants/four loops. Their generated/source WAV payloads still need to be committed or supplied before Reawarp can audition or render them.
