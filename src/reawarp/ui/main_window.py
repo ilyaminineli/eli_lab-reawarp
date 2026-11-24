@@ -779,14 +779,15 @@ class MainWindow(QMainWindow):
             self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
         )
         self._fx_bus_returns = metadata.pop("bus_returns_audio", {})
-        active_send_stems = set(metadata.get("active_send_stems", []))
+        active_sends = metadata.get("active_send_stems_by_bus", {})
         solo_active = any(row.solo.isChecked() for row in self._mix_rows.values())
-        keep_sends = {
+        audible = {
             name for name, row in self._mix_rows.items()
             if not row.mute.isChecked() and (not solo_active or row.solo.isChecked())
         }
-        if active_send_stems and not active_send_stems.intersection(keep_sends):
-            self._fx_bus_returns = {}
+        for bus, contributors in active_sends.items():
+            if not set(contributors).intersection(audible):
+                self._fx_bus_returns.pop(bus, None)
         self._fx_processed_stems = processed
         metadata["_routing_signature"] = signature
         self._fx_routing_metadata = metadata
