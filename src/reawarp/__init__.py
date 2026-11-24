@@ -3,6 +3,7 @@
 from reawarp.config import GenerationConfig
 from reawarp.core.engine import ReawarpEngine
 from reawarp.core.project import ReawarpProject
+from reawarp.synthesis.score_voices import build_production_voice_renderers
 from reawarp.score import (
     AutomationControlBus,
     AutomationLane,
@@ -48,5 +49,6 @@ __all__ = [
     "ScoreRenderer",
     "TempoMap",
     "TempoPoint",
+    "build_production_voice_renderers",
 ]
 __version__ = "0.8.0"
