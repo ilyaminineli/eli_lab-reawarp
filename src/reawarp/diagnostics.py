@@ -24,6 +24,8 @@ def analyze_audio(
     samples = np.asarray(audio)
     if samples.ndim not in (1, 2):
         raise ValueError("audio must be a mono 1-D or channel-last 2-D array")
+    if not np.issubdtype(samples.dtype, np.number) or np.iscomplexobj(samples):
+        raise ValueError("audio samples must use a real numeric dtype")
     channels = 1 if samples.ndim == 1 else int(samples.shape[1])
     if channels < 1:
         raise ValueError("audio must contain at least one channel")
