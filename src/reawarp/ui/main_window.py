@@ -1081,6 +1081,13 @@ class MainWindow(QMainWindow):
             f"[{item.get('kick_family', '')}/{item.get('snare_family', '')}/{item.get('hat_family', '')}]"
             for item in drum_plan
         )
+        profile_map = result.metadata.get("drum_section_profiles", {})
+        profile_line = " | ".join(
+            f"{section}: {profile_map.get('kick', {}).get(section, '—')}/"
+            f"{profile_map.get('snare', {}).get(section, '—')}/"
+            f"{profile_map.get('hat', {}).get(section, '—')}"
+            for section in profile_map.get("kick", {})
+        )
         loaded_sources = [
             f"{role}:{source.get('source', {}).get('source_name', Path(source.get('path', role)).name)}"
             for role, source in result.metadata.get("sample_sources", {}).items()
@@ -1096,6 +1103,7 @@ class MainWindow(QMainWindow):
             f"PHRASES: {phrase_line or 'n/a'}"
             + (f"\nFORM MAP: {phrase_detail}" if phrase_detail else "")
             + (f"\nDRUM EVOLUTION: {drum_line}" if drum_line else "\nDRUM EVOLUTION: static mode")
+            + (f"\nDRUM TIMBRES: {profile_line}" if profile_line else "")
             + f"\nSOURCE ENGINE: {source_line}"
             + (f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}" if loaded_sources else "")
         )
