@@ -109,7 +109,7 @@ def test_m13_segment_curves_are_evaluated_on_score_tempo_map_and_frame_clock():
                 kind="hit",
             ),
         ),
-        metadata={"render_stems": ["kick"], "sample_rate": 1000, "duration_seconds": 7.0},
+        metadata={"render_stems": ["kick"], "sample_rate": 48_000, "duration_seconds": 7.0},
     )
     payload = {
         "schema_version": 1,
