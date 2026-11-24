@@ -152,6 +152,13 @@ class MainWindow(QMainWindow):
         self.pattern_relationship.addItems(list(PATTERN_RELATIONSHIPS))
         self.pattern_relationship.setCurrentText("interlock")
         form.addRow("Pattern relationship", self.pattern_relationship)
+        self.pattern_follow_structure = QCheckBox("Auto-switch patterns at formal sections")
+        self.pattern_follow_structure.setChecked(False)
+        self.pattern_follow_structure.setToolTip(
+            "When enabled, change the break pattern family at formal section boundaries. "
+            "Off preserves the existing break phrase grammar."
+        )
+        form.addRow("Pattern development", self.pattern_follow_structure)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
@@ -586,6 +593,7 @@ class MainWindow(QMainWindow):
             composition_flow=self.composition_flow.currentText(),
             pattern_family=self.pattern_family.currentText(),
             pattern_relationship=self.pattern_relationship.currentText(),
+            pattern_follow_structure=self.pattern_follow_structure.isChecked(),
             synth_palette=self.synth_palette.currentText(),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
