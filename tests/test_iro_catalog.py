@@ -40,7 +40,11 @@ def test_iro_catalog_keeps_mathematical_family_and_articulation():
     assets = load_drum_assets()
     assert any(item.family == "sub_impact" for item in assets)
     assert any(item.articulation for item in assets)
-    family_names = {item.family for item in load_entity_assets()}
+    entities = load_entity_assets()
+    assert len(entities) == 48
+    assert all(item.role == "math_entity" for item in entities)
+    assert all(not item.available for item in entities)
+    family_names = {item.family for item in entities}
     assert {
         "boundary_shard", "coordinate_slip", "interference_knot", "phase_fracture",
         "quantization_residue", "ratio_orbit", "recurrence_ghost", "spectral_bloom",
