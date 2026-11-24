@@ -21,6 +21,7 @@ from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
+from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
@@ -29,6 +30,7 @@ from reawarp.synthesis.profiles import (
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.pages.fx_lab import FxLabPage
+from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -52,6 +54,9 @@ class MainWindow(QMainWindow):
         self._worker: RenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
         self._mix_rows: dict[str, StemRow] = {}
+        self._fx_processed_stems: dict[str, np.ndarray] = {}
+        self._fx_bus_returns: dict[str, np.ndarray] = {}
+        self._fx_routing_metadata: dict[str, Any] = {}
         self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
         self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
@@ -690,7 +695,11 @@ class MainWindow(QMainWindow):
         self.player.stop()
         self._playback_stopped()
         self.project = result
+        self._fx_processed_stems = {}
+        self._fx_bus_returns = {}
+        self._fx_routing_metadata = {}
         self._rebuild_mixer()
+        self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate)
         self.preview_source.blockSignals(True)
         self.preview_source.clear()
         self.preview_source.addItem("MASTER MIX", "master")
@@ -745,6 +754,9 @@ class MainWindow(QMainWindow):
             self._mix_rows[name] = row
             self.mixer_rows_layout.addWidget(row)
         self.mixer_rows_layout.addStretch(1)
+        self.fx_routing_editor = FXRoutingEditor()
+        self.fx_routing_editor.changed.connect(self._refresh_preview)
+        layout.addWidget(self.fx_routing_editor)
 
     def _select_stem(self, name: str) -> None:
         index = self.preview_source.findData(name)
@@ -752,9 +764,29 @@ class MainWindow(QMainWindow):
             self.preview_source.setCurrentIndex(index)
         self.tabs.setCurrentIndex(0)
 
+    def _routing_signature(self) -> str:
+        import hashlib
+        payload = json.dumps(self.fx_routing_editor.routing(), sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _ensure_routing_render(self) -> None:
+        if self.project is None:
+            return
+        signature = self._routing_signature()
+        if self._fx_routing_metadata.get("_routing_signature") == signature:
+            return
+        processed, metadata = render_fx_routing(
+            self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
+        )
+        self._fx_bus_returns = metadata.pop("bus_returns_audio", {})
+        self._fx_processed_stems = processed
+        metadata["_routing_signature"] = signature
+        self._fx_routing_metadata = metadata
+
     def _processed_stem(self, name: str) -> np.ndarray:
         assert self.project is not None
-        audio = self.project.stems[name]
+        self._ensure_routing_render()
+        audio = self._fx_processed_stems.get(name, self.project.stems[name])
         row = self._mix_rows.get(name)
         if row is None:
             return audio
@@ -772,14 +804,13 @@ class MainWindow(QMainWindow):
     def _render_mix(self) -> np.ndarray | None:
         if self.project is None:
             return None
-        master = np.zeros((self.project.frame_count, 2), dtype=np.float32)
-        for name in self.project.stems:
-            master += self._processed_stem(name)
-        peak = float(np.max(np.abs(master))) if master.size else 0.0
-        ceiling = 10.0 ** (-1.0 / 20.0)
-        if peak > ceiling:
-            master *= ceiling / peak
-        return np.clip(master, -1.0, 1.0).astype(np.float32, copy=False)
+        self._ensure_routing_render()
+        mixed = {name: self._processed_stem(name) for name in self.project.stems}
+        routing = self.fx_routing_editor.routing()
+        return render_master_with_returns(
+            mixed, self._fx_bus_returns, frames=self.project.frame_count,
+            master_wet=float(routing["master_wet"]),
+        )
 
     def _current_preview_audio(self) -> np.ndarray | None:
         if self.project is None:
@@ -875,6 +906,13 @@ class MainWindow(QMainWindow):
             master = self._render_mix()
             if master is not None:
                 write_wav(output / "master.wav", master, self.project.sample_rate, 24)
+            self._ensure_routing_render()
+            routing_path = save_fx_routing(
+                output / "fx_routing.json", self.fx_routing_editor.routing(),
+                list(self.project.stems), self.project.sample_rate,
+            )
+            for bus, audio in self._fx_bus_returns.items():
+                write_wav(output / "returns" / f"{bus}.wav", audio, self.project.sample_rate, 24)
             mix_data = {
                 "schema_version": 1,
                 "description": (
@@ -884,6 +922,9 @@ class MainWindow(QMainWindow):
                 "master_peak": (
                     float(np.max(np.abs(master))) if master is not None and master.size else 0.0
                 ),
+                "fx_routing": routing_path.name,
+                "fx_returns": list(self._fx_bus_returns),
+                "routing_render": self._fx_routing_metadata,
             }
             (output / "mix.json").write_text(
                 json.dumps(mix_data, indent=2, ensure_ascii=False), encoding="utf-8"
