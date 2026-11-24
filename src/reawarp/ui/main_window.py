@@ -755,7 +755,7 @@ class MainWindow(QMainWindow):
             self.mixer_rows_layout.addWidget(row)
         self.mixer_rows_layout.addStretch(1)
         self.fx_routing_editor = FXRoutingEditor()
-        self.fx_routing_editor.changed.connect(self._refresh_preview)
+        self.fx_routing_editor.changed.connect(self._refresh_routing)
         layout.addWidget(self.fx_routing_editor)
 
     def _select_stem(self, name: str) -> None:
