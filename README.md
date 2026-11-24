@@ -24,20 +24,23 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Stem-only regeneration while preserving unrelated stems bit-identically.
 - A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
 
-### Offline sound design (M10–M11)
+### Offline sound design (M10–M13)
 - A separate FX Lab loads external mono/stereo audio without changing the source file.
 - Optional Pyo offline processing with high/low/band-pass filters, saturation, delay, frequency shift, and Freeverb stages.
 - Four starting chains: restrained space, tape echo, metallic machine, and digital fracture.
 - M11 adds a serial-chain editor: add/remove stages, reorder processing, edit each stage’s parameters and mix, and save/load portable versioned JSON chains.
 - M12 adds per-stem inserts and shared SPACE/ECHO sends/returns in the Stem Mixer, with a separate offline routing render and non-destructive export.
+- M13 adds beat-based deterministic automation for insert wet, per-stem sends, and shared return wet, plus tempo-synchronised delay divisions on the ECHO bus.
 - Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
 - The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
 
-### Editable processing chains and role-aware routing (M11–M12)
+### Editable processing, role-aware routing, and musical automation (M11–M13)
 
 M11's serial chain editor supports add/remove/reorder operations, bounded stage parameters, per-stage wet/dry, global wet/tail, and portable versioned JSON.
 
-M12 brings those chains into the generated-project Stem Mixer. Each stem can have its own insert and post-insert sends to shared SPACE and ECHO returns. Routing is an offline pass; the generated dry stem buffers are preserved. The routed master, return WAVs, and portable fx_routing.json are exported separately. Pyo remains optional and is needed only when an active insert or send is rendered.
+M12 brings those chains into the generated-project Stem Mixer. Each stem can have its own insert and post-insert sends to the two shared returns, SPACE and ECHO. The design is intentionally small and dry by default. Original stem exports remain untouched; insert tails can feed shared sends and returns can extend the routed master.
+
+M13 adds deterministic beat-addressed automation for insert wet, stem sends, and bus return wet, along with tempo-synchronised delay divisions. Automation JSON is portable and independent from routing JSON. Pyo remains optional and is needed only when an active insert or send is rendered.
 
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
@@ -147,10 +150,10 @@ After exporting a generated project, create a starter routing document:
 
 Validate or render a routing file without overwriting the source project:
 
-    reawarp-routing output/my-composition --routing my-routing.json --validate
-    reawarp-routing output/my-composition --routing my-routing.json --output output/routed
+    reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --validate
+    reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --output output/routed
 
-The Stem Mixer also exposes per-stem inserts and shared SPACE/ECHO send levels. Routing JSON, shared return WAVs, and the routed master are exported separately; original stems remain dry and unchanged. See [M12 role-aware FX routing](docs/M12.md).
+The Stem Mixer exposes per-stem inserts, shared SPACE/ECHO sends, beat-based automation, and tempo-synchronised ECHO divisions. The routed export contains dry source stems, processed return WAVs, the routed master, fx_routing.json, fx_automation.json, and render metadata. See [M12 role-aware FX routing](docs/M12.md) and [M13 musical FX automation](docs/M13.md).
 
 ## Python API
 
@@ -277,7 +280,7 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
     python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The repository currently uses compile and command-line smoke checks; no unit-test suite is included. The M11 smoke workflow also validates the portable FX-chain JSON schema without requiring Pyo.
+The repository currently uses compile and command-line smoke checks; no unit-test suite is included. The smoke workflow validates FX-chain and routing JSON, verifies dry-buffer immutability, checks beat automation curves, and constructs the routing/automation UI without requiring Pyo.
 
 The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 
