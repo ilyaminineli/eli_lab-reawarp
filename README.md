@@ -24,12 +24,17 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Stem-only regeneration while preserving unrelated stems bit-identically.
 - A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
 
-### Offline sound design (M10)
+### Offline sound design (M10–M11)
 - A separate FX Lab loads external mono/stereo audio without changing the source file.
-- Optional Pyo offline processing with ordered high/low/band-pass filtering, saturation, delay, frequency shift, and Freeverb stages.
-- Four role-oriented chains: restrained space, tape echo, metallic machine, and digital fracture.
+- Optional Pyo offline processing with high/low/band-pass filters, saturation, delay, frequency shift, and Freeverb stages.
+- Four starting chains: restrained space, tape echo, metallic machine, and digital fracture.
+- M11 adds a serial-chain editor: add/remove stages, reorder processing, edit each stage’s parameters and mix, and save/load portable versioned JSON chains.
 - Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
-- The same processing engine is available through the `reawarp-fx` command; Pyo is not required by the base generator.
+- The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
+
+### Editable processing chains (M11)
+
+Custom FX chains use a portable JSON object with `schema_version: 1`, a name, global wet/tail settings, and an ordered array of stages. Each stage keeps its own parameters and mix. The serial order is intentional: distortion before a filter is not equivalent to a filter before distortion. The editor keeps a dry source reference and does not insert processing into generated stems yet; role-aware per-stem routing is a later milestone.
 
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
@@ -115,12 +120,15 @@ Install its optional backend and launch the desktop app:
     python -m pip install -e ".[pyo]"
     reawarp-gui
 
-The FX LAB workspace loads a mono/stereo audio file, lets you select a processing chain and wet/dry balance, renders a separate result, and allows dry/processed audition and export. The original is untouched. CLI usage:
+The FX LAB workspace loads a mono/stereo audio file, lets you build an ordered processing chain, and renders a separate result for dry/processed audition and export. The source is untouched. Start from a preset or edit its stages; each stage has its own mix and bounded controls. Save your chain as JSON to reuse it in the GUI or CLI:
 
     reawarp-fx input.wav output_fx.wav --preset tape_echo --wet 0.70 --tail 2.0
+    reawarp-fx input.wav output_custom.wav --chain-json my_chain.json
     reawarp-fx --list-presets
+    reawarp-fx --list-stages
+    reawarp-fx --validate-chain-json my_chain.json
 
-Available chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md).
+Available starting chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md) and [M11 Editable FX Chains](docs/M11.md).
 
 Pitch/time/granular operations accept their own controls:
 
@@ -195,7 +203,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 
 - Internal format: NumPy float32, stereo.
 - Default sample rate: 48 kHz.
-- Duration: 5–45 seconds.
+- Duration: 5–180 seconds (up to three minutes).
 - BPM: 60–220.
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
@@ -212,7 +220,7 @@ or:
 
     python -m reawarp.ui
 
-The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md). The M6 library is currently exposed through the Python API and `reawarp-library` CLI.
+The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. The Library provides local indexing, search, similarity, collections, and audition, with matching `reawarp-library` CLI commands. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md).
 
 ## Local sample and stem library (M6)
 
@@ -253,7 +261,7 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
     python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The repository currently uses compile and command-line smoke checks; no unit-test suite is included.
+The repository currently uses compile and command-line smoke checks; no unit-test suite is included. The M11 smoke workflow also validates the portable FX-chain JSON schema without requiring Pyo.
 
 The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 
@@ -267,6 +275,6 @@ Use the same formal controls in the command line or the desktop Generator:
 
 Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
 
-The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The shared ELI LAB icon is packaged for the application window and system tray.
+The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
 
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.

@@ -1,16 +1,77 @@
-"""Optional Pyo-backed offline effects rack for Reawarp.
+"""Optional Pyo-backed offline effects rack and portable FX-chain format.
 
-The NumPy renderer remains the deterministic reference engine. Pyo is loaded only
-when an FX render is requested, so importing Reawarp never requires a Pyo runtime.
+The NumPy renderer remains the deterministic reference engine. Pyo is loaded
+only when an FX render is requested, so importing Reawarp never requires Pyo.
 """
 
 from __future__ import annotations
 
+import json
+import math
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 import numpy as np
+
+FX_CHAIN_SCHEMA_VERSION = 1
+FX_MAX_STAGES = 12
+
+FX_STAGE_DEFAULTS: dict[str, dict[str, float]] = {
+    "highpass": {"cutoff_hz": 40.0, "mix": 1.0},
+    "lowpass": {"cutoff_hz": 12_000.0, "mix": 1.0},
+    "bandpass": {"center_hz": 1_000.0, "q": 2.0, "mix": 1.0},
+    "saturation": {"drive": 0.3, "slope": 0.7, "mix": 1.0},
+    "delay": {"delay_seconds": 0.25, "feedback": 0.2, "mix": 1.0},
+    "reverb": {"size": 0.35, "damping": 0.6, "mix": 1.0},
+    "frequency_shift": {"shift_hz": 10.0, "mix": 1.0},
+}
+
+# (minimum, maximum, step, decimals, suffix)
+FX_STAGE_PARAMETERS: dict[str, dict[str, tuple[float, float, float, int, str]]] = {
+    "highpass": {
+        "cutoff_hz": (20.0, 21_600.0, 10.0, 1, " Hz"),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "lowpass": {
+        "cutoff_hz": (40.0, 21_600.0, 100.0, 1, " Hz"),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "bandpass": {
+        "center_hz": (40.0, 21_600.0, 25.0, 1, " Hz"),
+        "q": (0.5, 24.0, 0.25, 2, ""),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "saturation": {
+        "drive": (0.0, 0.98, 0.02, 2, ""),
+        "slope": (0.0, 1.0, 0.05, 2, ""),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "delay": {
+        "delay_seconds": (0.01, 2.0, 0.01, 3, " s"),
+        "feedback": (0.0, 0.82, 0.02, 2, ""),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "reverb": {
+        "size": (0.0, 1.0, 0.05, 2, ""),
+        "damping": (0.0, 1.0, 0.05, 2, ""),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+    "frequency_shift": {
+        "shift_hz": (-500.0, 500.0, 1.0, 1, " Hz"),
+        "mix": (0.0, 1.0, 0.05, 2, ""),
+    },
+}
+
+FX_STAGE_DESCRIPTIONS = {
+    "highpass": "Remove low-frequency energy before it reaches later stages.",
+    "lowpass": "Restrict bandwidth and soften the upper spectrum.",
+    "bandpass": "Focus a resonant frequency region with adjustable Q.",
+    "saturation": "Add controlled nonlinear harmonics.",
+    "delay": "Create repeats with bounded feedback.",
+    "reverb": "Add a diffuse resonant tail.",
+    "frequency_shift": "Displace partials by a fixed frequency offset.",
+}
 
 FX_PRESETS: dict[str, tuple[dict[str, float | str], ...]] = {
     "restrained_space": (
@@ -53,6 +114,128 @@ FX_PRESET_DESCRIPTIONS = {
 }
 
 
+def default_fx_stage(kind: str) -> dict[str, float | str]:
+    """Return a fresh copy of the default settings for one effect type."""
+    if kind not in FX_STAGE_DEFAULTS:
+        raise ValueError(f"Unknown FX stage {kind!r}")
+    return {"type": kind, **FX_STAGE_DEFAULTS[kind].copy()}
+
+
+def normalise_fx_stages(
+    stages: Sequence[Mapping[str, Any]],
+    *,
+    sample_rate: int | None = None,
+) -> tuple[dict[str, float | str], ...]:
+    """Validate and normalise an ordered chain to bounded numeric parameters."""
+    if not isinstance(stages, Sequence) or isinstance(stages, (str, bytes)):
+        raise ValueError("FX stages must be a sequence of stage objects")
+    if not 1 <= len(stages) <= FX_MAX_STAGES:
+        raise ValueError(f"FX chain must contain between 1 and {FX_MAX_STAGES} stages")
+
+    nyquist_limit = 21_600.0
+    if sample_rate is not None:
+        if int(sample_rate) <= 0:
+            raise ValueError("sample_rate must be positive")
+        nyquist_limit = min(nyquist_limit, float(sample_rate) * 0.45)
+
+    result: list[dict[str, float | str]] = []
+    for index, raw in enumerate(stages, start=1):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"FX stage {index} must be an object")
+        kind = raw.get("type")
+        if not isinstance(kind, str) or kind not in FX_STAGE_DEFAULTS:
+            raise ValueError(f"FX stage {index} has an unknown type: {kind!r}")
+        defaults = FX_STAGE_DEFAULTS[kind]
+        unknown = set(raw) - {"type", *defaults.keys()}
+        if unknown:
+            raise ValueError(
+                f"FX stage {index} ({kind}) has unknown parameter(s): "
+                + ", ".join(sorted(str(item) for item in unknown))
+            )
+
+        stage: dict[str, float | str] = {"type": kind}
+        for field, default in defaults.items():
+            try:
+                value = float(raw.get(field, default))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"FX stage {index} parameter {field} must be numeric") from exc
+            if not math.isfinite(value):
+                raise ValueError(f"FX stage {index} parameter {field} must be finite")
+            low, high, *_ = FX_STAGE_PARAMETERS[kind][field]
+            if field in {"cutoff_hz", "center_hz"}:
+                high = nyquist_limit
+                # Clamp a high cutoff to the source's safe Nyquist region rather than
+                # rejecting an otherwise valid low-sample-rate file.
+                value = min(value, high)
+            if not low <= value <= high:
+                raise ValueError(
+                    f"FX stage {index} parameter {field} must be between {low:g} and {high:g}"
+                )
+            stage[field] = value
+        result.append(stage)
+    return tuple(result)
+
+
+def load_fx_chain(path: str | Path, *, sample_rate: int | None = None) -> dict[str, Any]:
+    """Load and validate a portable version-1 FX chain JSON file."""
+    source = Path(path).expanduser()
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("FX chain file must contain a JSON object")
+    if payload.get("schema_version") != FX_CHAIN_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported FX chain schema version: {payload.get('schema_version')!r}"
+        )
+    name = str(payload.get("name", "Custom chain")).strip() or "Custom chain"
+    wet = float(payload.get("wet", 0.75))
+    tail_seconds = float(payload.get("tail_seconds", 1.5))
+    if not math.isfinite(wet) or not 0.0 <= wet <= 1.0:
+        raise ValueError("chain wet must be between 0 and 1")
+    if not math.isfinite(tail_seconds) or not 0.0 <= tail_seconds <= 12.0:
+        raise ValueError("chain tail_seconds must be between 0 and 12")
+    stages = normalise_fx_stages(payload.get("stages", []), sample_rate=sample_rate)
+    return {
+        "schema_version": FX_CHAIN_SCHEMA_VERSION,
+        "name": name,
+        "wet": wet,
+        "tail_seconds": tail_seconds,
+        "stages": stages,
+    }
+
+
+def save_fx_chain(
+    path: str | Path,
+    *,
+    name: str,
+    stages: Sequence[Mapping[str, Any]],
+    wet: float = 0.75,
+    tail_seconds: float = 1.5,
+) -> Path:
+    """Save a validated, versioned FX chain JSON file."""
+    destination = Path(path).expanduser()
+    if not name.strip():
+        raise ValueError("FX chain name cannot be empty")
+    wet = float(wet)
+    tail_seconds = float(tail_seconds)
+    if not math.isfinite(wet) or not 0.0 <= wet <= 1.0:
+        raise ValueError("wet must be between 0 and 1")
+    if not math.isfinite(tail_seconds) or not 0.0 <= tail_seconds <= 12.0:
+        raise ValueError("tail_seconds must be between 0 and 12")
+    chain = {
+        "schema_version": FX_CHAIN_SCHEMA_VERSION,
+        "name": name.strip(),
+        "wet": wet,
+        "tail_seconds": tail_seconds,
+        "stages": normalise_fx_stages(stages),
+    }
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(chain, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return destination
+
+
 def _validate_audio(audio: np.ndarray, sample_rate: int) -> np.ndarray:
     samples = np.asarray(audio, dtype=np.float32)
     if samples.ndim == 1:
@@ -71,45 +254,33 @@ def _validate_audio(audio: np.ndarray, sample_rate: int) -> np.ndarray:
 def _make_stage(pyo: Any, source: Any, stage: dict[str, float | str], sample_rate: int) -> Any:
     kind = str(stage["type"])
     mix = float(stage.get("mix", 1.0))
-    if not 0.0 <= mix <= 1.0:
-        raise ValueError(f"FX stage mix must be between 0 and 1: {kind}")
-
     nyquist_guard = float(sample_rate) * 0.45
     if kind == "highpass":
-        processed = pyo.ButHP(
-            source, freq=min(max(20.0, float(stage.get("cutoff_hz", 40.0))), nyquist_guard)
-        )
+        processed = pyo.ButHP(source, freq=min(float(stage["cutoff_hz"]), nyquist_guard))
     elif kind == "lowpass":
-        processed = pyo.ButLP(
-            source,
-            freq=min(max(40.0, float(stage.get("cutoff_hz", 12_000.0))), nyquist_guard),
-        )
+        processed = pyo.ButLP(source, freq=min(float(stage["cutoff_hz"]), nyquist_guard))
     elif kind == "bandpass":
-        center = min(
-            max(40.0, float(stage.get("center_hz", 1_000.0))), nyquist_guard
-        )
-        q = min(max(0.5, float(stage.get("q", 2.0))), 24.0)
-        processed = pyo.ButBP(source, freq=center, q=q)
+        center = min(float(stage["center_hz"]), nyquist_guard)
+        processed = pyo.ButBP(source, freq=center, q=float(stage["q"]))
     elif kind == "saturation":
-        drive = min(max(0.0, float(stage.get("drive", 0.3))), 0.98)
-        slope = min(max(0.0, float(stage.get("slope", 0.7))), 1.0)
-        processed = pyo.Disto(source, drive=drive, slope=slope)
+        processed = pyo.Disto(source, drive=float(stage["drive"]), slope=float(stage["slope"]))
     elif kind == "delay":
-        delay_seconds = min(max(0.01, float(stage.get("delay_seconds", 0.25))), 2.0)
-        feedback = min(max(0.0, float(stage.get("feedback", 0.2))), 0.82)
+        delay_seconds = float(stage["delay_seconds"])
         processed = pyo.Delay(
             source,
             delay=delay_seconds,
-            feedback=feedback,
+            feedback=float(stage["feedback"]),
             maxdelay=max(0.5, delay_seconds * 2.5),
         )
     elif kind == "reverb":
-        size = min(max(0.0, float(stage.get("size", 0.35))), 1.0)
-        damping = min(max(0.0, float(stage.get("damping", 0.6))), 1.0)
-        processed = pyo.Freeverb(source, size=size, damp=damping, bal=1.0)
+        processed = pyo.Freeverb(
+            source,
+            size=float(stage["size"]),
+            damp=float(stage["damping"]),
+            bal=1.0,
+        )
     elif kind == "frequency_shift":
-        shift = min(max(-500.0, float(stage.get("shift_hz", 10.0))), 500.0)
-        processed = pyo.FreqShift(source, shift=shift)
+        processed = pyo.FreqShift(source, shift=float(stage["shift_hz"]))
     else:
         raise ValueError(f"Unsupported Pyo FX stage: {kind}")
 
@@ -124,18 +295,25 @@ def render_pyo_fx(
     audio: np.ndarray,
     sample_rate: int,
     *,
-    preset: str = "restrained_space",
+    preset: str | None = "restrained_space",
+    stages: Sequence[Mapping[str, Any]] | None = None,
     wet: float = 0.75,
     tail_seconds: float = 1.5,
 ) -> np.ndarray:
-    """Render a preset to a new float32 buffer without changing the input.
+    """Render a preset or custom ordered chain to a new float32 buffer.
 
     This is an offline render: it does not open an audio device. Pyo and
     SoundFile are imported lazily so the rest of Reawarp remains usable without
     either optional package.
     """
-    if preset not in FX_PRESETS:
-        raise ValueError(f"Unknown FX preset {preset!r}; choose from {', '.join(FX_PRESETS)}")
+    if stages is None:
+        if preset is None or preset not in FX_PRESETS:
+            raise ValueError(
+                f"Unknown FX preset {preset!r}; choose from {', '.join(FX_PRESETS)}"
+            )
+        chain = normalise_fx_stages(FX_PRESETS[preset], sample_rate=sample_rate)
+    else:
+        chain = normalise_fx_stages(stages, sample_rate=sample_rate)
     if not 0.0 <= float(wet) <= 1.0:
         raise ValueError("wet must be between 0 and 1")
     if not 0.0 <= float(tail_seconds) <= 12.0:
@@ -182,7 +360,7 @@ def render_pyo_fx(
             )
             source = pyo.SfPlayer(str(source_path), loop=False, interp=4)
             processed = source
-            for stage in FX_PRESETS[preset]:
+            for stage in chain:
                 processed = _make_stage(pyo, processed, dict(stage), int(sample_rate))
 
             output = source * (1.0 - float(wet)) + processed * float(wet)
