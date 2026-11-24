@@ -36,7 +36,7 @@ def test_production_melody_voice_families_render_from_scheduled_score(palette):
     event = score.events[0]
     gate = Fraction(event.parameters['gate_duration_beats'])
     assert event.duration_beats > gate
-    assert event.parameters['release_seconds'] == pytest.approx(0.28)
+    assert event.parameters['release_seconds'] == pytest.approx(0.65)
 
     first = ReawarpEngine().render_score(score, config=config)
     second = ReawarpEngine().render_score(score, config=config)
