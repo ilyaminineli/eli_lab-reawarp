@@ -224,10 +224,7 @@ class ReawarpEngine:
         percussion = build_percussion_events(
             config, percussion_rngs, composition_plan, drum_plan=drum_plan
         )
-        # Sample and synthesis layers share the same score. One arrangement
-        # decision drives the complete hybrid voice rather than two trigger
-        # streams that can drift apart.
-        sample_trigger_patterns = percussion
+        # Sample and synthesis layers share the exact same role events.
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
 
         # Phrase function modifies event activity as a separate composition
@@ -795,11 +792,19 @@ class ReawarpEngine:
                 )
             },
             "sample_trigger_seed_streams": {
-                name: sample_streams.seed_for(name)
-                for name in ("kick_pattern", "snare_pattern", "hat_pattern", "break_pattern", "break_processing")
+                "shared_drum_score": True,
+                "break_processing": sample_streams.seed_for("break_processing"),
             },
             "generator_families": {
-                "percussion": "euclidean + prime-indexed mutation + logistic control",
+                "percussion": (
+                    "section-aware role grammars with stable anchor, linked kick/snare/hat "
+                    "families, phrase-boundary transition gestures"
+                    if config.pattern_follow_structure
+                    else "sparse Euclidean core with bar-rotating accents"
+                ),
+                "drum_arrangement": "shared formal-section plan drives both sample and synthesis layers",
+                "drum_source_mode": config.percussion_source_mode,
+                "hybrid_architecture": config.percussion_hybrid_architecture,
                 "composition_director": f"seeded formal section plan ({config.structure}/{config.composition_flow})",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
                 "melody": f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette",
@@ -821,9 +826,18 @@ class ReawarpEngine:
                     "snare": len(SNARE_PROFILES),
                     "hat": len(HAT_PROFILES),
                 },
+                "percussion_source_mode": config.percussion_source_mode,
+                "percussion_hybrid_architecture": config.percussion_hybrid_architecture,
+                "percussion_sample_mix": config.percussion_sample_mix,
+                "melody_scale": config.melody_scale,
+                "melody_root": config.melody_root,
             },
             "composition_plan": composition_plan.to_dict(),
             "phrase_directives": [item.to_dict() for item in phrase_directives],
+            "drum_arrangement": [item.to_dict() for item in drum_plan],
+            "drum_source_mode": config.percussion_source_mode,
+            "drum_hybrid_architecture": config.percussion_hybrid_architecture,
+            "drum_sample_mix": config.percussion_sample_mix,
             "synth_palette": config.synth_palette,
             "break_rhythm": {
                 "style": next(
