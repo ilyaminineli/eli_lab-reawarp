@@ -767,13 +767,7 @@ class MainWindow(QMainWindow):
     def _routing_signature(self) -> str:
         import hashlib
         payload = json.dumps(self.fx_routing_editor.routing(), sort_keys=True, default=str)
-        mixer = {
-            name: {"gain": row.gain.value(), "pan": row.pan.value()}
-            for name, row in self._mix_rows.items()
-        }
-        return hashlib.sha256(
-            (payload + json.dumps(mixer, sort_keys=True)).encode("utf-8")
-        ).hexdigest()
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _ensure_routing_render(self) -> None:
         if self.project is None:
@@ -785,10 +779,6 @@ class MainWindow(QMainWindow):
             self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
         )
         self._fx_bus_returns = metadata.pop("bus_returns_audio", {})
-        solo_active = any(row.solo.isChecked() for row in self._mix_rows.values())
-        for name, row in self._mix_rows.items():
-            if row.mute.isChecked() or (solo_active and not row.solo.isChecked()):
-                processed[name] = np.zeros_like(processed[name])
         self._fx_processed_stems = processed
         metadata["_routing_signature"] = signature
         self._fx_routing_metadata = metadata
@@ -810,6 +800,11 @@ class MainWindow(QMainWindow):
         elif pan > 0:
             result[:, 0] *= float(np.cos(pan * np.pi / 2.0))
         return result
+
+    def _refresh_routing(self) -> None:
+        """Invalidate the offline FX cache only when routing controls change."""
+        self._fx_routing_metadata = {}
+        self._refresh_preview()
 
     def _render_mix(self) -> np.ndarray | None:
         if self.project is None:
