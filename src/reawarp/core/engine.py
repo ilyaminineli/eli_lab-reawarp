@@ -676,6 +676,8 @@ class ReawarpEngine:
                     place_role_sample(role, target, event, sample_gain, source_entry)
 
                 record = event.to_dict()
+                record["section_name"] = section.name
+                record["phrase_function"] = phrase_at_time(event.time).function
                 record["sound_profile"] = profile if synth_gain > 1e-7 else None
                 record["source_mix"] = {
                     "mode": config.percussion_source_mode,
@@ -1062,6 +1064,7 @@ class ReawarpEngine:
                 ),
                 "drum_arrangement": "shared formal-section plan drives both sample and synthesis layers",
                 "drum_source_mode": config.percussion_source_mode,
+                "drum_sample_automation": config.drum_sample_automation,
                 "hybrid_architecture": config.percussion_hybrid_architecture,
                 "composition_director": f"seeded formal section plan ({config.structure}/{config.composition_flow})",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
@@ -1087,6 +1090,10 @@ class ReawarpEngine:
                 "percussion_source_mode": config.percussion_source_mode,
                 "percussion_hybrid_architecture": config.percussion_hybrid_architecture,
                 "percussion_sample_mix": config.percussion_sample_mix,
+                "drum_sample_automation": config.drum_sample_automation,
+                "sample_bank_sizes": {
+                    role: len(bank) for role, bank in drum_sample_banks.items()
+                },
                 "melody_scale": config.melody_scale,
                 "melody_root": config.melody_root,
             },
@@ -1103,6 +1110,16 @@ class ReawarpEngine:
             "drum_source_mode": config.percussion_source_mode,
             "drum_hybrid_architecture": config.percussion_hybrid_architecture,
             "drum_sample_mix": config.percussion_sample_mix,
+            "drum_sample_automation": config.drum_sample_automation,
+            "sample_switch_summary": {
+                role: {
+                    "bank_count": len(drum_sample_banks.get(role, [])),
+                    "switch_count": len(sample_switch_history[role]),
+                    "variant_usage": dict(sample_variant_usage[role]),
+                    "switch_points": list(sample_switch_history[role]),
+                }
+                for role in ("kick", "snare", "hat")
+            },
             "synth_palette": config.synth_palette,
             "break_rhythm": {
                 "style": next(
