@@ -213,8 +213,8 @@ def _percussion_renderer(
         source_kind = str(parameters.get("source_kind", "")).casefold()
         duration = frames / float(sample_rate)
         synth_gain = float(np.clip(parameters.get("synth_gain", 1.0), 0.0, 1.0))
-        if role != "break" and config.percussion_source_mode == "sample":
-            return np.zeros(frames, dtype=np.float32)
+        # Sample-only suppression is encoded by a prepared event's synth_gain=0.
+        # Without a configured sample bank, preserve the legacy synth fallback.
         if synth_gain <= 0.0:
             return np.zeros(frames, dtype=np.float32)
 
