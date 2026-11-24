@@ -1287,6 +1287,21 @@ class MainWindow(QMainWindow):
             f"{role}:{source.get('source', {}).get('source_name', Path(source.get('path', role)).name)}"
             for role, source in result.metadata.get("sample_sources", {}).items()
         ]
+        switch_summary = result.metadata.get("sample_switch_summary", {})
+        bank_summary = " · ".join(
+            f"{role.upper()} {details.get('bank_count', 0)} sounds / "
+            f"{details.get('switch_count', 0)} switches"
+            for role, details in switch_summary.items()
+            if details.get("bank_count", 0)
+        )
+        switch_timeline = " | ".join(
+            f"{role.upper()}: " + ", ".join(
+                f"{item.get('section', '?')} → {item.get('label', item.get('to_index', '?'))}"
+                for item in details.get("switch_points", [])
+            )
+            for role, details in switch_summary.items()
+            if details.get("switch_points")
+        )
         source_line = (
             f"{result.config.percussion_source_mode.upper()} · "
             f"{result.config.percussion_hybrid_architecture.replace('_', ' ')}"
@@ -1300,6 +1315,8 @@ class MainWindow(QMainWindow):
             + (f"\nDRUM EVOLUTION: {drum_line}" if drum_line else "\nDRUM EVOLUTION: static mode")
             + (f"\nDRUM TIMBRES: {profile_line}" if profile_line else "")
             + f"\nSOURCE ENGINE: {source_line}"
+            + (f"\nSAMPLE BANKS: {bank_summary}" if bank_summary else "")
+            + (f"\nSAMPLE SWITCHES: {switch_timeline}" if switch_timeline else "")
             + (f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}" if loaded_sources else "")
         )
         self.statusBar().showMessage(
