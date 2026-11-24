@@ -2,13 +2,19 @@
 
 A deterministic mathematical audio laboratory for IDM percussion, synthetic breaks, eccentric melodic sequences, and stem generation.
 
-Reawarp is an offline-first Python audio engine. Its synthesis core is independent of the desktop layer and optional third-party analysis or playback backends. It renders short loops, synchronized stems, and machine-readable event provenance.
+Reawarp is an offline-first Python audio engine. Its synthesis core is independent of the desktop layer and optional third-party analysis or playback backends. It renders compositions up to three minutes, synchronized stems, and machine-readable event provenance.
 
 ## Current implementation
 
-### Synthesis and composition
+### Synthesis and composition (M8)
+- Long-form composition planning up to 180 seconds with classical-arc, transformed-sonata, free-jazz, episodic, minimal-variation, and Autechre-inspired process-form presets.
+- Structure flow controls: preserve a preset, cross-mix its movements with another formal grammar, or mutate the order of inner movements deterministically.
+- A pattern grammar library with asymmetric, interlocking, ghost-break, omission, rotating-cycle, ratchet, cross-accent, and broken-regularity families.
+- Pattern relationship tools for unison, interlock, shadow/phase offset, call-and-response, and counter-accent; motif transformations include retrograde, inversion, augmentation, diminution, fragmentation, reordering, and displacement.
+- Selectable melodic synthesis palettes: FM/hybrid, additive, modal/physical-style resonators, inharmonic partial banks, granular micro-clouds, and scanned/pulsar-style wavetable motion.
+- New metallic-FM, inharmonic-mallet, formant-dark, and spectral-pad voice recipes.
 - Thirteen named kick profiles, six snare profiles, and six hi-hat profiles, with mix-friendly weighted automatic choices.
-- Five profiled additive/FM melody voices with evolving partials, soft detuning, envelopes, low-pass shaping, and release tails.
+- Nine profiled additive/FM and extended sound-object melody voices with evolving partials, soft detuning, envelopes, low-pass shaping, and release tails.
 - A separate harmonic ambience stem with filtered noise, slow stereo movement, and restrained early reflections.
 - A structured 16-step break grammar (broken funk, half-time, straight, sparse) with density, phrase-cycle, and bounded variation controls.
 - Imported break recordings are transient-sliced and triggered on the groove grid; complete clips are no longer stacked at every trigger.
@@ -65,6 +71,16 @@ If upgrading an environment that previously had PySide6 6.12.0, remove the two o
     python -m pip check
 
 Csound, SuperCollider, and FluidSynth also require their native runtimes when those adapters are used.
+
+## Generate a composition (M8)
+
+The composition duration can be up to three minutes. Example:
+
+    reawarp --duration 180 --structure autechre_like --flow mix --synth-palette inharmonic --seed 20261124 --output output/three-minute-study
+
+Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`, `free_jazz_episodic`, `autechre_like`, `minimal_variation`, and `hybrid`. The `preset` flow preserves the chosen movement sequence, `mix` imports middle movements from a deterministic alternate structure, and `mutate` reorders the inner movements while retaining the opening and ending.
+
+Choose a lead synthesis palette with `--synth-palette`: `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. These are native, deterministic NumPy reference implementations; external synthesis engines remain optional adapters.
 
 ## Generate a loop
 
