@@ -11,6 +11,7 @@ from reawarp.synthesis.profiles import (
     MELODY_PROFILES,
     SNARE_PROFILES,
     select_profile_name,
+    EXTENDED_MELODY_PROFILES,
 )
 
 
