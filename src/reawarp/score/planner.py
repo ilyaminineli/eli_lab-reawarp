@@ -9,6 +9,7 @@ from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.time import MeterMap, TempoMap
 
+
 def _step_beats(step: int) -> Fraction:
     """Express a sixteenth-note grid position as an exact quarter-note beat."""
     if isinstance(step, bool) or int(step) != step or int(step) < 0:
