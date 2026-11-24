@@ -153,6 +153,7 @@ class ReawarpEngine:
             structure=config.structure,
             energy=config.composition_energy,
             variation=config.composition_variation,
+            flow=config.composition_flow,
         )
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
@@ -575,9 +576,9 @@ class ReawarpEngine:
             },
             "generator_families": {
                 "percussion": "euclidean + prime-indexed mutation + logistic control",
-                "composition_director": "seeded bar-quantised formal section plan",
+                "composition_director": f"seeded formal section plan ({config.structure}/{config.composition_flow})",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
-                "melody": "3:5 Lissajous curve + logistic-map contour + profiled additive/FM synthesis",
+                "melody": f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette",
                 "texture": "coloured noise with low-frequency amplitude modulation",
                 "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
                 "break_processing": list(config.break_transforms),
@@ -594,6 +595,7 @@ class ReawarpEngine:
                 },
             },
             "composition_plan": composition_plan.to_dict(),
+            "synth_palette": config.synth_palette,
             "break_rhythm": {
                 "style": next(
                     (
