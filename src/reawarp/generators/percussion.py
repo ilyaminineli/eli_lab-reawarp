@@ -132,8 +132,19 @@ def _drum_section_function(name: str) -> str:
     return "continuation"
 
 
-def _family_for_role(function: str, role: str, anchor_family: str) -> str:
-    """Choose a role pattern family from formal function, preserving a return anchor."""
+def _family_for_role(
+    function: str,
+    role: str,
+    anchor_family: str,
+    *,
+    rng: np.random.Generator | None = None,
+    intensity: float = 0.68,
+) -> str:
+    """Choose a role pattern family from formal function, preserving a return anchor.
+
+    Multi-option functions use a dedicated deterministic stream. Drum evolution
+    therefore changes timbral/rhythmic parts without consuming hit-level RNG.
+    """
     choices = {
         "intro": {
             "kick": ("sparse", "omission"),
@@ -192,7 +203,11 @@ def _family_for_role(function: str, role: str, anchor_family: str) -> str:
         },
     }
     options = choices.get(function, choices["continuation"])[role]
-    return options[0] if len(options) == 1 else options[0]
+    if len(options) == 1 or rng is None:
+        return options[0]
+    if float(rng.random()) >= float(np.clip(intensity, 0.0, 1.0)):
+        return options[0]
+    return str(rng.choice(options))
 
 
 def build_drum_part_plan(
@@ -210,9 +225,22 @@ def build_drum_part_plan(
     plans: list[DrumSectionPlan] = []
     for section in composition_plan.sections:
         function = _drum_section_function(section.name)
-        kick_family = _family_for_role(function, "kick", anchor_family)
-        snare_family = _family_for_role(function, "snare", anchor_family)
-        hat_family = _family_for_role(function, "hat", anchor_family)
+        def family_rng(role: str) -> np.random.Generator:
+            return np.random.default_rng(
+                derive_seed(config.seed, f"drum-family:{section.index}:{section.name}:{role}")
+            )
+        kick_family = _family_for_role(
+            function, "kick", anchor_family,
+            rng=family_rng("kick"), intensity=config.drum_change_intensity,
+        )
+        snare_family = _family_for_role(
+            function, "snare", anchor_family,
+            rng=family_rng("snare"), intensity=config.drum_change_intensity,
+        )
+        hat_family = _family_for_role(
+            function, "hat", anchor_family,
+            rng=family_rng("hat"), intensity=config.drum_change_intensity,
+        )
 
         def role_steps(role: str, family: str) -> tuple[int, ...]:
             seed = derive_seed(
