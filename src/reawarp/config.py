@@ -37,6 +37,8 @@ class GenerationConfig:
     ambience_level: float = 0.16
     sample_paths: dict[str, str] = field(default_factory=dict)
     sample_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    sample_banks: dict[str, tuple[dict[str, Any], ...]] = field(default_factory=dict)
+    drum_sample_automation: str = "automatic"
     kick_profile: str = "auto"
     snare_profile: str = "auto"
     hat_profile: str = "auto"
@@ -86,8 +88,14 @@ class GenerationConfig:
             raise ValueError("percussion_synthesis must be minimal, extended, or samples")
         if self.percussion_source_mode not in {"automatic", "synth", "sample", "hybrid"}:
             raise ValueError("percussion_source_mode must be automatic, synth, sample, or hybrid")
-        if self.percussion_hybrid_architecture not in {"transient_body", "layered"}:
-            raise ValueError("percussion_hybrid_architecture must be transient_body or layered")
+        if self.percussion_hybrid_architecture not in {
+            "transient_body", "layered", "feature_guided"
+        }:
+            raise ValueError(
+                "percussion_hybrid_architecture must be transient_body, layered, or feature_guided"
+            )
+        if self.drum_sample_automation not in {"fixed", "section", "cycle", "automatic"}:
+            raise ValueError("drum_sample_automation must be fixed, section, cycle, or automatic")
         if not 0.0 <= float(self.percussion_sample_mix) <= 1.0:
             raise ValueError("percussion_sample_mix must be between 0 and 1")
         if not 5.0 <= float(self.hybrid_transient_ms) <= 200.0:
@@ -122,6 +130,36 @@ class GenerationConfig:
         for role, metadata in self.sample_metadata.items():
             if not isinstance(metadata, dict):
                 raise ValueError(f"sample metadata for {role} must be a JSON object")
+
+        normalized_banks: dict[str, tuple[dict[str, Any], ...]] = {}
+        unknown_banks = set(self.sample_banks) - {"kick", "snare", "hat"}
+        if unknown_banks:
+            raise ValueError(f"unsupported sample-bank roles: {', '.join(sorted(unknown_banks))}")
+        for role, entries in self.sample_banks.items():
+            normalized_entries: list[dict[str, Any]] = []
+            seen_paths: set[str] = set()
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    raise ValueError(f"sample bank entry for {role} must be a JSON object")
+                path = str(entry.get("path", "")).strip()
+                if not path:
+                    raise ValueError(f"sample bank entry for {role} needs a non-empty path")
+                canonical = str(Path(path).expanduser())
+                if canonical in seen_paths:
+                    continue
+                seen_paths.add(canonical)
+                metadata = entry.get("metadata", {})
+                features = entry.get("features", {})
+                if not isinstance(metadata, dict) or not isinstance(features, dict):
+                    raise ValueError(f"sample bank metadata/features for {role} must be JSON objects")
+                normalized_entries.append({
+                    **entry,
+                    "path": canonical,
+                    "metadata": dict(metadata),
+                    "features": dict(features),
+                })
+            normalized_banks[role] = tuple(normalized_entries)
+        object.__setattr__(self, "sample_banks", normalized_banks)
 
         if self.kick_profile != "auto" and self.kick_profile not in KICK_PROFILES:
             raise ValueError(f"unknown kick profile: {self.kick_profile}")
@@ -183,5 +221,9 @@ class GenerationConfig:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["sample_paths"] = {role: str(Path(path)) for role, path in self.sample_paths.items()}
+        data["sample_banks"] = {
+            role: [dict(entry) for entry in entries]
+            for role, entries in self.sample_banks.items()
+        }
         data["break_transforms"] = list(self.break_transforms)
         return data
