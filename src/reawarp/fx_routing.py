@@ -188,7 +188,6 @@ def render_fx_routing(
     config = normalise_fx_routing(routing, names, sample_rate)
     outputs: dict[str, np.ndarray] = {}
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
-    active_stems: list[str] = []
     active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     for name, source in dry_stems.items():
         dry = np.asarray(source, dtype=np.float32)
@@ -204,8 +203,6 @@ def render_fx_routing(
         for bus, amount in record["sends"].items():
             if amount > 0:
                 bus_inputs[bus] += processed * float(amount)
-                if name not in active_stems:
-                    active_stems.append(name)
                 if name not in active_stems_by_bus[bus]:
                     active_stems_by_bus[bus].append(name)
     returns: dict[str, np.ndarray] = {}
@@ -232,7 +229,6 @@ def render_fx_routing(
         },
         "buses": config["buses"],
         "rendered_returns": list(returns),
-        "active_send_stems": active_stems,
         "active_send_stems_by_bus": active_stems_by_bus,
     }
     metadata["bus_returns_audio"] = returns
@@ -244,6 +240,7 @@ def render_master_with_returns(
     *, frames: int | None = None, master_wet: float = 1.0
 ) -> np.ndarray:
     """Sum aligned processed stems and shared returns without modifying inputs."""
+    wet = _finite(master_wet, "master_wet", 0.0, 1.0)
     all_buffers = [*processed_stems.values(), *bus_returns.values()]
     if frames is None:
         frames = max((len(item) for item in all_buffers), default=0)
@@ -256,4 +253,4 @@ def render_master_with_returns(
     ceiling = 10.0 ** (-1.0 / 20.0)
     if peak > ceiling:
         master *= ceiling / peak
-    return np.clip(master * float(master_wet), -1.0, 1.0).astype(np.float32, copy=False)
+    return np.clip(master * wet, -1.0, 1.0).astype(np.float32, copy=False)
