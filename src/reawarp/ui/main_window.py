@@ -775,9 +775,20 @@ class MainWindow(QMainWindow):
         signature = self._routing_signature()
         if self._fx_routing_metadata.get("_routing_signature") == signature:
             return
-        processed, metadata = render_fx_routing(
-            self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
-        )
+        try:
+            processed, metadata = render_fx_routing(
+                self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
+            )
+        except Exception as exc:
+            self._fx_processed_stems = {
+                name: audio.copy() for name, audio in self.project.stems.items()
+            }
+            self._fx_bus_returns = {}
+            self._fx_routing_metadata = {"_routing_signature": signature, "error": str(exc)}
+            self.statusBar().showMessage(
+                f"FX routing was bypassed: {exc}", 10000
+            )
+            return
         self._fx_bus_returns = metadata.pop("bus_returns_audio", {})
         self._fx_processed_stems = processed
         metadata["_routing_signature"] = signature
