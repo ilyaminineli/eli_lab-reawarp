@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
@@ -143,6 +144,14 @@ class MainWindow(QMainWindow):
             "Preset keeps the selected form; mix borrows movements from another form; mutate reorders inner movements."
         )
         form.addRow("Structure flow", self.composition_flow)
+        self.pattern_family = QComboBox()
+        self.pattern_family.addItems(list(PATTERN_FAMILIES))
+        self.pattern_family.setCurrentText("broken_funk")
+        form.addRow("Pattern family", self.pattern_family)
+        self.pattern_relationship = QComboBox()
+        self.pattern_relationship.addItems(list(PATTERN_RELATIONSHIPS))
+        self.pattern_relationship.setCurrentText("interlock")
+        form.addRow("Pattern relationship", self.pattern_relationship)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
@@ -575,6 +584,8 @@ class MainWindow(QMainWindow):
             duration=self.duration.value(),
             structure=self.structure.currentText(),
             composition_flow=self.composition_flow.currentText(),
+            pattern_family=self.pattern_family.currentText(),
+            pattern_relationship=self.pattern_relationship.currentText(),
             synth_palette=self.synth_palette.currentText(),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
