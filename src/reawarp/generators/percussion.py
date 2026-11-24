@@ -178,7 +178,7 @@ def _build_break_events(
 
         # Pattern-family remapping follows the existing break-variation control.
         # A zero value guarantees the original phrase and density semantics.
-        if config.break_variation > 0.0:
+        if config.break_variation > 0.0 and bar % int(config.break_cycle_bars) == 0:
             family_steps = pattern_for_section(
                 config.pattern_family,
                 section_index=section.index,
