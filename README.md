@@ -48,7 +48,7 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - 16-bit and 24-bit PCM WAV export.
 - JSON project metadata and event provenance.
 
-The core requires Python 3.10+ and NumPy. `requirements.txt` is the complete implemented/planned package inventory; planned dependencies are commented out. `pyproject.toml` extras remain the supported optional install groups.
+The core requires Python 3.10+ and NumPy. `requirements.txt` is an expanded environment inventory: every uncommented line is installed, including experimental integrations that may need native runtimes or platform-specific setup. `pyproject.toml` extras remain the curated install groups for supported features.
 
 ## Install
 
@@ -250,8 +250,10 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
 ## Development
 
     python -m pip install -e ".[dev]"
-    pytest
+    python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
+
+The repository currently uses compile and command-line smoke checks; no unit-test suite is included.
 
 The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 

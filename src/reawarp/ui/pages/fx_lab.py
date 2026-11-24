@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+
 import numpy as np
 from PySide6.QtCore import QThreadPool, Qt
 from PySide6.QtWidgets import (
@@ -60,9 +62,9 @@ class FxLabPage(QWidget):
         self.path_field.setReadOnly(True)
         self.path_field.setPlaceholderText("Choose a mono or stereo audio file…")
         source_layout.addWidget(self.path_field, 1)
-        browse_button = QPushButton("BROWSE…")
-        browse_button.clicked.connect(self._browse)
-        source_layout.addWidget(browse_button)
+        self.source_button = QPushButton("BROWSE…")
+        self.source_button.clicked.connect(self._browse)
+        source_layout.addWidget(self.source_button)
         layout.addWidget(source_group)
 
         controls_group = QGroupBox("PROCESSING CHAIN")
@@ -187,6 +189,13 @@ class FxLabPage(QWidget):
         self.play_result_button.setEnabled(available)
         self.save_button.setEnabled(available)
 
+    def _set_rendering(self, rendering: bool) -> None:
+        self.render_button.setEnabled(not rendering)
+        self.source_button.setEnabled(not rendering)
+        self.preset.setEnabled(not rendering)
+        self.wet.setEnabled(not rendering)
+        self.tail.setEnabled(not rendering)
+
     def _render(self) -> None:
         if self.source_audio is None:
             self.status.setText("Choose a source file before rendering.")
@@ -198,7 +207,7 @@ class FxLabPage(QWidget):
         preset = str(self.preset.currentData())
         wet = self.wet.value() / 100.0
         tail = self.tail.value()
-        self.render_button.setEnabled(False)
+        self._set_rendering(True)
         self.status.setText(f"Rendering {preset.replace('_', ' ')} offline…")
         worker = RenderWorker(
             lambda: render_pyo_fx(
@@ -212,7 +221,7 @@ class FxLabPage(QWidget):
 
     def _render_finished(self, result: object) -> None:
         self._worker = None
-        self.render_button.setEnabled(True)
+        self._set_rendering(False)
         if not isinstance(result, np.ndarray):
             self.status.setText("FX worker returned an unexpected result.")
             return
@@ -228,7 +237,7 @@ class FxLabPage(QWidget):
 
     def _render_failed(self, message: str) -> None:
         self._worker = None
-        self.render_button.setEnabled(True)
+        self._set_rendering(False)
         self._set_result_available(False)
         self.status.setText(message)
 

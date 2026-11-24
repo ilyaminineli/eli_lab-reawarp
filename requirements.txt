@@ -5,15 +5,14 @@
 # - selected audio libraries from https://github.com/andreimatveyeu/awesome-python-audio
 #
 # IMPORTANT:
-#   This file is an inventory, not a recommendation to install every package at once.
-#   Uncomment a planned dependency only when its adapter is implemented and its
-#   Python/platform/native-runtime/license constraints have been reviewed.
-#   The authoritative curated installation groups remain in pyproject.toml extras.
+#   This is an expanded developer inventory. Every uncommented line is active and
+#   will be attempted by "pip install -r requirements.txt", including some research
+#   tools that are not yet wired into Reawarp and may need native runtimes/toolchains.
+#   For a curated, portable install, use the supported pyproject.toml extras instead.
 #
 # For the minimal renderer, install only the CORE section.
-# For all currently implemented Python features, install CORE + IMPLEMENTED OPTIONAL.
-# The PLANNED section is deliberately commented out to avoid pulling in experimental,
-# platform-restricted or heavyweight ML stacks into normal desktop installations.
+# For implemented desktop features, use the extras documented in README.md.
+# Experimental or platform-sensitive packages should remain commented until reviewed.
 
 
 # -----------------------------------------------------------------------------
