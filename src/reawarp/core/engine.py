@@ -476,6 +476,7 @@ class ReawarpEngine:
                 )
                 applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
+            role_metadata = dict(config.sample_metadata.get(role, {}))
             triggers = sample_trigger_patterns[role]
             if role == "kick":
                 triggers = [
@@ -520,6 +521,7 @@ class ReawarpEngine:
             for trigger_index, event in enumerate(ordered_triggers):
                 record = {
                     "lane": f"sample_{role}",
+                    "sample_metadata": role_metadata,
                     "source_lane": role,
                     "time": event.time,
                     "step": event.step,
@@ -582,6 +584,7 @@ class ReawarpEngine:
             sample_manifest[role] = {
                 "path": str(path.resolve()),
                 "sha256": sample_digest,
+                "source": role_metadata,
                 "frames_after_resampling": source_frame_count,
                 "frames_after_processing": int(len(sample)),
                 "duration_after_processing": len(sample) / float(sample_rate),
