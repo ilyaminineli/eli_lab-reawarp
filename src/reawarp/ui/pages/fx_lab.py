@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QPushButton,
+    QScrollArea,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -63,7 +64,14 @@ class FxLabPage(QWidget):
         ]
         self._parameter_widgets: dict[str, QDoubleSpinBox] = {}
 
-        layout = QVBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(14, 14, 14, 14)
         layout.setSpacing(10)
 
@@ -231,6 +239,8 @@ class FxLabPage(QWidget):
         self._set_result_available(False)
         self.play_source_button.setEnabled(False)
         self._update_stage_buttons()
+        self.content_scroll.setWidget(content)
+        outer_layout.addWidget(self.content_scroll)
 
     def _preset_changed(self, *_args: Any) -> None:
         name = self.preset.currentData()
