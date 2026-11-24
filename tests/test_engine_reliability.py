@@ -20,6 +20,15 @@ def test_small_render_is_repeatable_finite_and_stem_aligned():
     assert first.frame_count == config.frame_count
     assert first.duration == 5.0
     assert first.events == second.events
+    timings = first.metadata["performance"]
+    assert {
+        "composition_plan_seconds",
+        "event_generation_seconds",
+        "synthesis_and_buffer_seconds",
+        "headroom_seconds",
+        "total_engine_seconds",
+    } <= set(timings)
+    assert all(value >= 0.0 for value in timings.values())
     for name, audio in first.stems.items():
         assert audio.shape == (config.frame_count, 2)
         assert np.isfinite(audio).all()
