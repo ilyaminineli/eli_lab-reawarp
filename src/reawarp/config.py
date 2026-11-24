@@ -15,6 +15,7 @@ class GenerationConfig:
     bpm: float = 137.0
     duration: float = 24.0
     structure: str = "evolving"
+    composition_flow: str = "preset"
     composition_energy: float = 0.62
     composition_variation: float = 0.45
     sample_rate: int = 48_000
@@ -29,6 +30,7 @@ class GenerationConfig:
     snare_profile: str = "auto"
     hat_profile: str = "auto"
     melody_profile: str = "auto"
+    synth_palette: str = "hybrid"
     break_style: str = "broken_funk"
     break_density: float = 0.50
     break_variation: float = 0.25
@@ -48,12 +50,16 @@ class GenerationConfig:
     def __post_init__(self) -> None:
         if not 60.0 <= float(self.bpm) <= 220.0:
             raise ValueError("bpm must be between 60 and 220")
-        if not 5.0 <= float(self.duration) <= 45.0:
-            raise ValueError("duration must be between 5 and 45 seconds")
+        if not 5.0 <= float(self.duration) <= 180.0:
+            raise ValueError("duration must be between 5 and 180 seconds")
         if not 22_050 <= int(self.sample_rate) <= 192_000:
             raise ValueError("sample_rate must be between 22050 and 192000 Hz")
-        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift"}:
+        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift", "classical_arc", "sonata_mutation", "free_jazz", "free_jazz_episodic", "autechre_like", "minimal_variation", "hybrid"}:
             raise ValueError("unknown composition structure")
+        if self.composition_flow not in {"preset", "mix", "mutate"}:
+            raise ValueError("composition_flow must be preset, mix, or mutate")
+        if self.synth_palette not in {"hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"}:
+            raise ValueError("unknown synth palette")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
             raise ValueError("composition_energy must be between 0 and 1")
         if not 0.0 <= float(self.composition_variation) <= 1.0:
