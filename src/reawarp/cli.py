@@ -12,7 +12,7 @@ from reawarp.synthesis.profiles import (
 )
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.composition.director import STRUCTURES
-from reawarp.mathematics.theory import ROOT_NAMES, SCALE_STEPS
+from reawarp.mathematics.theory import SCALE_STEPS
 from reawarp.samples.catalog import default_sample_for_role
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
