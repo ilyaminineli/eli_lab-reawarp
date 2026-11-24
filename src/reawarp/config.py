@@ -36,7 +36,7 @@ class GenerationConfig:
     snare_profile: str = "auto"
     hat_profile: str = "auto"
     melody_profile: str = "auto"
-    synth_palette: str = "hybrid"
+    synth_palette: str = "subtractive"
     break_style: str = "broken_funk"
     break_density: float = 0.50
     break_variation: float = 0.25
