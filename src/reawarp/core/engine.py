@@ -153,7 +153,7 @@ class ReawarpEngine:
             config, regenerate=regenerate, variation=variation
         ).score
 
-    def _generate_legacy(
+    def generate(
             self,
             config: GenerationConfig | None = None,
             *,
@@ -437,7 +437,7 @@ class ReawarpEngine:
     def _event_lane_for_stem(stem: str) -> str:
         return {"hats": "hat", "synthetic_break": "break"}.get(stem, stem)
 
-    def generate(
+    def _generate_legacy(
             self,
             config: GenerationConfig | None = None,
             *,
