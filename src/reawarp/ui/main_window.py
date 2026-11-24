@@ -565,6 +565,9 @@ class MainWindow(QMainWindow):
         note.setObjectName("muted")
         note.setWordWrap(True)
         layout.addWidget(note)
+        self.fx_routing_editor = FXRoutingEditor()
+        self.fx_routing_editor.changed.connect(self._refresh_routing)
+        layout.addWidget(self.fx_routing_editor)
         return page
 
     def _choose_break_sample(self) -> None:
@@ -754,9 +757,6 @@ class MainWindow(QMainWindow):
             self._mix_rows[name] = row
             self.mixer_rows_layout.addWidget(row)
         self.mixer_rows_layout.addStretch(1)
-        self.fx_routing_editor = FXRoutingEditor()
-        self.fx_routing_editor.changed.connect(self._refresh_routing)
-        layout.addWidget(self.fx_routing_editor)
 
     def _select_stem(self, name: str) -> None:
         index = self.preview_source.findData(name)
