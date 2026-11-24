@@ -176,15 +176,14 @@ def _build_break_events(
         )
         bar_hits = list(selected)
 
-        # Only opt into pattern-family remapping when structural variation is
-        # enabled. The default variation value keeps the M8 feature active,
-        # while variation=0 remains fully backward-compatible.
-        if config.composition_variation > 0.0:
+        # Pattern-family remapping follows the existing break-variation control.
+        # A zero value guarantees the original phrase and density semantics.
+        if config.break_variation > 0.0:
             family_steps = pattern_for_section(
                 config.pattern_family,
                 section_index=section.index,
                 section_name=section.name,
-                variation=config.composition_variation,
+                variation=config.break_variation,
                 density=float(section.density),
                 rng=rng,
             )
@@ -202,7 +201,7 @@ def _build_break_events(
                 companion_family,
                 section_index=section.index + 1,
                 section_name=section.name,
-                variation=config.composition_variation,
+                variation=config.break_variation,
                 density=float(section.density),
                 rng=companion_rng,
             )
