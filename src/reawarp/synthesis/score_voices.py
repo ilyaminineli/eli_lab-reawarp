@@ -164,7 +164,7 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
             gate_end_frame = scheduled.start_frame + scheduled.duration_frames
             try:
                 gate_beats = Fraction(str(gate_value))
-                _unused_start, gate_end_frame = controls.timeline.beat_span_to_frames(
+                _start_frame, gate_end_frame = controls.timeline.beat_span_to_frames(
                     event.onset_beats, gate_beats
                 )
             except (TypeError, ValueError, ZeroDivisionError):
@@ -213,58 +213,75 @@ def _percussion_renderer(
         frames = scheduled.duration_frames
         if frames <= 0:
             return np.zeros(0, dtype=np.float32)
-        source_kind = str(parameters.get('source_kind', '')).casefold()
+        source_kind = str(parameters.get("source_kind", "")).casefold()
         duration = frames / float(sample_rate)
-        synth_gain = float(np.clip(parameters.get('synth_gain', 1.0), 0.0, 1.0))
-        if config.percussion_source_mode == 'sample' or config.percussion_synthesis == 'samples':
+        synth_gain = float(np.clip(parameters.get("synth_gain", 1.0), 0.0, 1.0))
+        if config.percussion_source_mode == "sample" or config.percussion_synthesis == "samples":
             return np.zeros(frames, dtype=np.float32)
         if synth_gain <= 0.0:
             return np.zeros(frames, dtype=np.float32)
-        rng = _event_rng(event, config.seed, f'percussion:{role}')
-        if role == 'break':
-            subrole = source_kind if source_kind in {'kick', 'snare', 'hat'} else 'snare'
-            profile = str(parameters.get('sound_profile') or (selected_profile.get(subrole) if isinstance(selected_profile, dict) else selected_profile))
-            if subrole == 'kick':
-                    audio = render_kick(sample_rate, rng, 1.0, duration=duration, amp_decay=0.16, profile=profile if profile in KICK_PROFILES else '909_punch')
-            elif subrole == 'snare':
-                audio = render_snare(sample_rate, rng, 1.0, duration=duration, profile=profile if profile in SNARE_PROFILES else '909_crack')
-            else:
-                audio = render_hat(sample_rate, rng, 1.0, duration=duration, profile=profile if profile in HAT_PROFILES else 'closed')
-        else:
-            profile = str(parameters.get('sound_profile') or selected_profile)
-        if role != 'break' and (config.percussion_synthesis in {'minimal', 'extended'} or parameters.get('synthesis_voice')):
-            defaults = {
-                'kick': 'soft_kick' if config.percussion_synthesis == 'minimal' else 'dry_thump',
-                'snare': 'paper_snare' if config.percussion_synthesis == 'minimal' else 'muted_rim',
-                'hat': 'noise_hat' if config.percussion_synthesis == 'minimal' else 'metal_tick',
-            }
-            voice = str(parameters.get('synthesis_voice') or defaults[role])
-            pitch_hz = parameters.get('pitch_hz')
-            if pitch_hz is None:
-                pitch_hz = (
-                    KICK_PROFILES[profile].end_frequency if role == 'kick' and profile in KICK_PROFILES
-                    else SNARE_PROFILES[profile].body_frequency if role == 'snare' and profile in SNARE_PROFILES
-                    else HAT_PROFILES[profile].partials[0][0] if role == 'hat' and profile in HAT_PROFILES
-                    else None
+
+        rng = _event_rng(event, config.seed, f"percussion:{role}")
+        if role == "break":
+            subrole = source_kind if source_kind in {"kick", "snare", "hat"} else "snare"
+            selected = selected_profile.get(subrole, "909_crack") if isinstance(selected_profile, dict) else selected_profile
+            profile = str(parameters.get("sound_profile") or selected)
+            if subrole == "kick":
+                audio = render_kick(
+                    sample_rate, rng, 1.0, duration=duration, amp_decay=0.16,
+                    profile=profile if profile in KICK_PROFILES else "909_punch",
                 )
-            synth_duration = {'kick': 0.19, 'snare': 0.17, 'hat': 0.085}.get(role, duration)
-            audio = render_synthetic_percussion(
-                voice, sample_rate, rng, duration=synth_duration, velocity=1.0,
-                pitch_hz=None if pitch_hz is None else float(pitch_hz),
-            )
-        elif role == 'kick':
-            audio = render_kick(sample_rate, rng, 1.0, duration=duration, profile=profile)
-        elif role == 'snare':
-            audio = render_snare(sample_rate, rng, 1.0, duration=duration, profile=profile)
+            elif subrole == "snare":
+                audio = render_snare(
+                    sample_rate, rng, 1.0, duration=duration,
+                    profile=profile if profile in SNARE_PROFILES else "909_crack",
+                )
+            else:
+                audio = render_hat(
+                    sample_rate, rng, 1.0, duration=duration,
+                    profile=profile if profile in HAT_PROFILES else "closed",
+                )
         else:
-            audio = render_hat(sample_rate, rng, 1.0, duration=duration, profile=profile)
-        scale = float(parameters.get('synthesis_velocity_scale', 1.0))
-        if role == 'break':
-            scale *= {'kick': 0.82, 'snare': 0.78, 'hat': 0.90}.get(subrole, 1.0)
+            profile = str(parameters.get("sound_profile") or selected_profile)
+            synthetic = (
+                config.percussion_synthesis in {"minimal", "extended"}
+                or bool(parameters.get("synthesis_voice"))
+            )
+            if synthetic:
+                defaults = {
+                    "kick": "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump",
+                    "snare": "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim",
+                    "hat": "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick",
+                }
+                voice = str(parameters.get("synthesis_voice") or defaults[role])
+                pitch_hz = parameters.get("pitch_hz")
+                if pitch_hz is None:
+                    if role == "kick" and profile in KICK_PROFILES:
+                        pitch_hz = KICK_PROFILES[profile].end_frequency
+                    elif role == "snare" and profile in SNARE_PROFILES:
+                        pitch_hz = SNARE_PROFILES[profile].body_frequency
+                    elif role == "hat" and profile in HAT_PROFILES:
+                        pitch_hz = HAT_PROFILES[profile].partials[0][0]
+                synth_duration = {"kick": 0.19, "snare": 0.17, "hat": 0.085}[role]
+                audio = render_synthetic_percussion(
+                    voice, sample_rate, rng, duration=synth_duration, velocity=1.0,
+                    pitch_hz=None if pitch_hz is None else float(pitch_hz),
+                )
+            elif role == "kick":
+                audio = render_kick(sample_rate, rng, 1.0, duration=duration, profile=profile)
+            elif role == "snare":
+                audio = render_snare(sample_rate, rng, 1.0, duration=duration, profile=profile)
+            else:
+                audio = render_hat(sample_rate, rng, 1.0, duration=duration, profile=profile)
+
+        scale = float(parameters.get("synthesis_velocity_scale", 1.0))
+        if role == "break":
+            scale *= {"kick": 0.82, "snare": 0.78, "hat": 0.90}.get(subrole, 1.0)
         audio = _fit_frames(audio, frames) * np.float32(synth_gain * scale)
-        if 'synth.gain' in controls.target_ids:
+        if "synth.gain" in controls.target_ids:
             audio = _apply_musical_controls(audio, scheduled, sample_rate, controls)
         return audio
+
     return render
 
 
