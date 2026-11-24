@@ -22,6 +22,7 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
+from reawarp.fx_automation import save_fx_automation
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
@@ -30,6 +31,7 @@ from reawarp.synthesis.profiles import (
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.pages.fx_lab import FxLabPage
+from reawarp.ui.pages.fx_automation import FXAutomationEditor
 from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.theme import APP_STYLE
@@ -565,9 +567,14 @@ class MainWindow(QMainWindow):
         note.setObjectName("muted")
         note.setWordWrap(True)
         layout.addWidget(note)
+        self.fx_workspace_tabs = QTabWidget()
         self.fx_routing_editor = FXRoutingEditor()
         self.fx_routing_editor.changed.connect(self._refresh_routing)
-        layout.addWidget(self.fx_routing_editor)
+        self.fx_automation_editor = FXAutomationEditor()
+        self.fx_automation_editor.changed.connect(self._refresh_routing)
+        self.fx_workspace_tabs.addTab(self.fx_routing_editor, "ROUTING")
+        self.fx_workspace_tabs.addTab(self.fx_automation_editor, "AUTOMATION")
+        layout.addWidget(self.fx_workspace_tabs)
         return page
 
     def _choose_break_sample(self) -> None:
@@ -695,6 +702,9 @@ class MainWindow(QMainWindow):
             self._set_busy(False)
             self._show_error("Render worker returned an unexpected result.")
             return
+        previous_names = tuple(self.project.stems) if self.project is not None else ()
+        previous_routing = self.fx_routing_editor.routing() if previous_names else None
+        previous_automation = self.fx_automation_editor.automation() if previous_names else None
         self.player.stop()
         self._playback_stopped()
         self.project = result
@@ -702,7 +712,12 @@ class MainWindow(QMainWindow):
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._rebuild_mixer()
-        self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate)
+        self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate, result.config.bpm)
+        self.fx_automation_editor.set_project(list(result.stems), result.config.bpm)
+        if previous_routing is not None and previous_names == tuple(result.stems):
+            self.fx_routing_editor.set_routing(previous_routing)
+        if previous_automation is not None and previous_names == tuple(result.stems):
+            self.fx_automation_editor.set_automation(previous_automation)
         self.preview_source.blockSignals(True)
         self.preview_source.clear()
         self.preview_source.addItem("MASTER MIX", "master")
@@ -766,8 +781,13 @@ class MainWindow(QMainWindow):
 
     def _routing_signature(self) -> str:
         import hashlib
-        payload = json.dumps(self.fx_routing_editor.routing(), sort_keys=True, default=str)
-        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        payload = {
+            "routing": self.fx_routing_editor.routing(),
+            "automation": self.fx_automation_editor.automation(),
+            "bpm": float(self.project.config.bpm) if self.project is not None else 120.0,
+        }
+        encoded = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     def _ensure_routing_render(self) -> None:
         if self.project is None:
@@ -777,7 +797,11 @@ class MainWindow(QMainWindow):
             return
         try:
             processed, metadata = render_fx_routing(
-                self.project.stems, self.project.sample_rate, self.fx_routing_editor.routing()
+                self.project.stems,
+                self.project.sample_rate,
+                self.fx_routing_editor.routing(),
+                bpm=float(self.project.config.bpm),
+                automation=self.fx_automation_editor.automation(),
             )
         except Exception as exc:
             self._fx_processed_stems = {
@@ -936,6 +960,10 @@ class MainWindow(QMainWindow):
                 output / "fx_routing.json", self.fx_routing_editor.routing(),
                 list(self.project.stems), self.project.sample_rate,
             )
+            automation_path = save_fx_automation(
+                output / "fx_automation.json", self.fx_automation_editor.automation(),
+                list(self.project.stems),
+            )
             for bus, audio in self._fx_bus_returns.items():
                 write_wav(output / "returns" / f"{bus}.wav", audio, self.project.sample_rate, 24)
             mix_data = {
@@ -948,6 +976,7 @@ class MainWindow(QMainWindow):
                     float(np.max(np.abs(master))) if master is not None and master.size else 0.0
                 ),
                 "fx_routing": routing_path.name,
+                "fx_automation": automation_path.name,
                 "fx_returns": list(self._fx_bus_returns),
                 "routing_render": self._fx_routing_metadata,
             }

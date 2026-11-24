@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp.fx import FX_PRESETS
-from reawarp.fx_routing import (FX_BUSES, default_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing)
+from reawarp.fx_routing import (FX_BUSES, FX_DELAY_DIVISIONS, default_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing)
 
 
 class FXRoutingEditor(QGroupBox):
@@ -61,6 +61,7 @@ class FXRoutingEditor(QGroupBox):
         self.bus_wet: dict[str, QSlider] = {}
         self.bus_tail: dict[str, QDoubleSpinBox] = {}
         self.bus_chain: dict[str, QComboBox] = {}
+        self.bus_sync: dict[str, QComboBox] = {}
         for bus, default in (("space", "restrained_space"), ("echo", "tape_echo")):
             chain = QComboBox()
             for name in FX_PRESETS:
@@ -80,6 +81,13 @@ class FXRoutingEditor(QGroupBox):
             row.addRow("Processor", chain)
             row.addRow("Return level", wet)
             row.addRow("Tail", tail)
+            if bus == "echo":
+                sync = QComboBox()
+                for division in FX_DELAY_DIVISIONS:
+                    sync.addItem("STATIC" if division == "off" else division.replace("_", " ").upper(), division)
+                self.bus_sync[bus] = sync
+                row.addRow("Delay division", sync)
+                sync.currentIndexChanged.connect(self._store_buses)
             return_form.addRow(form)
             chain.currentIndexChanged.connect(self._store_buses)
             wet.valueChanged.connect(self._store_buses)
@@ -99,9 +107,10 @@ class FXRoutingEditor(QGroupBox):
         self.status.setWordWrap(True)
         root.addWidget(self.status)
 
-    def set_stems(self, names: list[str] | tuple[str, ...], sample_rate: int) -> None:
+    def set_stems(self, names: list[str] | tuple[str, ...], sample_rate: int, bpm: float = 120.0) -> None:
         self._stem_names = tuple(names)
         self._sample_rate = int(sample_rate)
+        self._bpm = float(bpm)
         current = self.stem.currentData()
         self._routing = default_fx_routing(self._stem_names)
         self.stem.blockSignals(True)
@@ -114,7 +123,7 @@ class FXRoutingEditor(QGroupBox):
         self.stem.setCurrentIndex(index if index >= 0 else 0)
         self._load_selected()
         self._load_buses_into_widgets()
-        self.status.setText(f"{len(names)} stems · dry by default · insert and sends are opt-in.")
+        self.status.setText(f"{len(names)} stems · {self._bpm:g} BPM · dry by default; insert and sends are opt-in.")
 
     def _load_selected(self, *_args: Any) -> None:
         name = self.stem.currentData()
@@ -152,14 +161,35 @@ class FXRoutingEditor(QGroupBox):
             self.bus_chain[bus].setCurrentIndex(max(0, self.bus_chain[bus].findData(record["chain"])))
             self.bus_wet[bus].setValue(round(record["wet"] * 100))
             self.bus_tail[bus].setValue(record["tail_seconds"])
+            if bus in self.bus_sync:
+                sync = self.bus_sync[bus]
+                sync.blockSignals(True)
+                sync.setCurrentIndex(max(0, sync.findData(record.get("delay_sync", "off"))))
+                sync.blockSignals(False)
+                has_delay = any(
+                    stage.get("type") == "delay" for stage in FX_PRESETS[record["chain"]]
+                )
+                sync.setEnabled(has_delay)
 
     def _store_buses(self, *_args: Any) -> None:
         if not hasattr(self, "bus_chain"):
             return
+        echo_preset = str(self.bus_chain["echo"].currentData())
+        echo_has_delay = any(
+            stage.get("type") == "delay" for stage in FX_PRESETS[echo_preset]
+        )
+        if not echo_has_delay and self.bus_sync["echo"].currentData() != "off":
+            self.bus_sync["echo"].blockSignals(True)
+            self.bus_sync["echo"].setCurrentIndex(self.bus_sync["echo"].findData("off"))
+            self.bus_sync["echo"].blockSignals(False)
+        self.bus_sync["echo"].setEnabled(echo_has_delay)
         self._routing["buses"] = {
-            bus: {"chain": self.bus_chain[bus].currentData(),
-                  "wet": self.bus_wet[bus].value() / 100,
-                  "tail_seconds": self.bus_tail[bus].value()}
+            bus: {
+                "chain": self.bus_chain[bus].currentData(),
+                "wet": self.bus_wet[bus].value() / 100,
+                "tail_seconds": self.bus_tail[bus].value(),
+                "delay_sync": self.bus_sync[bus].currentData() if bus in self.bus_sync else "off",
+            }
             for bus in FX_BUSES
         }
         self.changed.emit()

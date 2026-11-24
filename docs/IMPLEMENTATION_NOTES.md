@@ -43,9 +43,10 @@ The repository currently uses compile, CLI, library, and desktop-import smoke ch
 - **M9:** restrained subtractive synthesis, dedicated generated drum voices, sparser defaults, monochrome UI, and dependency inventory.
 - **M10:** optional Pyo offline FX backend, four starter chains, FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
 - **M11:** editable ordered effect chains, stage-level parameter controls, and portable chain JSON.
-- **M12:** role-aware per-stem inserts, shared SPACE/ECHO sends and returns, portable routing JSON, Stem Mixer integration, and offline routed export. FX rendering remains an optional Pyo pass; dry generator stems and deterministic regeneration are preserved.
+- **M12:** deliberately small role-aware routing with per-stem inserts, two shared SPACE/ECHO returns, portable routing JSON, and offline routed export. Direct stems remain dry/frame-aligned; insert tails can reach shared sends and returns can extend the master.
+- **M13:** deterministic beat-based automation for insert wet, stem sends, and shared return wet; tempo-synchronised delay divisions; portable automation JSON; compact routing/automation sub-tabs in the Stem Mixer.
 
-M12 implements the role-aware routing layer as a separate offline pass. The generated dry stem buffers remain the source of truth; project routing is applied after generation and must not consume or alter named synthesis random streams. Future work can add tempo-aware delay divisions, richer bus topologies, automation lanes, and a fully asynchronous render cache.
+M12 remains a fixed two-bus offline pass rather than a general-purpose graph. M13 evaluates beat-based control lanes against the project's constant BPM. Automation is evaluated sample-by-sample from ordered points, uses hold/linear/smooth curves, and does not consume or alter named synthesis random streams. Pyo processing is still offline; the current desktop render path can block during longer FX renders, which remains a future asynchronous-rendering task.
 
 ## Audio engineering notes
 
