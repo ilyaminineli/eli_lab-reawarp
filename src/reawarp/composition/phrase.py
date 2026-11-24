@@ -196,6 +196,13 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
             "outro": "dissolve",
         }[function]
 
+        event_activity = _clamp(energy * (1.0 - silence_ratio))
+        if function == "uplift":
+            event_activity = _clamp(event_activity * 1.12)
+        elif function == "drop":
+            event_activity = max(0.08, event_activity * 0.24)
+        elif function == "silence":
+            event_activity = 0.0
         result.append(PhraseDirective(
             index=index,
             function=function,
@@ -205,7 +212,7 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
             motif_mode=section.motif_mode,
             rhythm_mode=rhythm_mode,
             density_scale=_clamp(section.density * (1.0 - silence_ratio)),
-            event_activity=locals().get("event_activity", _clamp(energy * (1.0 - silence_ratio))),
+            event_activity=event_activity,
             kick_activity=kick_activity,
             snare_activity=snare_activity,
             high_activity=high_activity,
