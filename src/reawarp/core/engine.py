@@ -180,6 +180,12 @@ class ReawarpEngine:
             config, regenerate=regenerate, variation=variation
         )
         planning_seconds = perf_counter() - planning_started
+        composition_plan_seconds = float(
+            plan.timings.get("composition_plan_seconds", 0.0)
+        )
+        event_generation_seconds = float(
+            plan.timings.get("event_generation_seconds", 0.0)
+        )
 
         score_render_started = perf_counter()
         rendered = self.render_score(plan.score, config=config)
@@ -289,10 +295,14 @@ class ReawarpEngine:
         project_score = replace(canonical_score, metadata=score_metadata)
         project_events = score_to_legacy_project_events(project_score)
 
+        synthesis_and_buffer_seconds = score_render_seconds + field_render_seconds
         performance = {
             "planning_seconds": planning_seconds,
+            "composition_plan_seconds": composition_plan_seconds,
+            "event_generation_seconds": event_generation_seconds,
             "score_render_seconds": score_render_seconds,
             "field_render_seconds": field_render_seconds,
+            "synthesis_and_buffer_seconds": synthesis_and_buffer_seconds,
             "headroom_seconds": headroom_seconds,
             "total_engine_seconds": perf_counter() - total_started,
         }
