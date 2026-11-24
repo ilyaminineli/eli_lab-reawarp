@@ -702,6 +702,9 @@ class MainWindow(QMainWindow):
             self._set_busy(False)
             self._show_error("Render worker returned an unexpected result.")
             return
+        previous_names = tuple(self.project.stems) if self.project is not None else ()
+        previous_routing = self.fx_routing_editor.routing() if previous_names else None
+        previous_automation = self.fx_automation_editor.automation() if previous_names else None
         self.player.stop()
         self._playback_stopped()
         self.project = result
@@ -711,6 +714,10 @@ class MainWindow(QMainWindow):
         self._rebuild_mixer()
         self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate, result.config.bpm)
         self.fx_automation_editor.set_project(list(result.stems), result.config.bpm)
+        if previous_routing is not None and previous_names == tuple(result.stems):
+            self.fx_routing_editor.set_routing(previous_routing)
+        if previous_automation is not None and previous_names == tuple(result.stems):
+            self.fx_automation_editor.set_automation(previous_automation)
         self.preview_source.blockSignals(True)
         self.preview_source.clear()
         self.preview_source.addItem("MASTER MIX", "master")
