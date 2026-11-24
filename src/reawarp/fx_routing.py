@@ -78,6 +78,64 @@ def default_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
     }
 
 
+def build_role_audition_matrix(stem_names: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """Create four restrained, comparable role-routing starting points.
+
+    Names are classified conservatively. Unknown stem names remain completely
+    dry rather than receiving an assumed effect assignment.
+    """
+    def role_of(name: str) -> str:
+        token = str(name).lower()
+        if "kick" in token or "sub" in token or "bass" in token:
+            return "kick"
+        if "snare" in token or "clap" in token:
+            return "snare"
+        if any(part in token for part in ("hat", "cymbal", "ride", "shaker", "tamb")):
+            return "hats"
+        if "break" in token or "loop" in token:
+            return "break"
+        if any(part in token for part in ("melody", "lead", "arp")):
+            return "melody"
+        if any(part in token for part in ("ambience", "texture", "noise", "pad")):
+            return "ambience"
+        return "other"
+
+    roles = {name: role_of(name) for name in stem_names}
+    definitions = {
+        "percussion_focus": {
+            "sends": {"snare": (0.02, 0.00), "hats": (0.06, 0.02), "break": (0.04, 0.01)},
+            "space_wet": 0.12, "echo_wet": 0.05,
+        },
+        "melody_foreground": {
+            "sends": {"melody": (0.08, 0.04), "hats": (0.02, 0.00), "break": (0.02, 0.00)},
+            "space_wet": 0.14, "echo_wet": 0.08,
+        },
+        "ambience_background": {
+            "sends": {"ambience": (0.16, 0.00), "melody": (0.02, 0.00)},
+            "space_wet": 0.16, "echo_wet": 0.00,
+        },
+        "combined_roles": {
+            "sends": {
+                "snare": (0.02, 0.00), "hats": (0.04, 0.01), "break": (0.04, 0.01),
+                "melody": (0.07, 0.03), "ambience": (0.12, 0.00),
+            },
+            "space_wet": 0.14, "echo_wet": 0.06,
+        },
+    }
+    matrix: dict[str, dict[str, Any]] = {}
+    for profile, spec in definitions.items():
+        routing = default_fx_routing(stem_names)
+        for stem, role in roles.items():
+            send = spec["sends"].get(role)
+            if send is None:
+                continue
+            routing["stems"][stem]["sends"] = {"space": send[0], "echo": send[1]}
+        routing["buses"]["space"]["wet"] = spec["space_wet"]
+        routing["buses"]["echo"]["wet"] = spec["echo_wet"]
+        matrix[profile] = routing
+    return matrix
+
+
 def normalise_fx_routing(
     payload: Mapping[str, Any], stem_names: Sequence[str], sample_rate: int
 ) -> dict[str, Any]:
