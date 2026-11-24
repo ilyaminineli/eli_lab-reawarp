@@ -73,6 +73,7 @@ jobs:
               automation_envelope, load_fx_automation, normalise_fx_automation,
               save_fx_automation,
           )
+          from reawarp.fx_routing import build_role_audition_matrix, normalise_fx_routing
           project = json.loads(Path('/tmp/reawarp-ci/project.json').read_text(encoding='utf-8'))
           stem = project['stems'][0]
           payload = {
