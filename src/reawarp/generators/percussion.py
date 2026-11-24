@@ -149,31 +149,20 @@ def _build_break_events(
         style = str(rng.choice(BREAK_STYLE_NAMES))
     template = BREAK_PATTERNS[style]
 
-    # The selected structure governs how the break grammar evolves across
-    # sections. Keep the original event vocabulary and metric anchors, but
-    # adapt the phrase steps to the selected composition family.
-    target_count = 4 + int(round(float(config.break_density) * 4.0))
-    selected = sorted(
-        sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
-        key=lambda item: item[0],
-    )
-    if composition_plan is None:
-        composition_plan = build_composition_plan(
-            duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
-            structure=config.structure, energy=config.composition_energy,
-            variation=config.composition_variation, flow=config.composition_flow,
-            pattern_family=config.pattern_family,
-            pattern_relationship=config.pattern_relationship,
-        )
-
+    # Pattern-family adaptation is deliberately opt-in through the global
+    # structural-variation control. With zero variation, preserve the original
+    # exact phrase template and density contract byte-for-byte.
     step_seconds = config.sixteenth_seconds
     bar_count = (step_count + 15) // 16
     events: list[PercussionEvent] = []
 
     for bar in range(bar_count):
         section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
-        # A zero structural-variation setting must preserve a stable,
-        # repeatable phrase. Otherwise choose a section-aware family cell.
+        target_count = 4 + int(round(float(config.break_density) * 4.0))
+        selected = sorted(
+            sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
+            key=lambda item: item[0],
+        )
         bar_hits = list(selected)
         if config.composition_variation > 0.0:
             family_steps = pattern_for_section(
@@ -219,7 +208,7 @@ def _build_break_events(
                 for index, item in enumerate(ornaments):
                     if index >= len(selected_steps):
                         break
-                    step, kind, priority, velocity, pan = item
+                    _step, kind, priority, velocity, pan = item
                     remapped.append((selected_steps[index], kind, priority, velocity, pan))
                 bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
