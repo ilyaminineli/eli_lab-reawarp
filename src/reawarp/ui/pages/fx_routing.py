@@ -180,6 +180,7 @@ class FXRoutingEditor(QGroupBox):
         self._load_selected()
         self._load_buses_into_widgets()
         self.status.setText(f"Loaded routing: {Path(path).name}")
+        self.changed.emit()
 
     def _save_file(self) -> None:
         if not self._stem_names:
@@ -193,6 +194,12 @@ class FXRoutingEditor(QGroupBox):
             QMessageBox.warning(self, "FX routing", str(exc))
             return
         self.status.setText(f"Saved {Path(path).resolve()}")
+
+    def set_routing(self, payload: dict[str, Any]) -> None:
+        self._routing = normalise_fx_routing(payload, self._stem_names, self._sample_rate)
+        self._load_selected()
+        self._load_buses_into_widgets()
+        self.changed.emit()
 
     def routing(self) -> dict[str, Any]:
         return normalise_fx_routing(self._routing, self._stem_names, self._sample_rate) if self._stem_names else default_fx_routing()
