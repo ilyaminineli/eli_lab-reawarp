@@ -25,7 +25,8 @@ from reawarp.fx_routing import render_fx_routing, render_master_with_returns, sa
 from reawarp.fx_automation import save_fx_automation
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
-    default_sample_for_role, discover_bundled_samples, sample_library_counts,
+    classify_sample_role, default_sample_for_role, discover_bundled_samples,
+    sample_library_counts,
 )
 from reawarp.mathematics.theory import ROOT_NAMES, SCALE_STEPS
 from reawarp.synthesis.profiles import (
@@ -213,19 +214,23 @@ class MainWindow(QMainWindow):
 
     def _build_generator_page(self) -> QWidget:
         page = QWidget()
-        layout = QHBoxLayout(page)
+        layout = QVBoxLayout(page)
         layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(14)
+        layout.setSpacing(10)
 
         panel = QWidget()
         panel.setMinimumWidth(0)
         panel.setMaximumWidth(450)
         panel_layout = QVBoxLayout(panel)
-        control_tabs = QTabWidget()
-        form_page, voices_page, rhythm_page = QWidget(), QWidget(), QWidget()
-        form_layout = QVBoxLayout(form_page)
-        voices_layout = QVBoxLayout(voices_page)
-        rhythm_layout = QVBoxLayout(rhythm_page)
+        controls_page = QWidget()
+        controls_layout = QVBoxLayout(controls_page)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(10)
+        # Form, rhythm, source and voice controls are one connected workflow,
+        # not separate feature tabs that hide the Generate action.
+        form_layout = controls_layout
+        voices_layout = controls_layout
+        rhythm_layout = controls_layout
 
         global_group = QGroupBox("COMPOSITION FORM")
         form = QFormLayout(global_group)
@@ -388,6 +393,29 @@ class MainWindow(QMainWindow):
         source_form.addRow(self.sample_library_note)
         voices_layout.addWidget(source_group)
 
+        automation_group = QGroupBox("DRUM PART AUTOMATION")
+        automation_form = QFormLayout(automation_group)
+        self.auto_drum_sample_switching = QCheckBox("Switch sample parts through the track")
+        self.auto_drum_sample_switching.setChecked(True)
+        self.auto_drum_sample_switching.setToolTip(
+            "Selects among the available samples for each role at section or phrase-cycle boundaries. "
+            "Returns recall the established opening sample."
+        )
+        automation_form.addRow(self.auto_drum_sample_switching)
+        self.include_indexed_library_samples = QCheckBox("Include indexed Library assets")
+        self.include_indexed_library_samples.setChecked(True)
+        self.include_indexed_library_samples.setToolTip(
+            "Adds indexed audio with matching kick/snare/hat roles or recognizable file/folder names to the role banks."
+        )
+        automation_form.addRow(self.include_indexed_library_samples)
+        self.drum_sample_automation = QComboBox()
+        self.drum_sample_automation.addItem("AUTOMATIC · PHRASE AWARE", "automatic")
+        self.drum_sample_automation.addItem("CHANGE AT EACH SECTION", "section")
+        self.drum_sample_automation.addItem("CHANGE BY DRUM CYCLE", "cycle")
+        self.drum_sample_automation.addItem("FIXED · ONE SOUND PER ROLE", "fixed")
+        automation_form.addRow("Switch schedule", self.drum_sample_automation)
+        voices_layout.addWidget(automation_group)
+
         hybrid_group = QGroupBox("PERCUSSION SOURCE ENGINE")
         hybrid_form = QFormLayout(hybrid_group)
         self.percussion_source_mode = QComboBox()
@@ -399,6 +427,7 @@ class MainWindow(QMainWindow):
         self.percussion_hybrid_architecture = QComboBox()
         self.percussion_hybrid_architecture.addItem("TRANSIENT SAMPLE + SYNTH BODY", "transient_body")
         self.percussion_hybrid_architecture.addItem("PARALLEL FULL LAYERS", "layered")
+        self.percussion_hybrid_architecture.addItem("FEATURE-GUIDED HYBRID", "feature_guided")
         hybrid_form.addRow("Hybrid architecture", self.percussion_hybrid_architecture)
         self.percussion_sample_mix = QDoubleSpinBox()
         self.percussion_sample_mix.setRange(0.0, 1.0)
@@ -491,13 +520,8 @@ class MainWindow(QMainWindow):
         source_layout.addWidget(browse)
         rhythm_layout.addWidget(source_group)
 
-        form_layout.addStretch(1)
-        voices_layout.addStretch(1)
-        rhythm_layout.addStretch(1)
-        control_tabs.addTab(form_page, "FORM")
-        control_tabs.addTab(voices_page, "VOICES")
-        control_tabs.addTab(rhythm_page, "RHYTHM")
-        panel_layout.addWidget(control_tabs, 1)
+        controls_layout.addStretch(1)
+        panel_layout.addWidget(controls_page, 1)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -517,19 +541,6 @@ class MainWindow(QMainWindow):
         control_caption.setObjectName("sectionTitle")
         left_layout.addWidget(control_caption)
         left_layout.addWidget(scroll, 1)
-        self.generate_button = QPushButton("GENERATE COMPOSITION  →")
-        self.generate_button.setObjectName("primaryAction")
-        self.generate_button.setMinimumHeight(48)
-        self.generate_button.setToolTip(
-            "Build the formal arrangement and render all connected sample, synthesis and texture roles."
-        )
-        self.generate_button.clicked.connect(self._generate)
-        left_layout.addWidget(self.generate_button)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 0)
-        self.progress.setVisible(False)
-        left_layout.addWidget(self.progress)
-
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
@@ -561,6 +572,35 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setSizes([370, 900])
+
+        action_bar = QFrame()
+        action_bar.setObjectName("generatorActionBar")
+        action_layout = QHBoxLayout(action_bar)
+        action_layout.setContentsMargins(16, 11, 16, 11)
+        action_copy = QVBoxLayout()
+        action_title = QLabel("GENERATE A TRACK")
+        action_title.setObjectName("sectionTitle")
+        action_copy.addWidget(action_title)
+        action_flow = QLabel("FORM  →  DRUM PARTS  →  SAMPLE LIBRARY  →  SYNTHESIS  →  RENDER")
+        action_flow.setObjectName("muted")
+        action_copy.addWidget(action_flow)
+        action_layout.addLayout(action_copy, 1)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 0)
+        self.progress.setMaximumWidth(90)
+        self.progress.setVisible(False)
+        action_layout.addWidget(self.progress)
+        self.generate_button = QPushButton("GENERATE TRACK  →")
+        self.generate_button.setObjectName("primaryAction")
+        self.generate_button.setMinimumHeight(54)
+        self.generate_button.setMinimumWidth(230)
+        self.generate_button.setToolTip(
+            "Build one connected composition: formal arrangement, evolving drum parts, "
+            "feature-guided sample selection, synthesis, textures and stems."
+        )
+        self.generate_button.clicked.connect(self._generate)
+        action_layout.addWidget(self.generate_button)
+        layout.addWidget(action_bar)
         layout.addWidget(splitter, 1)
         return page
 
