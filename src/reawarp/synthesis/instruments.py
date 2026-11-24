@@ -6,11 +6,14 @@ import numpy as np
 
 from reawarp.synthesis.envelopes import exponential_decay
 from reawarp.synthesis.profiles import (
+    EXTENDED_MELODY_PROFILES,
     HAT_PROFILES,
     KICK_PROFILES,
     MELODY_PROFILES,
+    EXTENDED_MELODY_PROFILES,
     SNARE_PROFILES,
     select_profile_name,
+    EXTENDED_MELODY_PROFILES,
 )
 
 
@@ -237,3 +240,120 @@ def render_noise_texture(
     airy = 0.18 * white
     signal = (0.72 * brown + airy) * slow_mod * float(amount)
     return signal.astype(np.float32)
+
+
+
+def render_extended_note(
+        frequency: float,
+        sample_rate: int,
+        rng: np.random.Generator,
+        duration: float = 0.34,
+        velocity: float = 0.65,
+        palette: str = "hybrid",
+        brightness: float = 0.5,
+        instability: float = 0.0,
+) -> np.ndarray:
+    """Render extended tonal families with NumPy-only reference algorithms.
+
+    Families include additive/inharmonic partial banks, a wavetable-like
+    oscillator scan, pulsar windows, and modal resonators. Granular and physical
+    palettes use a restrained deterministic microsound/modal approximation;
+    optional specialist backends can be added without changing event data.
+    """
+    if frequency <= 0 or sample_rate <= 0 or duration <= 0:
+        raise ValueError("frequency, sample_rate, and duration must be positive")
+    if not 0 <= brightness <= 1 or not 0 <= instability <= 1:
+        raise ValueError("brightness and instability must be between zero and one")
+    if palette not in {"hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"}:
+        raise ValueError(f"unknown synthesis palette: {palette}")
+
+    if palette in {"hybrid", "fm"}:
+        profile = "soft_keys" if palette == "hybrid" else "metallic_fm"
+        return render_fm_note(
+            frequency, sample_rate, rng, duration, velocity,
+            profile=profile, brightness=brightness, instability=instability,
+        )
+
+    length = max(64, int(round(sample_rate * (duration + 0.28))))
+    t = np.arange(length, dtype=np.float64) / float(sample_rate)
+    note_end = float(duration)
+    release = np.exp(-np.maximum(0.0, t - note_end) / 0.28)
+    attack = 1.0 - np.exp(-t / 0.006)
+    body_env = np.where(t < note_end, attack, attack * release)
+    rng_phase = rng.uniform(0.0, 2.0 * np.pi, 12)
+    signal = np.zeros(length, dtype=np.float64)
+
+    # Data-driven inharmonic/modal-style voices provide reproducible partial recipes.
+    # For these palettes, the recipe is used to distribute partial ratios/decays.
+    if palette in {"additive", "inharmonic"}:
+        extended_profile = EXTENDED_MELODY_PROFILES.get(
+            "inharmonic_mallet" if palette == "inharmonic" else "soft_spectral_pad"
+        )
+        ratios = (
+            (1.0, .60), (2.0, .24), (3.0, .12), (4.0, .07), (5.0, .035),
+            (6.0, .02), (7.0, .012), (8.0, .008),
+        ) if palette == "additive" else (
+            (1.0, .58), (2.76, .24), (5.41, .13), (8.93, .07),
+            (13.1, .035), (17.8, .018),
+        )
+        if extended_profile is not None:
+            ratios = extended_profile.partials
+        for index, (ratio, amp) in enumerate(ratios):
+            detune = 1.0 + instability * (0.0007 * np.sin(2*np.pi*(.11+index*.017)*t))
+            partial = frequency * ratio * detune
+            signal += amp * np.sin(2*np.pi*partial*t + rng_phase[index])
+    elif palette == "modal" or palette == "physical":
+        # Modal bank: inharmonic frequencies with individual decay constants.
+        mode_profile = EXTENDED_MELODY_PROFILES.get(
+            "inharmonic_mallet" if palette == "physical" else "metallic_fm"
+        )
+        ratios = mode_profile.partials if mode_profile is not None else (
+            (1.0, .62), (2.32, .28), (4.18, .19), (6.71, .12), (9.4, .075), (13.2, .04)
+        )
+        modes = tuple(
+            (ratio, amplitude, max(.10, .65 - index * .075))
+            for index, (ratio, amplitude) in enumerate(ratios)
+        )
+        excitation = np.exp(-t / (0.004 + (1.0-brightness)*0.012))
+        for index, (ratio, amp, decay) in enumerate(modes):
+            mode = np.sin(2*np.pi*frequency*ratio*t + rng_phase[index])
+            signal += amp * mode * np.exp(-t / (decay * (0.35 + duration))) * excitation
+    elif palette == "granular":
+        # Micro-grain cloud around a tuned carrier; fixed windows avoid clicks.
+        grain_count = max(8, int(duration * (18 + 70 * brightness)))
+        centres = np.linspace(0.015, max(0.02, duration), grain_count)
+        for index, centre in enumerate(centres):
+            grain_duration = (0.012 + 0.055 * (1.0 - brightness))
+            rate = 1.0 + rng.uniform(-0.12, 0.12) * (0.25 + instability)
+            start = max(0, int((centre - grain_duration * .5) * sample_rate))
+            end = min(length, int((centre + grain_duration * .5) * sample_rate))
+            if end <= start:
+                continue
+            local_t = np.arange(end-start, dtype=np.float64) / sample_rate
+            window = np.hanning(max(3, end-start))
+            grain = np.sin(2*np.pi*frequency*rate*local_t + rng_phase[index % len(rng_phase)])
+            signal[start:end] += grain * window * (0.55 / max(1, grain_count)**0.35)
+    else:
+        # Wavetable/pulsar hybrid: smoothly scan harmonic tables by varying
+        # partial amplitudes over a slow cycle; pulses expose microscopic slices.
+        phase = (frequency * t) % 1.0
+        pulse_width = 0.18 + 0.72 * brightness
+        pulse = np.clip((pulse_width - phase) * 28.0, 0.0, 1.0)
+        scan = 0.5 + 0.5 * np.sin(2*np.pi*(0.17 + instability*.31)*t)
+        for index, ratio in enumerate((1.0, 2.0, 3.01, 4.2, 5.7, 7.4)):
+            amp = (0.55 / (index + 1)) * (0.2 + 0.8 * scan ** (1 + index*.35))
+            signal += amp * np.sin(2*np.pi*frequency*ratio*t + rng_phase[index]) * pulse
+
+    signal *= body_env
+    # Gentle spectral darkening, implemented without an external DSP backend.
+    cutoff = min(sample_rate * .44, frequency * (7.0 + 34.0 * brightness))
+    spectrum = np.fft.rfft(signal)
+    hz = np.fft.rfftfreq(length, 1.0 / sample_rate)
+    spectrum *= 1.0 / np.sqrt(1.0 + (hz / max(120.0, cutoff)) ** 8)
+    signal = np.fft.irfft(spectrum, n=length)
+    drive = 1.0 + 1.6 * instability
+    signal = np.tanh(signal * drive) / max(1.0, np.tanh(drive) * 1.5)
+    peak = float(np.max(np.abs(signal))) if signal.size else 0.0
+    if peak > 1e-9:
+        signal *= min(1.0, 0.82 / peak)
+    return (signal * float(np.clip(velocity, 0.0, 1.0))).astype(np.float32)

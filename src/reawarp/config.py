@@ -6,7 +6,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.synthesis.profiles import (
+    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
+)
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
@@ -15,6 +18,10 @@ class GenerationConfig:
     bpm: float = 137.0
     duration: float = 24.0
     structure: str = "evolving"
+    composition_flow: str = "preset"
+    pattern_family: str = "broken_funk"
+    pattern_relationship: str = "interlock"
+    pattern_follow_structure: bool = False
     composition_energy: float = 0.62
     composition_variation: float = 0.45
     sample_rate: int = 48_000
@@ -29,6 +36,7 @@ class GenerationConfig:
     snare_profile: str = "auto"
     hat_profile: str = "auto"
     melody_profile: str = "auto"
+    synth_palette: str = "hybrid"
     break_style: str = "broken_funk"
     break_density: float = 0.50
     break_variation: float = 0.25
@@ -48,12 +56,20 @@ class GenerationConfig:
     def __post_init__(self) -> None:
         if not 60.0 <= float(self.bpm) <= 220.0:
             raise ValueError("bpm must be between 60 and 220")
-        if not 5.0 <= float(self.duration) <= 45.0:
-            raise ValueError("duration must be between 5 and 45 seconds")
+        if not 5.0 <= float(self.duration) <= 180.0:
+            raise ValueError("duration must be between 5 and 180 seconds")
         if not 22_050 <= int(self.sample_rate) <= 192_000:
             raise ValueError("sample_rate must be between 22050 and 192000 Hz")
-        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift"}:
+        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift", "classical_arc", "sonata_mutation", "free_jazz", "free_jazz_episodic", "autechre_like", "minimal_variation", "hybrid"}:
             raise ValueError("unknown composition structure")
+        if self.composition_flow not in {"preset", "mix", "mutate"}:
+            raise ValueError("composition_flow must be preset, mix, or mutate")
+        if self.pattern_family not in PATTERN_FAMILIES:
+            raise ValueError(f"unknown pattern family: {self.pattern_family}")
+        if self.pattern_relationship not in PATTERN_RELATIONSHIPS:
+            raise ValueError(f"unknown pattern relationship: {self.pattern_relationship}")
+        if self.synth_palette not in SYNTH_PALETTES:
+            raise ValueError("unknown synth palette")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
             raise ValueError("composition_energy must be between 0 and 1")
         if not 0.0 <= float(self.composition_variation) <= 1.0:

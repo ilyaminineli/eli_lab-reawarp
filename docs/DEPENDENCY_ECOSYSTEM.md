@@ -15,12 +15,25 @@ Before bundling any dependency in a desktop release, re-check the current suppor
 | NumPy + custom Reawarp DSP | Deterministic reference renderer and offline stem engine | Core; required |
 | SciPy | Optional signal-processing utilities and future filter/analysis helpers | Optional `audio` extra; never required by the core |
 | Pyo | Real-time oscillators, filters, delays, modulation, granular work, MIDI/OSC | Candidate optional real-time backend; do not replace NumPy |
-| Pippi | Experimental buffer, wavetable, window, and granular sound design | Research adapter; 2.x development line was considered experimental in the M3 notes |
+| Pippi | Experimental buffer, wavetable, window, and granular sound design | Optional `research` extra; evaluate 2.x API stability before release use |
 | pyFluidSynth | SF2 SoundFont playback and pitched source material | Optional `soundfont` extra; native FluidSynth runtime is required |
 | ctcsound / Csound | Offline physical modelling, resonators, and complex modulation | External backend candidate; Python bindings must match the installed Csound API, especially across the 6/7 API boundary |
 | SuperCollider / sc3nb | Interactive synthesis graphs and sonification | External experimental backend; keep independent of the core runtime |
 
-The first implementation should stay NumPy-first. Pyo is the most direct future path for real-time audition and synthesis; Pippi is the experimental sound-design path. FluidSynth is useful as a source instrument, not as the central renderer.
+The implementation remains NumPy-first. Reawarp's M8 reference renderer covers additive and inharmonic partial banks, modal resonator approximations, granular micro-clouds, and scanned/pulsar-style wavetable motion without a native dependency. Pyo remains a candidate for real-time audition and synthesis; Pippi remains an experimental buffer/sound-design adapter. FluidSynth is useful as a source instrument, not as the central renderer.
+
+### M8 sound-design library decisions
+
+| Library / technology | Intended M8 role | Adoption |
+|---|---|---|
+| NumPy FFT and oscillator bank | Reference additive, inharmonic, scanned and spectral utilities | Core; deterministic |
+| SciPy | Higher-order filters, resampling, convolution helpers and future oversampled nonlinear DSP | Optional `audio` / `synthesis` extra |
+| Pippi | Buffer manipulation, wavetable preparation, granular and windowing experiments | Optional `research` extra; isolate behind adapter and test on Windows |
+| Csound / ctcsound | Modal, physical-model, resonator and complex modulation backends | Candidate external backend; requires matching native runtime |
+| SuperCollider / sc3nb | Synthesis graph prototyping, feedback networks and spectral-delay research | External experimental backend |
+| Pyo | Low-latency modulation, filters, granular playback and real-time preview | Optional future backend; not used by offline renderer |
+
+The sound-design manual also suggests convolution, spectral delay, feedback systems, oversampling, multiband processing and sample-to-wavetable conversion. These should be implemented as small, independently tested DSP modules or optional adapters, not as heavyweight mandatory dependencies. The current `synthesis` extra exposes SciPy only; `research` is for experimental library evaluation, not required generation.
 
 ## 2. Audio I/O, playback, and analysis
 
@@ -104,6 +117,8 @@ No external project should be copied into Reawarp merely because it is useful. P
 - **M4 — implemented:** PySide6 Generator, Break Lab, and Stem Mixer workspaces, SoundDevice audition, waveform/spectrogram views, asynchronous rendering, and stem controls.
 - **M5 — implemented:** universal score/event model, rational beat time, tempo/meter maps, automation lanes, tuning interface, project score conversion, and Mido MIDI 1.0 import/export.
 - **M6 — next:** searchable sample/stem catalogue, metadata indexing, similarity features, collections, variation genealogy, and MusPy-based research utilities.
-- **M7 — later:** optional Pyo/Pippi/Csound/SuperCollider backends, advanced mathematical composition, and curated dataset experiments.
+- **M7 — implemented:** 45-second composition workbench, section-aware motifs, layer regeneration, workspaces and searchable library.
+- **M8 — current:** up-to-three-minute formal presets and flow modes, pattern relationship/motif transformation utilities, and selectable native synthesis palettes.
+- **M9 — candidates:** dedicated modules for oversampled waveshaping, spectral delay, convolution/cross-synthesis, feedback-delay-network reverb and sample-to-wavetable instruments; add optional Csound/Pyo/Pippi adapters only behind isolated interfaces.
 
 The project should grow through small, testable adapters. Its identity remains in its mathematics, event model, and deterministic renderer.

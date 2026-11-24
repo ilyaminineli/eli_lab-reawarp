@@ -18,7 +18,7 @@ from reawarp.generators.percussion import build_percussion_events
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
-    render_fm_note,
+    render_extended_note,
     render_hat,
     render_kick,
     render_noise_texture,
@@ -42,7 +42,7 @@ from reawarp.transforms.pipeline import apply_break_transforms
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.7.0"
+    VERSION = "0.8.0"
 
     def generate_variant(
             self,
@@ -153,6 +153,9 @@ class ReawarpEngine:
             structure=config.structure,
             energy=config.composition_energy,
             variation=config.composition_variation,
+            flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
         )
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
@@ -196,7 +199,7 @@ class ReawarpEngine:
             "hat": streams.get("hat_pattern"),
             "break": streams.get("break_pattern"),
         }
-        percussion = build_percussion_events(config, percussion_rngs)
+        percussion = build_percussion_events(config, percussion_rngs, composition_plan)
         # Imported sample overlays keep their own baseline trigger score. A
         # procedural lane variation must not mutate a separate sample stem.
         sample_trigger_patterns = build_percussion_events(config, {
@@ -204,7 +207,7 @@ class ReawarpEngine:
             "snare": sample_streams.get("snare_pattern"),
             "hat": sample_streams.get("hat_pattern"),
             "break": sample_streams.get("break_pattern"),
-        })
+        }, composition_plan)
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
 
         kick_stem = new_stem("kick")
@@ -323,21 +326,17 @@ class ReawarpEngine:
                 if not section.melody:
                     continue
                 effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
-                signal = render_fm_note(
-                    effective_frequency,
-                    sample_rate,
-                    streams.get("melody_synthesis"),
-                    duration=event.duration,
-                    velocity=event.velocity,
-                    profile=melody_profile,
-                    brightness=section.brightness,
+                signal = render_extended_note(
+                    effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                    duration=event.duration, velocity=event.velocity,
+                    palette=config.synth_palette, brightness=section.brightness,
                     instability=section.instability,
                 )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
                 record.update({
                     "lane": "melody",
-                    "kind": "profiled_additive_fm_note",
+                    "kind": f"{config.synth_palette}_synth_note",
                     "synthesis_profile": melody_profile,
                 })
                 event_records.append(record)
@@ -575,9 +574,9 @@ class ReawarpEngine:
             },
             "generator_families": {
                 "percussion": "euclidean + prime-indexed mutation + logistic control",
-                "composition_director": "seeded bar-quantised formal section plan",
+                "composition_director": f"seeded formal section plan ({config.structure}/{config.composition_flow})",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
-                "melody": "3:5 Lissajous curve + logistic-map contour + profiled additive/FM synthesis",
+                "melody": f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette",
                 "texture": "coloured noise with low-frequency amplitude modulation",
                 "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
                 "break_processing": list(config.break_transforms),
@@ -587,6 +586,9 @@ class ReawarpEngine:
                 "snare": config.snare_profile,
                 "hat": config.hat_profile,
                 "melody": melody_profile,
+                "palette": config.synth_palette,
+                "available_palettes": ["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"],
+                "extended_melody_voices": ["inharmonic_mallet", "metallic_fm", "dark_formant", "soft_spectral_pad"],
                 "catalogue_counts": {
                     "kick": len(KICK_PROFILES),
                     "snare": len(SNARE_PROFILES),
@@ -594,6 +596,7 @@ class ReawarpEngine:
                 },
             },
             "composition_plan": composition_plan.to_dict(),
+            "synth_palette": config.synth_palette,
             "break_rhythm": {
                 "style": next(
                     (

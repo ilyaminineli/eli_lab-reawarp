@@ -3,6 +3,6 @@ from reawarp import __version__
 from reawarp.core.engine import ReawarpEngine
 
 
-def test_release_version_is_070():
-    assert __version__ == "0.7.0"
-    assert ReawarpEngine.VERSION == "0.7.0"
+def test_release_version_is_080():
+    assert __version__ == "0.8.0"
+    assert ReawarpEngine.VERSION == "0.8.0"

@@ -167,3 +167,36 @@ def test_engine_stores_seeded_composition_plan_and_respects_duration():
     assert plan["sections"][0]["start_seconds"] == 0.0
     assert plan["sections"][-1]["end_seconds"] == pytest.approx(12.0)
     assert project.frame_count == 12 * 22_050
+
+
+
+def test_engine_renders_three_minute_composition_with_new_form_and_palette():
+    project = ReawarpEngine().generate(small_config(
+        duration=180.0, structure="autechre_like", composition_flow="mutate",
+        synth_palette="inharmonic",
+    ))
+    assert project.frame_count == 180 * 22_050
+    plan = project.metadata["composition_plan"]
+    assert plan["duration_seconds"] == pytest.approx(180.0)
+    assert plan["flow"] == "mutate"
+    assert plan["sections"][-1]["end_seconds"] == pytest.approx(180.0)
+    assert project.metadata["synth_palette"] == "inharmonic"
+    assert np.all(np.isfinite(project.stems["melody"]))
+
+
+
+def test_engine_patterns_change_with_selected_section_grammar():
+    base = ReawarpEngine().generate(small_config(
+        duration=12.0, seed=813, structure="autechre_like",
+        pattern_family="broken_funk", pattern_relationship="interlock", pattern_follow_structure=True,
+    ))
+    altered = ReawarpEngine().generate(small_config(
+        duration=12.0, seed=813, structure="autechre_like",
+        pattern_family="asymmetric_7", pattern_relationship="shadow", pattern_follow_structure=True,
+    ))
+    base_steps = [event["step"] % 16 for event in base.events
+                  if event.get("lane") == "break"]
+    altered_steps = [event["step"] % 16 for event in altered.events
+                     if event.get("lane") == "break"]
+    assert base_steps != altered_steps
+    assert altered.metadata["composition_plan"]["pattern_family"] == "asymmetric_7"

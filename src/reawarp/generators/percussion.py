@@ -12,6 +12,9 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from reawarp.config import GenerationConfig
+from reawarp.composition.patterns import pattern_for_section, relate_patterns
+from reawarp.composition.director import CompositionPlan, build_composition_plan, section_for_time
+from reawarp.core.random_streams import derive_seed
 from reawarp.mathematics.rhythms import euclidean_rhythm
 from reawarp.mathematics.sequences import fibonacci, logistic_map, primes
 
@@ -139,6 +142,7 @@ def _build_break_events(
         config: GenerationConfig,
         rng: np.random.Generator,
         step_count: int,
+        composition_plan: CompositionPlan | None = None,
 ) -> list[PercussionEvent]:
     """Build repeated 16-step break phrases with bounded bar-end mutations."""
     style = config.break_style
@@ -146,44 +150,118 @@ def _build_break_events(
         style = str(rng.choice(BREAK_STYLE_NAMES))
     template = BREAK_PATTERNS[style]
 
-    # Density changes the number of selected voices, not the probability of
-    # every individual sixteenth-note slot. Four anchors are always retained.
-    target_count = 4 + int(round(float(config.break_density) * 4.0))
-    selected = sorted(
-        sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
-        key=lambda item: item[0],
-    )
+    # Pattern-family adaptation is deliberately opt-in through the global
+    # structural-variation control. With zero variation, preserve the original
+    # exact phrase template and density contract byte-for-byte.
+    if composition_plan is None:
+        composition_plan = build_composition_plan(
+            duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
+            structure=config.structure, energy=config.composition_energy,
+            variation=config.composition_variation, flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
+        )
 
     step_seconds = config.sixteenth_seconds
     bar_count = (step_count + 15) // 16
     events: list[PercussionEvent] = []
 
+    previous_section_index = -1
+    cycle_phrase: list[tuple[int, str, float, float, float]] | None = None
+    cycle_section_index = -1
     for bar in range(bar_count):
-        bar_hits = list(selected)
-        is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
-        if is_phrase_end and config.break_variation > 0.0:
+        section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
+        target_count = 4 + int(round(float(config.break_density) * 4.0))
+        selected = sorted(
+            sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
+            key=lambda item: item[0],
+        )
+        cycle_start = bar % int(config.break_cycle_bars) == 0
+        section_changed = section.index != cycle_section_index
+
+        # Legacy break variation remains phrase-local. Structural pattern
+        # switching is a separate opt-in and happens only at cycle boundaries.
+        if cycle_phrase is None or (
+            cycle_start and config.pattern_follow_structure and section_changed
+        ):
+            cycle_phrase = list(selected)
+            cycle_section_index = section.index
+            if config.pattern_follow_structure:
+                family_steps = pattern_for_section(
+                    config.pattern_family,
+                    section_index=section.index,
+                    section_name=section.name,
+                    variation=config.composition_variation,
+                    density=float(section.density),
+                    rng=rng,
+                )
+                companion_family = config.pattern_family
+                if companion_family == "interlock_a":
+                    companion_family = "interlock_b"
+                elif companion_family == "interlock_b":
+                    companion_family = "interlock_a"
+                elif companion_family == "broken_funk":
+                    companion_family = "offbeat_cells"
+                elif companion_family == "straight":
+                    companion_family = "clave_displaced"
+                companion_seed = derive_seed(
+                    config.seed,
+                    f"pattern-companion:{section.index}:{companion_family}:{config.pattern_relationship}",
+                )
+                companion_rng = np.random.default_rng(companion_seed)
+                companion_base = pattern_for_section(
+                    companion_family,
+                    section_index=section.index + 1,
+                    section_name=section.name,
+                    variation=config.composition_variation,
+                    density=float(section.density),
+                    rng=companion_rng,
+                )
+                companion_steps, family_steps = relate_patterns(
+                    family_steps, companion_base,
+                    relationship=config.pattern_relationship,
+                    cycle_steps=16,
+                )
+                if len(family_steps) >= 2:
+                    anchors = [item for item in cycle_phrase if item[0] in {0, 4, 8, 12}]
+                    ornaments = [item for item in cycle_phrase if item[0] not in {0, 4, 8, 12}]
+                    remapped = []
+                    selected_steps = (
+                        companion_steps
+                        if config.pattern_relationship in {"shadow", "call_response", "counter_accent"}
+                        else family_steps
+                    )
+                    for index, item in enumerate(ornaments):
+                        if index >= len(selected_steps):
+                            break
+                        _step, kind, priority, velocity, pan = item
+                        remapped.append((selected_steps[index], kind, priority, velocity, pan))
+                    cycle_phrase = sorted(anchors + remapped, key=lambda item: item[0])
+        previous_section_index = section.index
+
+        is_cycle_end = (bar + 1) % int(config.break_cycle_bars) == 0
+        # Mutate only the closing bar of a cycle; do not carry this one-off
+        # edit forward into the next cycle. The base phrase repeats by design.
+        render_hits = list(cycle_phrase or selected)
+        if is_cycle_end and config.break_variation > 0.0:
             anchor_steps = {
                 step for step, _kind, priority, _velocity, _pan in template
                 if priority >= 0.88
             }
-            bar_hits = _mutate_break_bar(
-                bar_hits, rng, float(config.break_variation), anchor_steps
+            render_hits = _mutate_break_bar(
+                render_hits, rng, float(config.break_variation), anchor_steps
             )
 
-        for step_in_bar, kind, _priority, base_velocity, pan in bar_hits:
+        for step_in_bar, kind, _priority, base_velocity, pan in render_hits:
             absolute_step = bar * 16 + step_in_bar
             time_seconds = absolute_step * step_seconds
             if absolute_step >= step_count or time_seconds >= config.duration:
                 continue
-            velocity = float(base_velocity)
-            if is_phrase_end and config.break_variation > 0.0:
-                spread = 0.10 * float(config.break_variation)
-                velocity *= float(rng.uniform(1.0 - spread, 1.0 + spread))
             events.append(PercussionEvent(
                 "break",
                 absolute_step,
                 time_seconds,
-                float(np.clip(velocity, 0.12, 1.0)),
+                float(np.clip(base_velocity, 0.12, 1.0)),
                 float(pan),
                 kind,
                 style,
@@ -195,6 +273,7 @@ def _build_break_events(
 def build_percussion_events(
         config: GenerationConfig,
         rngs: dict[str, np.random.Generator],
+        composition_plan: CompositionPlan | None = None,
 ) -> dict[str, list[PercussionEvent]]:
     """Build four related percussion lanes with independent control streams."""
     step_seconds = config.sixteenth_seconds
@@ -258,5 +337,5 @@ def build_percussion_events(
                 PercussionEvent("hat", step, step * step_seconds, velocity, pan, "metal_noise")
             )
 
-    lane_events["break"] = _build_break_events(config, break_rng, step_count)
+    lane_events["break"] = _build_break_events(config, break_rng, step_count, composition_plan)
     return lane_events

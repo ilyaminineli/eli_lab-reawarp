@@ -8,20 +8,26 @@ from pathlib import Path
 from reawarp import GenerationConfig, ReawarpEngine
 from reawarp.generators.percussion import BREAK_STYLE_NAMES
 from reawarp.synthesis.profiles import (
-    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES
+    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES
 )
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="reawarp",
-        description="Generate deterministic mathematical IDM loops and stems.",
+        description="Generate deterministic, structure-aware IDM compositions and stems.",
     )
     parser.add_argument("--bpm", type=float, default=137.0, help="tempo in BPM (60–220)")
-    parser.add_argument("--duration", type=float, default=24.0, help="duration in seconds (5–45)")
-    parser.add_argument("--structure", choices=("evolving", "additive", "subtractive", "episodic", "drift"),
+    parser.add_argument("--duration", type=float, default=24.0, help="duration in seconds (5–180)")
+    parser.add_argument("--structure", choices=("evolving", "additive", "subtractive", "episodic", "drift", "classical_arc", "sonata_mutation", "free_jazz", "free_jazz_episodic", "autechre_like", "minimal_variation", "hybrid"),
                         default="evolving", help="formal composition trajectory")
+    parser.add_argument("--flow", choices=("preset", "mix", "mutate"), default="preset", help="keep the preset, cross-mix its sections, or mutate its middle flow")
+    parser.add_argument("--pattern-family", choices=tuple(PATTERN_FAMILIES), default="broken_funk", help="structure-aware rhythmic family")
+    parser.add_argument("--pattern-relationship", choices=PATTERN_RELATIONSHIPS, default="interlock", help="relationship between pattern voices")
+    parser.add_argument("--pattern-follow-structure", action="store_true", help="automatically switch pattern families at formal section boundaries")
+    parser.add_argument("--synth-palette", choices=SYNTH_PALETTES, default="hybrid", help="lead synthesis architecture palette")
     parser.add_argument("--energy", type=float, default=0.62, help="composition energy target, not output gain (0–1)")
     parser.add_argument("--variation", type=float, default=0.45, help="bounded formal variation (0–1)")
     parser.add_argument("--seed", default="20261123", help="integer or text seed")
@@ -104,6 +110,11 @@ def main() -> None:
         bpm=args.bpm,
         duration=args.duration,
         structure=args.structure,
+        composition_flow=args.flow,
+        pattern_family=args.pattern_family,
+        pattern_relationship=args.pattern_relationship,
+        pattern_follow_structure=args.pattern_follow_structure,
+        synth_palette=args.synth_palette,
         composition_energy=args.energy,
         composition_variation=args.variation,
         sample_rate=args.sample_rate,

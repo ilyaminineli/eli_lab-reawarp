@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
@@ -127,8 +128,8 @@ class MainWindow(QMainWindow):
         self.bpm.setValue(137)
         form.addRow("Tempo / BPM", self.bpm)
         self.duration = QDoubleSpinBox()
-        self.duration.setRange(5, 45)
-        self.duration.setToolTip("Offline composition duration, up to 45 seconds.")
+        self.duration.setRange(5, 180)
+        self.duration.setToolTip("Offline composition duration, up to 180 seconds (3 minutes).")
         self.duration.setDecimals(1)
         self.duration.setSingleStep(0.5)
         self.duration.setValue(24)
@@ -137,6 +138,27 @@ class MainWindow(QMainWindow):
         self.structure.addItems(list(STRUCTURES))
         self.structure.setCurrentText("evolving")
         form.addRow("Formal trajectory", self.structure)
+        self.composition_flow = QComboBox()
+        self.composition_flow.addItems(["preset", "mix", "mutate"])
+        self.composition_flow.setToolTip(
+            "Preset keeps the selected form; mix borrows movements from another form; mutate reorders inner movements."
+        )
+        form.addRow("Structure flow", self.composition_flow)
+        self.pattern_family = QComboBox()
+        self.pattern_family.addItems(list(PATTERN_FAMILIES))
+        self.pattern_family.setCurrentText("broken_funk")
+        form.addRow("Pattern family", self.pattern_family)
+        self.pattern_relationship = QComboBox()
+        self.pattern_relationship.addItems(list(PATTERN_RELATIONSHIPS))
+        self.pattern_relationship.setCurrentText("interlock")
+        form.addRow("Pattern relationship", self.pattern_relationship)
+        self.pattern_follow_structure = QCheckBox("Auto-switch patterns at formal sections")
+        self.pattern_follow_structure.setChecked(False)
+        self.pattern_follow_structure.setToolTip(
+            "When enabled, change the break pattern family at formal section boundaries. "
+            "Off preserves the existing break phrase grammar."
+        )
+        form.addRow("Pattern development", self.pattern_follow_structure)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
@@ -217,6 +239,12 @@ class MainWindow(QMainWindow):
         self.melody_profile = QComboBox()
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
+        self.synth_palette = QComboBox()
+        self.synth_palette.addItems(["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"])
+        self.synth_palette.setToolTip(
+            "Select the lead synthesis family. Experimental families retain the NumPy reference renderer."
+        )
+        profile_form.addRow("Lead synthesis", self.synth_palette)
         voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
@@ -562,6 +590,11 @@ class MainWindow(QMainWindow):
             bpm=self.bpm.value(),
             duration=self.duration.value(),
             structure=self.structure.currentText(),
+            composition_flow=self.composition_flow.currentText(),
+            pattern_family=self.pattern_family.currentText(),
+            pattern_relationship=self.pattern_relationship.currentText(),
+            pattern_follow_structure=self.pattern_follow_structure.isChecked(),
+            synth_palette=self.synth_palette.currentText(),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
