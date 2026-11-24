@@ -101,6 +101,77 @@ jobs:
           print('Beat automation OK · deterministic smooth/linear/hold lanes')
           PY
           reawarp-routing /tmp/reawarp-ci --routing /tmp/reawarp-routing.json --automation /tmp/reawarp-automation.json --validate
+      - name: Check role-aware signal flow with a deterministic FX stand-in
+        run: |
+          python - <<'PY'
+          import numpy as np
+          import reawarp.fx_routing as fx
+          from reawarp.fx_routing import default_fx_routing, render_fx_routing, render_master_with_returns
+          sample_rate = 1000
+          frames = 4000
+          time = np.arange(frames, dtype=np.float32) / sample_rate
+          dry = {
+              'kick': np.zeros((frames, 2), dtype=np.float32),
+              'snare': np.zeros((frames, 2), dtype=np.float32),
+              'melody': np.column_stack((0.06 * np.sin(2 * np.pi * 110 * time),) * 2).astype(np.float32),
+              'ambience': np.column_stack((0.02 * np.sin(2 * np.pi * 55 * time),) * 2).astype(np.float32),
+          }
+          dry['kick'][::400] = 0.18
+          dry['snare'][100::400] = 0.08
+          original = {name: audio.copy() for name, audio in dry.items()}
+          routing = default_fx_routing(tuple(dry))
+          routing['stems']['melody']['insert'] = {
+              'kind': 'preset', 'preset': 'restrained_space', 'wet': 0.18, 'tail_seconds': 0.10
+          }
+          routing['stems']['melody']['sends'] = {'space': 0.08, 'echo': 0.03}
+          routing['stems']['ambience']['sends'] = {'space': 0.12, 'echo': 0.0}
+          routing['buses']['space'].update({'wet': 0.15, 'tail_seconds': 0.20})
+          routing['buses']['echo'].update({'wet': 0.10, 'tail_seconds': 0.10, 'delay_sync': '1/8'})
+          automation = {
+              'schema_version': 1,
+              'lanes': {
+                  'stem.melody.send.space': [
+                      {'beat': 0, 'value': 0.04, 'curve': 'smooth'},
+                      {'beat': 8, 'value': 0.08, 'curve': 'hold'},
+                  ],
+                  'bus.space.wet': [
+                      {'beat': 0, 'value': 0.10, 'curve': 'linear'},
+                      {'beat': 8, 'value': 0.15, 'curve': 'hold'},
+                  ],
+              },
+          }
+          captured = {}
+          def deterministic_fx(audio, sr, *, preset=None, stages=None, wet=1.0, tail_seconds=0.0):
+              source = np.asarray(audio, dtype=np.float32)
+              if source.ndim == 1:
+                  source = source[:, None]
+              for stage in stages or ():
+                  if stage.get('type') == 'delay':
+                      captured['delay_seconds'] = float(stage['delay_seconds'])
+              tail = int(round(tail_seconds * sr))
+              result = np.zeros((len(source) + tail, source.shape[1]), dtype=np.float32)
+              result[:len(source)] = source * 0.72
+              if tail and len(source):
+                  decay = np.linspace(0.10, 0.0, tail, dtype=np.float32)[:, None]
+                  result[len(source):] = source[-1:] * decay
+              return result
+          fx.render_pyo_fx = deterministic_fx
+          processed, metadata = render_fx_routing(
+              dry, sample_rate, routing, bpm=120, automation=automation
+          )
+          returns = metadata.pop('bus_returns_audio')
+          assert all(audio.shape == (frames, 2) for audio in processed.values())
+          assert all(np.array_equal(dry[name], original[name]) for name in dry)
+          assert set(returns) == {'space', 'echo'}
+          assert metadata['active_send_stems_by_bus']['space'] == ['melody', 'ambience']
+          assert abs(captured['delay_seconds'] - 0.25) < 1e-9
+          direct = sum(float(np.sqrt(np.mean(audio ** 2))) for audio in processed.values())
+          returned = sum(float(np.sqrt(np.mean(audio ** 2))) for audio in returns.values())
+          assert 0.0 < returned < direct
+          master = render_master_with_returns(processed, returns)
+          assert len(master) > frames
+          print(f'Role routing OK · return/direct RMS sum ratio {returned / direct:.3f} · 1/8 at 120 BPM = 0.25 s')
+          PY
       - name: Smoke-test local library CLI
         run: |
           reawarp-library --db /tmp/reawarp-library.sqlite3 index samples/13_cymbal1_606.wav
