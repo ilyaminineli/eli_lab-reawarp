@@ -218,3 +218,18 @@ def test_extended_synthesis_palettes_are_finite_deterministic_and_distinct(palet
     assert np.all(np.isfinite(first))
     assert np.max(np.abs(first)) <= 1.0
     assert np.max(np.abs(first)) > .001
+
+
+def test_new_pattern_families_preserve_grid_and_are_reproducible():
+    families = ("asymmetric_5", "asymmetric_7", "interlock_a", "interlock_b",
+                "ghost_break", "rotating_cycle", "ratchet", "broken_regularity")
+    for family in families:
+        config = GenerationConfig(
+            bpm=128, duration=8.0, sample_rate=22_050, seed=991,
+            pattern_family=family, pattern_relationship="shadow",
+        )
+        first = _break_events(config)
+        second = _break_events(config)
+        assert [event.to_dict() for event in first] == [event.to_dict() for event in second]
+        assert all(event.step % 1 == 0 for event in first)
+        assert all(0 <= event.time < config.duration for event in first)
