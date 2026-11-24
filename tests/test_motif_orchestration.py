@@ -224,7 +224,7 @@ def test_density_thins_non_anchors_and_syncopation_moves_eligible_hits():
     low_plan = build_section_orchestration_plan(composition, phrases, base)
     dense_config = replace(base, arrangement_density=1.0)
     dense_plan = build_section_orchestration_plan(composition, phrases, dense_config)
-    sync_config = replace(base, rhythmic_syncopation=1.0)
+    sync_config = replace(dense_config, rhythmic_syncopation=1.0)
     sync_plan = build_section_orchestration_plan(composition, phrases, sync_config)
 
     source_events = [
