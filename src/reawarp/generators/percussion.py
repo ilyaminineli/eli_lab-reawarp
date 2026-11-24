@@ -535,6 +535,7 @@ def build_percussion_events(
         config: GenerationConfig,
         rngs: dict[str, np.random.Generator],
         composition_plan: CompositionPlan | None = None,
+        drum_plan: tuple[DrumSectionPlan, ...] | None = None,
 ) -> dict[str, list[PercussionEvent]]:
     """Build related percussion lanes, optionally evolving them by formal section."""
     if composition_plan is None:
@@ -550,9 +551,9 @@ def build_percussion_events(
             pattern_relationship=config.pattern_relationship,
         )
     if config.pattern_follow_structure:
-        drum_plan = build_drum_part_plan(config, composition_plan)
+        selected_plan = drum_plan or build_drum_part_plan(config, composition_plan)
         lane_events = _build_section_aware_drum_events(
-            config, composition_plan, rngs, drum_plan
+            config, composition_plan, rngs, selected_plan
         )
     else:
         # Preserve the original sparse, slowly rotating generator as a manual
