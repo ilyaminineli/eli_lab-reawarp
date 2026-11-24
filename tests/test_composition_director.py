@@ -100,3 +100,15 @@ def test_motif_transformations_are_deterministic_and_bounded(transform):
     second = evolve_phrase(events, rng=np.random.default_rng(4), **kwargs)
     assert first == second
     assert all(event.step >= 0 for event in first)
+
+
+
+def test_composition_plan_persists_pattern_family_and_relationship():
+    plan = build_composition_plan(
+        duration_seconds=90, bpm=129, seed=220,
+        structure="autechre_like", pattern_family="asymmetric_7",
+        pattern_relationship="shadow",
+    )
+    data = plan.to_dict()
+    assert data["pattern_family"] == "asymmetric_7"
+    assert data["pattern_relationship"] == "shadow"
