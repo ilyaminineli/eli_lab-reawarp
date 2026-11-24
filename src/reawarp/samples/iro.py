@@ -253,7 +253,7 @@ def load_sound_lab_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
 
 
 def load_entity_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
-    """Read the eight mathematical entity families and their six variants."""
+    """Read eight IRO mathematical entity families and their six variants."""
     entity_root = IRO_ROOT / "entities"
     records: list[IROAsset] = []
     if not entity_root.is_dir():
@@ -266,17 +266,26 @@ def load_entity_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
             continue
         family = manifest.get("family", {})
         family_name = str(family.get("name", family_dir.name))
+        # The current IRO family.json schema stores family fields at root.
+        if not family:
+            family = manifest.get("family", manifest)
+            family_name = str(family.get("name", family_dir.name))
         for item in manifest.get("entities", []):
-            relative = str(item.get("file", ""))
+            relative = str(item.get("file", item.get("path", "")))
+            if not relative:
+                continue
+            # Entity family paths are rooted at samples/Iro, not inside the
+            # family directory, as specified by the family manifest.
             asset = _asset(
                 pack_root=IRO_ROOT,
                 relative_path=relative,
                 role="math_entity",
-                family=family_name,
+                family=str(item.get("family", family_name)),
                 pack="entities",
                 articulation=str(item.get("variation", "")),
                 expected_sha256=str(item.get("sha256", "")),
                 sample_rate=item.get("sample_rate"),
+                channels=item.get("channels"),
                 duration_seconds=item.get("duration_seconds"),
                 source_feature_index=item.get("source_feature_index"),
                 seed=item.get("seed"),
@@ -284,14 +293,14 @@ def load_entity_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
                     **dict(item),
                     "sonic_identity": family.get("sonic_identity", ""),
                     "synthesis_approach": family.get("synthesis_approach", ""),
-                    "equation": family.get("equation", ""),
+                    "equation": item.get("equation", family.get("equation", "")),
+                    "description": item.get("description", ""),
                 },
             )
-            if verify_hashes and asset.sha256 and _sha256(asset.path) != asset.sha256:
+            if verify_hashes and asset.available and asset.sha256 and _sha256(asset.path) != asset.sha256:
                 raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
             records.append(asset)
     return records
-
 
 def load_iro_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Collect every supported IRO asset pack; preserve pack/family identity."""
