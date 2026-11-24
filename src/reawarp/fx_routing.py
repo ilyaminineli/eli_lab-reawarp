@@ -253,7 +253,11 @@ def render_fx_routing(
         insert = record["insert"]
         insert_target = f"stem.{name}.insert_wet"
         insert_points = lanes["lanes"].get(insert_target)
-        if insert["kind"] == "bypass":
+        insert_can_open = (
+            float(insert["wet"]) > 0.0
+            or any(float(point["value"]) > 0.0 for point in (insert_points or ()))
+        )
+        if insert["kind"] == "bypass" or not insert_can_open:
             processed_full = dry.copy()
             insert_level = np.zeros(frames, dtype=np.float32)
         else:
