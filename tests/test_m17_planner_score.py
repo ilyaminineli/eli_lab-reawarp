@@ -26,7 +26,7 @@ def _generated():
         duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
         structure=config.structure, energy=config.composition_energy,
         variation=config.composition_variation, flow=config.composition_flow,
-        pattern_family=config.pattern_family, relationship=config.pattern_relationship,
+        pattern_family=config.pattern_family, pattern_relationship=config.pattern_relationship,
     )
     streams = RandomStreams(config.seed)
     drum_rngs = {
