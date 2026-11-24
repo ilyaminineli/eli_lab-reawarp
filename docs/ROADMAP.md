@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-24  
-**Current implementation baseline:** M15 composition director implementation in progress on `main`; M14 portable regression suite and Windows CI passed; target-machine profiling and listening remain pending  
+**Current implementation baseline:** M15 motif/orchestration implementation and cross-platform regression coverage landed on `main`; subjective listening validation remains pending; M14 target-machine profiling/listening also remains pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -60,7 +60,7 @@ No new synthesis palette, arbitrary routing graph, convolution engine or GPU por
 
 ## M15: Composition Director 2.0 — motifs, roles and transitions
 
-**Status:** Implementation in progress on `main`.
+**Status:** Implementation landed on `main`; 66 regression tests pass on Linux Python 3.10–3.12 and Windows Python 3.11. Subjective listening validation remains pending.
 
 **Goal:** Make long-form arrangements feel composed rather than like a sequence of section-level parameter states.
 
