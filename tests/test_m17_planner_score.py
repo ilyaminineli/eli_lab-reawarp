@@ -1,6 +1,7 @@
 from fractions import Fraction
 
 import numpy as np
+import pytest
 
 from reawarp.config import GenerationConfig
 from reawarp.core.random_streams import RandomStreams
@@ -83,9 +84,9 @@ def test_planner_score_is_deterministic_and_compatibility_view_uses_score_clock(
         assert len(records) == len(matching)
         for record, event in zip(records, matching):
             assert record['step'] == event.onset_beats * 4
-            assert record['time'] == np.testing.assert_allclose(
-                record['time'], float(event.onset_beats) * 60.0 / config.bpm
-            ) if False else record['time']
+            assert record['time'] == pytest.approx(
+                float(event.onset_beats) * 60.0 / config.bpm
+            )
 
 
 def test_score_projection_refuses_non_grid_events():
