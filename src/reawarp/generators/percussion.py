@@ -167,103 +167,102 @@ def _build_break_events(
     events: list[PercussionEvent] = []
 
     previous_section_index = -1
+    cycle_phrase: list[tuple[int, str, float, float, float]] | None = None
+    cycle_section_index = -1
     for bar in range(bar_count):
         section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
-        # Preserve the established density and phrase-cycle semantics exactly.
-        # The base grammar is always the existing BREAK_PATTERNS template.
         target_count = 4 + int(round(float(config.break_density) * 4.0))
         selected = sorted(
             sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
             key=lambda item: item[0],
         )
-        bar_hits = list(selected)
-
-        # Pattern-family remapping follows the existing break-variation control.
-        # A zero value guarantees the original phrase and density semantics.
-        if config.break_variation > 0.0 and (bar == 0 or section.index != previous_section_index):
-            family_steps = pattern_for_section(
-                config.pattern_family,
-                section_index=section.index,
-                section_name=section.name,
-                variation=config.break_variation,
-                density=float(section.density),
-                rng=rng,
-            )
-            companion_family = config.pattern_family
-            if companion_family == "interlock_a":
-                companion_family = "interlock_b"
-            elif companion_family == "interlock_b":
-                companion_family = "interlock_a"
-            elif companion_family == "broken_funk":
-                companion_family = "offbeat_cells"
-            elif companion_family == "straight":
-                companion_family = "clave_displaced"
-            # A companion phrase is keyed by the formal section rather than
-            # the current bar, so it remains identical across repeated cycles
-            # inside that section and changes only when the composition moves on.
-            companion_seed = derive_seed(
-                config.seed,
-                f"pattern-companion:{section.index}:{companion_family}:{config.pattern_relationship}",
-            )
-            companion_rng = np.random.default_rng(companion_seed)
-            companion_base = pattern_for_section(
-                companion_family,
-                section_index=section.index + 1,
-                section_name=section.name,
-                variation=config.break_variation,
-                density=float(section.density),
-                rng=companion_rng,
-            )
-            companion_steps, family_steps = relate_patterns(
-                family_steps, companion_base,
-                relationship=config.pattern_relationship,
-                cycle_steps=16,
-            )
-            if len(family_steps) >= 2:
-                anchors = [item for item in bar_hits if item[0] in {0, 4, 8, 12}]
-                ornaments = [item for item in bar_hits if item[0] not in {0, 4, 8, 12}]
-                remapped = []
-                selected_steps = (
-                    companion_steps
-                    if config.pattern_relationship in {"shadow", "call_response", "counter_accent"}
-                    else family_steps
+        section_changed = section.index != previous_section_index
+        if cycle_phrase is None or (
+            config.break_variation > 0.0 and section_changed
+        ):
+            cycle_phrase = list(selected)
+            cycle_section_index = section.index
+            if config.break_variation > 0.0:
+                family_steps = pattern_for_section(
+                    config.pattern_family,
+                    section_index=section.index,
+                    section_name=section.name,
+                    variation=config.break_variation,
+                    density=float(section.density),
+                    rng=rng,
                 )
-                for index, item in enumerate(ornaments):
-                    if index >= len(selected_steps):
-                        break
-                    _step, kind, priority, velocity, pan = item
-                    remapped.append((selected_steps[index], kind, priority, velocity, pan))
-                bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
+                companion_family = config.pattern_family
+                if companion_family == "interlock_a":
+                    companion_family = "interlock_b"
+                elif companion_family == "interlock_b":
+                    companion_family = "interlock_a"
+                elif companion_family == "broken_funk":
+                    companion_family = "offbeat_cells"
+                elif companion_family == "straight":
+                    companion_family = "clave_displaced"
+                companion_seed = derive_seed(
+                    config.seed,
+                    f"pattern-companion:{section.index}:{companion_family}:{config.pattern_relationship}",
+                )
+                companion_rng = np.random.default_rng(companion_seed)
+                companion_base = pattern_for_section(
+                    companion_family,
+                    section_index=section.index + 1,
+                    section_name=section.name,
+                    variation=config.break_variation,
+                    density=float(section.density),
+                    rng=companion_rng,
+                )
+                companion_steps, family_steps = relate_patterns(
+                    family_steps, companion_base,
+                    relationship=config.pattern_relationship,
+                    cycle_steps=16,
+                )
+                if len(family_steps) >= 2:
+                    anchors = [item for item in cycle_phrase if item[0] in {0, 4, 8, 12}]
+                    ornaments = [item for item in cycle_phrase if item[0] not in {0, 4, 8, 12}]
+                    remapped = []
+                    selected_steps = (
+                        companion_steps
+                        if config.pattern_relationship in {"shadow", "call_response", "counter_accent"}
+                        else family_steps
+                    )
+                    for index, item in enumerate(ornaments):
+                        if index >= len(selected_steps):
+                            break
+                        _step, kind, priority, velocity, pan = item
+                        remapped.append((selected_steps[index], kind, priority, velocity, pan))
+                    cycle_phrase = sorted(anchors + remapped, key=lambda item: item[0])
         previous_section_index = section.index
 
-        is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
-        if is_phrase_end and config.break_variation > 0.0:
+        is_cycle_end = (bar + 1) % int(config.break_cycle_bars) == 0
+        cycle_hits = list(cycle_phrase or selected)
+        if is_cycle_end and config.break_variation > 0.0:
             anchor_steps = {
                 step for step, _kind, priority, _velocity, _pan in template
                 if priority >= 0.88
             }
-            bar_hits = _mutate_break_bar(
-                bar_hits, rng, float(config.break_variation), anchor_steps
+            cycle_hits = _mutate_break_bar(
+                cycle_hits, rng, float(config.break_variation), anchor_steps
             )
+            # The mutated phrase becomes the next cycle's stable base.
+            cycle_phrase = list(cycle_hits)
 
-        for step_in_bar, kind, _priority, base_velocity, pan in bar_hits:
+        # Keep the phrase identical across bars in this cycle. The final bar
+        # introduces the cached mutation only after its last events are emitted.
+        render_hits = list(cycle_phrase or selected)
+        if is_cycle_end and config.break_variation > 0.0:
+            render_hits = list(cycle_hits)
+        for step_in_bar, kind, _priority, base_velocity, pan in render_hits:
             absolute_step = bar * 16 + step_in_bar
             time_seconds = absolute_step * step_seconds
             if absolute_step >= step_count or time_seconds >= config.duration:
                 continue
-            velocity = float(base_velocity)
-            if (
-                is_phrase_end
-                and config.break_variation > 0.0
-                and not ((bar + 1) % int(config.break_cycle_bars) == 0)
-            ):
-                spread = 0.10 * float(config.break_variation)
-                velocity *= float(rng.uniform(1.0 - spread, 1.0 + spread))
             events.append(PercussionEvent(
                 "break",
                 absolute_step,
                 time_seconds,
-                float(np.clip(velocity, 0.12, 1.0)),
+                float(np.clip(base_velocity, 0.12, 1.0)),
                 float(pan),
                 kind,
                 style,
