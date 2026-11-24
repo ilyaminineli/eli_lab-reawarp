@@ -270,7 +270,7 @@ class ReawarpEngine:
         )
         synthetic_percussion = config.percussion_synthesis in {"minimal", "extended"}
         for event in percussion["kick"]:
-            if not section_for_time(composition_plan, event.time).kick:
+            if event.velocity <= 1e-7 or not section_for_time(composition_plan, event.time).kick:
                 continue
             profile = kick_profile
             if synthetic_percussion:
@@ -294,6 +294,8 @@ class ReawarpEngine:
             auto_choices=AUTO_SNARE_PROFILES,
         )
         for event in percussion["snare"]:
+            if event.velocity <= 1e-7:
+                continue
             section = section_for_time(composition_plan, event.time)
             if section.density < 0.14 and event.velocity < 0.70:
                 continue
@@ -319,6 +321,8 @@ class ReawarpEngine:
             auto_choices=AUTO_HAT_PROFILES,
         )
         for event in percussion["hat"]:
+            if event.velocity <= 1e-7:
+                continue
             section = section_for_time(composition_plan, event.time)
             if streams.get("section_ornaments").random() > section.percussion_density_scale:
                 continue
@@ -355,6 +359,8 @@ class ReawarpEngine:
             ),
         }
         for event in percussion["break"]:
+            if event.velocity <= 1e-7:
+                continue
             section = section_for_time(composition_plan, event.time)
             if event.kind == "kick" and not section.kick:
                 continue
