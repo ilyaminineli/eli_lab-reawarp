@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
     QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
     QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QSystemTrayIcon, QTabWidget, QVBoxLayout, QWidget,
+    QSystemTrayIcon, QStackedWidget, QSplitter, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
@@ -34,6 +34,7 @@ from reawarp.ui.pages.fx_lab import FxLabPage
 from reawarp.ui.pages.fx_automation import FXAutomationEditor
 from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.library import LibraryPage
+from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
@@ -86,33 +87,124 @@ class MainWindow(QMainWindow):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        header = QFrame()
-        header.setObjectName("header")
-        header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(20, 10, 20, 10)
+        app_header = QFrame()
+        app_header.setObjectName("header")
+        app_header_layout = QHBoxLayout(app_header)
+        app_header_layout.setContentsMargins(20, 9, 20, 9)
         brand = QLabel("再変形")
         brand.setObjectName("brand")
-        header_layout.addWidget(brand)
+        app_header_layout.addWidget(brand)
         subtitle = QLabel("REAWARP  /  MATHEMATICAL AUDIO LAB")
         subtitle.setObjectName("muted")
-        header_layout.addWidget(subtitle)
-        header_layout.addStretch(1)
+        app_header_layout.addWidget(subtitle)
+        app_header_layout.addStretch(1)
         self.header_state = QLabel("OFFLINE RENDER ENGINE")
         self.header_state.setObjectName("sectionTitle")
-        header_layout.addWidget(self.header_state)
-        root_layout.addWidget(header)
+        app_header_layout.addWidget(self.header_state)
+        root_layout.addWidget(app_header)
 
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_generator_page(), "GENERATOR")
-        self.tabs.addTab(self._build_break_page(), "BREAK LAB")
-        self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
+        # One shared transport serves the current composition in the workspaces
+        # where project audition is the primary task. FX Lab keeps its own A/B
+        # source/result controls while using the same underlying audio player.
+        self.transport_bar = self._build_transport_bar()
+        root_layout.addWidget(self.transport_bar)
+
+        generator_page = self._build_generator_page()
+        break_page = self._build_break_page()
+        mixer_page = self._build_mixer_page()
         self.fx_lab_page = FxLabPage(self.player, self)
-        self.tabs.addTab(self.fx_lab_page, "FX LAB")
         self.library_page = LibraryPage(self)
-        self.tabs.addTab(self.library_page, "LIBRARY")
-        root_layout.addWidget(self.tabs, 1)
+
+        self.workspace_stack = QStackedWidget()
+        # Keep the historical attribute as a small compatibility bridge for
+        # code/tests that query the number of workspace pages.
+        self.tabs = self.workspace_stack
+        for workspace in (
+            generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page
+        ):
+            self.workspace_stack.addWidget(workspace)
+
+        self._workspace_info = [
+            ("GENERATOR", "Define form, rhythm, synthesis and source material."),
+            ("BREAK LAB", "Analyse, transform and reuse break material in the composition."),
+            ("STEM MIXER", "Shape the relationships between generated musical roles."),
+            ("FX LAB", "Build reusable non-destructive processing chains and compare results."),
+            ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
+        ]
+        self.navigator = WorkspaceNavigator(
+            [
+                ("COMPOSE", [
+                    ("Generator", "Create the composition plan and its coordinated sound sources.", 0),
+                    ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
+                ]),
+                ("PRODUCE", [
+                    ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
+                    ("FX Lab", "Design and audition reusable offline effect chains.", 3),
+                ]),
+                ("ASSETS", [
+                    ("Library", "Browse and organise reusable samples, stems and variations.", 4),
+                ]),
+            ]
+        )
+        self.navigator.workspaceSelected.connect(self._set_workspace)
+
+        workspace_header = QFrame()
+        workspace_header.setObjectName("workspaceHeader")
+        header_layout = QVBoxLayout(workspace_header)
+        header_layout.setContentsMargins(18, 9, 18, 8)
+        title_row = QHBoxLayout()
+        self.workspace_title = QLabel()
+        self.workspace_title.setObjectName("workspaceTitle")
+        title_row.addWidget(self.workspace_title)
+        title_row.addStretch(1)
+        self.project_context = QLabel()
+        self.project_context.setObjectName("projectContext")
+        self.project_context.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        title_row.addWidget(self.project_context)
+        header_layout.addLayout(title_row)
+        self.workspace_description = QLabel()
+        self.workspace_description.setObjectName("muted")
+        self.workspace_description.setWordWrap(True)
+        header_layout.addWidget(self.workspace_description)
+        root_layout.addWidget(workspace_header)
+
+        body = QWidget()
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(12, 10, 12, 12)
+        body_layout.setSpacing(12)
+        body_layout.addWidget(self.navigator)
+        body_layout.addWidget(self.workspace_stack, 1)
+        root_layout.addWidget(body, 1)
+
         self.setCentralWidget(root)
-        self.statusBar().showMessage("Ready — define constraints, generate, listen, and select.")
+        self._update_project_context()
+        self._set_workspace(0)
+        self.statusBar().showMessage(
+            "Ready — one project, connected workspaces, deterministic offline rendering."
+        )
+
+    def _set_workspace(self, index: int) -> None:
+        if not 0 <= int(index) < self.workspace_stack.count():
+            return
+        index = int(index)
+        self.workspace_stack.setCurrentIndex(index)
+        self.navigator.select_workspace(index)
+        title, description = self._workspace_info[index]
+        self.workspace_title.setText(title)
+        self.workspace_description.setText(description)
+        self.transport_bar.setVisible(index in (0, 2))
+
+    def _update_project_context(self) -> None:
+        if self.project is None:
+            self.project_context.setText(
+                "NO COMPOSITION  ·  Generate a project to connect the production workspaces."
+            )
+            return
+        self.project_context.setText(
+            f"PROJECT READY  ·  {self.project.duration:.1f} s  ·  "
+            f"{len(self.project.stems)} STEMS  ·  {self.project.sample_rate:,} Hz  ·  "
+            f"SEED {self.project.config.seed}"
+        )
 
     def _build_generator_page(self) -> QWidget:
         page = QWidget()
@@ -121,8 +213,8 @@ class MainWindow(QMainWindow):
         layout.setSpacing(14)
 
         panel = QWidget()
-        panel.setMinimumWidth(320)
-        panel.setMaximumWidth(410)
+        panel.setMinimumWidth(0)
+        panel.setMaximumWidth(450)
         panel_layout = QVBoxLayout(panel)
         control_tabs = QTabWidget()
         form_page, voices_page, rhythm_page = QWidget(), QWidget(), QWidget()
@@ -326,13 +418,13 @@ class MainWindow(QMainWindow):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(285)
         scroll.setWidget(panel)
-        layout.addWidget(scroll)
 
         right = QWidget()
         right_layout = QVBoxLayout(right)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(self._build_transport_bar())
         self.preview = AudioPreview()
         right_layout.addWidget(self.preview, 1)
         self.render_summary = QLabel(
@@ -342,7 +434,13 @@ class MainWindow(QMainWindow):
         self.render_summary.setObjectName("muted")
         self.render_summary.setWordWrap(True)
         right_layout.addWidget(self.render_summary)
-        layout.addWidget(right, 1)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(scroll)
+        splitter.addWidget(right)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([370, 900])
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_tray_icon(self) -> None:
@@ -407,6 +505,7 @@ class MainWindow(QMainWindow):
 
     def _build_transport_bar(self) -> QWidget:
         bar = QFrame()
+        bar.setObjectName("transportBar")
         bar.setStyleSheet(
             "QFrame { background: #101010; border: 1px solid #303030; border-radius: 1px; }"
         )
@@ -417,6 +516,7 @@ class MainWindow(QMainWindow):
         self.preview_source.addItem("MASTER MIX", "master")
         self.preview_source.currentIndexChanged.connect(self._refresh_preview)
         self.preview_source.setMinimumWidth(175)
+        self.preview_source.setEnabled(False)
         layout.addWidget(self.preview_source)
         layout.addWidget(QLabel("OUTPUT"))
         self.output_device = QComboBox()
@@ -424,11 +524,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.output_device)
         self.play_button = QPushButton("PLAY")
         self.play_button.clicked.connect(self._toggle_playback)
+        self.play_button.setEnabled(False)
         layout.addWidget(self.play_button)
-        stop = QPushButton("STOP")
-        stop.clicked.connect(self.player.stop)
-        stop.clicked.connect(self._playback_stopped)
-        layout.addWidget(stop)
+        self.stop_button = QPushButton("STOP")
+        self.stop_button.clicked.connect(self.player.stop)
+        self.stop_button.clicked.connect(self._playback_stopped)
+        self.stop_button.setEnabled(False)
+        layout.addWidget(self.stop_button)
         self.transport_position = QLabel("00:00.0 / 00:00.0")
         self.transport_position.setObjectName("muted")
         layout.addWidget(self.transport_position)
@@ -439,11 +541,11 @@ class MainWindow(QMainWindow):
         page = QWidget()
         layout = QHBoxLayout(page)
         layout.setContentsMargins(14, 14, 14, 14)
-        layout.setSpacing(14)
+        layout.setSpacing(12)
 
         controls = QWidget()
-        controls.setMinimumWidth(310)
-        controls.setMaximumWidth(380)
+        controls.setMinimumWidth(0)
+        controls.setMaximumWidth(420)
         control_layout = QVBoxLayout(controls)
 
         source = QGroupBox("BREAK SOURCE")
@@ -520,26 +622,37 @@ class MainWindow(QMainWindow):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setMinimumWidth(250)
         scroll.setWidget(controls)
-        layout.addWidget(scroll)
 
         preview_panel = QWidget()
         preview_layout = QVBoxLayout(preview_panel)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
         self.break_preview = AudioPreview()
         preview_layout.addWidget(self.break_preview, 1)
         self.break_analysis_summary = QLabel(
-            "Transient markers appear in amber. Preview is non-destructive; source files are never rewritten."
+            "Load a break, inspect its transients, then reuse the source in your composition. "
+            "All analysis and transformation controls are non-destructive."
         )
         self.break_analysis_summary.setObjectName("muted")
         self.break_analysis_summary.setWordWrap(True)
         preview_layout.addWidget(self.break_analysis_summary)
-        layout.addWidget(preview_panel, 1)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(scroll)
+        splitter.addWidget(preview_panel)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([330, 900])
+        layout.addWidget(splitter, 1)
         return page
 
     def _build_mixer_page(self) -> QWidget:
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(10)
         header = QHBoxLayout()
         title = QLabel("STEM MATRIX")
         title.setObjectName("sectionTitle")
@@ -551,6 +664,36 @@ class MainWindow(QMainWindow):
         header.addWidget(self.export_button)
         layout.addLayout(header)
 
+        self.mixer_stack = QStackedWidget()
+        empty_state = QFrame()
+        empty_state.setObjectName("emptyState")
+        empty_layout = QVBoxLayout(empty_state)
+        empty_layout.setContentsMargins(30, 35, 30, 35)
+        empty_layout.addStretch(1)
+        empty_title = QLabel("A composition belongs here.")
+        empty_title.setObjectName("workspaceTitle")
+        empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_title)
+        empty_copy = QLabel(
+            "The Stem Mixer is connected to the Generator. Create a composition first; "
+            "its dry stems, routing, automation and export controls will appear here."
+        )
+        empty_copy.setObjectName("muted")
+        empty_copy.setWordWrap(True)
+        empty_copy.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_copy)
+        go_generate = QPushButton("OPEN GENERATOR")
+        go_generate.setObjectName("primaryAction")
+        go_generate.setMaximumWidth(220)
+        go_generate.clicked.connect(lambda: self._set_workspace(0))
+        empty_layout.addWidget(go_generate, 0, Qt.AlignmentFlag.AlignHCenter)
+        empty_layout.addStretch(1)
+        self.mixer_stack.addWidget(empty_state)
+
+        mixer_content_page = QWidget()
+        mixer_layout = QVBoxLayout(mixer_content_page)
+        mixer_layout.setContentsMargins(0, 0, 0, 0)
+        mixer_layout.setSpacing(9)
         self.mixer_scroll = QScrollArea()
         self.mixer_scroll.setWidgetResizable(True)
         self.mixer_content = QWidget()
@@ -558,15 +701,15 @@ class MainWindow(QMainWindow):
         self.mixer_rows_layout.setContentsMargins(0, 0, 0, 0)
         self.mixer_rows_layout.setSpacing(6)
         self.mixer_scroll.setWidget(self.mixer_content)
-        layout.addWidget(self.mixer_scroll, 1)
+        mixer_layout.addWidget(self.mixer_scroll, 1)
 
         note = QLabel(
-            "Gain and pan affect audition and the exported master. Stem WAVs remain the original aligned render buffers. "
-            "Regeneration uses independent deterministic streams."
+            "Gain and pan shape the project audition and exported master. Dry stem files remain "
+            "the original aligned render buffers; inserts and shared returns are a separate pass."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
-        layout.addWidget(note)
+        mixer_layout.addWidget(note)
         self.fx_workspace_tabs = QTabWidget()
         self.fx_routing_editor = FXRoutingEditor()
         self.fx_routing_editor.changed.connect(self._refresh_routing)
@@ -574,7 +717,10 @@ class MainWindow(QMainWindow):
         self.fx_automation_editor.changed.connect(self._refresh_routing)
         self.fx_workspace_tabs.addTab(self.fx_routing_editor, "ROUTING")
         self.fx_workspace_tabs.addTab(self.fx_automation_editor, "AUTOMATION")
-        layout.addWidget(self.fx_workspace_tabs)
+        mixer_layout.addWidget(self.fx_workspace_tabs)
+        self.mixer_stack.addWidget(mixer_content_page)
+        self.mixer_stack.setCurrentIndex(0)
+        layout.addWidget(self.mixer_stack, 1)
         return page
 
     def _choose_break_sample(self) -> None:
@@ -712,6 +858,11 @@ class MainWindow(QMainWindow):
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._rebuild_mixer()
+        self.mixer_stack.setCurrentIndex(1)
+        self._update_project_context()
+        self.preview_source.setEnabled(True)
+        self.play_button.setEnabled(True)
+        self.stop_button.setEnabled(True)
         self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate, result.config.bpm)
         self.fx_automation_editor.set_project(list(result.stems), result.config.bpm)
         if previous_routing is not None and previous_names == tuple(result.stems):
@@ -777,7 +928,7 @@ class MainWindow(QMainWindow):
         index = self.preview_source.findData(name)
         if index >= 0:
             self.preview_source.setCurrentIndex(index)
-        self.tabs.setCurrentIndex(0)
+        self._set_workspace(0)
 
     def _routing_signature(self) -> str:
         import hashlib
