@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eli-lab-reawarp"
-version = "0.8.0"
-description = "Deterministic mathematical IDM loop, break transformation, and desktop audio instrument"
+version = "0.9.0"
+description = "Deterministic mathematical IDM composition, break transformation, and offline sound-design instrument"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -19,8 +19,10 @@ analysis = ["librosa>=0.10"]
 midi = ["mido>=1.3"]
 theory = ["music21>=8"]
 soundfont = ["pyfluidsynth>=1.3"]
-synthesis = ["scipy>=1.10", "pedalboard>=0.9"]
-research = ["pippi>=2.0", "librosa>=0.10"]
+synthesis = ["scipy>=1.10"]
+pyo = ["pyo>=1.0", "soundfile>=0.12"]
+research = ["librosa>=0.10"]
+pippi = ["pippi>=2.0.0b16,<2.1.0"]
 ui = ["PySide6>=6.8,<6.12", "pyqtgraph>=0.14,<0.15"]
 m4 = ["PySide6>=6.8,<6.12", "pyqtgraph>=0.14,<0.15", "sounddevice>=0.5.3"]
 dev = ["pytest>=8", "ruff>=0.5"]
@@ -31,6 +33,7 @@ reawarp-gui = "reawarp.ui.__main__:main"
 reawarp-midi-export = "reawarp.cli_midi:export_main"
 reawarp-midi-import = "reawarp.cli_midi:import_main"
 reawarp-library = "reawarp.library.cli:main"
+reawarp-fx = "reawarp.cli_fx:main"
 
 [tool.setuptools.package-data]
 reawarp = ["resources/icons/*.ico"]

@@ -28,6 +28,7 @@ from reawarp.synthesis.profiles import (
 )
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
+from reawarp.ui.pages.fx_lab import FxLabPage
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -98,6 +99,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_generator_page(), "GENERATOR")
         self.tabs.addTab(self._build_break_page(), "BREAK LAB")
         self.tabs.addTab(self._build_mixer_page(), "STEM MIXER")
+        self.fx_lab_page = FxLabPage(self.player, self)
+        self.tabs.addTab(self.fx_lab_page, "FX LAB")
         self.library_page = LibraryPage(self)
         self.tabs.addTab(self.library_page, "LIBRARY")
         root_layout.addWidget(self.tabs, 1)

@@ -24,6 +24,13 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Stem-only regeneration while preserving unrelated stems bit-identically.
 - A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
 
+### Offline sound design (M10)
+- A separate FX Lab loads external mono/stereo audio without changing the source file.
+- Optional Pyo offline processing with ordered high/low/band-pass filtering, saturation, delay, frequency shift, and Freeverb stages.
+- Four role-oriented chains: restrained space, tape echo, metallic machine, and digital fracture.
+- Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
+- The same processing engine is available through the `reawarp-fx` command; Pyo is not required by the base generator.
+
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
 - Automatic frame-accurate slicing with configurable slice limits.
@@ -41,7 +48,7 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - 16-bit and 24-bit PCM WAV export.
 - JSON project metadata and event provenance.
 
-The core requires Python 3.10+ and NumPy. `requirements.txt` is the complete implemented/planned package inventory; planned dependencies are commented out. `pyproject.toml` extras remain the supported optional install groups.
+The core requires Python 3.10+ and NumPy. `requirements.txt` is an expanded environment inventory: every uncommented line is installed, including experimental integrations that may need native runtimes or platform-specific setup. `pyproject.toml` extras remain the curated install groups for supported features.
 
 ## Install
 
@@ -60,6 +67,8 @@ Optional analysis and music integrations:
     python -m pip install -e ".[midi]"       # Mido MIDI import/export
     python -m pip install -e ".[theory]"     # music21 symbolic music theory
     python -m pip install -e ".[soundfont]"  # FluidSynth / SF2 source synthesis
+    python -m pip install -e ".[pyo]"       # Pyo offline FX Lab backend
+    python -m pip install -e ".[pippi]"     # experimental Pippi beta (platform caveat)
 
 Install extras only when the corresponding feature is needed. A full M4/M5 development environment can also include analysis and symbolic-theory tools:
 
@@ -80,7 +89,7 @@ The composition duration can be up to three minutes. Example:
 
 Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`, `free_jazz_episodic`, `autechre_like`, `minimal_variation`, and `hybrid`. The `preset` flow preserves the chosen movement sequence, `mix` imports middle movements from a deterministic alternate structure, and `mutate` reorders the inner movements while retaining the opening and ending.
 
-Choose a lead synthesis architecture with `--synth-palette`: `subtractive` (default), `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. `subtractive` is a separate renderer, not another FM preset. Choose drum construction separately with `--percussion-synthesis minimal|extended|samples`; `minimal` (default) uses sparse, dry transient/body/tail kick/snare/hat voices, while `samples` selects the legacy profiled drum renderers. Convolution, spectral delay, feedback-delay networks, cross-synthesis and oversampled nonlinear processing remain documented follow-on DSP modules; they are not claimed as implemented here. External synthesis engines remain optional adapters.
+Choose a lead synthesis architecture with `--synth-palette`: `subtractive` (default), `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. `subtractive` is a separate renderer, not another FM preset. Choose drum construction separately with `--percussion-synthesis minimal|extended|samples`; `minimal` (default) uses sparse, dry transient/body/tail kick/snare/hat voices, while `samples` selects the legacy profiled drum renderers. The M10 FX Lab adds a separate non-destructive Pyo processing path; the core generator and NumPy reference renderer remain independent. Convolution, spectral delay, feedback-delay networks, cross-synthesis, oversampling and per-stem inserts remain later DSP modules.
 
 ## Generate a loop
 
@@ -98,6 +107,20 @@ Use a fixed or automatically selected percussion profile:
 Process an imported break sample without modifying the original file:
 
     reawarp --break-sample samples/Breaks/my_break.wav --break-transforms slice_rearrange,stutter,dropout,reverse,gate --break-slice-count 16 --output output/processed
+
+### Offline FX Lab (M10)
+
+Install its optional backend and launch the desktop app:
+
+    python -m pip install -e ".[pyo]"
+    reawarp-gui
+
+The FX LAB workspace loads a mono/stereo audio file, lets you select a processing chain and wet/dry balance, renders a separate result, and allows dry/processed audition and export. The original is untouched. CLI usage:
+
+    reawarp-fx input.wav output_fx.wav --preset tape_echo --wet 0.70 --tail 2.0
+    reawarp-fx --list-presets
+
+Available chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md).
 
 Pitch/time/granular operations accept their own controls:
 
@@ -189,7 +212,7 @@ or:
 
     python -m reawarp.ui
 
-The main workspaces are Generator, Break Lab, and Stem Mixer. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md). The M6 library is currently exposed through the Python API and `reawarp-library` CLI.
+The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md). The M6 library is currently exposed through the Python API and `reawarp-library` CLI.
 
 ## Local sample and stem library (M6)
 
@@ -227,10 +250,12 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
 ## Development
 
     python -m pip install -e ".[dev]"
-    pytest
+    python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
+The repository currently uses compile and command-line smoke checks; no unit-test suite is included.
+
+The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 
 ## M7 — Composition Workbench (0.7.0)
 
@@ -242,6 +267,6 @@ Use the same formal controls in the command line or the desktop Generator:
 
 Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
 
-The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The shared ELI LAB icon is packaged for the application window and system tray.
+The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The shared ELI LAB icon is packaged for the application window and system tray.
 
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.

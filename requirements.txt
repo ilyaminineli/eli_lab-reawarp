@@ -5,15 +5,14 @@
 # - selected audio libraries from https://github.com/andreimatveyeu/awesome-python-audio
 #
 # IMPORTANT:
-#   This file is an inventory, not a recommendation to install every package at once.
-#   Uncomment a planned dependency only when its adapter is implemented and its
-#   Python/platform/native-runtime/license constraints have been reviewed.
-#   The authoritative curated installation groups remain in pyproject.toml extras.
+#   This is an expanded developer inventory. Every uncommented line is active and
+#   will be attempted by "pip install -r requirements.txt", including some research
+#   tools that are not yet wired into Reawarp and may need native runtimes/toolchains.
+#   For a curated, portable install, use the supported pyproject.toml extras instead.
 #
 # For the minimal renderer, install only the CORE section.
-# For all currently implemented Python features, install CORE + IMPLEMENTED OPTIONAL.
-# The PLANNED section is deliberately commented out to avoid pulling in experimental,
-# platform-restricted or heavyweight ML stacks into normal desktop installations.
+# For implemented desktop features, use the extras documented in README.md.
+# Experimental or platform-sensitive packages should remain commented until reviewed.
 
 
 # -----------------------------------------------------------------------------
@@ -49,6 +48,9 @@ pyfluidsynth>=1.3
 # Optional offline audio analysis
 librosa>=0.10
 
+# Optional Pyo offline processing backend for the M10 FX Lab
+pyo>=1.0
+
 
 # -----------------------------------------------------------------------------
 # DEVELOPMENT / QUALITY
@@ -61,13 +63,13 @@ ruff>=0.5
 # PLANNED DSP / SYNTHESIS / EFFECTS — not required by current generation
 # -----------------------------------------------------------------------------
 
-# Real-time synthesis, filters, oscillators, modulation and granular instruments.
-# Review its LGPL terms and native audio backend before redistributing.
-pyo>=1.0
+# Pyo is implemented as an optional offline FX Lab backend and is listed above.
 
 # Experimental buffer / wavetable / windowing / granular sound-design environment.
-# Pippi upstream is evolving; review the exact release and Windows wheel availability.
-pippi>=2.0
+# Keep inactive in a standard Windows requirements install: 2.0.0b16 is a
+# pre-release; its published wheel targets Linux/CPython 3.14, while Windows
+# currently receives a source archive that may require a native build toolchain.
+# pippi>=2.0.0b16,<2.1.0
 
 # Csound Python binding. This additionally requires a compatible native Csound
 # installation and API version; keep it behind an optional backend.
@@ -76,8 +78,9 @@ ctcsound>=6.0
 # Python SuperCollider/Jupyter bridge. Requires an external SuperCollider server.
 sc3nb>=1.1
 
-# High-quality audio effects, filters, convolution and pedalboard-style processing.
-pedalboard>=0.9
+# Pedalboard is GPL-3.0; keep inactive pending a deliberate distribution/license
+# decision for the MIT application.
+# pedalboard>=0.9
 
 # Convenience audio conversion and file manipulation (FFmpeg may also be needed).
 pydub>=0.25
