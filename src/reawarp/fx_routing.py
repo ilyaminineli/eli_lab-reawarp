@@ -74,8 +74,8 @@ def default_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
             for name in stem_names
         },
         "buses": {
-            "space": {"chain": "restrained_space", "wet": 1.0, "tail_seconds": 2.0},
-            "echo": {"chain": "tape_echo", "wet": 1.0, "tail_seconds": 1.5},
+            "space": {"chain": "restrained_space", "wet": 0.18, "tail_seconds": 2.0},
+            "echo": {"chain": "tape_echo", "wet": 0.0, "tail_seconds": 1.5},
         },
     }
 
@@ -188,7 +188,6 @@ def render_fx_routing(
     config = normalise_fx_routing(routing, names, sample_rate)
     outputs: dict[str, np.ndarray] = {}
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
-    bus_tail_frames = 0
     active_stems: list[str] = []
     active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     for name, source in dry_stems.items():
