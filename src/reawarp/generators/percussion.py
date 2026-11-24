@@ -176,18 +176,22 @@ def _build_break_events(
             sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
             key=lambda item: item[0],
         )
-        section_changed = section.index != previous_section_index
+        cycle_start = bar % int(config.break_cycle_bars) == 0
+        section_changed = section.index != cycle_section_index
+
+        # Legacy break variation remains phrase-local. Structural pattern
+        # switching is a separate opt-in and happens only at cycle boundaries.
         if cycle_phrase is None or (
-            config.break_variation > 0.0 and section_changed
+            cycle_start and config.pattern_follow_structure and section_changed
         ):
             cycle_phrase = list(selected)
             cycle_section_index = section.index
-            if config.break_variation > 0.0:
+            if config.pattern_follow_structure:
                 family_steps = pattern_for_section(
                     config.pattern_family,
                     section_index=section.index,
                     section_name=section.name,
-                    variation=config.break_variation,
+                    variation=config.composition_variation,
                     density=float(section.density),
                     rng=rng,
                 )
@@ -209,7 +213,7 @@ def _build_break_events(
                     companion_family,
                     section_index=section.index + 1,
                     section_name=section.name,
-                    variation=config.break_variation,
+                    variation=config.composition_variation,
                     density=float(section.density),
                     rng=companion_rng,
                 )
@@ -236,23 +240,18 @@ def _build_break_events(
         previous_section_index = section.index
 
         is_cycle_end = (bar + 1) % int(config.break_cycle_bars) == 0
-        cycle_hits = list(cycle_phrase or selected)
+        # Mutate only the closing bar of a cycle; do not carry this one-off
+        # edit forward into the next cycle. The base phrase repeats by design.
+        render_hits = list(cycle_phrase or selected)
         if is_cycle_end and config.break_variation > 0.0:
             anchor_steps = {
                 step for step, _kind, priority, _velocity, _pan in template
                 if priority >= 0.88
             }
-            cycle_hits = _mutate_break_bar(
-                cycle_hits, rng, float(config.break_variation), anchor_steps
+            render_hits = _mutate_break_bar(
+                render_hits, rng, float(config.break_variation), anchor_steps
             )
-            # The mutated phrase becomes the next cycle's stable base.
-            cycle_phrase = list(cycle_hits)
 
-        # Keep the phrase identical across bars in this cycle. The final bar
-        # introduces the cached mutation only after its last events are emitted.
-        render_hits = list(cycle_phrase or selected)
-        if is_cycle_end and config.break_variation > 0.0:
-            render_hits = list(cycle_hits)
         for step_in_bar, kind, _priority, base_velocity, pan in render_hits:
             absolute_step = bar * 16 + step_in_bar
             time_seconds = absolute_step * step_seconds
