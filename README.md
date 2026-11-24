@@ -50,6 +50,8 @@ The Generator now builds one shared kick/snare/hat score for both synthesis and 
 
 The phrase director remains responsible for the larger arc—introduction, establishment, development, uplift, arrival, drop, silence, contrast, return and residue—while the drum arranger and source engine translate those functions into actual patterns, timbres and source contributions.
 
+See [M15 — Integrated composition-to-production workflow](docs/M15.md) for the shared drum-score, hybrid source and Generator architecture.
+
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
 - Automatic frame-accurate slicing with configurable slice limits.
