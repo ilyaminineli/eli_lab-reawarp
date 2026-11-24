@@ -98,9 +98,14 @@ jobs:
           save_fx_automation(path, automation, project['stems'])
           loaded = load_fx_automation(path, project['stems'])
           assert loaded == automation
-          print('Beat automation OK · deterministic smooth/linear/hold lanes')
+          matrix = build_role_audition_matrix(project['stems'])
+          assert set(matrix) == {'percussion_focus', 'melody_foreground', 'ambience_background', 'combined_roles'}
+          for profile in matrix.values():
+              normalise_fx_routing(profile, project['stems'], project['sample_rate'])
+          print('Beat automation and role audition profiles OK')
           PY
           reawarp-routing /tmp/reawarp-ci --routing /tmp/reawarp-routing.json --automation /tmp/reawarp-automation.json --validate
+          reawarp-routing /tmp/reawarp-ci --audition-matrix --validate
       - name: Check role-aware signal flow with a deterministic FX stand-in
         run: |
           python - <<'PY'
