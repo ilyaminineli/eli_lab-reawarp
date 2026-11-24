@@ -24,6 +24,7 @@ from reawarp.export.wav import write_wav
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
+    SUBTRACTIVE_VOICES,
 )
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
@@ -240,11 +241,19 @@ class MainWindow(QMainWindow):
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
         self.synth_palette = QComboBox()
-        self.synth_palette.addItems(["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"])
+        self.synth_palette.addItems(["subtractive", "hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"])
         self.synth_palette.setToolTip(
             "Select the lead synthesis family. Experimental families retain the NumPy reference renderer."
         )
         profile_form.addRow("Lead synthesis", self.synth_palette)
+        self.percussion_synthesis = QComboBox()
+        self.percussion_synthesis.addItems(["minimal", "extended", "samples"])
+        self.percussion_synthesis.setCurrentText("minimal")
+        self.percussion_synthesis.setToolTip(
+            "Minimal uses dry transient/body/tail synthesis; extended adds resonant detail; "
+            "samples uses the profiled legacy drum synthesis."
+        )
+        profile_form.addRow("Percussion synthesis", self.percussion_synthesis)
         voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
@@ -595,6 +604,7 @@ class MainWindow(QMainWindow):
             pattern_relationship=self.pattern_relationship.currentText(),
             pattern_follow_structure=self.pattern_follow_structure.isChecked(),
             synth_palette=self.synth_palette.currentText(),
+            percussion_synthesis=self.percussion_synthesis.currentText(),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
