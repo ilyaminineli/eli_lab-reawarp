@@ -13,7 +13,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from reawarp.fx import FX_PRESETS, FX_STAGE_DEFAULTS, load_fx_chain, normalise_fx_stages, render_pyo_fx
+from reawarp.fx import FX_PRESETS, load_fx_chain, normalise_fx_stages, render_pyo_fx
 
 FX_ROUTING_SCHEMA_VERSION = 1
 FX_BUSES = ("space", "echo")
@@ -189,6 +189,7 @@ def render_fx_routing(
     outputs: dict[str, np.ndarray] = {}
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
     bus_tail_frames = 0
+    active_stems: list[str] = []
     for name, source in dry_stems.items():
         dry = np.asarray(source, dtype=np.float32)
         if dry.shape != (frames, channels):
@@ -200,7 +201,8 @@ def render_fx_routing(
         for bus, amount in record["sends"].items():
             if amount > 0:
                 bus_inputs[bus] += processed * float(amount)
-                bus_tail_frames = max(bus_tail_frames, int(config["buses"][bus]["tail_seconds"] * sample_rate))
+                if name not in active_stems:
+                    active_stems.append(name)
     returns: dict[str, np.ndarray] = {}
     for bus, source in bus_inputs.items():
         record = config["buses"][bus]
@@ -225,6 +227,7 @@ def render_fx_routing(
         },
         "buses": config["buses"],
         "rendered_returns": list(returns),
+        "active_send_stems": active_stems,
     }
     metadata["bus_returns_audio"] = returns
     return outputs, metadata
