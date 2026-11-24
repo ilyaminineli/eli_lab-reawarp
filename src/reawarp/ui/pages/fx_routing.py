@@ -1,18 +1,17 @@
 """Compact editor for per-stem inserts and shared send buses."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QMessageBox, QPushButton, QScrollArea, QSlider, QVBoxLayout, QWidget,
+    QLabel, QMessageBox, QPushButton, QSlider, QVBoxLayout, QWidget,
 )
 
 from reawarp.fx import FX_PRESETS
-from reawarp.fx_routing import FX_BUSES, default_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing
+from reawarp.fx_routing import (FX_BUSES, default_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing)
 
 
 class FXRoutingEditor(QGroupBox):
