@@ -182,3 +182,21 @@ def test_engine_renders_three_minute_composition_with_new_form_and_palette():
     assert plan["sections"][-1]["end_seconds"] == pytest.approx(180.0)
     assert project.metadata["synth_palette"] == "inharmonic"
     assert np.all(np.isfinite(project.stems["melody"]))
+
+
+
+def test_engine_patterns_change_with_selected_section_grammar():
+    base = ReawarpEngine().generate(small_config(
+        duration=12.0, seed=813, structure="autechre_like",
+        pattern_family="broken_funk", pattern_relationship="interlock",
+    ))
+    altered = ReawarpEngine().generate(small_config(
+        duration=12.0, seed=813, structure="autechre_like",
+        pattern_family="asymmetric_7", pattern_relationship="shadow",
+    ))
+    base_steps = [event["step"] % 16 for event in base.events
+                  if event.get("lane") == "break"]
+    altered_steps = [event["step"] % 16 for event in altered.events
+                     if event.get("lane") == "break"]
+    assert base_steps != altered_steps
+    assert altered.metadata["composition_plan"]["pattern_family"] == "asymmetric_7"
