@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-24  
-**Current implementation baseline:** M13 merged; M14 initial implementation in progress on `main`  
+**Current implementation baseline:** M13 merged; M14 portable regression suite and Windows CI landed and passed on `main`; target-machine profiling and listening remain pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -31,37 +31,28 @@ The current application has strong components at most of these stages, but score
 | Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
 | GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
-| Regression testing | Partially implemented | Initial pytest coverage protects stream determinism, section planning, signal diagnostics, stem regeneration and FX invariants; edge-case and portability coverage remains |
+| Regression testing | Implemented | 59-test pytest suite covers deterministic streams, transform edge cases, score/MIDI and project round trips, FX contracts, stem isolation and offscreen UI navigation; passing on Linux Python 3.10–3.12 and Windows Python 3.11 |
 | Target-machine DSP listening validation | Pending | Requires Pyo-enabled Windows render and critical audition |
 | Performance benchmark baseline | Partially implemented | Reproducible benchmark harness and phase timings are present; target-Windows 30/180-second results are pending |
 
 ## Current focus — M14: Reliability and Performance Baseline
 
-**Status:** Initial implementation landed. The milestone remains open until the expanded edge-case suite and target-machine benchmark results are recorded.
+**Status:** Portable implementation and CI acceptance passed on `main` (commit `3ea19f7`). The milestone remains open for 48 kHz target-Windows 30/180-second profiling and Pyo-enabled critical listening.
 
 **Goal:** Make changes to the generator safe, measurable and repeatable before expanding the composition and DSP surface.
 
-### Scope
+### Delivered on `main`
 
-1. Expand the initial `tests/` suite with break-transform, project export/reload, score/MIDI and GUI transition fixtures.
-2. Protect deterministic stream derivation and lane independence.
-3. Validate event timing, composition boundaries and exact render duration.
-4. Validate signal invariants: finite samples, expected shape, peak limits, no accidental source mutation and aligned dry stems.
-5. Test break transform edge cases, silence, short clips, stereo input, and boundary fades.
-6. Test FX stage/routing/automation schemas, tails and dry-source immutability without requiring Pyo.
-7. Add benchmark cases for 5 s, 30 s and 180 s at 48 kHz; measure per-stage render time and peak memory.
-8. Add supported Windows/Python CI coverage, with optional Pyo integration tests separated from core CI.
-9. Use the new signal diagnostics module in tests, benchmarks and audition reports.
+- Expanded the pytest suite to 59 tests, including short/silent/stereo transform cases, seeded full-chain transforms, score JSON and MIDI round trips, exported-project reopen validation, and GUI navigation transitions.
+- Added `GenerationConfig.from_dict`, PCM `read_wav` with preserved channel layout, and `ReawarpProject.load` with schema, configuration, timing, stem alignment, finiteness and score-metadata validation.
+- Added a native Windows Python 3.11 CI job. Linux Python 3.10, 3.11 and 3.12 plus Windows Python 3.11 all pass the regression suite; CLI/benchmark/desktop smoke checks also pass.
+- Retained the named-stream, exact-duration, dry-buffer immutability, FX routing and signal-diagnostic checks already in the suite.
 
-### Acceptance criteria
+### Remaining sign-off
 
-- Same version, environment, config and seed reproduce the expected events and audio within declared tolerances.
-- Regenerating one stem preserves unrelated stems and event lanes.
-- Every rendered buffer has the expected shape, sample rate, finite values and documented peak/headroom behaviour.
-- FX routing and automation never mutate dry input buffers.
-- Core installation and smoke tests do not import or require optional Pyo.
-- Benchmarks report a baseline with hardware/software metadata and no unsupported optimisation claims.
-- CI exercises unit tests, CLI smoke tests, JSON round trips and offscreen UI construction.
+1. Run the 30-second and 180-second benchmark cases at 48 kHz on the target Windows machine; record the processor, memory, Python, NumPy, SciPy versions, render time, real-time factor and peak memory.
+2. Profile any measured hotspots and optimise only where the evidence supports it, preserving deterministic output and the current signal contracts.
+3. Run the optional Pyo-enabled integration and critical listening checks on the target audio setup, including low-volume and mono compatibility.
 
 ### Explicitly out of scope
 
