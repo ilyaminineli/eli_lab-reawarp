@@ -14,7 +14,7 @@ Before bundling any dependency in a desktop release, re-check the current suppor
 |---|---|---|
 | NumPy + custom Reawarp DSP | Deterministic reference renderer and offline stem engine | Core; required |
 | SciPy | Optional signal-processing utilities and future filter/analysis helpers | Optional `audio` extra; never required by the core |
-| Pyo | Offline DSP chains for the M10 FX Lab; filters, distortion, delay, reverb | Implemented as an optional `pyo` extra; lazy-loaded and isolated from NumPy generation |
+| Pyo | Offline DSP chains for the M10–M11 FX Lab; filters, distortion, delay, reverb | Implemented as an optional `pyo` extra; lazy-loaded and isolated from NumPy generation |
 | Pippi | Experimental buffer, wavetable, window, and granular sound design | Isolated optional `pippi` beta extra; Windows native build caveat |
 | pyFluidSynth | SF2 SoundFont playback and pitched source material | Optional `soundfont` extra; native FluidSynth runtime is required |
 | ctcsound / Csound | Offline physical modelling, resonators, and complex modulation | External backend candidate; Python bindings must match the installed Csound API, especially across the 6/7 API boundary |
@@ -125,7 +125,7 @@ No external project should be copied into Reawarp merely because it is useful. P
 - **M8 — implemented:** up-to-three-minute formal presets and flow modes, pattern relationships, motif transformations, and selectable native synthesis palettes.
 - **M9 — implemented:** minimal subtractive lead and transient/body/tail drum renderers, sparser default drum generation, requirements inventory, and monochrome UI refinement.
 - **M10 — implemented:** optional Pyo offline FX backend, four starter chains, non-destructive FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
-- **M11 — in progress:** editable ordered FX chains, per-stage parameter editing, and portable chain JSON. Per-stem routing, tempo-synced delay, convolution, spectral delay, FDNs, cross-synthesis, and oversampling remain follow-on modules.
+- **M11 — implemented:** editable ordered FX chains, per-stage parameter editing, and portable chain JSON. Per-stem routing, tempo-synced delay, convolution, spectral delay, FDNs, cross-synthesis, and oversampling remain follow-on modules.
 
 The project should grow through small, testable adapters. Its identity remains in its mathematics, event model, and deterministic renderer.
 

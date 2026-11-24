@@ -24,12 +24,17 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Stem-only regeneration while preserving unrelated stems bit-identically.
 - A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
 
-### Offline sound design (M10)
+### Offline sound design (M10–M11)
 - A separate FX Lab loads external mono/stereo audio without changing the source file.
-- Optional Pyo offline processing with ordered high/low/band-pass filtering, saturation, delay, frequency shift, and Freeverb stages.
-- Four role-oriented chains: restrained space, tape echo, metallic machine, and digital fracture.
+- Optional Pyo offline processing with high/low/band-pass filters, saturation, delay, frequency shift, and Freeverb stages.
+- Four starting chains: restrained space, tape echo, metallic machine, and digital fracture.
+- M11 adds a serial-chain editor: add/remove stages, reorder processing, edit each stage’s parameters and mix, and save/load portable versioned JSON chains.
 - Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
-- The same processing engine is available through the `reawarp-fx` command; Pyo is not required by the base generator.
+- The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
+
+### Editable processing chains (M11)
+
+Custom FX chains use a portable JSON object with `schema_version: 1`, a name, global wet/tail settings, and an ordered array of stages. Each stage keeps its own parameters and mix. The serial order is intentional: distortion before a filter is not equivalent to a filter before distortion. The editor keeps a dry source reference and does not insert processing into generated stems yet; role-aware per-stem routing is a later milestone.
 
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
@@ -115,12 +120,15 @@ Install its optional backend and launch the desktop app:
     python -m pip install -e ".[pyo]"
     reawarp-gui
 
-The FX LAB workspace loads a mono/stereo audio file, lets you select a processing chain and wet/dry balance, renders a separate result, and allows dry/processed audition and export. The original is untouched. CLI usage:
+The FX LAB workspace loads a mono/stereo audio file, lets you build an ordered processing chain, and renders a separate result for dry/processed audition and export. The source is untouched. Start from a preset or edit its stages; each stage has its own mix and bounded controls. Save your chain as JSON to reuse it in the GUI or CLI:
 
     reawarp-fx input.wav output_fx.wav --preset tape_echo --wet 0.70 --tail 2.0
+    reawarp-fx input.wav output_custom.wav --chain-json my_chain.json
     reawarp-fx --list-presets
+    reawarp-fx --list-stages
+    reawarp-fx --validate-chain-json my_chain.json
 
-Available chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md).
+Available starting chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md) and [M11 Editable FX Chains](docs/M11.md).
 
 Pitch/time/granular operations accept their own controls:
 
@@ -253,7 +261,7 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
     python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
 
-The repository currently uses compile and command-line smoke checks; no unit-test suite is included.
+The repository currently uses compile and command-line smoke checks; no unit-test suite is included. The M11 smoke workflow also validates the portable FX-chain JSON schema without requiring Pyo.
 
 The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 

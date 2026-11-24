@@ -42,7 +42,7 @@ The repository currently uses compile, CLI, library, and desktop-import smoke ch
 - **M7–M8:** formal composition planning, section-aware patterns, motif transformations, long-form structure presets, and selectable synthesis architectures.
 - **M9:** restrained subtractive synthesis, dedicated generated drum voices, sparser defaults, monochrome UI, and dependency inventory.
 - **M10:** optional Pyo offline FX backend, four starter chains, FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
-- **M11 — in progress:** editable ordered effect chains, stage-level parameter controls, and portable chain JSON.
+- **M11:** editable ordered effect chains, stage-level parameter controls, and portable chain JSON.
 
 The next architectural extension after M11 is role-aware per-stem effect routing. Keep it separate from the current master-level mixer and validate that effect rendering never mutates or regenerates unrelated stems.
 
