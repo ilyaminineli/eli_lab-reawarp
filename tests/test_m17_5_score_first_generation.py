@@ -106,7 +106,10 @@ def test_legacy_generator_remains_available_as_a_migration_comparison():
     legacy = ReawarpEngine().generate_legacy(config)
 
     assert legacy.score is None
-    assert legacy.metadata.get("renderer_version", f"legacy-generator/{legacy.metadata["algorithm_version"]}").startswith("legacy-generator/")
+    legacy_renderer = legacy.metadata.get("renderer_version")
+    if legacy_renderer is None:
+        legacy_renderer = "legacy-generator/" + str(legacy.metadata["algorithm_version"])
+    assert legacy_renderer.startswith("legacy-generator/")
     assert legacy.to_score().metadata["render_provenance"]["event_source"] == (
         "ReawarpProject.events"
     )
