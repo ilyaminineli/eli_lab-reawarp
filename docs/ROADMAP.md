@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-24  
-**Current implementation baseline:** M13 merged on `main`  
+**Current implementation baseline:** M13 merged; M14 initial implementation in progress on `main`  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -30,18 +30,20 @@ The current application has strong components at most of these stages, but score
 | FX Lab and editable serial chains | Implemented | Optional Pyo offline backend and portable JSON |
 | Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
-| GUI / CLI workflow | Implemented | PySide6 UI, commands and render worker; main window orchestration is due for modularisation |
-| Comprehensive regression testing | Not complete | Current docs describe compile/smoke validation; real unit/integration coverage is required |
+| GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
+| Regression testing | Partially implemented | Initial pytest coverage protects stream determinism, section planning, signal diagnostics, stem regeneration and FX invariants; edge-case and portability coverage remains |
 | Target-machine DSP listening validation | Pending | Requires Pyo-enabled Windows render and critical audition |
-| Performance benchmark baseline | Not complete | Must be measured before optimisation claims |
+| Performance benchmark baseline | Partially implemented | Reproducible benchmark harness and phase timings are present; target-Windows 30/180-second results are pending |
 
 ## Current focus — M14: Reliability and Performance Baseline
+
+**Status:** Initial implementation landed. The milestone remains open until the expanded edge-case suite and target-machine benchmark results are recorded.
 
 **Goal:** Make changes to the generator safe, measurable and repeatable before expanding the composition and DSP surface.
 
 ### Scope
 
-1. Reintroduce a focused `tests/` suite.
+1. Expand the initial `tests/` suite with break-transform, project export/reload, score/MIDI and GUI transition fixtures.
 2. Protect deterministic stream derivation and lane independence.
 3. Validate event timing, composition boundaries and exact render duration.
 4. Validate signal invariants: finite samples, expected shape, peak limits, no accidental source mutation and aligned dry stems.
@@ -49,7 +51,7 @@ The current application has strong components at most of these stages, but score
 6. Test FX stage/routing/automation schemas, tails and dry-source immutability without requiring Pyo.
 7. Add benchmark cases for 5 s, 30 s and 180 s at 48 kHz; measure per-stage render time and peak memory.
 8. Add supported Windows/Python CI coverage, with optional Pyo integration tests separated from core CI.
-9. Extract a small signal diagnostics module used by tests and audition reports.
+9. Use the new signal diagnostics module in tests, benchmarks and audition reports.
 
 ### Acceptance criteria
 
@@ -63,7 +65,7 @@ The current application has strong components at most of these stages, but score
 
 ### Explicitly out of scope
 
-No new synthesis palette, arbitrary routing graph, convolution engine, GPU port or broad UI redesign in M14.
+No new synthesis palette, arbitrary routing graph, convolution engine or GPU port in M14. The first navigation/layout redesign is included; a broader controller/service extraction remains a follow-on task.
 
 ## M15: Composition Director 2.0 — motifs, roles and transitions
 
