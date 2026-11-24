@@ -63,59 +63,59 @@ ruff>=0.5
 
 # Real-time synthesis, filters, oscillators, modulation and granular instruments.
 # Review its LGPL terms and native audio backend before redistributing.
-# pyo>=1.0
+pyo>=1.0
 
 # Experimental buffer / wavetable / windowing / granular sound-design environment.
 # Pippi upstream is evolving; review the exact release and Windows wheel availability.
-# pippi>=2.0
+pippi>=2.0
 
 # Csound Python binding. This additionally requires a compatible native Csound
 # installation and API version; keep it behind an optional backend.
-# ctcsound>=6.0
+ctcsound>=6.0
 
 # Python SuperCollider/Jupyter bridge. Requires an external SuperCollider server.
-# sc3nb>=1.1
+sc3nb>=1.1
 
 # High-quality audio effects, filters, convolution and pedalboard-style processing.
-# pedalboard>=0.9
+pedalboard>=0.9
 
 # Convenience audio conversion and file manipulation (FFmpeg may also be needed).
-# pydub>=0.25
-# audioread>=3.0
+pydub>=0.25
+audioread>=3.0
 
 # Lightweight pitch/onset/tempo analysis. Check GPL-3.0-or-later implications.
-# aubio>=0.4.9
+aubio>=0.4.9
 
 # Advanced MIR descriptors / similarity / fingerprinting.
 # Essentia has native and wheel/platform constraints; do not assume Windows support.
-# essentia>=2.1b6
+essentia>=2.1b6
 
 # Broad feature-extraction toolkit (consider only if feature coverage justifies it).
-# audioflux>=0.1
+audioflux>=0.1
 
 # MIR-focused audio processing; legacy dependency/platform state needs review.
-# madmom>=0.16
+madmom>=0.16
 
 # Evaluation functions and dataset loaders for MIR research.
-# mir_eval>=0.8
-# mirdata>=0.3
+mir_eval>=0.8
+mirdata>=0.3
 
 # Extra analysis/segmentation experiments; overlaps with librosa and Reawarp DSP.
-# pyAudioAnalysis>=0.3
+pyAudioAnalysis>=0.3
 
 # Spectral transforms and GPU audio analysis experiments. Heavy PyTorch stack.
-# nnAudio>=0.3
+nnAudio>=0.3
 
 # Audio augmentation experiments (not needed by a procedural synthesizer).
-# audiomentations>=0.37
-# noisereduce>=3.0
+audiomentations>=0.37
+noisereduce>=3.0
 
 # Optional resampling / sample-rate conversion helpers.
-# samplerate>=0.2
-# resampy>=0.4
+samplerate>=0.2
+resampy>=0.4
 
 # Optional audio matching/mastering research; not an automatic part of generation.
-# matchering>=2.0
+matchering>=2.0
 
 
 # -----------------------------------------------------------------------------
@@ -123,26 +123,26 @@ ruff>=0.5
 # -----------------------------------------------------------------------------
 
 # Symbolic music datasets, representations and evaluation.
-# muspy>=0.5
+muspy>=0.5
 
 # Alternative MIDI writer; Mido is the selected import/export adapter today.
-# MIDIUtil>=1.2
+MIDIUtil>=1.2
 
 # MIDI convenience objects; overlaps with the current Mido score adapter.
-# pretty-midi>=0.2
+pretty-midi>=0.2
 
 # Music theory / notation systems; optional research alternatives to music21.
-# mingus>=0.6
-# abjad>=3.19
-# pychord>=1.2
+mingus>=0.6
+abjad>=3.19
+pychord>=1.2
 
 # Microtonal and non-standard temperament support. Verify GPL distribution terms.
-# xenharmlib>=0.2
+xenharmlib>=0.2
 
 # Algorithmic composition framework, studied for concepts rather than embedded runtime.
 # athenaCL is an application/research reference, not a current dependency.
-# maelzel>=0.1
-# scamp>=0.9
+maelzel>=0.1
+scamp>=0.9
 
 
 # -----------------------------------------------------------------------------
