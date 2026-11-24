@@ -27,9 +27,12 @@ def _event_seed(seed_streams: Mapping[str, Any], stream_name: str | None) -> int
 def percussion_to_score_events(
     lanes: Mapping[str, Sequence[Any]],
     *,
+    bpm: float = 120.0,
     seed_streams: Mapping[str, Any] | None = None,
 ) -> tuple[MusicalEvent, ...]:
     """Convert planner percussion grid positions; never read legacy seconds."""
+    if bpm <= 0:
+        raise ValueError("bpm must be positive")
     streams = dict(seed_streams or {})
     result: list[MusicalEvent] = []
     index = 0
@@ -37,11 +40,13 @@ def percussion_to_score_events(
         for source in sorted(lanes[lane], key=lambda item: (int(item.step), str(item.kind or ""))):
             role = str(getattr(source, "lane", lane))
             kind = str(getattr(source, "kind", "") or "")
+            voice_duration = _percussion_voice_duration(role, kind)
+            duration_beats = Fraction(str(voice_duration * float(bpm) / 60.0)).limit_denominator(15360)
             result.append(MusicalEvent(
                 event_id=f"perc-{index:07d}",
                 voice_id=role,
                 onset_beats=_step_beats(int(source.step)),
-                duration_beats=Fraction(1, 4),
+                duration_beats=max(Fraction(1, 64), duration_beats),
                 kind="hit",
                 velocity=float(source.velocity),
                 parameters={
@@ -52,6 +57,7 @@ def percussion_to_score_events(
                     "motif_relation": getattr(source, "motif_relation", None),
                     "source_kind": kind,
                     "planner": "percussion",
+                    "voice_duration_seconds": voice_duration,
                 },
                 tags=("percussion", role, kind),
                 source_id=getattr(source, "motif_id", None) or role,
@@ -63,16 +69,24 @@ def percussion_to_score_events(
     )))
 
 
+def _percussion_voice_duration(role: str, kind: str) -> float:
+    """Default specialist voice lengths; score duration is the playable event span."""
+    if role == "break":
+        return {"kick": 0.31, "snare": 0.22, "hat": 0.075}.get(kind.casefold(), 0.22)
+    return {"kick": 0.48, "snare": 0.30, "hat": 0.115}.get(role.casefold(), 0.22)
+
+
 def melody_to_score_events(
     events: Iterable[Any],
     *,
     bpm: float,
     seed: int | None = None,
     voice_id: str = "melody",
+    release_seconds: float = 0.28,
 ) -> tuple[MusicalEvent, ...]:
     """Convert melody events; onset comes from the exact grid, duration is quantised to rational beats."""
-    if bpm <= 0:
-        raise ValueError("bpm must be positive")
+    if bpm <= 0 or release_seconds < 0:
+        raise ValueError("bpm must be positive and release_seconds non-negative")
     result: list[MusicalEvent] = []
     ordered = sorted(events, key=lambda item: (int(item.step), int(item.midi_note)))
     for index, source in enumerate(ordered):
@@ -80,7 +94,9 @@ def melody_to_score_events(
         raw_duration = Fraction(
             str(float(source.duration) * float(bpm) / 60.0)
         ).limit_denominator(15360)
-        duration = max(Fraction(1, 64), raw_duration)
+        gate_duration = max(Fraction(1, 64), raw_duration)
+        tail_duration = Fraction(str(float(release_seconds) * float(bpm) / 60.0)).limit_denominator(15360)
+        duration = gate_duration + tail_duration
         result.append(MusicalEvent(
             event_id=f"melody-{index:07d}",
             voice_id=voice_id,
@@ -95,6 +111,8 @@ def melody_to_score_events(
                 "source_x": float(source.source_x),
                 "source_y": float(source.source_y),
                 "step": int(source.step),
+                "gate_duration_beats": str(gate_duration),
+                "release_seconds": float(release_seconds),
                 "motif_id": getattr(source, "motif_id", None),
                 "motif_transform": getattr(source, "motif_transform", None),
                 "phrase_index": getattr(source, "phrase_index", None),
@@ -115,14 +133,16 @@ def score_from_planner_events(
     bpm: float = 120.0,
     seed_streams: Mapping[str, Any] | None = None,
     metadata: Mapping[str, Any] | None = None,
+    melody_release_seconds: float = 0.28,
 ) -> Score:
     """Assemble a score before audio rendering from planner-native grid decisions."""
     if bpm <= 0:
         raise ValueError("bpm must be positive")
     streams = dict(seed_streams or {})
-    drum_events = percussion_to_score_events(percussion or {}, seed_streams=streams)
+    drum_events = percussion_to_score_events(percussion or {}, bpm=bpm, seed_streams=streams)
     melody_events = melody_to_score_events(
-        melody, bpm=bpm, seed=_event_seed(streams, 'melody_pattern')
+        melody, bpm=bpm, seed=_event_seed(streams, "melody_pattern"),
+        release_seconds=melody_release_seconds,
     )
     merged = tuple(sorted(
         (*drum_events, *melody_events),
@@ -155,7 +175,8 @@ def score_to_legacy_grid_events(score: Score) -> dict[str, list[dict[str, Any]]]
         result.setdefault(event.voice_id, []).append({
             "step": int(step),
             "time": float(score.tempo_map.beat_to_seconds(event.onset_beats)),
-            "duration_beats": str(event.duration_beats),
+            "duration_beats": event.parameters.get("gate_duration_beats", str(event.duration_beats)),
+            "render_duration_beats": str(event.duration_beats),
             "velocity": event.velocity,
             "pan": float(event.parameters.get("pan", 0.0)),
             "kind": event.parameters.get("source_kind", event.kind),
