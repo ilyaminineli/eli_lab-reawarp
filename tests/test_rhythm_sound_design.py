@@ -9,7 +9,7 @@ from reawarp import GenerationConfig, ReawarpEngine
 from reawarp.core.random_streams import RandomStreams
 from reawarp.generators.percussion import build_percussion_events
 from reawarp.synthesis.ambience import render_ambience
-from reawarp.synthesis.instruments import render_fm_note
+from reawarp.synthesis.instruments import render_fm_note, render_extended_note
 from reawarp.synthesis.profiles import MELODY_PROFILES
 
 
@@ -201,3 +201,20 @@ def test_fm_macro_controls_reject_out_of_range_values():
         render_fm_note(220.0, 22_050, np.random.default_rng(1), brightness=1.1)
     with pytest.raises(ValueError, match="instability"):
         render_fm_note(220.0, 22_050, np.random.default_rng(1), instability=-0.1)
+
+
+
+@pytest.mark.parametrize("palette", [
+    "hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical",
+])
+def test_extended_synthesis_palettes_are_finite_deterministic_and_distinct(palette):
+    args = dict(
+        frequency=220, sample_rate=22_050, duration=.22, velocity=.7,
+        palette=palette, brightness=.6, instability=.35,
+    )
+    first = render_extended_note(rng=np.random.default_rng(99), **args)
+    second = render_extended_note(rng=np.random.default_rng(99), **args)
+    assert np.array_equal(first, second)
+    assert np.all(np.isfinite(first))
+    assert np.max(np.abs(first)) <= 1.0
+    assert np.max(np.abs(first)) > .001
