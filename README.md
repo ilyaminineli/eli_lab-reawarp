@@ -153,7 +153,11 @@ Validate or render a routing file without overwriting the source project:
     reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --validate
     reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --output output/routed
 
-The Stem Mixer exposes per-stem inserts, shared SPACE/ECHO sends, beat-based automation, and tempo-synchronised ECHO divisions. The routed export contains dry source stems, processed return WAVs, the routed master, fx_routing.json, fx_automation.json, and render metadata. See [M12 role-aware FX routing](docs/M12.md) and [M13 musical FX automation](docs/M13.md).
+Generate four starter listening variants from the same dry stems:
+
+    reawarp-routing output/my-composition --audition-matrix --output output/role-auditions
+
+The audition matrix exports percussion, melody, ambience, and combined-role renders plus an RMS/peak report. The report is a signal-level aid, not a substitute for listening. The Stem Mixer exposes per-stem inserts, shared SPACE/ECHO sends, beat-based automation, and tempo-synchronised ECHO divisions. The routed export contains dry source stems, processed return WAVs, the routed master, fx_routing.json, fx_automation.json, and render metadata. See [M12 role-aware FX routing](docs/M12.md) and [M13 musical FX automation](docs/M13.md).
 
 ## Python API
 
