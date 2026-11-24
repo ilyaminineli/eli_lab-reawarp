@@ -43,8 +43,9 @@ The repository currently uses compile, CLI, library, and desktop-import smoke ch
 - **M9:** restrained subtractive synthesis, dedicated generated drum voices, sparser defaults, monochrome UI, and dependency inventory.
 - **M10:** optional Pyo offline FX backend, four starter chains, FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
 - **M11:** editable ordered effect chains, stage-level parameter controls, and portable chain JSON.
+- **M12:** role-aware per-stem inserts, shared SPACE/ECHO sends and returns, portable routing JSON, Stem Mixer integration, and offline routed export. FX rendering remains an optional Pyo pass; dry generator stems and deterministic regeneration are preserved.
 
-The next architectural extension after M11 is role-aware per-stem effect routing. Keep it separate from the current master-level mixer and validate that effect rendering never mutates or regenerates unrelated stems.
+M12 implements the role-aware routing layer as a separate offline pass. The generated dry stem buffers remain the source of truth; project routing is applied after generation and must not consume or alter named synthesis random streams. Future work can add tempo-aware delay divisions, richer bus topologies, automation lanes, and a fully asynchronous render cache.
 
 ## Audio engineering notes
 
