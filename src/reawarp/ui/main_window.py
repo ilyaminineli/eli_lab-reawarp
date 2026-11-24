@@ -117,6 +117,7 @@ class MainWindow(QMainWindow):
         mixer_page = self._build_mixer_page()
         self.fx_lab_page = FxLabPage(self.player, self)
         self.library_page = LibraryPage(self)
+        self.library_page.sampleSelected.connect(self._accept_library_sample)
 
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
@@ -852,6 +853,37 @@ class MainWindow(QMainWindow):
         self.mixer_stack.setCurrentIndex(0)
         layout.addWidget(self.mixer_stack, 1)
         return page
+
+    def _accept_library_sample(self, role: str, path: str) -> None:
+        """Route a Library selection into its corresponding Generator source role."""
+        source_path = str(Path(path).expanduser().resolve())
+        if role in self.sample_selectors:
+            selector = self.sample_selectors[role]
+            selected = selector.findData(source_path)
+            if selected < 0:
+                selector.addItem(f"{Path(source_path).name} · LIBRARY", source_path)
+                selected = selector.count() - 1
+            selector.setCurrentIndex(selected)
+        elif role == "break":
+            try:
+                audio = read_sample(source_path, 48_000)
+            except Exception as exc:
+                self._show_error(f"Could not load Library break sample: {exc}")
+                return
+            self._break_path = source_path
+            self._break_audio = audio
+            self.break_path_label.setText(Path(source_path).name)
+            self.break_source_label.setText(source_path)
+            self._analyze_break()
+        else:
+            self._show_error(f"Unsupported Generator source role: {role}")
+            return
+
+        self._set_workspace(0)
+        self.statusBar().showMessage(
+            f"Library source connected to Generator · {role.upper()} · {Path(source_path).name}",
+            8000,
+        )
 
     def _choose_drum_sample(self, role: str) -> None:
         selector = self.sample_selectors.get(role)
