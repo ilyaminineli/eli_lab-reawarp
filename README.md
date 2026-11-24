@@ -283,8 +283,10 @@ The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--d
     python -m pip install -e ".[dev]"
     python -m compileall -q src/reawarp
     reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
+    python -m pytest -q
+    python scripts/benchmark_generation.py --durations 5 30 180 --palettes subtractive fm --output benchmark-m14.json
 
-The repository currently uses compile and command-line smoke checks; no unit-test suite is included. The smoke workflow validates FX-chain and routing JSON, verifies dry-buffer immutability, checks beat automation curves, and constructs the routing/automation UI without requiring Pyo.
+The repository now includes an initial M14 pytest regression suite for deterministic random streams, composition planning, signal diagnostics, stem regeneration, and dry FX/automation contracts. CI also runs a short benchmark fixture and an offscreen check of the grouped workspace shell. Additional transform-boundary, score round-trip, project portability, Windows and Pyo-enabled tests remain outstanding.
 
 The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
 
@@ -298,14 +300,15 @@ Use the same formal controls in the command line or the desktop Generator:
 
 Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
 
-The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
+The Generator is divided into Form, Voices, and Rhythm sub-pages. Workspaces are grouped into Compose (Generator, Break Lab), Produce (Stem Mixer, FX Lab), and Assets (Library). A persistent project-context header and shared audition transport keep the in-memory composition connected across production workspaces; the Stem Mixer presents an explicit empty state until a project exists. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
 
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.
 
 ## Current roadmap
 
-The current implementation baseline is M13. The next planned milestone is **M14 — Reliability and Performance Baseline**, followed by deeper composition direction, score-driven rendering, synthesis automation, mixer quality and selected advanced DSP modules.
+The current implementation baseline is **M13 with M14 in progress**. M14 has added initial regression coverage, signal diagnostics, render-phase timings, a benchmark harness and a grouped project-centred workspace shell. Its target-machine profiling and expanded validation are still pending. The next milestones deepen composition direction, score-driven rendering, synthesis automation, mixer quality and selected advanced DSP modules.
 
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
 - [Consolidated Roadmap](docs/ROADMAP.md) — implementation status and M14–M20 forward plan.
+- [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
