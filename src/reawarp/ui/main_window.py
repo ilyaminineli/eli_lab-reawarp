@@ -127,8 +127,8 @@ class MainWindow(QMainWindow):
         self.bpm.setValue(137)
         form.addRow("Tempo / BPM", self.bpm)
         self.duration = QDoubleSpinBox()
-        self.duration.setRange(5, 45)
-        self.duration.setToolTip("Offline composition duration, up to 45 seconds.")
+        self.duration.setRange(5, 180)
+        self.duration.setToolTip("Offline composition duration, up to 180 seconds (3 minutes).")
         self.duration.setDecimals(1)
         self.duration.setSingleStep(0.5)
         self.duration.setValue(24)
@@ -137,6 +137,12 @@ class MainWindow(QMainWindow):
         self.structure.addItems(list(STRUCTURES))
         self.structure.setCurrentText("evolving")
         form.addRow("Formal trajectory", self.structure)
+        self.composition_flow = QComboBox()
+        self.composition_flow.addItems(["preset", "mix", "mutate"])
+        self.composition_flow.setToolTip(
+            "Preset keeps the selected form; mix borrows movements from another form; mutate reorders inner movements."
+        )
+        form.addRow("Structure flow", self.composition_flow)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
@@ -217,6 +223,12 @@ class MainWindow(QMainWindow):
         self.melody_profile = QComboBox()
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
+        self.synth_palette = QComboBox()
+        self.synth_palette.addItems(["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"])
+        self.synth_palette.setToolTip(
+            "Select the lead synthesis family. Experimental families retain the NumPy reference renderer."
+        )
+        profile_form.addRow("Lead synthesis", self.synth_palette)
         voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
@@ -562,6 +574,8 @@ class MainWindow(QMainWindow):
             bpm=self.bpm.value(),
             duration=self.duration.value(),
             structure=self.structure.currentText(),
+            composition_flow=self.composition_flow.currentText(),
+            synth_palette=self.synth_palette.currentText(),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
