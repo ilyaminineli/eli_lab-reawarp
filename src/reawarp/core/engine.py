@@ -411,7 +411,7 @@ class ReawarpEngine:
             melody_stem = new_stem("melody")
             for event in melody_events:
                 section = section_for_time(composition_plan, event.time)
-                if not section.melody:
+                if event.velocity <= 1e-7 or not section.melody:
                     continue
                 effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
                 if config.synth_palette == "subtractive":
