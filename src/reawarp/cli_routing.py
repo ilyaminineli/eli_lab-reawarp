@@ -68,11 +68,16 @@ def _write_render(
 
     direct_mix = _sum_buffers(processed)
     return_mix = _sum_buffers(returns)
+    analysis_frames = max(len(direct_mix), len(return_mix))
+    direct_aligned = np.pad(direct_mix, ((0, analysis_frames - len(direct_mix)), (0, 0)))
+    return_aligned = np.pad(return_mix, ((0, analysis_frames - len(return_mix)), (0, 0)))
+    direct_rms = _rms(direct_aligned)
+    return_rms = _rms(return_aligned)
     peak = float(np.max(np.abs(master))) if master.size else 0.0
     analysis = {
-        "direct_rms": _rms(direct_mix),
-        "return_rms": _rms(return_mix),
-        "return_to_direct_rms_db": _db_ratio(_rms(return_mix), _rms(direct_mix)),
+        "direct_rms": direct_rms,
+        "return_rms": return_rms,
+        "return_to_direct_rms_db": _db_ratio(return_rms, direct_rms),
         "direct_peak": float(np.max(np.abs(direct_mix))) if direct_mix.size else 0.0,
         "return_peak": float(np.max(np.abs(return_mix))) if return_mix.size else 0.0,
         "master_peak": peak,
