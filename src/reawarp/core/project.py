@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import math
 import platform
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -38,9 +38,7 @@ class ReawarpProject:
     def to_score(self, *, title: str | None = None):
         """Return the canonical score, or adapt a legacy project when absent."""
         if self.score is not None:
-            return self.score if title is None else __import__(
-                "dataclasses"
-            ).replace(self.score, title=title)
+            return self.score if title is None else replace(self.score, title=title)
         from reawarp.score.conversion import project_to_score
 
         return project_to_score(self, title=title)
