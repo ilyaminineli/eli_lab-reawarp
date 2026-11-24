@@ -172,54 +172,56 @@ def _build_break_events(
 
     for bar in range(bar_count):
         section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
-        family_steps = pattern_for_section(
-            config.pattern_family,
-            section_index=section.index,
-            section_name=section.name,
-            variation=config.composition_variation,
-            density=float(section.density),
-            rng=rng,
-        )
-        # Companion line uses a distinct deterministic family cycle so that
-        # shadow/call-response/interlock relationships can be heard.
-        companion_family = config.pattern_family
-        if companion_family == "interlock_a":
-            companion_family = "interlock_b"
-        elif companion_family == "interlock_b":
-            companion_family = "interlock_a"
-        elif companion_family == "broken_funk":
-            companion_family = "offbeat_cells"
-        elif companion_family == "straight":
-            companion_family = "clave_displaced"
-        companion_seed = int(rng.integers(0, 2**32 - 1))
-        companion_rng = np.random.default_rng(companion_seed)
-        companion_base = pattern_for_section(
-            companion_family,
-            section_index=section.index + 1,
-            section_name=section.name,
-            variation=config.composition_variation,
-            density=float(section.density),
-            rng=companion_rng,
-        )
-        companion_steps, family_steps = relate_patterns(
-            family_steps, companion_base,
-            relationship=config.pattern_relationship,
-            cycle_steps=16,
-        )
-        # Remap secondary hits into the chosen pattern family, retaining the
-        # four structural break anchors from the selected break style.
+        # A zero structural-variation setting must preserve a stable,
+        # repeatable phrase. Otherwise choose a section-aware family cell.
         bar_hits = list(selected)
-        if len(family_steps) >= 2:
-            anchors = [item for item in bar_hits if item[0] in {0, 4, 8, 12}]
-            ornaments = [item for item in bar_hits if item[0] not in {0, 4, 8, 12}]
-            remapped = []
-            selected_steps = companion_steps if config.pattern_relationship in {"shadow", "call_response", "counter_accent"} else family_steps
-            for index, item in enumerate(ornaments):
-                if index >= len(selected_steps):
-                    break
-                step, kind, priority, velocity, pan = item
-                remapped.append((selected_steps[index], kind, priority, velocity, pan))
-            bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
+        if config.composition_variation > 0.0:
+            family_steps = pattern_for_section(
+                config.pattern_family,
+                section_index=section.index,
+                section_name=section.name,
+                variation=config.composition_variation,
+                density=float(section.density),
+                rng=rng,
+            )
+            companion_family = config.pattern_family
+            if companion_family == "interlock_a":
+                companion_family = "interlock_b"
+            elif companion_family == "interlock_b":
+                companion_family = "interlock_a"
+            elif companion_family == "broken_funk":
+                companion_family = "offbeat_cells"
+            elif companion_family == "straight":
+                companion_family = "clave_displaced"
+            companion_rng = np.random.default_rng(int(rng.integers(0, 2**32 - 1)))
+            companion_base = pattern_for_section(
+                companion_family,
+                section_index=section.index + 1,
+                section_name=section.name,
+                variation=config.composition_variation,
+                density=float(section.density),
+                rng=companion_rng,
+            )
+            companion_steps, family_steps = relate_patterns(
+                family_steps, companion_base,
+                relationship=config.pattern_relationship,
+                cycle_steps=16,
+            )
+            if len(family_steps) >= 2:
+                anchors = [item for item in bar_hits if item[0] in {0, 4, 8, 12}]
+                ornaments = [item for item in bar_hits if item[0] not in {0, 4, 8, 12}]
+                remapped = []
+                selected_steps = (
+                    companion_steps
+                    if config.pattern_relationship in {"shadow", "call_response", "counter_accent"}
+                    else family_steps
+                )
+                for index, item in enumerate(ornaments):
+                    if index >= len(selected_steps):
+                        break
+                    step, kind, priority, velocity, pan = item
+                    remapped.append((selected_steps[index], kind, priority, velocity, pan))
+                bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
         if is_phrase_end and config.break_variation > 0.0:
             anchor_steps = {
