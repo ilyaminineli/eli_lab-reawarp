@@ -238,10 +238,6 @@ def build_drum_part_plan(
             )
 
         kick_steps = role_steps("kick", kick_family)
-        snare_seed = derive_seed(
-            config.seed, f"drum-relate:{section.index}:snare:{config.pattern_relationship}"
-        )
-        snare_rng = np.random.default_rng(snare_seed)
         snare_steps = role_steps("snare", snare_family)
         kick_steps, snare_steps = relate_patterns(
             kick_steps, snare_steps,
