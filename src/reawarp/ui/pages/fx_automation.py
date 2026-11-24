@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp.fx_automation import (
-    FX_AUTOMATION_CURVES, automation_targets, load_fx_automation,
+    FX_AUTOMATION_CURVES, FX_AUTOMATION_MAX_POINTS, automation_targets, load_fx_automation,
     normalise_fx_automation, save_fx_automation,
 )
 
@@ -171,6 +171,9 @@ class FXAutomationEditor(QGroupBox):
         if target is None:
             return
         points = list(self._automation["lanes"].get(target, []))
+        if len(points) >= FX_AUTOMATION_MAX_POINTS:
+            self.status.setText(f"A lane can contain at most {FX_AUTOMATION_MAX_POINTS} points.")
+            return
         point = self._point_from_controls()
         if any(abs(float(item["beat"]) - point["beat"]) < 1e-6 for item in points):
             self.status.setText("A point already exists at that beat. Select it and use UPDATE.")
