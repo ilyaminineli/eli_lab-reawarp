@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
@@ -16,6 +17,8 @@ class GenerationConfig:
     duration: float = 24.0
     structure: str = "evolving"
     composition_flow: str = "preset"
+    pattern_family: str = "broken_funk"
+    pattern_relationship: str = "interlock"
     composition_energy: float = 0.62
     composition_variation: float = 0.45
     sample_rate: int = 48_000
@@ -58,6 +61,10 @@ class GenerationConfig:
             raise ValueError("unknown composition structure")
         if self.composition_flow not in {"preset", "mix", "mutate"}:
             raise ValueError("composition_flow must be preset, mix, or mutate")
+        if self.pattern_family not in PATTERN_FAMILIES:
+            raise ValueError(f"unknown pattern family: {self.pattern_family}")
+        if self.pattern_relationship not in PATTERN_RELATIONSHIPS:
+            raise ValueError(f"unknown pattern relationship: {self.pattern_relationship}")
         if self.synth_palette not in SYNTH_PALETTES:
             raise ValueError("unknown synth palette")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
