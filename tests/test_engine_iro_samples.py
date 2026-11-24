@@ -6,8 +6,8 @@ from reawarp.samples.iro import load_drum_assets
 
 def test_iro_samples_render_as_role_aligned_stems_with_provenance():
     assets = load_drum_assets()
-    kick = next(item for item in assets if item.role == "kick")
-    snare = next(item for item in assets if item.role == "snare")
+    kick = next(item for item in assets if item.available and item.role == "kick")
+    snare = next(item for item in assets if item.available and item.role == "snare")
     config = GenerationConfig(
         duration=5.0,
         bpm=120.0,
