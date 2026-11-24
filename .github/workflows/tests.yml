@@ -30,8 +30,8 @@ jobs:
             libxcb-render-util0 libxcb-xinerama0 libxcb-xfixes0
       - name: Install package and test dependencies
         run: python -m pip install -e ".[dev,audio,m4,midi]"
-      - name: Syntax-check legacy M7 updater
-        run: python -m py_compile apply_m7_update.py
+      - name: Compile application package
+        run: python -m compileall -q src/reawarp
       - name: Run test suite
         env:
           QT_QPA_PLATFORM: offscreen
