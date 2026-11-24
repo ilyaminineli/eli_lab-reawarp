@@ -237,11 +237,7 @@ def _build_break_events(
         previous_section_index = section.index
 
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
-        if (
-            is_phrase_end
-            and config.break_variation > 0.0
-            and (bar + 1) % int(config.break_cycle_bars) == 0
-        ):
+        if is_phrase_end and config.break_variation > 0.0:
             anchor_steps = {
                 step for step, _kind, priority, _velocity, _pan in template
                 if priority >= 0.88
