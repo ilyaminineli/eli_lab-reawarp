@@ -23,6 +23,8 @@ from reawarp.synthesis.instruments import (
     render_kick,
     render_noise_texture,
     render_snare,
+    render_subtractive_note,
+    render_synthetic_percussion,
 )
 from reawarp.synthesis.profiles import (
     AUTO_HAT_PROFILES,
@@ -314,24 +316,40 @@ class ReawarpEngine:
 
         melody_profile: str | None = None
         if config.include_melody:
-            melody_profile = select_profile_name(
-                config.melody_profile,
-                MELODY_PROFILES,
-                streams.get("melody_profile"),
-                auto_choices=AUTO_MELODY_PROFILES,
-            )
+            if config.synth_palette == "subtractive":
+                melody_profile = select_profile_name(
+                    config.melody_profile,
+                    __import__("reawarp.synthesis.profiles", fromlist=["SUBTRACTIVE_VOICES"]).SUBTRACTIVE_VOICES,
+                    streams.get("melody_profile"),
+                    auto_choices=AUTO_MELODY_PROFILES,
+                )
+            else:
+                melody_profile = select_profile_name(
+                    config.melody_profile,
+                    MELODY_PROFILES,
+                    streams.get("melody_profile"),
+                    auto_choices=AUTO_MELODY_PROFILES,
+                )
             melody_stem = new_stem("melody")
             for event in melody_events:
                 section = section_for_time(composition_plan, event.time)
                 if not section.melody:
                     continue
                 effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
-                signal = render_extended_note(
-                    effective_frequency, sample_rate, streams.get("melody_synthesis"),
-                    duration=event.duration, velocity=event.velocity,
-                    palette=config.synth_palette, brightness=section.brightness,
-                    instability=section.instability,
-                )
+                if config.synth_palette == "subtractive":
+                    signal = render_subtractive_note(
+                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                        duration=event.duration, velocity=event.velocity,
+                        profile=melody_profile, brightness=section.brightness,
+                        instability=section.instability,
+                    )
+                else:
+                    signal = render_extended_note(
+                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                        duration=event.duration, velocity=event.velocity,
+                        palette=config.synth_palette, brightness=section.brightness,
+                        instability=section.instability,
+                    )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
                 record.update({
