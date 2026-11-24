@@ -178,10 +178,20 @@ def _build_break_events(
             density=float(section.density),
             rng=rng,
         )
-        # Treat the second pattern as a companion line. The selected relation
-        # determines whether it reinforces, answers, shadows or interlocks.
+        # Derive a related companion phrase. A deterministic offset stream
+        # avoids sharing the main pattern's exact event set except for unison.
+        companion_seed = int(rng.integers(0, 2**32 - 1))
+        companion_rng = np.random.default_rng(companion_seed)
+        companion_base = pattern_for_section(
+            config.pattern_family,
+            section_index=section.index + 1,
+            section_name=section.name,
+            variation=config.composition_variation,
+            density=float(section.density),
+            rng=companion_rng,
+        )
         companion_steps, family_steps = relate_patterns(
-            family_steps, family_steps,
+            family_steps, companion_base,
             relationship=config.pattern_relationship,
             cycle_steps=16,
         )
