@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.composition.director import STRUCTURES
+from reawarp.mathematics.theory import SCALE_STEPS
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
 )
@@ -21,7 +23,9 @@ class GenerationConfig:
     composition_flow: str = "preset"
     pattern_family: str = "broken_funk"
     pattern_relationship: str = "interlock"
-    pattern_follow_structure: bool = False
+    pattern_follow_structure: bool = True
+    drum_change_intensity: float = 0.68
+    drum_part_cycle_bars: int = 2
     composition_energy: float = 0.62
     composition_variation: float = 0.45
     sample_rate: int = 48_000
@@ -39,6 +43,12 @@ class GenerationConfig:
     melody_profile: str = "auto"
     synth_palette: str = "subtractive"
     percussion_synthesis: str = "minimal"
+    percussion_source_mode: str = "automatic"
+    percussion_hybrid_architecture: str = "transient_body"
+    percussion_sample_mix: float = 0.46
+    hybrid_transient_ms: float = 28.0
+    melody_scale: str = "chromatic"
+    melody_root: int = 0
     break_style: str = "broken_funk"
     break_density: float = 0.50
     break_variation: float = 0.25
@@ -62,8 +72,8 @@ class GenerationConfig:
             raise ValueError("duration must be between 5 and 180 seconds")
         if not 22_050 <= int(self.sample_rate) <= 192_000:
             raise ValueError("sample_rate must be between 22050 and 192000 Hz")
-        if self.structure not in {"evolving", "additive", "subtractive", "episodic", "drift", "classical_arc", "sonata_mutation", "free_jazz", "free_jazz_episodic", "autechre_like", "minimal_variation", "hybrid"}:
-            raise ValueError("unknown composition structure")
+        if self.structure not in STRUCTURES:
+            raise ValueError(f"unknown composition structure: {self.structure}")
         if self.composition_flow not in {"preset", "mix", "mutate"}:
             raise ValueError("composition_flow must be preset, mix, or mutate")
         if self.pattern_family not in PATTERN_FAMILIES:
@@ -74,6 +84,22 @@ class GenerationConfig:
             raise ValueError("unknown synth palette")
         if self.percussion_synthesis not in {"minimal", "extended", "samples"}:
             raise ValueError("percussion_synthesis must be minimal, extended, or samples")
+        if self.percussion_source_mode not in {"automatic", "synth", "sample", "hybrid"}:
+            raise ValueError("percussion_source_mode must be automatic, synth, sample, or hybrid")
+        if self.percussion_hybrid_architecture not in {"transient_body", "layered"}:
+            raise ValueError("percussion_hybrid_architecture must be transient_body or layered")
+        if not 0.0 <= float(self.percussion_sample_mix) <= 1.0:
+            raise ValueError("percussion_sample_mix must be between 0 and 1")
+        if not 5.0 <= float(self.hybrid_transient_ms) <= 200.0:
+            raise ValueError("hybrid_transient_ms must be between 5 and 200 ms")
+        if self.melody_scale not in SCALE_STEPS:
+            raise ValueError(f"unknown melody scale: {self.melody_scale}")
+        if not 0 <= int(self.melody_root) <= 11:
+            raise ValueError("melody_root must be a pitch class from 0 to 11")
+        if not 0.0 <= float(self.drum_change_intensity) <= 1.0:
+            raise ValueError("drum_change_intensity must be between 0 and 1")
+        if int(self.drum_part_cycle_bars) not in (1, 2, 4):
+            raise ValueError("drum_part_cycle_bars must be 1, 2, or 4")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
             raise ValueError("composition_energy must be between 0 and 1")
         if not 0.0 <= float(self.composition_variation) <= 1.0:
