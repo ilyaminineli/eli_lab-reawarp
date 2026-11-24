@@ -6,6 +6,7 @@ import numpy as np
 
 from reawarp.synthesis.envelopes import exponential_decay
 from reawarp.synthesis.profiles import (
+    EXTENDED_MELODY_PROFILES,
     HAT_PROFILES,
     KICK_PROFILES,
     MELODY_PROFILES,
@@ -282,6 +283,8 @@ def render_extended_note(
     rng_phase = rng.uniform(0.0, 2.0 * np.pi, 12)
     signal = np.zeros(length, dtype=np.float64)
 
+    # Data-driven inharmonic/modal-style voices provide reproducible partial recipes.
+    # For these palettes, the recipe is used to distribute partial ratios/decays.
     if palette in {"additive", "inharmonic"}:
         ratios = (
             (1.0, .60), (2.0, .24), (3.0, .12), (4.0, .07), (5.0, .035),
