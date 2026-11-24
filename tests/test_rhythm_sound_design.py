@@ -227,6 +227,7 @@ def test_new_pattern_families_preserve_grid_and_are_reproducible():
         config = GenerationConfig(
             bpm=128, duration=8.0, sample_rate=22_050, seed=991,
             pattern_family=family, pattern_relationship="shadow",
+            pattern_follow_structure=True,
         )
         first = _break_events(config)
         second = _break_events(config)
