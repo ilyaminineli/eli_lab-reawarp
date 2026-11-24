@@ -242,7 +242,7 @@ The main reawarp command can also export MIDI for a freshly generated render wit
 
 MIDI 1.0 note numbers are integer semitones. Reawarp rounds fractional pitches to the nearest MIDI note for ordinary playback, while embedding exact pitch, frequency, event identity, and Reawarp metadata in text meta events for a Reawarp-to-Reawarp round trip. Linear tempo ramps are sampled into discrete MIDI tempo events. The score model remains the authoritative representation.
 
-M16 adds a score-native offline render entry point with tempo-map-aware frame scheduling, meter queries, and typed frame-addressed automation. The existing Generator still converts its legacy seconds-based events into the universal score after generation; migrating every production planner and synthesis voice to consume score events directly remains open. See the [M16 implementation guide](docs/M16.md).
+M16 adds the score-native offline renderer, tempo-map-aware frame scheduling, meter queries, and typed frame-addressed automation. M17.5 completes the Score-first cutover: the default `ReawarpEngine.generate()` plans a canonical rational-beat Score before rendering event-backed voices, and project event dictionaries are derived compatibility/export views. Specialised whole-field texture and ambience passes remain outside event-level scheduling; `generate_legacy()` is retained for comparison. See [M16/M17 implementation details](docs/M16.md) and the [post-M17 roadmap](docs/ROADMAP.md).
 
 ## Determinism
 
@@ -336,7 +336,8 @@ See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented b
 The current implementation baseline is **M13 with M14 in progress**. M14 has added initial regression coverage, signal diagnostics, render-phase timings, a benchmark harness and a grouped project-centred workspace shell. Its target-machine profiling and expanded validation are still pending. The next milestones deepen composition direction, score-driven rendering, synthesis automation, mixer quality and selected advanced DSP modules.
 
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
-- [Consolidated Roadmap](docs/ROADMAP.md) — implementation status and M14–M20 forward plan.
+- [Consolidated Roadmap](docs/ROADMAP.md) — post-M17.5 status and M18–M25 forward plan.
+- [Architecture and Musical Reassessment](docs/REASSESSMENT.md) — philosophy-to-architecture gaps and sequencing rationale.
 - [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
 - [M16 Score-driven Render Core](docs/M16.md) — frame-accurate score scheduling, typed automation and migration status.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
