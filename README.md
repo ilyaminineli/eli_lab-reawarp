@@ -29,12 +29,15 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Optional Pyo offline processing with high/low/band-pass filters, saturation, delay, frequency shift, and Freeverb stages.
 - Four starting chains: restrained space, tape echo, metallic machine, and digital fracture.
 - M11 adds a serial-chain editor: add/remove stages, reorder processing, edit each stage’s parameters and mix, and save/load portable versioned JSON chains.
+- M12 adds per-stem inserts and shared SPACE/ECHO sends/returns in the Stem Mixer, with a separate offline routing render and non-destructive export.
 - Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
 - The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
 
-### Editable processing chains (M11)
+### Editable processing chains and role-aware routing (M11–M12)
 
-Custom FX chains use a portable JSON object with `schema_version: 1`, a name, global wet/tail settings, and an ordered array of stages. Each stage keeps its own parameters and mix. The serial order is intentional: distortion before a filter is not equivalent to a filter before distortion. The editor keeps a dry source reference and does not insert processing into generated stems yet; role-aware per-stem routing is a later milestone.
+M11's serial chain editor supports add/remove/reorder operations, bounded stage parameters, per-stage wet/dry, global wet/tail, and portable versioned JSON.
+
+M12 brings those chains into the generated-project Stem Mixer. Each stem can have its own insert and post-insert sends to shared SPACE and ECHO returns. Routing is an offline pass; the generated dry stem buffers are preserved. The routed master, return WAVs, and portable fx_routing.json are exported separately. Pyo remains optional and is needed only when an active insert or send is rendered.
 
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
@@ -135,6 +138,19 @@ Pitch/time/granular operations accept their own controls:
     reawarp --break-sample samples/Breaks/my_break.wav --break-transforms pitch_shift,time_stretch,granular --break-pitch-semitones 5 --break-time-stretch 1.25 --break-grain-size-ms 75 --break-grain-density 1.6 --output output/warped
 
 The output contains master.wav, a stems/ directory, project.json, events.json, and the synthesizer-independent score.json.
+
+## Role-aware per-stem FX routing (M12)
+
+After exporting a generated project, create a starter routing document:
+
+    reawarp-routing output/my-composition --output output/routed
+
+Validate or render a routing file without overwriting the source project:
+
+    reawarp-routing output/my-composition --routing my-routing.json --validate
+    reawarp-routing output/my-composition --routing my-routing.json --output output/routed
+
+The Stem Mixer also exposes per-stem inserts and shared SPACE/ECHO send levels. Routing JSON, shared return WAVs, and the routed master are exported separately; original stems remain dry and unchanged. See [M12 role-aware FX routing](docs/M12.md).
 
 ## Python API
 
