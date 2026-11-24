@@ -167,12 +167,18 @@ def _build_break_events(
 
     for bar in range(bar_count):
         section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
+        # Preserve the established density and phrase-cycle semantics exactly.
+        # The base grammar is always the existing BREAK_PATTERNS template.
         target_count = 4 + int(round(float(config.break_density) * 4.0))
         selected = sorted(
             sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
             key=lambda item: item[0],
         )
         bar_hits = list(selected)
+
+        # Only opt into pattern-family remapping when structural variation is
+        # enabled. The default variation value keeps the M8 feature active,
+        # while variation=0 remains fully backward-compatible.
         if config.composition_variation > 0.0:
             family_steps = pattern_for_section(
                 config.pattern_family,
@@ -220,6 +226,7 @@ def _build_break_events(
                     _step, kind, priority, velocity, pan = item
                     remapped.append((selected_steps[index], kind, priority, velocity, pan))
                 bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
+
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
         if is_phrase_end and config.break_variation > 0.0:
             anchor_steps = {
