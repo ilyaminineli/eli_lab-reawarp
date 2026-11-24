@@ -178,12 +178,21 @@ def _build_break_events(
             density=float(section.density),
             rng=rng,
         )
-        # Derive a related companion phrase. A deterministic offset stream
-        # avoids sharing the main pattern's exact event set except for unison.
+        # Companion line uses a distinct deterministic family cycle so that
+        # shadow/call-response/interlock relationships can be heard.
+        companion_family = config.pattern_family
+        if companion_family == "interlock_a":
+            companion_family = "interlock_b"
+        elif companion_family == "interlock_b":
+            companion_family = "interlock_a"
+        elif companion_family == "broken_funk":
+            companion_family = "offbeat_cells"
+        elif companion_family == "straight":
+            companion_family = "clave_displaced"
         companion_seed = int(rng.integers(0, 2**32 - 1))
         companion_rng = np.random.default_rng(companion_seed)
         companion_base = pattern_for_section(
-            config.pattern_family,
+            companion_family,
             section_index=section.index + 1,
             section_name=section.name,
             variation=config.composition_variation,
