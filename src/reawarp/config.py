@@ -32,6 +32,7 @@ class GenerationConfig:
     include_ambience: bool = True
     ambience_level: float = 0.16
     sample_paths: dict[str, str] = field(default_factory=dict)
+    sample_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
     kick_profile: str = "auto"
     snare_profile: str = "auto"
     hat_profile: str = "auto"
@@ -86,6 +87,15 @@ class GenerationConfig:
         for role, path in self.sample_paths.items():
             if not str(path).strip():
                 raise ValueError(f"sample path for {role} cannot be empty")
+        unknown_metadata = set(self.sample_metadata) - set(self.sample_paths)
+        if unknown_metadata:
+            raise ValueError(
+                "sample metadata has no matching sample path for: "
+                + ", ".join(sorted(unknown_metadata))
+            )
+        for role, metadata in self.sample_metadata.items():
+            if not isinstance(metadata, dict):
+                raise ValueError(f"sample metadata for {role} must be a JSON object")
 
         if self.kick_profile != "auto" and self.kick_profile not in KICK_PROFILES:
             raise ValueError(f"unknown kick profile: {self.kick_profile}")
