@@ -195,7 +195,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 
 - Internal format: NumPy float32, stereo.
 - Default sample rate: 48 kHz.
-- Duration: 5–45 seconds.
+- Duration: 5–180 seconds (up to three minutes).
 - BPM: 60–220.
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
@@ -212,7 +212,7 @@ or:
 
     python -m reawarp.ui
 
-The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator now exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md). The M6 library is currently exposed through the Python API and `reawarp-library` CLI.
+The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. The Library provides local indexing, search, similarity, collections, and audition, with matching `reawarp-library` CLI commands. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md).
 
 ## Local sample and stem library (M6)
 
@@ -267,6 +267,6 @@ Use the same formal controls in the command line or the desktop Generator:
 
 Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
 
-The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The shared ELI LAB icon is packaged for the application window and system tray.
+The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
 
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.

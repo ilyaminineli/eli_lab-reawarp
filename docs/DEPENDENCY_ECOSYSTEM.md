@@ -15,12 +15,12 @@ Before bundling any dependency in a desktop release, re-check the current suppor
 | NumPy + custom Reawarp DSP | Deterministic reference renderer and offline stem engine | Core; required |
 | SciPy | Optional signal-processing utilities and future filter/analysis helpers | Optional `audio` extra; never required by the core |
 | Pyo | Offline DSP chains for the M10 FX Lab; filters, distortion, delay, reverb | Implemented as an optional `pyo` extra; lazy-loaded and isolated from NumPy generation |
-| Pippi | Experimental buffer, wavetable, window, and granular sound design | Optional `research` extra; evaluate 2.x API stability before release use |
+| Pippi | Experimental buffer, wavetable, window, and granular sound design | Isolated optional `pippi` beta extra; Windows native build caveat |
 | pyFluidSynth | SF2 SoundFont playback and pitched source material | Optional `soundfont` extra; native FluidSynth runtime is required |
 | ctcsound / Csound | Offline physical modelling, resonators, and complex modulation | External backend candidate; Python bindings must match the installed Csound API, especially across the 6/7 API boundary |
 | SuperCollider / sc3nb | Interactive synthesis graphs and sonification | External experimental backend; keep independent of the core runtime |
 
-The implementation remains NumPy-first. M9 adds a genuine subtractive voice path and a transient/body/tail percussion renderer that does not call the melodic FM engine. The `minimal` percussion mode is the default; `extended` adds resonant detail; `samples` retains the existing profile-based drum path. The M8 additive, inharmonic, modal, granular and scanned reference voices remain available as explicit lead architectures, Pyo is now an optional offline FX backend; Pippi remains a pre-release research dependency. FluidSynth is useful as a source instrument, not as the central renderer.
+The implementation remains NumPy-first. M9 adds a genuine subtractive voice path and a transient/body/tail percussion renderer that does not call the melodic FM engine. The `minimal` percussion mode is the default; `extended` adds resonant detail; `samples` retains the existing profile-based drum path. The M8 additive, inharmonic, modal, granular, and scanned voices remain selectable lead architectures. M10 adds Pyo as an optional offline FX backend; Pippi remains a pre-release research dependency. FluidSynth is useful as a source instrument, not as the central renderer.
 
 ### M8 sound-design library decisions
 
@@ -28,7 +28,7 @@ The implementation remains NumPy-first. M9 adds a genuine subtractive voice path
 |---|---|---|
 | NumPy FFT and oscillator bank | Reference additive, inharmonic, scanned and spectral utilities | Core; deterministic |
 | SciPy | Higher-order filters, resampling, convolution helpers and future oversampled nonlinear DSP | Optional `audio` / `synthesis` extra |
-| Pippi | Buffer manipulation, wavetable preparation, granular and windowing experiments | Optional `research` extra; isolate behind adapter and test on Windows |
+| Pippi | Buffer manipulation, wavetable preparation, granular and windowing experiments | Separate `pippi` pre-release extra; evaluate native build on Windows before use |
 | Csound / ctcsound | Modal, physical-model, resonator and complex modulation backends | Candidate external backend; requires matching native runtime |
 | SuperCollider / sc3nb | Synthesis graph prototyping, feedback networks and spectral-delay research | External experimental backend |
 | Pyo | Offline effect processing and future live modulation/preview | Implemented for the M10 FX Lab through Pyo offline server mode; not used by the base renderer |
@@ -103,7 +103,9 @@ The installable extras in `pyproject.toml` are deliberately limited to adapters 
 | `m4` | PySide6, pyqtgraph 0.14.x, SoundDevice | Combined desktop and playback installation |
 | `synthesis` | SciPy | Optional higher-level filters and resampling |
 | `pyo` | Pyo, SoundFile | Optional M10 offline FX Lab backend |
-| `pippi` | Pippi 2.0.0b16 beta | Experimental buffer/wavetable research; Windows source-build caveat |\n| `research` | Pippi, librosa | Experimental buffer synthesis and feature research |\n| `dev` | pytest, Ruff | Development checks; the repository may temporarily omit a local test suite during milestone transitions |
+| `pippi` | Pippi 2.0.0b16 beta | Experimental buffer/wavetable research; Windows source-build caveat |
+| `research` | librosa | Offline analysis research |
+| `dev` | pytest, Ruff | Development and code-quality tools; no unit-test suite is currently checked in |
 
 Pippi, ctcsound, SuperCollider, Essentia, aubio, Xenharmlib, MusPy, and dataset repositories are not added as unconditional dependencies. Pyo is optional, and the remaining candidates have native software, platform, experimental, or licensing constraints that require a dedicated release review.
 
@@ -122,7 +124,8 @@ No external project should be copied into Reawarp merely because it is useful. P
 - **M7 — implemented:** section-aware motifs, layer regeneration, workspaces, and searchable library.
 - **M8 — implemented:** up-to-three-minute formal presets and flow modes, pattern relationships, motif transformations, and selectable native synthesis palettes.
 - **M9 — implemented:** minimal subtractive lead and transient/body/tail drum renderers, sparser default drum generation, requirements inventory, and monochrome UI refinement.
-- **M10 — implemented:** optional Pyo offline FX backend, four effect chains, non-destructive FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI. Convolution, spectral delay, FDN design, cross-synthesis, oversampling, and per-stem inserts remain follow-on modules.
+- **M10 — implemented:** optional Pyo offline FX backend, four starter chains, non-destructive FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
+- **M11 — in progress:** editable ordered FX chains, per-stage parameter editing, and portable chain JSON. Per-stem routing, tempo-synced delay, convolution, spectral delay, FDNs, cross-synthesis, and oversampling remain follow-on modules.
 
 The project should grow through small, testable adapters. Its identity remains in its mathematics, event model, and deterministic renderer.
 
