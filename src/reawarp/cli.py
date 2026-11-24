@@ -26,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--flow", choices=("preset", "mix", "mutate"), default="preset", help="keep the preset, cross-mix its sections, or mutate its middle flow")
     parser.add_argument("--pattern-family", choices=tuple(PATTERN_FAMILIES), default="broken_funk", help="structure-aware rhythmic family")
     parser.add_argument("--pattern-relationship", choices=PATTERN_RELATIONSHIPS, default="interlock", help="relationship between pattern voices")
+    parser.add_argument("--pattern-follow-structure", action="store_true", help="automatically switch pattern families at formal section boundaries")
     parser.add_argument("--synth-palette", choices=SYNTH_PALETTES, default="hybrid", help="lead synthesis architecture palette")
     parser.add_argument("--energy", type=float, default=0.62, help="composition energy target, not output gain (0–1)")
     parser.add_argument("--variation", type=float, default=0.45, help="bounded formal variation (0–1)")
@@ -112,6 +113,7 @@ def main() -> None:
         composition_flow=args.flow,
         pattern_family=args.pattern_family,
         pattern_relationship=args.pattern_relationship,
+        pattern_follow_structure=args.pattern_follow_structure,
         synth_palette=args.synth_palette,
         composition_energy=args.energy,
         composition_variation=args.variation,
