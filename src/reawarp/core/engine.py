@@ -18,7 +18,6 @@ from reawarp.generators.percussion import build_percussion_events
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
-    render_fm_note,
     render_extended_note,
     render_hat,
     render_kick,
@@ -43,7 +42,7 @@ from reawarp.transforms.pipeline import apply_break_transforms
 class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
-    VERSION = "0.7.0"
+    VERSION = "0.8.0"
 
     def generate_variant(
             self,
