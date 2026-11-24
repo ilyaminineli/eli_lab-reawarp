@@ -21,6 +21,7 @@ class GenerationConfig:
     composition_flow: str = "preset"
     pattern_family: str = "broken_funk"
     pattern_relationship: str = "interlock"
+    pattern_follow_structure: bool = False
     composition_energy: float = 0.62
     composition_variation: float = 0.45
     sample_rate: int = 48_000
