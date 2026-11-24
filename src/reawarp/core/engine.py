@@ -44,6 +44,7 @@ from reawarp.synthesis.instruments import (
     render_subtractive_note,
     render_synthetic_percussion,
 )
+from reawarp.synthesis.score_voices import build_production_voice_renderers
 from reawarp.synthesis.profiles import (
     AUTO_HAT_PROFILES,
     AUTO_KICK_PROFILES,
@@ -72,10 +73,15 @@ class ReawarpEngine:
             sample_rate: int | None = None,
             frame_count: int | None = None,
             voice_renderers: dict[str, Any] | None = None,
+            config: GenerationConfig | None = None,
     ) -> ScoreRenderResult:
         """Render a canonical score using the shared frame-accurate score core."""
+        if config is not None and voice_renderers is not None:
+            raise ValueError("pass either production config or explicit voice_renderers, not both")
+        if config is not None:
+            voice_renderers = build_production_voice_renderers(config)
         rate = (
-            int(score.metadata.get("sample_rate", 48_000))
+            int(config.sample_rate if config is not None else score.metadata.get("sample_rate", 48_000))
             if sample_rate is None else int(sample_rate)
         )
         return ScoreRenderer().render(
