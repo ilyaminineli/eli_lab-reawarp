@@ -68,7 +68,7 @@ def melody_to_score_events(
     *,
     bpm: float,
     seed: int | None = None,
-    voice_id: str = 'melody',
+    voice_id: str = "melody",
 ) -> tuple[MusicalEvent, ...]:
     """Convert melody events; onset comes from the exact grid, duration is quantised to rational beats."""
     if bpm <= 0:
