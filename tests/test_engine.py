@@ -188,11 +188,11 @@ def test_engine_renders_three_minute_composition_with_new_form_and_palette():
 def test_engine_patterns_change_with_selected_section_grammar():
     base = ReawarpEngine().generate(small_config(
         duration=12.0, seed=813, structure="autechre_like",
-        pattern_family="broken_funk", pattern_relationship="interlock",
+        pattern_family="broken_funk", pattern_relationship="interlock", pattern_follow_structure=True,
     ))
     altered = ReawarpEngine().generate(small_config(
         duration=12.0, seed=813, structure="autechre_like",
-        pattern_family="asymmetric_7", pattern_relationship="shadow",
+        pattern_family="asymmetric_7", pattern_relationship="shadow", pattern_follow_structure=True,
     ))
     base_steps = [event["step"] % 16 for event in base.events
                   if event.get("lane") == "break"]
