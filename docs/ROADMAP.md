@@ -123,7 +123,7 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 See M16.md for implementation details and the score-render API.
 ## M17: Canonical score-native composition pipeline
 
-**Status:** Partially implemented. M17.1 planner adapters and M17.2 deterministic production voice callbacks are in place. The legacy `ReawarpEngine.generate()` path still renders using its existing event loop; the canonical score is not yet the end-to-end generation authority.
+**Status:** Partially implemented. M17.1 planner adapters, M17.2 deterministic production voice callbacks, and M17.3 scheduled sample/break production callbacks are in place. The canonical score renderer can now render synthesis, sample-only, hybrid and imported-break event sources; the legacy `ReawarpEngine.generate()` path still uses its existing event loop.
 
 **Goal:** Make the universal score the only event-scheduling authority while preserving the existing M8–M15 musical grammar, instrument catalogue, sample bank logic and non-destructive production workflow.
 
@@ -140,7 +140,7 @@ See M16.md for implementation details and the score-render API.
 
 1. **M17.1 — Planner emission:** percussion and melody planner adapters emit MusicalEvent from sixteenth-grid positions; stable motif/style/role metadata and named stream seeds are retained. A compatibility projection exists for legacy consumers. Melody notes carry separate gate and scheduled release spans.
 2. **M17.2 — Production voices (implemented adapter layer):** `synthesis/score_voices.py` supplies deterministic per-event callbacks for subtractive, FM/hybrid and extended melody palettes, profile-based kick/snare/hat, and synthetic break voices. `ReawarpEngine.render_score(score, config=config)` builds the callbacks automatically; callers can still supply explicit custom callbacks. Callbacks use event-derived random streams and the shared control bus for pitch-at-onset, cutoff/resonance and gain automation. Each result is fitted to the exact scheduled frame span. This does not yet replace the legacy `generate()` rendering path.
-3. **M17.3 — Samples and breaks:** schedule sample-bank triggers, hybrid transient/body layers and imported break slices against absolute score frames. Sample-only production callbacks currently return silence until this adapter lands.
+3. **M17.3 — Samples and breaks (implemented adapter layer):** `synthesis/score_samples.py` turns drum hits into first-class sample trigger events, preserves sample/IRO metadata and indexed features, and resolves deterministic anchor/section/cycle/return variant choices from score metadata. Hybrid transient/body and layered sample sources are mixed as separate same-onset score events. Imported break assets are transformed, transient-sliced and trimmed to the next trigger or current bar boundary in absolute scheduled frames, with 2 ms edge fades. `render_score(score, config=config)` now composes these callbacks with M17.2 synthesis voices. The legacy `generate()` event loop remains unchanged.
 4. **M17.4 — FX automation:** map M13 curves and routing targets to typed score automation without breaking JSON import/export.
 5. **M17.5 — Cutover:** generate the canonical Score before audio rendering; make project event records a derived compatibility/export view.
 
@@ -149,7 +149,7 @@ See M16.md for implementation details and the score-render API.
 - Fixed seeds produce identical score JSON and repeatable stems.
 - No event time is routed through a seconds-based intermediate before frame placement.
 - Specialist voice callbacks use the event schedule, return exact-length finite buffers and do not share mutable RNG state.
-- Sample variant switching, motif cross-role relationships, hybrid percussion and break-slice trimming preserve existing musical semantics.
+- Sample variant switching, motif cross-role relationships, hybrid percussion and break-slice trimming preserve existing musical semantics; sample source decisions and provenance are retained as score metadata.
 - Existing exported projects and automation files remain readable.
 - All event-backed production lanes render through ScoreRenderer; texture/ambience whole-field renderers may remain specialised until they have event-level semantics.
 - Listening and target-machine performance sign-offs remain separate from automated test acceptance.

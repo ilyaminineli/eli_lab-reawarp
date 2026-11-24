@@ -261,6 +261,10 @@ def _percussion_renderer(
                         pitch_hz = SNARE_PROFILES[profile].body_frequency
                     elif role == "hat" and profile in HAT_PROFILES:
                         pitch_hz = HAT_PROFILES[profile].partials[0][0]
+                if pitch_hz is not None:
+                    pitch_hz = float(pitch_hz) * float(
+                        parameters.get("synthesis_pitch_ratio", 1.0)
+                    )
                 synth_duration = {"kick": 0.19, "snare": 0.17, "hat": 0.085}[role]
                 audio = render_synthetic_percussion(
                     voice, sample_rate, rng, duration=synth_duration, velocity=1.0,

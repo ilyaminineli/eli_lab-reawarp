@@ -78,12 +78,38 @@ class ReawarpEngine:
         """Render a canonical score using the shared frame-accurate score core."""
         if config is not None and voice_renderers is not None:
             raise ValueError("pass either production config or explicit voice_renderers, not both")
-        if config is not None:
-            voice_renderers = build_production_voice_renderers(config)
         rate = (
             int(config.sample_rate if config is not None else score.metadata.get("sample_rate", 48_000))
             if sample_rate is None else int(sample_rate)
         )
+        if config is not None:
+            from reawarp.synthesis.score_samples import prepare_score_sample_renderers
+
+            render_config = (
+                replace(config, sample_rate=rate)
+                if int(config.sample_rate) != rate else config
+            )
+            prepared_samples = prepare_score_sample_renderers(score, render_config)
+            score = prepared_samples.score
+            production_renderers = build_production_voice_renderers(render_config)
+            for role, sample_renderer in prepared_samples.voice_renderers.items():
+                base_renderer = production_renderers.get(role)
+                if base_renderer is None:
+                    production_renderers[role] = sample_renderer
+                    continue
+
+                def render_combined(
+                    scheduled, callback_rate, controls,
+                    _base=base_renderer, _sample=sample_renderer,
+                ):
+                    if scheduled.event.kind == "trigger":
+                        return _sample(scheduled, callback_rate, controls)
+                    return _base(scheduled, callback_rate, controls)
+
+                production_renderers[role] = render_combined
+            voice_renderers = production_renderers
+            if frame_count is None:
+                frame_count = render_config.frame_count
         return ScoreRenderer().render(
             score, rate, frame_count=frame_count, voice_renderers=voice_renderers,
         )
