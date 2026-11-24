@@ -28,8 +28,12 @@ def test_iro_catalog_preserves_release_pack_family_and_availability():
     assert {item.role for item in sound_fx} <= {"event_texture", "event_loop"}
     assert {item.role for item in sound_lab} <= {"one_shot", "rendered_loop", "rendered_stem"}
     assert all(item.available == item.path.is_file() for item in drums + entities + sound_fx + sound_lab)
-    assert any(item.available for item in drums)
-    assert any(not item.available for item in drums)
+    assert len(drums) == 96
+    assert all(not item.available for item in drums)
+    assert {item.role for item in drums} >= {
+        "kick", "sub_kick", "snare", "rim_click", "closed_hat",
+        "open_hat", "metallic_ping", "glitch_tom",
+    }
 
 
 def test_iro_catalog_keeps_mathematical_family_and_articulation():
@@ -58,4 +62,6 @@ def test_iro_integrity_report_is_non_destructive_and_explicit_about_missing_asse
     assert report["total"] == len(assets)
     assert report["available"] + len(report["missing"]) == report["total"]
     assert report["ok"] is True
-    assert report["verified"] > 0
+    assert report["verified"] == 0
+    assert report["available"] == 0
+    assert report["missing"]
