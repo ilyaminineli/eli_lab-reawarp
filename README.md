@@ -80,7 +80,7 @@ The composition duration can be up to three minutes. Example:
 
 Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`, `free_jazz_episodic`, `autechre_like`, `minimal_variation`, and `hybrid`. The `preset` flow preserves the chosen movement sequence, `mix` imports middle movements from a deterministic alternate structure, and `mutate` reorders the inner movements while retaining the opening and ending.
 
-Choose a lead synthesis palette with `--synth-palette`: `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. These are native, deterministic NumPy reference implementations; external synthesis engines remain optional adapters.
+Choose a lead synthesis palette with `--synth-palette`: `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. These are native, deterministic NumPy reference implementations. This M8 release implements additive/inharmonic partial banks, modal resonator approximations, granular micro-clouds and scanned/pulsar-style motion. Convolution, spectral delay, feedback-delay networks, cross-synthesis and oversampled nonlinear processing remain documented follow-on DSP modules; they are not claimed as implemented here. External synthesis engines remain optional adapters.
 
 ## Generate a loop
 
