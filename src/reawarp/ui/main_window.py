@@ -25,7 +25,7 @@ from reawarp.fx_routing import render_fx_routing, render_master_with_returns, sa
 from reawarp.fx_automation import save_fx_automation
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
-    BundledSample, default_sample_for_role, discover_bundled_samples, sample_library_counts,
+    default_sample_for_role, discover_bundled_samples, sample_library_counts,
 )
 from reawarp.mathematics.theory import ROOT_NAMES, SCALE_STEPS
 from reawarp.synthesis.profiles import (
