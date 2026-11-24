@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QThreadPool
+from PySide6.QtCore import QThreadPool, Signal
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QVBoxLayout, QWidget, QInputDialog,
@@ -17,7 +17,9 @@ from reawarp.ui.workers import RenderWorker
 
 
 class LibraryPage(QWidget):
-    """Browse, index, search, and audition local Reawarp audio material."""
+    """Browse, index, search, audition and route sources into the Generator."""
+
+    sampleSelected = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -106,6 +108,20 @@ class LibraryPage(QWidget):
         layout.addWidget(self.results)
         self._iro_assets: dict[str, IROAsset] = {}
         self._result_source = "library"
+        use_row = QHBoxLayout()
+        use_row.addWidget(QLabel("USE SELECTED IN GENERATOR"))
+        self.use_role = QComboBox()
+        self.use_role.addItem("AUTO-DETECT ROLE", "auto")
+        for role, label in (
+            ("kick", "KICK"), ("snare", "SNARE / CLAP"),
+            ("hat", "HAT / CYMBAL"), ("break", "BREAK / PHRASE"),
+        ):
+            self.use_role.addItem(label, role)
+        use_row.addWidget(self.use_role)
+        self.use_generator_button = QPushButton("SEND TO GENERATOR →")
+        self.use_generator_button.clicked.connect(self._use_in_generator)
+        use_row.addWidget(self.use_generator_button)
+        layout.addLayout(use_row)
         self.details = QLabel(
             "Index an audio folder to search samples, generated stems, and project masters."
         )
@@ -116,7 +132,63 @@ class LibraryPage(QWidget):
         layout.addWidget(self.preview, 1)
         self._refresh_collections()
 
+    def _use_in_generator(self) -> None:
+        asset_id = self.results.currentData()
+        if not asset_id:
+            self.details.setText("Select a playable sample before sending it to the Generator.")
+            return
+
+        selected_role = str(self.use_role.currentData() or "auto")
+        path: Path
+        inferred_role: str | None = None
+        if self._result_source == "iro":
+            asset = self._iro_assets.get(str(asset_id))
+            if asset is None:
+                return
+            if not asset.available:
+                self.details.setText(
+                    f"This IRO record is metadata-only; its WAV is not available: {asset.relative_path}"
+                )
+                return
+            path = asset.path
+            inferred_role = {
+                "kick": "kick", "sub_kick": "kick",
+                "snare": "snare", "closed_hat": "hat", "open_hat": "hat",
+                "hat": "hat",
+            }.get(asset.role)
+        else:
+            from reawarp.library.store import SampleLibrary
+
+            try:
+                with SampleLibrary() as library:
+                    asset = library.get_asset(str(asset_id))
+                if asset is None:
+                    self.details.setText("The selected library asset could not be opened.")
+                    return
+                path = Path(asset.path)
+                if asset.role in {"kick", "snare", "hat", "break"}:
+                    inferred_role = asset.role
+            except Exception as exc:
+                self.details.setText(f"Could not send sample to Generator: {exc}")
+                return
+
+        if selected_role == "auto":
+            if inferred_role is None:
+                from reawarp.samples.catalog import classify_sample_role
+                inferred_role = classify_sample_role(path)
+            selected_role = inferred_role or ""
+        if selected_role not in {"kick", "snare", "hat", "break"}:
+            self.details.setText(
+                "Choose KICK, SNARE, HAT or BREAK; this asset has no reliable automatic role."
+            )
+            return
+        self.sampleSelected.emit(selected_role, str(path))
+        self.details.setText(
+            f"SENT TO GENERATOR · {selected_role.upper()} · {path.name}"
+        )
+
     def _search_iro(self) -> None:
+
         scope = self.iro_source.currentText()
         catalog = load_iro_assets()
         packs = {
