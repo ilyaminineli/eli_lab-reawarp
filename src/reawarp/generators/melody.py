@@ -9,6 +9,7 @@ import numpy as np
 
 from reawarp.config import GenerationConfig
 from reawarp.mathematics.sequences import lissajous, logistic_map
+from reawarp.mathematics.theory import scale_midi_notes
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,11 @@ def build_melody_events(
     pitch_offsets = np.asarray([-12, -5, -1, 0, 2, 7, 11, 14, 19], dtype=int)
     events: list[MelodyEvent] = []
     base_note = 48 + int(round((complexity - 0.5) * 8.0))
+    scale_notes = (
+        scale_midi_notes(60 + int(config.melody_root), config.melody_scale, octaves=(-2, -1, 0, 1))
+        if config.melody_scale != "chromatic"
+        else ()
+    )
 
     for index in range(count):
         normalized_time = index / max(1, count - 1)
@@ -63,6 +69,13 @@ def build_melody_events(
             midi_note += 12
         elif y_values[index] < -0.84 and rng.random() < complexity * 0.40:
             midi_note -= 12
+        if scale_notes:
+            # The Lissajous contour still chooses the intended register and
+            # direction; the pitch-field adapter constrains that target to the
+            # selected scale rather than replacing the geometric process.
+            distances = np.abs(np.asarray(scale_notes, dtype=np.int16) - midi_note)
+            nearest = np.flatnonzero(distances == distances.min())
+            midi_note = int(scale_notes[int(rng.choice(nearest))])
         duration = float(np.clip(
             0.12 + (y_values[index] + 1.0) * 0.5 * (0.42 + complexity * 0.28),
             0.10,
