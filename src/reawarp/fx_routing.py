@@ -320,11 +320,13 @@ def render_fx_routing(
             ),
             channels,
         )
-        base_signal = _pad_to(source, len(processed))
+        desired_frames = max(len(source), len(processed))
+        base_signal = _pad_to(source, desired_frames)
+        processed = _pad_to(processed, desired_frames)
         wet_envelope = _automation_lane(
-            lanes, target, frames=len(processed), sample_rate=sample_rate,
+            lanes, target, frames=desired_frames, sample_rate=sample_rate,
             bpm=tempo, default=float(record["wet"]),
-        ) if points else np.full(len(processed), float(record["wet"]), dtype=np.float32)
+        ) if points else np.full(desired_frames, float(record["wet"]), dtype=np.float32)
         returns[bus] = np.ascontiguousarray(
             base_signal * (1.0 - wet_envelope[:, None]) + processed * wet_envelope[:, None],
             dtype=np.float32,
