@@ -19,7 +19,11 @@ from reawarp.transforms.pipeline import BREAK_TRANSFORMS, apply_break_transforms
 def test_silent_and_short_audio_is_safe_for_slice_and_transform_pipeline(audio):
     original = audio.copy()
     assert detect_transients(audio, 22_050) == []
-    assert auto_slice(audio, 22_050) == []
+    slices = auto_slice(audio, 22_050)
+    if len(audio) == 0:
+        assert slices == []
+    else:
+        assert [(item.start, item.end) for item in slices] == [(0, len(audio))]
 
     rendered = apply_break_transforms(
         audio,
