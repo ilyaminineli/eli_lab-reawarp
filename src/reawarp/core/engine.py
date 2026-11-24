@@ -19,6 +19,7 @@ from reawarp.samples.io import read_sample
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
     render_fm_note,
+    render_extended_note,
     render_hat,
     render_kick,
     render_noise_texture,
@@ -324,21 +325,25 @@ class ReawarpEngine:
                 if not section.melody:
                     continue
                 effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
-                signal = render_fm_note(
-                    effective_frequency,
-                    sample_rate,
-                    streams.get("melody_synthesis"),
-                    duration=event.duration,
-                    velocity=event.velocity,
-                    profile=melody_profile,
-                    brightness=section.brightness,
-                    instability=section.instability,
-                )
+                if config.synth_palette in {"hybrid", "fm"}:
+                    signal = render_extended_note(
+                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                        duration=event.duration, velocity=event.velocity,
+                        palette=config.synth_palette, brightness=section.brightness,
+                        instability=section.instability,
+                    )
+                else:
+                    signal = render_extended_note(
+                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                        duration=event.duration, velocity=event.velocity,
+                        palette=config.synth_palette, brightness=section.brightness,
+                        instability=section.instability,
+                    )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
                 record.update({
                     "lane": "melody",
-                    "kind": "profiled_additive_fm_note",
+                    "kind": f"{config.synth_palette}_synth_note",
                     "synthesis_profile": melody_profile,
                 })
                 event_records.append(record)
