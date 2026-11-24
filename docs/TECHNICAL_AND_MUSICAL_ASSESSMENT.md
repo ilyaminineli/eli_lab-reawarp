@@ -88,11 +88,11 @@ The README describes compile and command-line smoke checks, and the M10–M13 do
 
 **Risk:** subtle changes may alter event timing, break independence between random streams, truncate tails, create clicks, damage channel handling, or break old project files without a focused test identifying the regression.
 
-### 2.2 The score model is not yet the canonical composition representation
+### 2.2 The Score is now canonical for event-backed generation; the composition grammar is still evolving
 
-The score model supports rational beat positions, tempo and meter maps, multiple event types, tuning information and automation. However, the README explicitly says that the existing offline renderer does not yet follow arbitrary tempo maps, time-signature changes or score automation. Current generation still uses a configuration-driven engine and its own event builders; conversion to score is downstream.
+M17.5 moves default generation to Score-first planning. `ReawarpEngine.generate()` builds a rational-beat Score before rendering event-backed voices; ScoreRenderer resolves those events to frames; and legacy project event dictionaries are derived compatibility views. The previous renderer remains available as `generate_legacy()` for comparison. Texture and ambience remain specialised whole-field passes represented by Score markers. The high-level planners still inherit constant-BPM and sixteenth-grid assumptions in parts of the composition grammar, so tempo/meter-aware phrase and cycle planning remains a future refinement.
 
-**Risk:** two parallel representations of a composition can drift. MIDI round trips may preserve symbolic information that the audio render never used. Future editing will become complicated if there is no single canonical event/timing model.
+**Risk:** continuous-field renderers and high-level planner assumptions can remain separate conceptual systems if their time and control contracts are not progressively unified. Projected legacy records must never become an alternate scheduling authority.
 
 ### 2.3 The melody generator can feel like a contour generator rather than a developed musical voice
 
@@ -108,7 +108,7 @@ Section plans contain useful high-level values, but the composition still needs 
 
 ### 2.5 Automation is narrower than a full musical automation system
 
-M13 currently automates insert wet, per-stem SPACE/ECHO send amounts, and shared bus wet. Curves are hold, linear and smooth; points are beat-addressed but the milestone uses constant BPM. It does not yet automate synthesis parameters such as filter cutoff, pitch/register, decay, modulation depth, density, or pattern probability. Nor is the automation model unified with the score's automation lanes.
+M17.4 now adapts M13 insert wet, per-stem SPACE/ECHO sends and shared return wet into typed Score automation lanes, preserving the legacy JSON contract and per-point curves. The shared control bus also has synthesis targets such as cutoff, resonance, gain and pitch, and M17.5 makes Score the default source for event-backed generation. The remaining gap is composition-level authoring: there is not yet a complete user-facing system for writing role/section/event-relative synthesis and arrangement trajectories, generating modulators, or coupling modulation sources to destinations.
 
 **Risk:** musical movement is mostly post-processing movement. The generator and sound design remain comparatively static within a section.
 
@@ -187,16 +187,16 @@ Priority is based on user value and risk reduction, not novelty.
 
 **Acceptance:** a fixed seed produces a coherent multi-section arc where motifs can be recognised, transformed and intentionally retired. Compare sections with the same arrangement and a single changed control to show that the control does what it says.
 
-### P3 — Unify score and rendering
+### P3 — Extend the Score-first system into full musical control
 
-1. Define the score as the canonical symbolic representation for generated compositions.
-2. Have the generation planner emit score events and control lanes first; have the renderer consume that score.
-3. Implement tempo-map and meter-map aware beat-to-frame conversion, including boundaries and interpolation.
-4. Represent synthesis controls and FX controls as typed automation targets that can be evaluated from the same score timebase.
-5. Preserve exact rational beat positions until sample-frame conversion.
-6. Make round-trip tests for score JSON and MIDI, documenting which MIDI concepts cannot represent Reawarp-specific data.
+1. Complete M17.5 Score-first event generation (implemented); retain legacy project records only as compatibility views.
+2. Bring continuous texture/ambience intent and other field-like behaviours under explicit Score control contracts where useful, without forcing them into artificial per-grain events.
+3. Progressively remove constant-BPM/sixteenth-grid assumptions from phrase and cycle planning where arbitrary meter, tempo maps or asymmetric phrase lengths are musically needed.
+4. Extend typed targets into composition-level automation and deterministic modulation sources (M18).
+5. Keep exact rational beat positions until frame conversion and test the shared clock across tempo/meter changes.
+6. Preserve round-trip and compatibility contracts for Score, MIDI, projects and M13 automation.
 
-**Acceptance:** rendering the same score twice is deterministic; tempo changes and meter changes alter event placement correctly; score export matches the actual rendered events.
+**Acceptance:** Score is the only event-scheduling authority; continuous layers have explicit time/control contracts; and score timing, automation and export match the rendered result.
 
 ### P4 — Extend sound design only after profiling and tests
 
@@ -204,10 +204,15 @@ Suggested sequence:
 
 - **M14 — Engine reliability and profiling:** tests, benchmark harness, signal diagnostics and regression baselines.
 - **M15 — Composition director 2.0:** motif identity, role plans and transition gestures.
-- **M16 — Score-driven render core:** canonical score, tempo/meter map rendering and unified automation timebase.
-- **M17 — Synthesis modulation:** beat/bar/section automation for filter, envelope, pitch/register, density, stereo movement and selected oscillator parameters.
-- **M18 — Mixer quality:** bus meters, pre/post semantics, headroom warnings, tail controls and clear direct/return audition.
-- **M19 — Advanced DSP experiments:** convolution/IR, spectral delay, cross-synthesis, feedback networks, oversampling and sidechain control, each as optional modules behind measured CPU budgets.
+- **M16–M17 — Score-first event pipeline:** implemented for event-backed production; whole-field layers and broader planner time assumptions remain progressive refinements.
+- **M18 — Musical automation and control performance:** typed score trajectories, deterministic modulators and explicit modulation relationships.
+- **M19 — Harmonic context and voice-leading:** optional harmonic fields, tuning-aware pitch constraints, sonority planning and bass roles.
+- **M20 — Perceptual orchestration and multi-scale phrase grammar:** attention hierarchy, role-pair relationships, asymmetric phrases and long-form pacing.
+- **M21 — Sound-object and hybrid instrument architecture:** reusable envelope/spectrum/modulation/space behaviours and complementary hybrid voices.
+- **M22 — Mixer and routing quality:** signal-path visibility, metering, gain/tail/latency semantics and asynchronous processing.
+- **M23 — Variation browser and critical-listening workflow:** reproducible candidate selection and matched-level A/B.
+- **M24 — Advanced DSP research:** modular convolution, spectral delay, cross-synthesis, oversampling and sidechain tools.
+- **M25 — Performance, portability and project durability:** target-machine evidence, project manifest, asset policy and schema migration.
 
 These are proposed milestones, not claims that any of them have been implemented.
 
@@ -296,18 +301,7 @@ A numerical report should flag risks, not assign a subjective quality score.
 
 ## 7. Immediate next sprint
 
-The most sensible next step is a focused **M14 Reliability and Performance Baseline**, not another large feature release.
-
-Deliverables:
-1. A small but meaningful `tests/` suite for config validation, seed derivation, stream independence, composition plans, event timing, FX automation and routing invariants.
-2. Deterministic fixtures for a few representative seeds and configurations.
-3. A benchmark script for 5 s, 30 s and 180 s at 48 kHz with selected palettes and complexity levels.
-4. Per-stage profiling output and peak memory measurement.
-5. A signal diagnostics helper used by both smoke tests and the audition-matrix report.
-6. Windows/Python CI coverage and optional Pyo integration validation.
-7. Updated docs that distinguish implemented, partially implemented, deferred and experimentally unverified features.
-
-This gives later musical and DSP work a reliable foundation and identifies where optimisation will actually matter.
+The next feature increment should be **M18 Musical Automation and Control Performance**, because M16/M17 already provide the Score, frame clock and typed control bus. In parallel, complete the outstanding M14 target-Windows 30/180-second 48 kHz profiling and Pyo-enabled listening sign-off. Do not claim that M14 is complete until those measurements are recorded. The next musical increments are then M19 harmonic context, M20 perceptual orchestration, M21 sound-object architecture and M22 mixer quality, followed by M23 iteration, M24 advanced DSP research and M25 performance/portability hardening. See `docs/ROADMAP.md` and the individual M18–M25 specifications.
 
 ## 8. Source map reviewed
 
