@@ -361,26 +361,91 @@ class ReawarpEngine:
                 event.velocity * sample_gain, event.pan,
             )
 
-        kick_profile = select_profile_name(
-            config.kick_profile, KICK_PROFILES, streams.get("kick_profile"),
-            auto_choices=AUTO_KICK_PROFILES,
-        )
         synthetic_percussion = config.percussion_synthesis in {"minimal", "extended"}
         role_targets = {
             "kick": kick_stem,
             "snare": snare_stem,
             "hat": hat_stem,
         }
+        profile_catalogues = {
+            "kick": (config.kick_profile, KICK_PROFILES, AUTO_KICK_PROFILES),
+            "snare": (config.snare_profile, SNARE_PROFILES, AUTO_SNARE_PROFILES),
+            "hat": (config.hat_profile, HAT_PROFILES, AUTO_HAT_PROFILES),
+        }
+        section_profile_options = {
+            "kick": {
+                "intro": ("soft_round", "deep_sub"),
+                "establishment": ("deep_sub", "909_punch"),
+                "continuation": ("deep_sub", "rubber", "wooden"),
+                "development": ("rubber", "wooden", "fm_bass", "broken_digital"),
+                "uplift": ("909_punch", "rubber", "industrial"),
+                "arrival": ("909_punch", "hard_click", "industrial"),
+                "drop": ("short_pluck", "soft_round"),
+                "silence": ("soft_round",),
+                "contrast": ("wooden", "fm_bass", "laser"),
+                "return": ("deep_sub", "909_punch"),
+                "false_return": ("soft_round", "rubber"),
+                "transition": ("wooden", "short_pluck"),
+                "residue": ("soft_round", "long_tail"),
+                "outro": ("soft_round", "long_tail"),
+            },
+            "snare": {
+                "intro": ("soft_brush", "tonal"),
+                "establishment": ("acoustic", "909_crack"),
+                "continuation": ("acoustic", "tonal"),
+                "development": ("tonal", "soft_brush", "noise_burst"),
+                "uplift": ("909_crack", "acoustic"),
+                "arrival": ("909_crack", "industrial", "tonal"),
+                "drop": ("soft_brush", "tonal"),
+                "silence": ("soft_brush",),
+                "contrast": ("tonal", "soft_brush", "industrial"),
+                "return": ("acoustic", "909_crack"),
+                "false_return": ("tonal", "soft_brush"),
+                "transition": ("909_crack", "tonal"),
+                "residue": ("soft_brush", "tonal"),
+                "outro": ("soft_brush",),
+            },
+            "hat": {
+                "intro": ("dark", "closed"),
+                "establishment": ("closed", "dark"),
+                "continuation": ("closed", "open", "dark"),
+                "development": ("dark", "open", "digital"),
+                "uplift": ("open", "metallic"),
+                "arrival": ("metallic", "digital", "noisy"),
+                "drop": ("dark", "closed"),
+                "silence": ("dark",),
+                "contrast": ("open", "metallic", "dark"),
+                "return": ("closed", "dark"),
+                "false_return": ("dark", "open"),
+                "transition": ("metallic", "open"),
+                "residue": ("dark", "closed"),
+                "outro": ("dark",),
+            },
+        }
+
+        def build_section_profiles(role: str) -> dict[int, str]:
+            configured, catalogue, auto_choices = profile_catalogues[role]
+            section_choices: dict[int, str] = {}
+            anchor_profile: str | None = None
+            for section in composition_plan.sections:
+                function = phrase_at_time(section.start_seconds).function
+                if function == "return" and anchor_profile is not None:
+                    section_choices[section.index] = anchor_profile
+                    continue
+                choices = section_profile_options[role].get(function, auto_choices)
+                profile_rng = np.random.default_rng(
+                    derive_seed(config.seed, f"section-profile:{role}:{section.index}:{function}")
+                )
+                selected = select_profile_name(
+                    configured, catalogue, profile_rng, auto_choices=choices
+                )
+                section_choices[section.index] = selected
+                if function == "establishment":
+                    anchor_profile = selected
+            return section_choices
+
         selected_profiles = {
-            "kick": kick_profile,
-            "snare": select_profile_name(
-                config.snare_profile, SNARE_PROFILES, streams.get("snare_profile"),
-                auto_choices=AUTO_SNARE_PROFILES,
-            ),
-            "hat": select_profile_name(
-                config.hat_profile, HAT_PROFILES, streams.get("hat_profile"),
-                auto_choices=AUTO_HAT_PROFILES,
-            ),
+            role: build_section_profiles(role) for role in ("kick", "snare", "hat")
         }
         for role in ("kick", "snare", "hat"):
             target = role_targets[role]
@@ -397,7 +462,7 @@ class ReawarpEngine:
                     continue
 
                 synth_gain, sample_gain = percussion_source_levels(role, event.time)
-                profile = selected_profiles[role]
+                profile = selected_profiles[role][section.index]
                 signal: np.ndarray | None = None
                 if synth_gain > 1e-7:
                     velocity = event.velocity * synth_gain
@@ -835,6 +900,13 @@ class ReawarpEngine:
             "composition_plan": composition_plan.to_dict(),
             "phrase_directives": [item.to_dict() for item in phrase_directives],
             "drum_arrangement": [item.to_dict() for item in drum_plan],
+            "drum_section_profiles": {
+                role: {
+                    section.name: selected_profiles[role][section.index]
+                    for section in composition_plan.sections
+                }
+                for role in ("kick", "snare", "hat")
+            },
             "drum_source_mode": config.percussion_source_mode,
             "drum_hybrid_architecture": config.percussion_hybrid_architecture,
             "drum_sample_mix": config.percussion_sample_mix,
