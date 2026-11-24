@@ -23,7 +23,7 @@ class AutomationTarget:
     value_type: str = "continuous"
     minimum: float | None = None
     maximum: float | None = None
-    interpolation: tuple[str, ...] = ("step", "linear", "cubic", "exponential")
+    interpolation: tuple[str, ...] = ("step", "linear", "smooth", "cubic", "exponential")
 
     def __post_init__(self) -> None:
         if not self.target_id.strip():
@@ -38,7 +38,7 @@ class AutomationTarget:
             if self.minimum > self.maximum:
                 raise ValueError("automation target minimum cannot exceed maximum")
         if not self.interpolation or any(
-            item not in {"step", "linear", "cubic", "exponential"}
+            item not in {"step", "linear", "smooth", "cubic", "exponential"}
             for item in self.interpolation
         ):
             raise ValueError("automation target has unsupported interpolation modes")
@@ -103,6 +103,14 @@ class AutomationTargetRegistry:
             if lane.maximum > target.maximum:
                 raise ValueError(f"automation lane {lane.target_id!r} exceeds target maximum")
         for point in lane.points:
+            if (
+                point.interpolation_to_next is not None
+                and point.interpolation_to_next not in target.interpolation
+            ):
+                raise ValueError(
+                    f"per-point interpolation {point.interpolation_to_next!r} "
+                    f"is not supported by {lane.target_id!r}"
+                )
             if target.minimum is not None and point.value < target.minimum:
                 raise ValueError(
                     f"automation value for {lane.target_id!r} is below target minimum {target.minimum}"
@@ -186,13 +194,22 @@ class AutomationControlBus:
             return seconds
         return seconds * self.source_sample_rate
 
-    def value_at_frame(self, target_id: str, frame: int) -> float:
+    def value_at_frame(
+        self,
+        target_id: str,
+        frame: int,
+        *,
+        default_value: float | None = None,
+    ) -> float:
         if isinstance(frame, bool) or int(frame) != frame or int(frame) < 0:
             raise ValueError("frame must be a non-negative integer")
         lane = self._lanes.get(target_id)
         if lane is None:
             raise KeyError(f"automation lane not found: {target_id}")
-        return lane.evaluate(self._lane_position(lane, int(frame)))
+        return lane.evaluate(
+            self._lane_position(lane, int(frame)),
+            before_first=default_value,
+        )
 
     def sample(
         self,
@@ -201,6 +218,7 @@ class AutomationControlBus:
         end_frame: int,
         *,
         step_frames: int = 64,
+        default_value: float | None = None,
     ) -> AutomationSamples:
         """Sample a lane at a fixed control rate; end_frame is exclusive."""
         if start_frame < 0 or end_frame < start_frame:
@@ -213,7 +231,12 @@ class AutomationControlBus:
             else np.arange(start_frame, end_frame, step_frames, dtype=np.int64)
         )
         values = np.fromiter(
-            (self.value_at_frame(target_id, int(frame)) for frame in frames),
+            (
+                self.value_at_frame(
+                    target_id, int(frame), default_value=default_value
+                )
+                for frame in frames
+            ),
             dtype=np.float64,
             count=len(frames),
         ).astype(np.float32)

@@ -7,7 +7,7 @@ import math
 from dataclasses import replace
 from time import perf_counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 
@@ -74,6 +74,7 @@ class ReawarpEngine:
             frame_count: int | None = None,
             voice_renderers: dict[str, Any] | None = None,
             config: GenerationConfig | None = None,
+            fx_automation: Mapping[str, Any] | None = None,
     ) -> ScoreRenderResult:
         """Render a canonical score using the shared frame-accurate score core."""
         if config is not None and voice_renderers is not None:
@@ -82,6 +83,21 @@ class ReawarpEngine:
             int(config.sample_rate if config is not None else score.metadata.get("sample_rate", 48_000))
             if sample_rate is None else int(sample_rate)
         )
+        fx_stem_names = tuple(score.metadata.get("render_stems", ()))
+        if not fx_stem_names:
+            fx_stem_names = tuple(sorted({
+                event.voice_id for event in score.events
+                if event.voice_id != "sample_break"
+            }))
+        if fx_automation is not None:
+            from reawarp.fx_automation import attach_fx_automation_to_score
+
+            score = attach_fx_automation_to_score(
+                score, fx_automation, fx_stem_names
+            )
+        from reawarp.fx_automation import fx_automation_registry
+
+        automation_registry = fx_automation_registry(fx_stem_names)
         if config is not None:
             from reawarp.synthesis.score_samples import prepare_score_sample_renderers
 
@@ -111,7 +127,11 @@ class ReawarpEngine:
             if frame_count is None:
                 frame_count = render_config.frame_count
         return ScoreRenderer().render(
-            score, rate, frame_count=frame_count, voice_renderers=voice_renderers,
+            score,
+            rate,
+            frame_count=frame_count,
+            voice_renderers=voice_renderers,
+            automation_registry=automation_registry,
         )
 
     def generate_variant(

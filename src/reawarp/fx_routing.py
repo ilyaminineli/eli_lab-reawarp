@@ -15,6 +15,7 @@ import numpy as np
 
 from reawarp.fx import FX_PRESETS, normalise_fx_stages, render_pyo_fx
 from reawarp.fx_automation import automation_envelope, normalise_fx_automation
+from reawarp.score.automation import AutomationControlBus
 
 FX_ROUTING_SCHEMA_VERSION = 1
 FX_BUSES = ("space", "echo")
@@ -265,6 +266,34 @@ def _automation_lane(
     )
 
 
+
+
+def _control_bus_envelope(
+    controls: AutomationControlBus,
+    target: str,
+    *,
+    frames: int,
+    sample_rate: int,
+    default: float,
+) -> np.ndarray:
+    """Evaluate a score control lane at 1 kHz, then interpolate per audio frame."""
+    if target not in controls.target_ids:
+        return np.full(frames, float(default), dtype=np.float32)
+    if frames <= 0:
+        return np.zeros(max(0, frames), dtype=np.float32)
+    step = max(1, int(sample_rate) // 1000)
+    sampled = controls.sample(
+        target, 0, frames, step_frames=step, default_value=float(default)
+    )
+    if not len(sampled.frames):
+        return np.full(frames, float(default), dtype=np.float32)
+    positions = np.arange(frames, dtype=np.float64)
+    return np.interp(
+        positions, sampled.frames.astype(np.float64), sampled.values.astype(np.float64),
+        left=float(sampled.values[0]), right=float(sampled.values[-1]),
+    ).astype(np.float32)
+
+
 def _tempo_stages(bus_record: Mapping[str, Any], sample_rate: int, bpm: float) -> tuple[dict[str, Any], ...]:
     preset = str(bus_record["chain"])
     stages = [dict(stage) for stage in FX_PRESETS[preset]]
@@ -289,6 +318,7 @@ def render_fx_routing(
     *,
     bpm: float = 120.0,
     automation: Mapping[str, Any] | None = None,
+    controls: AutomationControlBus | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     """Render per-stem inserts and shared returns with optional beat automation.
 
@@ -300,11 +330,18 @@ def render_fx_routing(
         return {}, {"schema_version": 1, "buses": {}, "master_wet": 1.0,
                     "rendered_returns": [], "active_send_stems_by_bus": {}}
     tempo = _finite(bpm, "bpm", 1.0, 1000.0)
+    if controls is not None and automation is not None:
+        raise ValueError("pass either legacy automation JSON or score controls, not both")
+    if controls is not None and controls.timeline.sample_rate != int(sample_rate):
+        raise ValueError("score automation control bus sample rate must match FX render rate")
     names = tuple(dry_stems)
     first = _stereo(np.asarray(dry_stems[names[0]]), 2)
     frames, channels = first.shape
     config = normalise_fx_routing(routing, names, sample_rate)
-    lanes = normalise_fx_automation(automation, names)
+    lanes = (
+        normalise_fx_automation(automation, names)
+        if controls is None else {"schema_version": 1, "lanes": {}}
+    )
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
     active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     outputs: dict[str, np.ndarray] = {}
@@ -317,9 +354,11 @@ def render_fx_routing(
         insert = record["insert"]
         insert_target = f"stem.{name}.insert_wet"
         insert_points = lanes["lanes"].get(insert_target)
+        insert_controlled = controls is not None and insert_target in controls.target_ids
         insert_can_open = (
             float(insert["wet"]) > 0.0
             or any(float(point["value"]) > 0.0 for point in (insert_points or ()))
+            or insert_controlled
         )
         if insert["kind"] == "bypass" or not insert_can_open:
             processed_full = dry.copy()
@@ -329,10 +368,18 @@ def render_fx_routing(
             processed_full = _stereo(
                 _render_chain(dry, sample_rate, insert, wet=1.0), channels
             )
-            insert_level = _automation_lane(
-                lanes, insert_target, frames=frames, sample_rate=sample_rate,
-                bpm=tempo, default=float(insert["wet"]),
-            ) if insert_points else np.full(frames, float(insert["wet"]), dtype=np.float32)
+            if insert_controlled:
+                insert_level = _control_bus_envelope(
+                    controls, insert_target, frames=frames,
+                    sample_rate=sample_rate, default=float(insert["wet"]),
+                )
+            elif insert_points:
+                insert_level = _automation_lane(
+                    lanes, insert_target, frames=frames, sample_rate=sample_rate,
+                    bpm=tempo, default=float(insert["wet"]),
+                )
+            else:
+                insert_level = np.full(frames, float(insert["wet"]), dtype=np.float32)
 
         direct_processed = _pad_to(processed_full, frames)
         direct = dry * (1.0 - insert_level[:, None]) + direct_processed * insert_level[:, None]
@@ -349,10 +396,18 @@ def render_fx_routing(
         for bus, static_amount in record["sends"].items():
             target = f"stem.{name}.send.{bus}"
             points = lanes["lanes"].get(target)
-            envelope = _automation_lane(
-                lanes, target, frames=send_frames, sample_rate=sample_rate,
-                bpm=tempo, default=float(static_amount),
-            ) if points else np.full(send_frames, float(static_amount), dtype=np.float32)
+            if controls is not None and target in controls.target_ids:
+                envelope = _control_bus_envelope(
+                    controls, target, frames=send_frames,
+                    sample_rate=sample_rate, default=float(static_amount),
+                )
+            elif points:
+                envelope = _automation_lane(
+                    lanes, target, frames=send_frames, sample_rate=sample_rate,
+                    bpm=tempo, default=float(static_amount),
+                )
+            else:
+                envelope = np.full(send_frames, float(static_amount), dtype=np.float32)
             if not np.any(envelope):
                 continue
             contribution = send_source * envelope[:, None]
@@ -369,10 +424,20 @@ def render_fx_routing(
         record = config["buses"][bus]
         target = f"bus.{bus}.wet"
         points = lanes["lanes"].get(target)
-        requested_wet = _automation_lane(
-            lanes, target, frames=max(len(source), 1), sample_rate=sample_rate,
-            bpm=tempo, default=float(record["wet"]),
-        ) if points else np.full(max(len(source), 1), float(record["wet"]), dtype=np.float32)
+        if controls is not None and target in controls.target_ids:
+            requested_wet = _control_bus_envelope(
+                controls, target, frames=max(len(source), 1),
+                sample_rate=sample_rate, default=float(record["wet"]),
+            )
+        elif points:
+            requested_wet = _automation_lane(
+                lanes, target, frames=max(len(source), 1), sample_rate=sample_rate,
+                bpm=tempo, default=float(record["wet"]),
+            )
+        else:
+            requested_wet = np.full(
+                max(len(source), 1), float(record["wet"]), dtype=np.float32
+            )
         if not np.any(source) or not np.any(requested_wet):
             continue
 
@@ -387,10 +452,20 @@ def render_fx_routing(
         desired_frames = max(len(source), len(processed))
         base_signal = _pad_to(source, desired_frames)
         processed = _pad_to(processed, desired_frames)
-        wet_envelope = _automation_lane(
-            lanes, target, frames=desired_frames, sample_rate=sample_rate,
-            bpm=tempo, default=float(record["wet"]),
-        ) if points else np.full(desired_frames, float(record["wet"]), dtype=np.float32)
+        if controls is not None and target in controls.target_ids:
+            wet_envelope = _control_bus_envelope(
+                controls, target, frames=desired_frames,
+                sample_rate=sample_rate, default=float(record["wet"]),
+            )
+        elif points:
+            wet_envelope = _automation_lane(
+                lanes, target, frames=desired_frames, sample_rate=sample_rate,
+                bpm=tempo, default=float(record["wet"]),
+            )
+        else:
+            wet_envelope = np.full(
+                desired_frames, float(record["wet"]), dtype=np.float32
+            )
         returns[bus] = np.ascontiguousarray(
             base_signal * (1.0 - wet_envelope[:, None]) + processed * wet_envelope[:, None],
             dtype=np.float32,
@@ -415,7 +490,13 @@ def render_fx_routing(
         "buses": config["buses"],
         "rendered_returns": list(returns),
         "active_send_stems_by_bus": active_stems_by_bus,
-        "automation_lanes": list(lanes["lanes"]),
+        "automation_lanes": (
+            list(controls.target_ids) if controls is not None
+            else list(lanes["lanes"])
+        ),
+        "automation_source": (
+            "score-control-bus" if controls is not None else "legacy-json"
+        ),
     }
     metadata["bus_returns_audio"] = returns
     return outputs, metadata

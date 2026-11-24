@@ -133,6 +133,7 @@ class MusicalEvent:
 class AutomationPoint:
     at: Fraction
     value: float
+    interpolation_to_next: str | None = None
 
     def __post_init__(self) -> None:
         position = as_fraction(self.at)
@@ -140,11 +141,18 @@ class AutomationPoint:
             raise ValueError("automation point cannot be before zero")
         if not math.isfinite(float(self.value)):
             raise ValueError("automation value must be finite")
+        if self.interpolation_to_next not in {
+            None, "step", "linear", "smooth", "cubic", "exponential"
+        }:
+            raise ValueError("unsupported per-point automation interpolation")
         object.__setattr__(self, "at", position)
         object.__setattr__(self, "value", float(self.value))
 
     def to_dict(self) -> dict[str, Any]:
-        return {"at": str(self.at), "value": self.value}
+        data = {"at": str(self.at), "value": self.value}
+        if self.interpolation_to_next is not None:
+            data["interpolation_to_next"] = self.interpolation_to_next
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +174,7 @@ class AutomationLane:
             raise ValueError("automation target_id cannot be empty")
         if self.time_basis not in {"beats", "seconds", "frames"}:
             raise ValueError("automation time_basis must be beats, seconds, or frames")
-        if self.interpolation not in {"step", "linear", "cubic", "exponential"}:
+        if self.interpolation not in {"step", "linear", "smooth", "cubic", "exponential"}:
             raise ValueError("unsupported automation interpolation")
         points = tuple(self.points)
         if not points:
@@ -184,14 +192,21 @@ class AutomationLane:
             raise ValueError("automation minimum cannot exceed maximum")
         object.__setattr__(self, "points", points)
 
-    def evaluate(self, at: Fraction | int | float | str) -> float:
-        """Evaluate the lane; smoothing is retained as playback metadata for the host."""
+    def evaluate(
+        self,
+        at: Fraction | int | float | str,
+        *,
+        before_first: float | None = None,
+    ) -> float:
+        """Evaluate the lane, optionally overriding its pre-first-point value."""
         position = as_fraction(at)
         if position < 0:
             raise ValueError("automation evaluation position cannot be negative")
         if self.loop_length is not None:
             position %= self.loop_length
-        if position <= self.points[0].at:
+        if position < self.points[0].at:
+            value = self.points[0].value if before_first is None else float(before_first)
+        elif position == self.points[0].at:
             value = self.points[0].value
         elif position >= self.points[-1].at:
             value = self.points[-1].value
@@ -202,11 +217,15 @@ class AutomationLane:
             )
             left, right = self.points[segment], self.points[segment + 1]
             t = float((position - left.at) / (right.at - left.at))
-            if self.interpolation == "step":
+            segment_interpolation = left.interpolation_to_next or self.interpolation
+            if segment_interpolation == "step":
                 value = left.value
-            elif self.interpolation == "linear":
+            elif segment_interpolation == "linear":
                 value = left.value + (right.value - left.value) * t
-            elif self.interpolation == "exponential":
+            elif segment_interpolation == "smooth":
+                smooth_t = t * t * (3.0 - 2.0 * t)
+                value = left.value + (right.value - left.value) * smooth_t
+            elif segment_interpolation == "exponential":
                 if left.value == 0 or right.value == 0 or left.value * right.value < 0:
                     value = left.value + (right.value - left.value) * t
                 else:
@@ -262,7 +281,11 @@ class AutomationLane:
         return cls(
             target_id=str(data["target_id"]),
             points=tuple(
-                AutomationPoint(as_fraction(str(item["at"])), float(item["value"]))
+                AutomationPoint(
+                    as_fraction(str(item["at"])),
+                    float(item["value"]),
+                    item.get("interpolation_to_next"),
+                )
                 for item in data["points"]
             ),
             unit=str(data.get("unit", "normalized")),

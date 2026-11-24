@@ -7,11 +7,21 @@ sample rate, routing, and lane data.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
+from fractions import Fraction
 import math
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
+
+from reawarp.score.automation import (
+    AutomationTarget,
+    AutomationTargetRegistry,
+    DEFAULT_AUTOMATION_TARGETS,
+)
+from reawarp.score.events import AutomationLane, AutomationPoint
+from reawarp.score.model import Score
 
 FX_AUTOMATION_SCHEMA_VERSION = 1
 FX_AUTOMATION_CURVES = ("hold", "linear", "smooth")
@@ -165,3 +175,137 @@ def save_fx_automation(
         encoding="utf-8",
     )
     return destination
+
+
+
+def fx_automation_registry(stem_names: Sequence[str]) -> AutomationTargetRegistry:
+    """Build a typed registry for the existing M13 FX target identifiers."""
+    targets = list(DEFAULT_AUTOMATION_TARGETS.targets)
+    known = {target.target_id for target in targets}
+    for target_id in automation_targets(stem_names):
+        if target_id in known:
+            continue
+        targets.append(AutomationTarget(
+            target_id=target_id,
+            domain="fx",
+            unit="normalized",
+            minimum=0.0,
+            maximum=1.0,
+            interpolation=("step", "linear", "smooth"),
+        ))
+        known.add(target_id)
+    return AutomationTargetRegistry(targets)
+
+
+def fx_automation_to_score_lanes(
+    payload: Mapping[str, Any] | None,
+    stem_names: Sequence[str],
+) -> tuple[AutomationLane, ...]:
+    """Convert M13 schema-v1 JSON into typed beat-addressed score lanes.
+
+    M13 stores interpolation per point. The score keeps that exact segment
+    policy on AutomationPoint.interpolation_to_next instead of flattening a
+    mixed hold/linear/smooth lane to one lane-wide curve.
+    """
+    normalized = normalise_fx_automation(payload, stem_names)
+    lanes: list[AutomationLane] = []
+    curve_map = {"hold": "step", "linear": "linear", "smooth": "smooth"}
+    for target_id, raw_points in normalized["lanes"].items():
+        points = tuple(
+            AutomationPoint(
+                at=Fraction(str(point["beat"])),
+                value=float(point["value"]),
+                interpolation_to_next=curve_map[str(point["curve"])],
+            )
+            for point in raw_points
+        )
+        lanes.append(AutomationLane(
+            target_id=target_id,
+            points=points,
+            unit="normalized",
+            time_basis="beats",
+            interpolation="linear",
+            minimum=0.0,
+            maximum=1.0,
+        ))
+    return tuple(lanes)
+
+
+def score_lanes_to_fx_automation(
+    lanes: Sequence[AutomationLane],
+    stem_names: Sequence[str],
+) -> dict[str, Any]:
+    """Project typed score lanes back to the unchanged M13 schema-v1 contract."""
+    allowed = set(automation_targets(stem_names))
+    curve_map = {"step": "hold", "linear": "linear", "smooth": "smooth"}
+    payload_lanes: dict[str, list[dict[str, Any]]] = {}
+    for lane in lanes:
+        if lane.target_id not in allowed:
+            continue
+        if lane.time_basis != "beats":
+            raise ValueError(
+                f"M13 FX automation target {lane.target_id!r} requires beat-addressed points"
+            )
+        points: list[dict[str, Any]] = []
+        for point in lane.points:
+            interpolation = point.interpolation_to_next or lane.interpolation
+            curve = curve_map.get(interpolation)
+            if curve is None:
+                raise ValueError(
+                    f"cannot export {interpolation!r} interpolation to M13 FX automation"
+                )
+            points.append({
+                "beat": float(point.at),
+                "value": float(point.value),
+                "curve": curve,
+            })
+        payload_lanes[lane.target_id] = points
+    return normalise_fx_automation(
+        {"schema_version": FX_AUTOMATION_SCHEMA_VERSION, "lanes": payload_lanes},
+        stem_names,
+    )
+
+
+def attach_fx_automation_to_score(
+    score: Score,
+    payload: Mapping[str, Any],
+    stem_names: Sequence[str] | None = None,
+) -> Score:
+    """Merge a legacy M13 automation document into a score without losing lanes."""
+    names = tuple(stem_names or score.metadata.get("render_stems", ()))
+    if not names:
+        names = tuple(sorted({
+            event.voice_id for event in score.events
+            if event.voice_id not in {"sample_break"}
+        }))
+    converted = fx_automation_to_score_lanes(payload, names)
+    merged = {lane.target_id: lane for lane in score.automation}
+    for lane in converted:
+        merged[lane.target_id] = lane
+    metadata = dict(score.metadata)
+    metadata["fx_automation_compatibility"] = {
+        "schema_version": FX_AUTOMATION_SCHEMA_VERSION,
+        "target_stems": list(names),
+        "source_contract": "M13 fx_automation schema v1",
+        "segment_curves": "preserved per AutomationPoint.interpolation_to_next",
+    }
+    return replace(score, automation=tuple(merged.values()), metadata=metadata)
+
+
+def score_to_fx_automation(
+    score: Score,
+    stem_names: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    """Export a score's FX lanes through the established M13 JSON interface."""
+    names = tuple(
+        stem_names
+        or score.metadata.get("fx_automation_compatibility", {}).get("target_stems", ())
+        or score.metadata.get("render_stems", ())
+    )
+    if not names:
+        names = tuple(sorted({
+            lane.target_id.split(".")[1]
+            for lane in score.automation
+            if lane.target_id.startswith("stem.") and len(lane.target_id.split(".")) >= 4
+        }))
+    return score_lanes_to_fx_automation(score.automation, names)
