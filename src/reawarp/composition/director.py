@@ -162,6 +162,45 @@ STRUCTURES: dict[str, tuple[tuple[str, float, float, str], ...]] = {
         ("DECONSTRUCTION", .16, .30, "fragment"),
         ("CODA", .12, .12, "dissolve"),
     ),
+    # IRO Track 01-inspired organism arc: isolated signal, construction,
+    # orbital counter-motion, collision, withdrawal, false memory and residue.
+    "iro_metamorphosis": (
+        ("SIGNAL_INTRO", .08, .12, "fragment"),
+        ("CONSTRUCTION", .13, .34, "present"),
+        ("ORBIT", .17, .54, "develop"),
+        ("UPLIFT", .09, .72, "rhythmic"),
+        ("COLLISION", .13, .88, "fragment"),
+        ("OVERLOAD", .10, .96, "rhythmic"),
+        ("NULL_DROP", .07, .12, "fragment"),
+        ("AFTERSHOCK", .08, .48, "inversion"),
+        ("UNRAVEL", .06, .28, "fragment"),
+        ("FALSE_RETURN", .05, .42, "return"),
+        ("RESIDUE_CODA", .04, .10, "dissolve"),
+    ),
+    # A more conventional but clearly articulated rise / arrival / void / return.
+    "uplift_drop_return": (
+        ("FRAGMENT_INTRO", .10, .16, "fragment"),
+        ("ANCHOR_ESTABLISHMENT", .18, .38, "present"),
+        ("MOTIF_DEVELOPMENT", .18, .52, "develop"),
+        ("UPLIFT_A", .10, .68, "rhythmic"),
+        ("UPLIFT_B", .10, .82, "develop"),
+        ("ARRIVAL_PEAK", .10, .94, "present"),
+        ("DROP_VOID", .08, .08, "fragment"),
+        ("REBUILD", .08, .48, "inversion"),
+        ("TRANSFORMED_RETURN", .05, .62, "return"),
+        ("RESIDUE_OUTRO", .03, .10, "dissolve"),
+    ),
+    "two_movement": (
+        ("MOVEMENT_I_SIGNAL", .10, .18, "fragment"),
+        ("MOVEMENT_I_FORM", .16, .42, "present"),
+        ("MOVEMENT_I_EXPANSION", .18, .72, "develop"),
+        ("MOVEMENT_I_CADENCE", .06, .26, "dissolve"),
+        ("INTERMOVEMENT_VOID", .04, .04, "fragment"),
+        ("MOVEMENT_II_REENTRY", .12, .38, "return"),
+        ("MOVEMENT_II_MUTATION", .18, .82, "fragment"),
+        ("MOVEMENT_II_REASSEMBLY", .10, .60, "return"),
+        ("FINAL_RESIDUE", .06, .12, "dissolve"),
+    ),
 }
 
 
@@ -269,18 +308,62 @@ def build_composition_plan(
         ))
 
         upper = name.upper()
-        is_outro = "OUTRO" in upper or "RESIDUAL" in upper
-        is_sparse = "SUSPENSION" in upper or "EXPOSE" in upper
-        is_intro = upper == "INTRO"
-        kick = not (is_outro or is_sparse or is_intro)
-        melody = not is_outro and motif != "dissolve"
-        texture = not is_outro
+        is_outro = any(token in upper for token in ("OUTRO", "RESIDUAL", "CODA", "RELEASE"))
+        is_silence = any(token in upper for token in ("NULL", "VOID", "SILENCE"))
+        is_drop = "DROP" in upper
+        is_sparse = is_silence or is_drop or any(
+            token in upper for token in ("SUSPENSION", "EXPOSE", "AFTERSHOCK", "UNRAVEL")
+        )
+        is_intro = any(token in upper for token in ("INTRO", "SIGNAL"))
+        is_uplift = "UPLIFT" in upper
+        is_arrival = any(token in upper for token in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL"))
+        kick = not (is_outro or is_sparse or is_intro or is_silence)
+        melody = not is_outro and motif != "dissolve" and not is_silence
+        texture = not is_outro and not is_silence
         if is_sparse:
-            melody = motif == "present"
+            melody = motif in {"present", "return"} and not is_silence
+        if is_uplift:
+            kick = True
+            melody = True
+        if is_arrival:
+            kick = True
+            texture = False
+        if is_drop:
+            kick = False
+            texture = False
+        if is_silence:
+            kick = melody = texture = False
         register = int(rng.choice((-12, -7, 0, 5, 12))) if variation and motif in {"develop", "fragment"} else 0
+        if "UPLIFT" in upper:
+            register += int(rng.choice((5, 7, 12)))
+        elif "DROP" in upper or is_silence:
+            register -= int(rng.choice((5, 7, 12)))
+        elif "RETURN" in upper:
+            register = int(round(register * 0.5))
         support = float(np.clip(.98 - .43 * density, .52, .96))
+        if is_silence:
+            support = 0.0
+        elif is_drop:
+            support *= 0.12
+        elif is_uplift:
+            support = min(1.0, support * 1.18)
+        elif is_arrival:
+            support = min(1.0, support * 1.08)
         if section_energy > .78 and density > .62 and rng.random() < .65:
             texture = False
+        # A real void is an orchestration state, not merely a low energy value.
+        # Keep the time axis running while leaving only optional ambience/residue.
+        if is_silence:
+            texture = False
+            ambience = True
+            space = max(space, 0.72)
+            density = 0.0
+            support = 0.0
+        elif is_drop:
+            ambience = True
+            space = max(space, 0.62)
+        else:
+            ambience = True
 
         start_seconds = first_bar * bar_seconds
         end_seconds = min(duration_seconds, last_bar * bar_seconds)
@@ -301,7 +384,7 @@ def build_composition_plan(
             kick=kick,
             melody=melody,
             texture=texture,
-            ambience=True,
+            ambience=ambience,
             motif_mode=motif,
             motif_register_semitones=register,
             percussion_density_scale=support,
