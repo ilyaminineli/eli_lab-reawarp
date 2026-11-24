@@ -85,6 +85,14 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     return payload
 
 
+def _read_csv_rows(path: Path) -> list[dict[str, str]]:
+    """Read a UTF-8 CSV index while keeping header fields as strings."""
+    if not path.is_file():
+        return []
+    with path.open("r", encoding="utf-8-sig", newline="") as stream:
+        return list(csv.DictReader(stream))
+
+
 def _asset(
     *,
     pack_root: Path,
