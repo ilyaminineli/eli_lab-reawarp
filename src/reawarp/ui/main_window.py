@@ -398,7 +398,7 @@ class MainWindow(QMainWindow):
     def _build_transport_bar(self) -> QWidget:
         bar = QFrame()
         bar.setStyleSheet(
-            "QFrame { background: #1d242e; border: 1px solid #303b49; border-radius: 6px; }"
+            "QFrame { background: #101010; border: 1px solid #303030; border-radius: 1px; }"
         )
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(9, 7, 9, 7)

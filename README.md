@@ -6,15 +6,15 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 
 ## Current implementation
 
-### Synthesis and composition (M8)
+### Synthesis and composition (M9)
 - Long-form composition planning up to 180 seconds with classical-arc, transformed-sonata, free-jazz, episodic, minimal-variation, and Autechre-inspired process-form presets.
 - Structure flow controls: preserve a preset, cross-mix its movements with another formal grammar, or mutate the order of inner movements deterministically.
 - A pattern grammar library with asymmetric, interlocking, ghost-break, omission, rotating-cycle, ratchet, cross-accent, and broken-regularity families, selected per form and section.
 - Pattern relationship controls for unison, interlock, shadow/phase offset, call-and-response, and counter-accent; motif transformation utilities include retrograde, inversion, augmentation, diminution, fragmentation, reordering, and displacement. Formal-section pattern auto-switching is opt-in in the desktop UI or via `--pattern-follow-structure`, preserving legacy break phrases by default.
-- Selectable melodic synthesis palettes: FM/hybrid, additive, modal/physical-style resonators, inharmonic partial banks, granular micro-clouds, and scanned/pulsar-style wavetable motion.
-- New metallic-FM, inharmonic-mallet, formant-dark, and spectral-pad voice recipes.
-- Thirteen named kick profiles, six snare profiles, and six hi-hat profiles, with mix-friendly weighted automatic choices.
-- Nine profiled additive/FM and extended sound-object melody voices with evolving partials, soft detuning, envelopes, low-pass shaping, and release tails.
+- Role-driven lead synthesis defaults to a genuinely subtractive voice (harmonic source, moving low-pass filter, restrained resonance and envelope); additive, FM, modal, inharmonic, granular and scanned/pulsar voices remain selectable alternatives.
+- Drum synthesis is independent of the melody renderer: minimal dry transient/body/tail kick, snare and hat voices are the default; extended resonant voices and the legacy profiled sample-style renderer remain selectable.
+- Legacy profile catalogues remain available when `percussion_synthesis=samples` is selected.
+- Subtractive lead voices use independent oscillator/filter/envelope code paths rather than routing every named palette through FM.
 - A separate harmonic ambience stem with filtered noise, slow stereo movement, and restrained early reflections.
 - A structured 16-step break grammar (broken funk, half-time, straight, sparse) with density, phrase-cycle, and bounded variation controls.
 - Imported break recordings are transient-sliced and triggered on the groove grid; complete clips are no longer stacked at every trigger.
@@ -41,14 +41,14 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - 16-bit and 24-bit PCM WAV export.
 - JSON project metadata and event provenance.
 
-The core requires Python 3.10+ and NumPy. SoundFile and SciPy are optional in the audio extra; desktop and playback dependencies are grouped in the m4 extra; analysis, MIDI, symbolic theory, and SoundFont integrations remain separately installable.
+The core requires Python 3.10+ and NumPy. `requirements.txt` is the complete implemented/planned package inventory; planned dependencies are commented out. `pyproject.toml` extras remain the supported optional install groups.
 
 ## Install
 
 Create a virtual environment, then run:
 
     python -m pip install --upgrade pip
-    python -m pip install -e ".[dev,audio,m4,midi]"
+    python -m pip install -e ".[audio,m4,midi]"
 
 For the minimal core:
 
@@ -63,7 +63,7 @@ Optional analysis and music integrations:
 
 Install extras only when the corresponding feature is needed. A full M4/M5 development environment can also include analysis and symbolic-theory tools:
 
-    python -m pip install -e ".[dev,audio,m4,analysis,midi,theory,soundfont]"
+    python -m pip install -e ".[audio,m4,analysis,midi,theory,soundfont,synthesis]"
 
 If upgrading an environment that previously had PySide6 6.12.0, remove the two optional 6.12-only Qt extension wheels left behind by the downgrade before running pip check:
 
@@ -76,11 +76,11 @@ Csound, SuperCollider, and FluidSynth also require their native runtimes when th
 
 The composition duration can be up to three minutes. Example:
 
-    reawarp --duration 180 --structure autechre_like --flow mix --pattern-family asymmetric_7 --pattern-relationship shadow --pattern-follow-structure --synth-palette inharmonic --seed 20261124 --output output/three-minute-study
+    reawarp --duration 180 --structure autechre_like --flow mix --pattern-family asymmetric_7 --pattern-relationship shadow --pattern-follow-structure --synth-palette subtractive --percussion-synthesis minimal --complexity 0.42 --seed 20261124 --output output/three-minute-study
 
 Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`, `free_jazz_episodic`, `autechre_like`, `minimal_variation`, and `hybrid`. The `preset` flow preserves the chosen movement sequence, `mix` imports middle movements from a deterministic alternate structure, and `mutate` reorders the inner movements while retaining the opening and ending.
 
-Choose a lead synthesis palette with `--synth-palette`: `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. These are native, deterministic NumPy reference implementations. This M8 release implements additive/inharmonic partial banks, modal resonator approximations, granular micro-clouds and scanned/pulsar-style motion. Convolution, spectral delay, feedback-delay networks, cross-synthesis and oversampled nonlinear processing remain documented follow-on DSP modules; they are not claimed as implemented here. External synthesis engines remain optional adapters.
+Choose a lead synthesis architecture with `--synth-palette`: `subtractive` (default), `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. `subtractive` is a separate renderer, not another FM preset. Choose drum construction separately with `--percussion-synthesis minimal|extended|samples`; `minimal` (default) uses sparse, dry transient/body/tail kick/snare/hat voices, while `samples` selects the legacy profiled drum renderers. Convolution, spectral delay, feedback-delay networks, cross-synthesis and oversampled nonlinear processing remain documented follow-on DSP modules; they are not claimed as implemented here. External synthesis engines remain optional adapters.
 
 ## Generate a loop
 
@@ -177,7 +177,7 @@ The root seed is split into named NumPy random streams using a stable hash. Patt
 - Timing: event positions are derived from a sixteenth-note grid with controlled variation.
 - Export: 16-bit or 24-bit PCM WAV.
 
-The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. M6 adds the searchable local sample/stem library, similarity descriptors, collections, and project-variation genealogy. Reawarp remains an offline mathematical sound laboratory, not a live event sequencer or full DAW.
+The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M9 interface uses the AVTranslator-inspired near-black monochrome theme; closing its window now performs a full application shutdown. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. M6 adds the searchable local sample/stem library, similarity descriptors, collections, and project-variation genealogy. Reawarp remains an offline mathematical sound laboratory, not a live event sequencer or full DAW.
 
 ## Desktop application (M4)
 

@@ -359,14 +359,23 @@ def render_extended_note(
     return (signal * float(np.clip(velocity, 0.0, 1.0))).astype(np.float32)
 
 
-def _one_pole_lowpass(signal: np.ndarray, sample_rate: int, cutoff_hz: float) -> np.ndarray:
-    """Small stable one-pole low-pass used by the independent subtractive voice."""
-    cutoff = float(np.clip(cutoff_hz, 20.0, sample_rate * 0.45))
-    coefficient = 1.0 - np.exp(-2.0 * np.pi * cutoff / sample_rate)
+def _one_pole_lowpass(
+        signal: np.ndarray,
+        sample_rate: int,
+        cutoff_hz: float | np.ndarray,
+) -> np.ndarray:
+    """One-pole low-pass with scalar or per-sample cutoff automation."""
+    cutoff = np.clip(np.asarray(cutoff_hz, dtype=np.float64), 20.0, sample_rate * 0.45)
+    if cutoff.ndim == 0:
+        coefficient = np.full(len(signal), 1.0 - np.exp(-2.0 * np.pi * float(cutoff) / sample_rate))
+    else:
+        if cutoff.shape != signal.shape:
+            cutoff = np.broadcast_to(cutoff, signal.shape)
+        coefficient = 1.0 - np.exp(-2.0 * np.pi * cutoff / sample_rate)
     output = np.empty_like(signal, dtype=np.float64)
     state = 0.0
     for index, sample in enumerate(signal):
-        state += coefficient * (float(sample) - state)
+        state += float(coefficient[index]) * (float(sample) - state)
         output[index] = state
     return output
 
