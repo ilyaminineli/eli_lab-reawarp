@@ -121,25 +121,39 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 - The legacy Generator no longer maintains a parallel seconds-based event timeline; this final criterion remains open.
 
 See M16.md for implementation details and the score-render API.
-## M17: Synthesis modulation and musical automation
+## M17: Canonical score-native composition pipeline
 
-**Goal:** Make automation affect the sound-generation process itself, not only post-processing wet/send levels.
+**Status:** Partially implemented. Planner adapters and deterministic score fixtures are present; the generation production loop still uses legacy event objects and time-based render calls.
+
+**Goal:** Make the universal score the only event-scheduling authority while preserving the existing M8–M15 musical grammar, instrument catalogue, sample bank logic and non-destructive production workflow.
 
 ### Scope
 
-- Automate filter cutoff/resonance, oscillator or FM parameters, envelope times, pitch/register, modulation depth and selected spatial controls.
-- Automate role density, activity and rhythmic mutation at section/phrase boundaries.
-- Reuse the score's beat/bar/section timeline and typed target validation.
-- Support hold, linear and smooth curves first; add more curve types only when needed.
-- Provide preview of automation shape and a clear source/static value fallback.
-- Preserve deterministic evaluation and avoid random modulation unless explicitly seeded and saved.
+- Direct score emission from percussion, melody, motif and cross-role accent planners.
+- Rational-beat orchestration shaping and meter-aware phrase/section boundaries.
+- Production adapters for subtractive/FM/modal/other voices and role-specific percussion synthesis.
+- Sample-bank trigger, hybrid transient/body and frame-domain break-slice adapters.
+- Conversion of the M13 insert/send/return automation model to the typed score control bus.
+- Compatibility projections for existing project events, legacy automation JSON and project schema.
+
+### Implementation slices
+
+1. **M17.1 — Planner emission:** percussion and melody planner adapters now emit MusicalEvent from sixteenth-grid positions; stable motif/style/role metadata and named stream seeds are retained. A compatibility projection exists for legacy consumers.
+2. **M17.2 — Production voices:** adapt existing specialist voices to ScheduledScoreEvent and shared AutomationControlBus.
+3. **M17.3 — Samples and breaks:** schedule sample triggers and break slices against absolute score frames.
+4. **M17.4 — FX automation:** map M13 curves and routing targets to typed score automation without breaking JSON import/export.
+5. **M17.5 — Cutover:** generate the canonical Score before audio rendering; make project event records a derived compatibility/export view.
 
 ### Acceptance criteria
 
-- Every lane has a declared target, units, valid range and interpolation definition.
-- Identical score/config/seed/automation yields repeatable output.
-- Automation does not cause clicks, unbounded feedback, NaNs or silent parameter clamping.
-- A/B renders demonstrate the target control changed without unexpectedly changing unrelated roles.
+- Fixed seeds produce identical score JSON and repeatable stems.
+- No event time is routed through a seconds-based intermediate before frame placement.
+- Sample variant switching, motif cross-role relationships, hybrid percussion and break-slice trimming preserve existing musical semantics.
+- Existing exported projects and automation files remain readable.
+- All event-backed production lanes render through ScoreRenderer; texture/ambience whole-field renderers may remain specialised until they have event-level semantics.
+- Listening and target-machine performance sign-offs remain separate from automated test acceptance.
+
+See [M16 — Score-driven render core](M16.md) for the timing/render foundation and detailed M17 migration contract.
 
 ## M18: Mixer and routing quality
 
