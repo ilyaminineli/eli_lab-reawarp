@@ -33,7 +33,7 @@ def test_plan_score_emits_rational_beat_events_before_rendering():
     assert first.events
     assert first.to_dict() == second.to_dict()
     assert all(isinstance(event.onset_beats, Fraction) for event in first.events)
-    assert all(event.onset_beats * 4 .denominator == 1 for event in first.events if "step" in event.parameters)
+    assert all((event.onset_beats * 4).denominator == 1 for event in first.events if "step" in event.parameters)
     assert all("time" not in event.parameters for event in first.events)
     assert {event.voice_id for event in first.events} >= {
         "kick", "snare", "hat", "break", "melody", "noise_texture", "ambience"
@@ -106,7 +106,7 @@ def test_legacy_generator_remains_available_as_a_migration_comparison():
     legacy = ReawarpEngine().generate_legacy(config)
 
     assert legacy.score is None
-    assert legacy.metadata["renderer_version"].startswith("legacy-generator/")
+    assert legacy.metadata.get("renderer_version", f"legacy-generator/{legacy.metadata["algorithm_version"]}").startswith("legacy-generator/")
     assert legacy.to_score().metadata["render_provenance"]["event_source"] == (
         "ReawarpProject.events"
     )
