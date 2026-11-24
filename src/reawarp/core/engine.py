@@ -287,8 +287,11 @@ class ReawarpEngine:
         current_sample_index = {role: 0 for role in ("kick", "snare", "hat")}
 
         for role in ("kick", "snare", "hat"):
-            raw_entries = list(config.sample_banks.get(role, ()))
-            if not raw_entries and config.sample_paths.get(role):
+            raw_entries = (
+                [] if config.percussion_source_mode == "synth"
+                else list(config.sample_banks.get(role, ()))
+            )
+            if not raw_entries and config.sample_paths.get(role) and config.percussion_source_mode != "synth":
                 raw_entries = [{
                     "path": config.sample_paths[role],
                     "metadata": config.sample_metadata.get(role, {}),
@@ -702,13 +705,21 @@ class ReawarpEngine:
                     ),
                 }
                 if source_entry is not None:
-                    record["sample_metadata"] = source_entry["metadata"]
+                    metadata = source_entry["metadata"]
+                    record["sample_metadata"] = {
+                        key: metadata[key]
+                        for key in (
+                            "provider", "role", "relative_path", "source_name",
+                            "family", "articulation", "asset_type",
+                        )
+                        if key in metadata
+                    }
                     record["sample_source"] = {
                         "asset_id": source_entry["asset_id"],
                         "path": source_entry["path"],
                         "sha256": source_entry["sha256"],
                         "label": source_entry["label"],
-                        "features": source_entry["features"],
+                        "variant_index": record["source_mix"]["sample_variant_index"],
                     }
                 if guidance:
                     record["synthesis_guidance"] = guidance
