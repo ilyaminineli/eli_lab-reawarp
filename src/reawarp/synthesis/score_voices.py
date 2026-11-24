@@ -213,9 +213,7 @@ def _percussion_renderer(
         source_kind = str(parameters.get("source_kind", "")).casefold()
         duration = frames / float(sample_rate)
         synth_gain = float(np.clip(parameters.get("synth_gain", 1.0), 0.0, 1.0))
-        if role != "break" and (
-            config.percussion_source_mode == "sample" or config.percussion_synthesis == "samples"
-        ):
+        if role != "break" and config.percussion_source_mode == "sample":
             return np.zeros(frames, dtype=np.float32)
         if synth_gain <= 0.0:
             return np.zeros(frames, dtype=np.float32)
@@ -292,8 +290,9 @@ def build_production_voice_renderers(config: GenerationConfig) -> dict[str, Scor
     """Build deterministic production callbacks for all event-backed score voices.
 
     Melodic callbacks retain the selected subtractive/FM/extended synthesis family.
-    Percussion callbacks retain role-specific profile voices. Sample-only events
-    intentionally return silence here; sample and break-slice playback are M17.3.
+    Percussion callbacks retain role-specific profile voices. Imported sample
+    triggers and break-slice callbacks are composed by score_samples.py; only the
+    explicit sample source mode suppresses the corresponding synthesis hit.
     """
     renderers: dict[str, ScoreVoiceRenderer] = {}
     if config.include_melody:

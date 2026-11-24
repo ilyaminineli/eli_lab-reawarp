@@ -263,3 +263,31 @@ def test_feature_guided_hybrid_keeps_sample_driven_voice_and_pitch_adaptation(tm
     assert trigger.duration_frames == int(round(config.sample_rate * expected_transient_ms / 1000.0))
     assert np.isfinite(result.stems["kick"]).all()
     assert np.max(np.abs(result.stems["kick"])) > 0.05
+
+
+
+def test_profiled_sample_style_drum_voice_is_not_muted_by_imported_sample_adapter(tmp_path: Path):
+    sample = tmp_path / "profile-bank.wav"
+    _write_sample(sample, seconds=0.30, frequency=145.0)
+    config = GenerationConfig(
+        bpm=120.0,
+        duration=5.0,
+        sample_rate=22_050,
+        seed="m17.3-profiled-sample-style",
+        include_melody=False,
+        include_texture=False,
+        include_ambience=False,
+        percussion_source_mode="hybrid",
+        percussion_hybrid_architecture="layered",
+        percussion_sample_mix=0.0,
+        percussion_synthesis="samples",
+        sample_banks={"kick": (_sample_entry(sample, "profile-bank"),)},
+    )
+    result = ReawarpEngine().render_score(_score({"kick": [_hit("kick", 0)]}), config=config)
+    hit = next(item for item in result.schedule if item.event.kind == "hit")
+
+    assert hit.event.parameters["synth_gain"] == 1.0
+    assert hit.event.parameters["sample_gain"] == 0.0
+    assert not any(item.event.kind == "trigger" for item in result.schedule)
+    assert np.isfinite(result.stems["kick"]).all()
+    assert np.max(np.abs(result.stems["kick"])) > 0.05

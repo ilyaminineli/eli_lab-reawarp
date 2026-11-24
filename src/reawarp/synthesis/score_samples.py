@@ -424,8 +424,6 @@ def prepare_score_sample_renderers(
             continue
         section = _section_context(score, event, timeline, config.drum_part_cycle_bars)
         synth_gain, sample_gain = _source_levels(config, section["function"])
-        if config.percussion_synthesis == "samples":
-            synth_gain = 0.0
         variant_index = selected[event.event_id]
         asset = banks[role][variant_index]
         parameters = dict(event.parameters)
