@@ -1060,6 +1060,9 @@ class MainWindow(QMainWindow):
         self.preview_source.blockSignals(False)
         self.preview_source.setCurrentIndex(0)
         self.export_button.setEnabled(True)
+        self.open_mixer_button.setEnabled(True)
+        self.open_fx_button.setEnabled(True)
+        self.open_library_button.setEnabled(True)
         self._refresh_preview()
         phrase_report = result.metadata.get("phrase_directives", [])
         phrase_line = " → ".join(
@@ -1072,18 +1075,29 @@ class MainWindow(QMainWindow):
             f"{float(item.get('end_bar', 0)) * 240.0 / result.config.bpm:.1f}s)"
             for item in phrase_report
         )
-        iro_roles = [
-            f"{role}:{source.get('family', 'IRO')}"
+        drum_plan = result.metadata.get("drum_arrangement", [])
+        drum_line = " → ".join(
+            f"{item.get('section_name', '').upper()} "
+            f"[{item.get('kick_family', '')}/{item.get('snare_family', '')}/{item.get('hat_family', '')}]"
+            for item in drum_plan
+        )
+        loaded_sources = [
+            f"{role}:{source.get('source', {}).get('source_name', Path(source.get('path', role)).name)}"
             for role, source in result.metadata.get("sample_sources", {}).items()
-            if source.get("source", {}).get("provider") == "IRO"
         ]
+        source_line = (
+            f"{result.config.percussion_source_mode.upper()} · "
+            f"{result.config.percussion_hybrid_architecture.replace('_', ' ')}"
+        )
         self.render_summary.setText(
             f"{result.duration:.2f} s · {result.sample_rate:,} Hz · "
             f"{len(result.stems)} stems · {len(result.events)} events · "
             f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}\n"
             f"PHRASES: {phrase_line or 'n/a'}"
             + (f"\nFORM MAP: {phrase_detail}" if phrase_detail else "")
-            + (f"\nIRO: {', '.join(iro_roles)}" if iro_roles else "")
+            + (f"\nDRUM EVOLUTION: {drum_line}" if drum_line else "\nDRUM EVOLUTION: static mode")
+            + f"\nSOURCE ENGINE: {source_line}"
+            + (f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}" if loaded_sources else "")
         )
         self.statusBar().showMessage(
             f"Render complete — {len(result.events)} events, {len(result.stems)} aligned stems",
@@ -1112,8 +1126,7 @@ class MainWindow(QMainWindow):
             return
         supported = {
             "kick", "snare", "hats", "synthetic_break", "melody",
-            "noise_texture", "ambience", "sample_kick", "sample_snare",
-            "sample_hat", "sample_break",
+            "noise_texture", "ambience", "sample_break",
         }
         for name in self.project.stems:
             row = StemRow(name, name in supported)
