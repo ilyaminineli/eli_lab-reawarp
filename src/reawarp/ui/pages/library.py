@@ -141,13 +141,16 @@ class LibraryPage(QWidget):
         self.results.clear()
         for item in catalog:
             duration = f"{item.duration_seconds:.2f}s" if item.duration_seconds is not None else "duration n/a"
+            availability = "" if item.available else " · MISSING WAV"
             self.results.addItem(
-                f"{item.family} · {item.articulation or item.role} · {duration}",
+                f"{item.family} · {item.articulation or item.role} · {duration}{availability}",
                 item.asset_id,
             )
         self.results.blockSignals(False)
         self.details.setText(
-            f"{len(catalog)} IRO asset(s) · source pack metadata retained · originals are read-only"
+            f"{len(catalog)} IRO manifest entries · "
+            f"{sum(item.available for item in catalog)} WAVs available · "
+            "source pack metadata retained · originals are read-only"
         )
         if catalog:
             self.results.setCurrentIndex(0)
@@ -346,6 +349,12 @@ class LibraryPage(QWidget):
             if asset is None:
                 return
             meta = asset.metadata or {}
+            if not asset.available:
+                self.details.setText(
+                    f"IRO manifest entry is present, but its WAV is absent: {asset.relative_path}"
+                )
+                self.preview.set_audio(None)
+                return
             self.details.setText(
                 f"IRO · {asset.pack} · {asset.relative_path}\\n"
                 f"Role {asset.role} · family {asset.family} · articulation {asset.articulation or '—'}\\n"
