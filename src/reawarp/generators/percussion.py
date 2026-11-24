@@ -196,7 +196,14 @@ def _build_break_events(
                 companion_family = "offbeat_cells"
             elif companion_family == "straight":
                 companion_family = "clave_displaced"
-            companion_rng = np.random.default_rng(int(rng.integers(0, 2**32 - 1)))
+            # A companion phrase is keyed by the formal section rather than
+            # the current bar, so it remains identical across repeated cycles
+            # inside that section and changes only when the composition moves on.
+            companion_seed = derive_seed(
+                config.seed,
+                f"pattern-companion:{section.index}:{companion_family}:{config.pattern_relationship}",
+            )
+            companion_rng = np.random.default_rng(companion_seed)
             companion_base = pattern_for_section(
                 companion_family,
                 section_index=section.index + 1,
