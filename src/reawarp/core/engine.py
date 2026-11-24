@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from time import perf_counter
 from pathlib import Path
 from typing import Any
 
@@ -117,6 +118,7 @@ class ReawarpEngine:
 
         if variation < 1:
             raise ValueError("variation must be a positive integer")
+        total_started = perf_counter()
         stream_groups = {
             "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
             "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
@@ -149,6 +151,7 @@ class ReawarpEngine:
 
         frame_count = config.frame_count
         sample_rate = config.sample_rate
+        plan_started = perf_counter()
         composition_plan = build_composition_plan(
             duration_seconds=config.duration,
             bpm=config.bpm,
@@ -160,6 +163,8 @@ class ReawarpEngine:
             pattern_family=config.pattern_family,
             pattern_relationship=config.pattern_relationship,
         )
+        composition_plan_seconds = perf_counter() - plan_started
+        event_generation_started = perf_counter()
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
         stems: dict[str, np.ndarray] = {}
@@ -212,6 +217,8 @@ class ReawarpEngine:
             "break": sample_streams.get("break_pattern"),
         }, composition_plan)
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
+        event_generation_seconds = perf_counter() - event_generation_started
+        synthesis_started = perf_counter()
 
         kick_stem = new_stem("kick")
         snare_stem = new_stem("snare")
@@ -585,6 +592,8 @@ class ReawarpEngine:
                 "trigger_mode": "transient_slices" if role == "break" else "one_shot",
             }
 
+        synthesis_and_buffer_seconds = perf_counter() - synthesis_started
+        headroom_started = perf_counter()
         peak_ceiling = 10.0 ** (-1.0 / 20.0)
         stem_headroom_gains: dict[str, float] = {}
         for stem_name, stem_audio in stems.items():
@@ -593,6 +602,7 @@ class ReawarpEngine:
             if stem_gain < 1.0:
                 stem_audio *= stem_gain
             stem_headroom_gains[stem_name] = stem_gain
+        headroom_seconds = perf_counter() - headroom_started
 
         event_records.sort(
             key=lambda event: (float(event.get("time", 0.0)), str(event.get("lane", "")))
@@ -657,7 +667,14 @@ class ReawarpEngine:
             "sample_sources": sample_manifest,
             "event_count": len(event_records),
             "stem_headroom_gains": stem_headroom_gains,
+            "performance": {
+                "composition_plan_seconds": composition_plan_seconds,
+                "event_generation_seconds": event_generation_seconds,
+                "synthesis_and_buffer_seconds": synthesis_and_buffer_seconds,
+                "headroom_seconds": headroom_seconds,
+            },
         }
+        metadata["performance"]["total_engine_seconds"] = perf_counter() - total_started
         return ReawarpProject(
             config=config,
             sample_rate=sample_rate,
