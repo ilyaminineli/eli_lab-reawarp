@@ -29,9 +29,9 @@ The Generator filters unavailable records out of its selectable sample controls.
 ## Asset hierarchy already shipped in Reawarp
 
 - `samples/Iro/entities/<family>/`: eight mathematical families—boundary_shard, coordinate_slip, interference_knot, phase_fracture, quantization_residue, ratio_orbit, recurrence_ghost, spectral_bloom.
-- `samples/Iro/experimental-drum-kit-211/`: 96 instrument/articulation WAVs plus source indexes, drum manifest, drum map, MIDI note mapping and mutated kit alternatives.
-- `samples/Iro/sound-lab-211/`: 32 one-shots, four loops, four stems and MIDI/MusicXML material.
-- `samples/Iro/sound-fx-211/`: nine release-driven event families (with variants), four beat-aligned loops and an asset index.
+- `samples/Iro/experimental-drum-kit-211/`: a 96-row generated instrument/articulation index plus immutable source indexes, drum manifest, drum map, MIDI note mapping and mutated-kit manifest.
+- `samples/Iro/sound-lab-211/`: a manifest listing 32 one-shots, four loops, four stems and MIDI/MusicXML material.
+- `samples/Iro/sound-fx-211/`: 18 release-driven event variants across mathematical families, four beat-aligned loops and an asset index.
 
 The files are grouped by their generation identity and sonic family. Preserve that structure; do not rename all samples to generic role filenames.
 
