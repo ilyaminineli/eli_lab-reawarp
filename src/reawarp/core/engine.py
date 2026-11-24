@@ -25,7 +25,6 @@ from reawarp.synthesis.instruments import (
     render_snare,
     render_subtractive_note,
     render_synthetic_percussion,
-    render_synthetic_percussion,
 )
 from reawarp.synthesis.profiles import (
     AUTO_HAT_PROFILES,
