@@ -982,24 +982,142 @@ class MainWindow(QMainWindow):
         )
         sample_paths: dict[str, str] = {}
         sample_metadata: dict[str, dict[str, Any]] = {}
+        sample_banks: dict[str, tuple[dict[str, Any], ...]] = {}
+
+        # Pull indexed descriptors once for the whole generation request. The
+        # Generator then builds role banks from bundled material and assets the
+        # user has already indexed in Library; no audio is copied or re-written.
+        indexed_assets: list[Any] = []
+        if self.include_indexed_library_samples.isChecked():
+            try:
+                from reawarp.library.store import SampleLibrary
+                with SampleLibrary() as library:
+                    indexed_assets = library.search(asset_type="sample", limit=500)
+            except Exception as exc:
+                self.statusBar().showMessage(
+                    f"Indexed Library bank unavailable; using bundled samples only: {exc}", 8000
+                )
+
+        indexed_by_path = {
+            str(Path(asset.path).expanduser().resolve()): asset
+            for asset in indexed_assets
+        }
+
+        def add_bank_entry(
+            entries: list[dict[str, Any]],
+            path_value: str,
+            role: str,
+            *,
+            label: str | None = None,
+            metadata: dict[str, Any] | None = None,
+            features: dict[str, Any] | None = None,
+            sha256: str = "",
+            asset_id: str | None = None,
+        ) -> None:
+            path = Path(path_value).expanduser().resolve()
+            if not path.is_file() or any(item["path"] == str(path) for item in entries):
+                return
+            entry_metadata = dict(metadata or {})
+            entry_metadata.setdefault("role", role)
+            entries.append({
+                "path": str(path),
+                "label": label or path.name,
+                "asset_id": asset_id or path.name,
+                "sha256": sha256,
+                "metadata": entry_metadata,
+                "features": dict(features or {}),
+            })
+
         for role, selector in self.sample_selectors.items():
             selected_path = selector.currentData()
             if not selected_path:
                 continue
-            sample_paths[role] = str(selected_path)
+            selected_resolved = str(Path(str(selected_path)).expanduser().resolve())
+            sample_paths[role] = selected_resolved
+            selected_indexed = indexed_by_path.get(selected_resolved)
             matching = next(
                 (
                     asset for asset in self.sample_library.get(role, [])
-                    if str(asset.path) == str(selected_path)
+                    if str(Path(asset.path).expanduser().resolve()) == selected_resolved
                 ),
                 None,
             )
-            sample_metadata[role] = {
-                "provider": "bundled_sample_library" if matching else "custom_sample",
-                "relative_path": matching.relative_path if matching else Path(str(selected_path)).name,
+            anchor_metadata = {
+                "provider": "indexed_library" if selected_indexed else (
+                    "bundled_sample_library" if matching else "custom_sample"
+                ),
+                "relative_path": (
+                    str(Path(selected_indexed.path).name) if selected_indexed
+                    else matching.relative_path if matching
+                    else Path(selected_resolved).name
+                ),
                 "role": role,
-                "source_name": Path(str(selected_path)).name,
+                "source_name": Path(selected_resolved).name,
             }
+            sample_metadata[role] = anchor_metadata
+
+            bank: list[dict[str, Any]] = []
+            add_bank_entry(
+                bank,
+                selected_resolved,
+                role,
+                label=Path(selected_resolved).name,
+                metadata=anchor_metadata,
+                features=selected_indexed.features if selected_indexed else {},
+                sha256=selected_indexed.sha256 if selected_indexed else "",
+                asset_id=selected_indexed.asset_id if selected_indexed else None,
+            )
+
+            if self.auto_drum_sample_switching.isChecked():
+                # Bundled samples form the default role vocabulary. If already
+                # indexed, their measured descriptors are attached by exact path.
+                for asset in discover_bundled_samples(role=role):
+                    resolved = str(asset.path.expanduser().resolve())
+                    indexed = indexed_by_path.get(resolved)
+                    add_bank_entry(
+                        bank, resolved, role,
+                        label=asset.label,
+                        metadata={
+                            "provider": "indexed_bundled" if indexed else "bundled_sample_library",
+                            "relative_path": asset.relative_path,
+                            "role": role,
+                            "source_name": asset.path.name,
+                        },
+                        features=indexed.features if indexed else {},
+                        sha256=indexed.sha256 if indexed else "",
+                        asset_id=indexed.asset_id if indexed else None,
+                    )
+
+                # Add other indexed sounds that have a usable role, including
+                # files the user assigned by name/folder when indexing.
+                if self.include_indexed_library_samples.isChecked():
+                    for asset in indexed_assets:
+                        resolved = str(Path(asset.path).expanduser().resolve())
+                        if asset.role in {"kick", "snare", "hat"}:
+                            detected_role = asset.role
+                        else:
+                            detected_role = classify_sample_role(asset.path)
+                        if detected_role != role:
+                            continue
+                        add_bank_entry(
+                            bank, resolved, role,
+                            label=asset.file_name,
+                            metadata={
+                                "provider": "indexed_library",
+                                "role": role,
+                                "source_name": asset.file_name,
+                                **dict(asset.metadata or {}),
+                            },
+                            features=asset.features,
+                            sha256=asset.sha256,
+                            asset_id=asset.asset_id,
+                        )
+
+                # Keep the selector choice as the anchor; the remaining bank is
+                # bounded so a large project library cannot balloon render RAM.
+                bank = bank[:65]
+            sample_banks[role] = tuple(bank)
+
         if self._break_path:
             sample_paths["break"] = self._break_path
             sample_metadata["break"] = {
@@ -1035,6 +1153,11 @@ class MainWindow(QMainWindow):
             ambience_level=self.ambience_level.value(),
             sample_paths=sample_paths,
             sample_metadata=sample_metadata,
+            sample_banks=sample_banks,
+            drum_sample_automation=(
+                str(self.drum_sample_automation.currentData())
+                if self.auto_drum_sample_switching.isChecked() else "fixed"
+            ),
             kick_profile=self.kick_profile.currentText(),
             snare_profile=self.snare_profile.currentText(),
             hat_profile=self.hat_profile.currentText(),
