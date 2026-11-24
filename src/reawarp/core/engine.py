@@ -324,20 +324,12 @@ class ReawarpEngine:
                 if not section.melody:
                     continue
                 effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
-                if config.synth_palette in {"hybrid", "fm"}:
-                    signal = render_extended_note(
-                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
-                        duration=event.duration, velocity=event.velocity,
-                        palette=config.synth_palette, brightness=section.brightness,
-                        instability=section.instability,
-                    )
-                else:
-                    signal = render_extended_note(
-                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
-                        duration=event.duration, velocity=event.velocity,
-                        palette=config.synth_palette, brightness=section.brightness,
-                        instability=section.instability,
-                    )
+                signal = render_extended_note(
+                    effective_frequency, sample_rate, streams.get("melody_synthesis"),
+                    duration=event.duration, velocity=event.velocity,
+                    palette=config.synth_palette, brightness=section.brightness,
+                    instability=section.instability,
+                )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
                 record.update({
