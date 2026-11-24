@@ -42,8 +42,9 @@ jobs:
           assert drums and entities and sound_fx and sound_lab
           report = verify_iro_assets()
           assert report["ok"], report
+          assert report["available"] + len(report["missing"]) == report["total"]
           assert len({item.family for item in entities}) >= 8
-          print(f"IRO catalog OK · {len(drums)} drums · {len(entities)} entities · {len(sound_fx)} FX events/loops · {len(sound_lab)} sound-lab assets · {report['verified']} hashes verified")
+          print(f"IRO catalog OK · {len(drums)} drum entries ({sum(item.available for item in drums)} WAVs) · {len(entities)} entities · {len(sound_fx)} FX events/loops · {len(sound_lab)} sound-lab assets · {report['verified']} hashes verified · {len(report['missing'])} WAVs absent")
           PY
       - name: Run short M14 benchmark fixture
         run: python scripts/benchmark_generation.py --durations 5 --palettes subtractive --sample-rate 22050 --output /tmp/reawarp-m14-benchmark.json
