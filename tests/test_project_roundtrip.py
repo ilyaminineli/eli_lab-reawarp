@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
@@ -20,7 +22,7 @@ def test_exported_project_reopens_with_aligned_stems_events_and_score(tmp_path):
     assert reopened.sample_rate == project.sample_rate
     assert reopened.frame_count == project.frame_count
     assert reopened.events == project.events
-    assert reopened.metadata == project.metadata
+    assert reopened.metadata == json.loads(json.dumps(project.metadata))
     assert set(reopened.stems) == set(project.stems)
     for name, source in project.stems.items():
         restored = reopened.stems[name]
