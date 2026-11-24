@@ -954,10 +954,21 @@ class MainWindow(QMainWindow):
         self.preview_source.setCurrentIndex(0)
         self.export_button.setEnabled(True)
         self._refresh_preview()
+        phrase_report = result.metadata.get("phrase_directives", [])
+        phrase_line = " → ".join(
+            str(item.get("function", "")).upper() for item in phrase_report
+        )
+        iro_roles = [
+            f"{role}:{source.get('family', 'IRO')}"
+            for role, source in result.metadata.get("sample_sources", {}).items()
+            if source.get("source", {}).get("provider") == "IRO"
+        ]
         self.render_summary.setText(
             f"{result.duration:.2f} s · {result.sample_rate:,} Hz · "
             f"{len(result.stems)} stems · {len(result.events)} events · "
-            f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}"
+            f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}\n"
+            f"PHRASES: {phrase_line or 'n/a'}"
+            + (f"\nIRO: {', '.join(iro_roles)}" if iro_roles else "")
         )
         self.statusBar().showMessage(
             f"Render complete — {len(result.events)} events, {len(result.stems)} aligned stems",
