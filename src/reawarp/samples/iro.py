@@ -145,23 +145,33 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
         midi_by_role[str(instrument.get("name", ""))] = int(instrument.get("midi_note", 0))
 
     flat_index = _read_csv_rows(DRUM_PACK / "drum-kit-index.csv")
+    source_index = _read_csv_rows(DRUM_PACK / "source-assets-index.csv")
+    source_by_path = {
+        str(item.get("path", "")): item for item in source_index
+    }
     records: list[IROAsset] = []
     for item in flat_index:
         relative = str(item.get("file", ""))
         role = str(item.get("instrument", item.get("role", "percussion")))
         if not relative:
             continue
+        source_path = str(item.get("source_asset_path", ""))
+        source = source_by_path.get(source_path, {})
         asset = _asset(
             pack_root=DRUM_PACK,
             relative_path=relative,
             role=role,
-            family=str(item.get("family", role)),
+            family=str(source.get("family", item.get("family", role))),
             pack="experimental-drum-kit-211",
             articulation=str(item.get("articulation", "")),
             expected_sha256=str(item.get("sha256", "")),
             sample_rate=item.get("sample_rate"),
             duration_seconds=item.get("duration_seconds"),
             seed=211,
+            source_feature_index=(
+                int(source["source_feature_index"])
+                if source.get("source_feature_index") not in (None, "") else None
+            ),
             midi_note=midi_by_role.get(role),
             metadata={
                 "variant": item.get("variant"),
@@ -169,8 +179,12 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
                 "frequency_hz": item.get("frequency_hz"),
                 "rms": item.get("rms"),
                 "peak": item.get("peak"),
-                "source_asset_path": item.get("source_asset_path"),
+                "source_asset_path": source_path,
                 "source_asset_sha256": item.get("source_asset_sha256"),
+                "source_asset_family": source.get("family"),
+                "source_feature_index": source.get("source_feature_index"),
+                "source_seed": source.get("seed"),
+                "source_entity_family": source.get("source_entity_family"),
                 "reused_existing_output": item.get("reused_existing_output"),
             },
         )
