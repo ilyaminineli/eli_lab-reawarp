@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from dataclasses import replace
 from time import perf_counter
 from pathlib import Path
 from typing import Any
@@ -239,22 +240,34 @@ class ReawarpEngine:
             "break": "event_activity",
         }
         activity_defaults = {"kick": 0.72, "snare": 0.58, "hat": 0.50, "break": 0.46}
+        phrase_shaped_percussion: dict[str, list[Any]] = {}
         for role, events in percussion.items():
             activity_name = role_activity[role]
+            adjusted = []
             for event in events:
                 directive = phrase_at_time(float(event.time))
                 activity = float(getattr(directive, activity_name))
-                if directive.function == "silence" or activity <= 0.0:
-                    event.velocity = 0.0
-                else:
-                    event.velocity *= min(1.0, activity / activity_defaults[role])
+                velocity = (
+                    0.0 if directive.function == "silence" or activity <= 0.0
+                    else float(event.velocity) * min(1.0, activity / activity_defaults[role])
+                )
+                if velocity > 1e-7:
+                    adjusted.append(replace(event, velocity=float(np.clip(velocity, 0.0, 1.0))))
+            phrase_shaped_percussion[role] = adjusted
+        phrase_shaped_melody = []
         for event in melody_events:
             directive = phrase_at_time(float(event.time))
             activity = float(directive.melody_activity)
-            if directive.function == "silence" or activity <= 0.0:
-                event.velocity = 0.0
-            else:
-                event.velocity *= min(1.0, activity / 0.55)
+            velocity = (
+                0.0 if directive.function == "silence" or activity <= 0.0
+                else float(event.velocity) * min(1.0, activity / 0.55)
+            )
+            if velocity > 1e-7:
+                phrase_shaped_melody.append(
+                    replace(event, velocity=float(np.clip(velocity, 0.0, 1.0)))
+                )
+        percussion = phrase_shaped_percussion
+        melody_events = phrase_shaped_melody
 
         event_generation_seconds = perf_counter() - event_generation_started
         synthesis_started = perf_counter()
