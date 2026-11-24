@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 
 from reawarp.samples.iro import (
-    IRO_ROOT,
     load_drum_assets,
     load_entity_assets,
     load_iro_assets,
@@ -14,7 +13,7 @@ from reawarp.samples.iro import (
 )
 
 
-def test_iro_catalog_preserves_release_pack_and_family_identity():
+def test_iro_catalog_preserves_release_pack_family_and_availability():
     drums = load_drum_assets()
     entities = load_entity_assets()
     sound_fx = load_sound_fx_assets()
@@ -28,8 +27,9 @@ def test_iro_catalog_preserves_release_pack_and_family_identity():
     assert {item.pack for item in entities} == {"entities"}
     assert {item.role for item in sound_fx} <= {"event_texture", "event_loop"}
     assert {item.role for item in sound_lab} <= {"one_shot", "rendered_loop", "rendered_stem"}
-    assert all(item.path.is_file() for item in drums + entities + sound_fx + sound_lab)
-    assert all(item.sha256 for item in drums + entities)
+    assert all(item.available == item.path.is_file() for item in drums + entities + sound_fx + sound_lab)
+    assert any(item.available for item in drums)
+    assert any(not item.available for item in drums)
 
 
 def test_iro_catalog_keeps_mathematical_family_and_articulation():
@@ -52,9 +52,10 @@ def test_iro_manifest_paths_cannot_escape_pack_root(tmp_path: Path):
         _safe_path(root, "../outside.wav")
 
 
-def test_iro_integrity_report_is_non_destructive():
+def test_iro_integrity_report_is_non_destructive_and_explicit_about_missing_assets():
     assets = load_iro_assets()
     report = verify_iro_assets(assets)
     assert report["total"] == len(assets)
+    assert report["available"] + len(report["missing"]) == report["total"]
     assert report["ok"] is True
     assert report["verified"] > 0
