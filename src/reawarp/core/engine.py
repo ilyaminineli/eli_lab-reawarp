@@ -32,6 +32,8 @@ from reawarp.generators.percussion import (
 )
 from reawarp.samples.io import read_sample
 from reawarp.samples.selection import select_sample_variant
+from reawarp.score.model import Score
+from reawarp.score.render import ScoreRenderResult, ScoreRenderer
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
     render_extended_note,
@@ -62,6 +64,23 @@ class ReawarpEngine:
     """Generate deterministic musical material and render synchronized stereo stems."""
 
     VERSION = "0.8.0"
+
+    def render_score(
+            self,
+            score: Score,
+            *,
+            sample_rate: int | None = None,
+            frame_count: int | None = None,
+            voice_renderers: dict[str, Any] | None = None,
+    ) -> ScoreRenderResult:
+        """Render a canonical score using the shared frame-accurate score core."""
+        rate = (
+            int(score.metadata.get("sample_rate", 48_000))
+            if sample_rate is None else int(sample_rate)
+        )
+        return ScoreRenderer().render(
+            score, rate, frame_count=frame_count, voice_renderers=voice_renderers,
+        )
 
     def generate_variant(
             self,

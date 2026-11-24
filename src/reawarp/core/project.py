@@ -71,6 +71,12 @@ class ReawarpProject:
             "schema_version": 1,
             "application": "eli_lab-reawarp",
             "application_version": "0.12.0",
+            "renderer_version": str(self.metadata.get(
+                "renderer_version",
+                f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
+            )),
+            "score_file": "score.json",
+            "score_schema_version": 1,
             "python_version": platform.python_version(),
             "sample_rate": self.sample_rate,
             "duration_seconds": self.duration,
@@ -78,6 +84,16 @@ class ReawarpProject:
             "config": self.config.to_dict(),
             "metadata": self.metadata,
             "stems": list(self.stems),
+            "render_provenance": {
+                "renderer_version": str(self.metadata.get(
+                    "renderer_version",
+                    f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
+                )),
+                "root_seed": self.config.seed,
+                "sample_rate": self.sample_rate,
+                "frame_count": self.frame_count,
+                "duration_seconds": self.duration,
+            },
             "export": {"bit_depth": bit_depth, "master": include_master, "stems": include_stems},
         }
         (output / "project.json").write_text(

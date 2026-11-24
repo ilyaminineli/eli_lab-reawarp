@@ -89,26 +89,38 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 
 ## M16: Score-driven render core
 
-**Goal:** Make the universal score the canonical symbolic representation consumed by the audio renderer.
+**Status:** Partially implemented on main. A score-native offline renderer, shared beat/frame timeline, typed automation control bus and score provenance are landed. Full migration of the existing M8–M15 Generator planners and production synthesis loops remains open.
 
-### Scope
+**Goal:** Make the universal score the canonical symbolic event representation consumed by the audio renderer.
 
-- Generation planners emit score events and automation lanes.
-- Renderers consume score events rather than maintaining a parallel private event timeline.
-- Tempo-map and meter-map aware beat-to-frame conversion.
-- Rational beat positions remain exact until frame conversion.
-- Typed control lanes share a single timebase across synthesis and FX.
-- Project export stores canonical score, renderer version and provenance.
-- MIDI import/export round trips have documented representational limits.
+### Delivered in this increment
+
+- RenderTimeline maps rational beats to seconds and sample frames through step and linear tempo maps, and maps frames back to musical time.
+- Meter-map bar/beat queries are available on the render timeline; meter changes remain independent from tempo and pattern cycles.
+- ScoreRenderer consumes Score.events, schedules note/hit/grain/trigger events onto sample frames, and renders aligned dry per-voice stereo stems.
+- Production/custom voice callbacks receive a ScheduledScoreEvent and shared AutomationControlBus; the score core owns frame placement, velocity, mono panning and finite-buffer validation.
+- AutomationTargetRegistry defines synthesis, FX and MIDI control domains, units, value types, ranges and interpolation. Beat-, second- and frame-based lanes are evaluated against the same absolute frame clock.
+- Project-derived scores retain score-renderer version, source generator version, root seed, sample rate, frame count, duration, named seed streams and generator-family provenance.
+- Existing project and score schema version 1 remain readable; MIDI 1.0 precision and metadata limitations are documented in docs/M16.md.
+
+### Remaining integration work
+
+1. Convert the existing percussion, motif and melody planners to emit MusicalEvent records directly instead of legacy seconds-based event classes.
+2. Adapt production instrument, sample-trigger and break-slice renderers to consume ScheduledScoreEvent from the canonical score.
+3. Replace remaining constant-4/4 section and bar timing in the legacy Generator with MeterMap queries where musical form is expressed in bars.
+4. Route the existing M13 FX automation representation into the typed score control bus.
+5. Complete target-Windows performance profiling and critical listening after the production renderer adapters land.
 
 ### Acceptance criteria
 
-- Score events correspond to actual rendered note/hit/trigger positions.
-- Step and ramp tempo maps render at the expected musical positions.
-- Meter changes produce correct bar/beat queries and phrase boundaries.
-- Rendering the same score twice is deterministic within the documented environment contract.
-- Existing project exports remain readable through a migration or compatibility strategy.
+- Score event positions correspond to actual render frames through step and ramp tempo maps.
+- Meter changes produce correct bar/beat queries.
+- Repeated rendering of the same score is deterministic within the documented environment contract.
+- Synthesis and FX callbacks can evaluate typed control lanes on the same absolute frame clock.
+- Existing project exports remain readable and new exports contain renderer and generation provenance.
+- The legacy Generator no longer maintains a parallel seconds-based event timeline; this final criterion remains open.
 
+See M16.md for implementation details and the score-render API.
 ## M17: Synthesis modulation and musical automation
 
 **Goal:** Make automation affect the sound-generation process itself, not only post-processing wet/send levels.

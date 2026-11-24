@@ -242,7 +242,7 @@ The main reawarp command can also export MIDI for a freshly generated render wit
 
 MIDI 1.0 note numbers are integer semitones. Reawarp rounds fractional pitches to the nearest MIDI note for ordinary playback, while embedding exact pitch, frequency, event identity, and Reawarp metadata in text meta events for a Reawarp-to-Reawarp round trip. Linear tempo ramps are sampled into discrete MIDI tempo events. The score model remains the authoritative representation.
 
-The score system does not yet make the existing offline renderer follow arbitrary tempo maps, time-signature changes, or automation. It establishes the data model and interchange layer; score-driven rendering and editing are future work.
+M16 adds a score-native offline render entry point with tempo-map-aware frame scheduling, meter queries, and typed frame-addressed automation. The existing Generator still converts its legacy seconds-based events into the universal score after generation; migrating every production planner and synthesis voice to consume score events directly remains open. See the [M16 implementation guide](docs/M16.md).
 
 ## Determinism
 
@@ -338,6 +338,7 @@ The current implementation baseline is **M13 with M14 in progress**. M14 has add
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
 - [Consolidated Roadmap](docs/ROADMAP.md) — implementation status and M14–M20 forward plan.
 - [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
+- [M16 Score-driven Render Core](docs/M16.md) — frame-accurate score scheduling, typed automation and migration status.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
 
 
