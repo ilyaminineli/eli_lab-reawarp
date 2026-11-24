@@ -546,6 +546,7 @@ def build_score_generation_plan(
         "score_origin": "score_first_generation",
         "planner_event_timebase": "rational_quarter_note_beats_from_sixteenth_grid",
         "algorithm_version": "0.8.0",
+        "synth_palette": config.synth_palette,
         "root_seed": config.seed,
         "variation": {"stem": regenerate, "index": variation} if regenerate else None,
         "sample_rate": int(config.sample_rate),
@@ -650,7 +651,7 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
         parameters = dict(event.parameters)
         onset_seconds = float(score.tempo_map.beat_to_seconds(event.onset_beats))
         step = parameters.get("step")
-        if step is None and event.onset_beats * 4.denominator == 1:
+        if step is None and (event.onset_beats * 4).denominator == 1:
             step = int(event.onset_beats * 4)
         base = {
             "time": onset_seconds,
