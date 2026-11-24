@@ -25,6 +25,7 @@ from reawarp.synthesis.instruments import (
     render_snare,
     render_subtractive_note,
     render_synthetic_percussion,
+    render_synthetic_percussion,
 )
 from reawarp.synthesis.profiles import (
     AUTO_HAT_PROFILES,
@@ -222,13 +223,22 @@ class ReawarpEngine:
             config.kick_profile, KICK_PROFILES, streams.get("kick_profile"),
             auto_choices=AUTO_KICK_PROFILES,
         )
+        synthetic_percussion = config.percussion_synthesis in {"minimal", "extended"}
         for event in percussion["kick"]:
             if not section_for_time(composition_plan, event.time).kick:
                 continue
             profile = kick_profile
-            signal = render_kick(
-                sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
-            )
+            if synthetic_percussion:
+                signal = render_synthetic_percussion(
+                    "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump",
+                    sample_rate, streams.get("kick_synthesis"),
+                    velocity=event.velocity, duration=0.19,
+                    pitch_hz=KICK_PROFILES[profile].end_frequency,
+                )
+            else:
+                signal = render_kick(
+                    sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
+                )
             place_mono(kick_stem, signal, event.time, event.pan)
             record = event.to_dict()
             record["sound_profile"] = profile
@@ -243,9 +253,17 @@ class ReawarpEngine:
             if section.density < 0.14 and event.velocity < 0.70:
                 continue
             profile = snare_profile
-            signal = render_snare(
-                sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
-            )
+            if synthetic_percussion:
+                signal = render_synthetic_percussion(
+                    "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim",
+                    sample_rate, streams.get("snare_synthesis"),
+                    velocity=event.velocity, duration=0.17,
+                    pitch_hz=SNARE_PROFILES[profile].body_frequency,
+                )
+            else:
+                signal = render_snare(
+                    sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
+                )
             place_mono(snare_stem, signal, event.time, event.pan)
             record = event.to_dict()
             record["sound_profile"] = profile
@@ -260,9 +278,17 @@ class ReawarpEngine:
             if streams.get("section_ornaments").random() > section.percussion_density_scale:
                 continue
             profile = hat_profile
-            signal = render_hat(
-                sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
-            )
+            if synthetic_percussion:
+                signal = render_synthetic_percussion(
+                    "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick",
+                    sample_rate, streams.get("hat_synthesis"),
+                    velocity=event.velocity, duration=0.085,
+                    pitch_hz=HAT_PROFILES[profile].partials[0][0],
+                )
+            else:
+                signal = render_hat(
+                    sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
+                )
             place_mono(hat_stem, signal, event.time, event.pan)
             record = event.to_dict()
             record["sound_profile"] = profile
