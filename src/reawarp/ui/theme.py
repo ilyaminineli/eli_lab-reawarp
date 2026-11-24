@@ -61,6 +61,9 @@ QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
 QToolTip { background: #151515; color: #eee; border: 1px solid #555; padding: 5px 7px; }
 QMessageBox QLabel { color: #eee; min-width: 280px; }
 QFrame#header { background: #090909; border-bottom: 1px solid #252525; }
+QFrame#generatorActionBar { background: #171717; border: 1px solid #484848; border-radius: 2px; }
+QFrame#generatorActionBar QLabel#sectionTitle { color: #f0f0f0; font-size: 9pt; }
+QFrame#generatorActionBar QPushButton#primaryAction { min-width: 230px; min-height: 48px; padding: 12px 20px; font-size: 10pt; }
 QFrame#transportBar { background: #101010; border: 1px solid #303030; }
 QWidget#previewEmptyState { background: #101318; border: 1px solid #252b33; }
 QLabel#previewEmptyTitle { color: #c7cbd1; font-family: "DM Mono", "Consolas", monospace; font-size: 8.5pt; letter-spacing: 0.12em; padding: 4px; }
