@@ -24,7 +24,7 @@ def _write_test_sample(path: Path, sample_rate: int = 22_050) -> None:
 
 def _config(sample_path: Path, **overrides):
     values = {
-        "duration": 5.0,
+        "duration": 8.0,
         "bpm": 120.0,
         "sample_rate": 22_050,
         "seed": "hybrid-score-test",
