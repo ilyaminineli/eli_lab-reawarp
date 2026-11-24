@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from fractions import Fraction
 from typing import Any
+from time import perf_counter
 
 import numpy as np
 
@@ -67,6 +68,7 @@ class ScoreGenerationPlan:
     selected_profiles: dict[str, dict[int, str]]
     melody_profile: str | None
     break_profiles: dict[str, str]
+    timings: dict[str, float]
 
 
 def _profile_options() -> dict[str, dict[str, tuple[str, ...]]]:
@@ -210,6 +212,7 @@ def build_score_generation_plan(
         raise ValueError("variation must be a positive integer")
     seed_overrides = _seed_overrides(regenerate, variation, config.seed)
     streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
+    composition_started = perf_counter()
     composition_plan = build_composition_plan(
         duration_seconds=config.duration,
         bpm=config.bpm,
@@ -221,6 +224,8 @@ def build_score_generation_plan(
         pattern_family=config.pattern_family,
         pattern_relationship=config.pattern_relationship,
     )
+    composition_plan_seconds = perf_counter() - composition_started
+    event_generation_started = perf_counter()
     phrase_directives = tuple(build_phrase_directives(composition_plan.sections))
     drum_plan = build_drum_part_plan(config, composition_plan)
 
@@ -630,6 +635,10 @@ def build_score_generation_plan(
         events=tuple(events),
         metadata=metadata,
     )
+    timings = {
+        "composition_plan_seconds": composition_plan_seconds,
+        "event_generation_seconds": perf_counter() - event_generation_started,
+    }
     return ScoreGenerationPlan(
         score=score,
         composition_plan=composition_plan,
@@ -641,6 +650,7 @@ def build_score_generation_plan(
         selected_profiles=selected_profiles,
         melody_profile=melody_profile,
         break_profiles=break_profiles,
+        timings=timings,
     )
 
 
