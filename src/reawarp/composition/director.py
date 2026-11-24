@@ -48,6 +48,7 @@ class CompositionPlan:
     seed: int | str
     structure: str
     flow: str
+    source_structure: str | None
     sections: tuple[SectionPlan, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -57,6 +58,7 @@ class CompositionPlan:
             "seed": self.seed,
             "structure": self.structure,
             "flow": self.flow,
+            "source_structure": self.source_structure,
             "sections": [section.to_dict() for section in self.sections],
         }
 
@@ -184,12 +186,14 @@ def build_composition_plan(
 
     rng = np.random.default_rng(np.random.SeedSequence([_seed_value(seed), 0x52454157]))
     template = STRUCTURES[structure]
+    source_structure: str | None = None
     if flow == "mix" and structure not in {"hybrid"}:
         # A bounded cross-preset blend: retain the chosen form's opening and
         # ending while borrowing one middle movement from the contrasting form.
         alternatives = [name for name in STRUCTURES if name != structure]
         alternate_name = alternatives[int(rng.integers(0, len(alternatives)))]
         alternate = STRUCTURES[alternate_name]
+        source_structure = alternate_name
         left = list(template)
         middle = list(alternate[1:-1])
         if middle:
@@ -297,6 +301,7 @@ def build_composition_plan(
         seed=seed,
         structure=structure,
         flow=flow,
+        source_structure=source_structure,
         sections=tuple(sections),
     )
 
