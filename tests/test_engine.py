@@ -167,3 +167,18 @@ def test_engine_stores_seeded_composition_plan_and_respects_duration():
     assert plan["sections"][0]["start_seconds"] == 0.0
     assert plan["sections"][-1]["end_seconds"] == pytest.approx(12.0)
     assert project.frame_count == 12 * 22_050
+
+
+
+def test_engine_renders_three_minute_composition_with_new_form_and_palette():
+    project = ReawarpEngine().generate(small_config(
+        duration=180.0, structure="autechre_like", composition_flow="mutate",
+        synth_palette="inharmonic",
+    ))
+    assert project.frame_count == 180 * 22_050
+    plan = project.metadata["composition_plan"]
+    assert plan["duration_seconds"] == pytest.approx(180.0)
+    assert plan["flow"] == "mutate"
+    assert plan["sections"][-1]["end_seconds"] == pytest.approx(180.0)
+    assert project.metadata["synth_palette"] == "inharmonic"
+    assert np.all(np.isfinite(project.stems["melody"]))
