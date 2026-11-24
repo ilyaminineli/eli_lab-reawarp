@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("Reawarp — 再変形")
         self.resize(1440, 920)
-        self.setMinimumSize(1080, 700)
+        self.setMinimumSize(1024, 640)
         self.setStyleSheet(APP_STYLE)
 
         self.project: ReawarpProject | None = None
@@ -107,7 +107,6 @@ class MainWindow(QMainWindow):
         # where project audition is the primary task. FX Lab keeps its own A/B
         # source/result controls while using the same underlying audio player.
         self.transport_bar = self._build_transport_bar()
-        root_layout.addWidget(self.transport_bar)
 
         generator_page = self._build_generator_page()
         break_page = self._build_break_page()
@@ -167,6 +166,7 @@ class MainWindow(QMainWindow):
         self.workspace_description.setWordWrap(True)
         header_layout.addWidget(self.workspace_description)
         root_layout.addWidget(workspace_header)
+        root_layout.addWidget(self.transport_bar)
 
         body = QWidget()
         body_layout = QHBoxLayout(body)
