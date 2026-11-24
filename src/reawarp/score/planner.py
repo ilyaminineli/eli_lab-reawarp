@@ -77,10 +77,10 @@ def melody_to_score_events(
     ordered = sorted(events, key=lambda item: (int(item.step), int(item.midi_note)))
     for index, source in enumerate(ordered):
         onset = _step_beats(int(source.step))
-        duration = Fraction(
+        raw_duration = Fraction(
             str(float(source.duration) * float(bpm) / 60.0)
         ).limit_denominator(15360)
-        duration = max(Fraction(1, 64), duration)
+        duration = max(Fraction(1, 64), raw_duration)
         result.append(MusicalEvent(
             event_id=f"melody-{index:07d}",
             voice_id=voice_id,
@@ -145,7 +145,7 @@ def score_from_planner_events(
 def score_to_legacy_grid_events(score: Score) -> dict[str, list[dict[str, Any]]]:
     """Compatibility projection for old consumers at a constant tempo map."""
     tempos = score.tempo_map.points
-    if len(tempos) != 1:
+    if len(tempos) != 1 or tempos[0].interpolation_to_next != "step":
         raise ValueError("legacy projection requires a single constant tempo map")
     result: dict[str, list[dict[str, Any]]] = {}
     for event in score.events:
