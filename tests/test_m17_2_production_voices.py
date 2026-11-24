@@ -93,7 +93,6 @@ def test_score_voice_automation_uses_shared_control_bus_and_changes_audio():
         include_ambience=False,
     )
     base = score_from_planner_events(melody=[_melody_event()], bpm=config.bpm)
-    event = base.events[0]
     automated = Score(
         title='M17.2 automated voice',
         tempo_map=base.tempo_map,
@@ -114,8 +113,8 @@ def test_score_voice_automation_uses_shared_control_bus_and_changes_audio():
             ),
         ),
     )
-    dry = ReawarpEngine().render_score(base, config=config).stems['melody']
-    wet = ReawarpEngine().render_score(automated, config=config).stems['melody']
+    dry = ReawarpEngine().render_score(base, config=config, frame_count=90_000).stems['melody']
+    wet = ReawarpEngine().render_score(automated, config=config, frame_count=90_000).stems['melody']
     assert dry.shape == wet.shape
     assert np.isfinite(wet).all()
     assert not np.array_equal(dry, wet)
