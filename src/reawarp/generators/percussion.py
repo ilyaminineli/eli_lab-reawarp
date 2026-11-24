@@ -166,6 +166,7 @@ def _build_break_events(
     bar_count = (step_count + 15) // 16
     events: list[PercussionEvent] = []
 
+    previous_section_index = -1
     for bar in range(bar_count):
         section = section_for_time(composition_plan, bar * 4.0 * 60.0 / config.bpm)
         # Preserve the established density and phrase-cycle semantics exactly.
@@ -179,7 +180,7 @@ def _build_break_events(
 
         # Pattern-family remapping follows the existing break-variation control.
         # A zero value guarantees the original phrase and density semantics.
-        if config.break_variation > 0.0 and bar % int(config.break_cycle_bars) == 0:
+        if config.break_variation > 0.0 and (bar == 0 or section.index != previous_section_index):
             family_steps = pattern_for_section(
                 config.pattern_family,
                 section_index=section.index,
@@ -233,6 +234,7 @@ def _build_break_events(
                     _step, kind, priority, velocity, pan = item
                     remapped.append((selected_steps[index], kind, priority, velocity, pan))
                 bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
+        previous_section_index = section.index
 
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
         if (
