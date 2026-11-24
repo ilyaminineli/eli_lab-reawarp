@@ -13,7 +13,7 @@ import numpy as np
 
 from reawarp.config import GenerationConfig
 from reawarp.composition.patterns import pattern_for_section, relate_patterns
-from reawarp.composition.director import section_for_time
+from reawarp.composition.director import build_composition_plan, section_for_time
 from reawarp.mathematics.rhythms import euclidean_rhythm
 from reawarp.mathematics.sequences import fibonacci, logistic_map, primes
 
