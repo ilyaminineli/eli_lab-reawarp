@@ -10,10 +10,10 @@ from reawarp.synthesis.profiles import (
     HAT_PROFILES,
     KICK_PROFILES,
     MELODY_PROFILES,
-    EXTENDED_MELODY_PROFILES,
+    PERCUSSION_VOICES,
     SNARE_PROFILES,
+    SUBTRACTIVE_VOICES,
     select_profile_name,
-    EXTENDED_MELODY_PROFILES,
 )
 
 
@@ -357,3 +357,123 @@ def render_extended_note(
     if peak > 1e-9:
         signal *= min(1.0, 0.82 / peak)
     return (signal * float(np.clip(velocity, 0.0, 1.0))).astype(np.float32)
+
+
+def _one_pole_lowpass(signal: np.ndarray, sample_rate: int, cutoff_hz: float) -> np.ndarray:
+    """Small stable one-pole low-pass used by the independent subtractive voice."""
+    cutoff = float(np.clip(cutoff_hz, 20.0, sample_rate * 0.45))
+    coefficient = 1.0 - np.exp(-2.0 * np.pi * cutoff / sample_rate)
+    output = np.empty_like(signal, dtype=np.float64)
+    state = 0.0
+    for index, sample in enumerate(signal):
+        state += coefficient * (float(sample) - state)
+        output[index] = state
+    return output
+
+
+def render_subtractive_note(
+        frequency: float,
+        sample_rate: int,
+        rng: np.random.Generator,
+        duration: float = 0.22,
+        velocity: float = 0.55,
+        profile: str = "dry_pluck",
+        brightness: float = 0.42,
+        instability: float = 0.0,
+) -> np.ndarray:
+    """Render a genuinely subtractive voice: harmonic source, moving filter, ADSR.
+
+    Unlike the FM renderer, this uses a pulse/saw-like harmonic source filtered by
+    a time-varying one-pole ladder approximation. No FM operator is involved.
+    """
+    if frequency <= 0 or sample_rate <= 0 or duration <= 0:
+        raise ValueError("frequency, sample_rate, and duration must be positive")
+    if profile not in SUBTRACTIVE_VOICES:
+        raise ValueError(f"unknown subtractive profile: {profile}")
+    if not 0.0 <= brightness <= 1.0 or not 0.0 <= instability <= 1.0:
+        raise ValueError("brightness and instability must be between zero and one")
+    shape = SUBTRACTIVE_VOICES[profile]
+    length = max(64, int(round(sample_rate * (duration + shape.release + 0.04))))
+    t = np.arange(length, dtype=np.float64) / float(sample_rate)
+    phase_drift = np.sin(2*np.pi*0.13*t) * shape.drift_cents * instability
+    source = np.zeros(length, dtype=np.float64)
+    phase = 2*np.pi*frequency*np.power(2.0, phase_drift/1200.0)*t
+    for harmonic, amplitude in enumerate(shape.harmonics, start=1):
+        source += amplitude * np.sin(harmonic * phase)
+    if len(shape.harmonics) > 4:
+        source += 0.12 * np.sign(np.sin(phase))
+    attack = np.clip(t / max(shape.attack, 1e-4), 0.0, 1.0)
+    decay = shape.sustain + (1.0-shape.sustain)*np.exp(
+        -np.maximum(0.0, t-shape.attack)/max(shape.decay, 1e-4)
+    )
+    envelope = attack * decay
+    release_start = duration
+    release = np.exp(-np.maximum(0.0, t-release_start)/max(shape.release, 1e-4))
+    envelope *= np.where(t >= release_start, release, 1.0)
+    filter_env = np.exp(-t/max(shape.decay*1.8, 1e-3))
+    cutoff = frequency * (
+        1.6 + 18.0*brightness + shape.filter_env_amount*28.0*filter_env
+    )
+    filtered = _one_pole_lowpass(source, sample_rate, cutoff)
+    # Small resonant emphasis via a high-passed portion; deliberately restrained.
+    high = source - filtered
+    signal = filtered + shape.resonance * high
+    signal *= envelope
+    signal = np.tanh(signal * 1.1)
+    peak = float(np.max(np.abs(signal))) if signal.size else 0.0
+    if peak > 1e-9:
+        signal *= 0.78 / peak
+    return (signal * float(np.clip(velocity, 0.0, 1.0))).astype(np.float32)
+
+
+def render_synthetic_percussion(
+        voice: str,
+        sample_rate: int,
+        rng: np.random.Generator,
+        duration: float = 0.22,
+        velocity: float = 0.7,
+        pitch_hz: float | None = None,
+) -> np.ndarray:
+    """Render a sparse transient/body/tail percussion object without FM."""
+    if voice not in PERCUSSION_VOICES:
+        raise ValueError(f"unknown percussion voice: {voice}")
+    if sample_rate <= 0 or duration <= 0:
+        raise ValueError("sample_rate and duration must be positive")
+    shape = PERCUSSION_VOICES[voice]
+    length = max(32, int(round(sample_rate * duration)))
+    t = np.arange(length, dtype=np.float64)/sample_rate
+    signal = np.zeros(length, dtype=np.float64)
+    if shape.body_hz > 0.0:
+        base = float(pitch_hz or shape.body_hz)
+        ratio = 1.0 + shape.inharmonicity
+        body = np.sin(2*np.pi*base*t) * 0.72
+        if shape.inharmonicity:
+            body += 0.22*np.sin(2*np.pi*base*ratio*2.17*t)
+        signal += body*np.exp(-t/max(shape.body_decay, 1e-4))
+    if shape.transient_gain:
+        transient_noise = rng.standard_normal(length)
+        transient = transient_noise*np.exp(-t/max(shape.transient_decay, 1e-4))
+        signal += shape.transient_gain*transient
+    if shape.noise_gain:
+        noise = rng.standard_normal(length)
+        # Tilt the noise toward the top end without generating an unbounded hiss.
+        high = np.empty_like(noise)
+        high[0] = noise[0]
+        high[1:] = noise[1:] - 0.92*noise[:-1]
+        signal += shape.noise_gain*high*np.exp(-t/max(shape.body_decay, 1e-4))
+    if shape.tail_gain:
+        tail = np.zeros(length, dtype=np.float64)
+        ratios = (1.0, 2.31, 3.87, 6.14)
+        for index, ratio in enumerate(ratios):
+            tail += np.sin(2*np.pi*float(pitch_hz or shape.body_hz)*ratio*t + index*.7)/(index+1)
+        signal += shape.tail_gain*tail*np.exp(-t/max(shape.tail_decay, 1e-4))
+    # A short onset ramp and restrained output level make dry hits sit naturally.
+    attack = 1.0-np.exp(-t/0.0008)
+    signal *= attack
+    signal = np.tanh(signal*0.8)
+    peak=float(np.max(np.abs(signal))) if signal.size else 0.0
+    if peak>1e-9:
+        signal *= 0.72/peak
+    return (signal*float(np.clip(velocity,0.0,1.0))).astype(np.float32)
+
+
