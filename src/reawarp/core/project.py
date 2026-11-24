@@ -7,7 +7,10 @@ import math
 import platform
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from reawarp.score.model import Score
 
 import numpy as np
 
@@ -22,6 +25,7 @@ class ReawarpProject:
     stems: dict[str, np.ndarray]
     events: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    score: Score | None = None
 
     @property
     def frame_count(self) -> int:
@@ -32,7 +36,11 @@ class ReawarpProject:
         return self.frame_count / float(self.sample_rate)
 
     def to_score(self, *, title: str | None = None):
-        """Return the synthesizer-independent symbolic score for this render."""
+        """Return the canonical score, or adapt a legacy project when absent."""
+        if self.score is not None:
+            return self.score if title is None else __import__(
+                "dataclasses"
+            ).replace(self.score, title=title)
         from reawarp.score.conversion import project_to_score
 
         return project_to_score(self, title=title)
@@ -184,4 +192,5 @@ class ReawarpProject:
             stems=stems,
             events=events,
             metadata=metadata,
+            score=score,
         )
