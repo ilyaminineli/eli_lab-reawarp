@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES
+from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
@@ -58,7 +58,7 @@ class GenerationConfig:
             raise ValueError("unknown composition structure")
         if self.composition_flow not in {"preset", "mix", "mutate"}:
             raise ValueError("composition_flow must be preset, mix, or mutate")
-        if self.synth_palette not in {"hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"}:
+        if self.synth_palette not in SYNTH_PALETTES:
             raise ValueError("unknown synth palette")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
             raise ValueError("composition_energy must be between 0 and 1")
