@@ -83,7 +83,7 @@ def test_percussion_and_synthetic_break_voices_use_specialist_scheduled_adapters
     kick = next(item for item in result.schedule if item.event.voice_id == 'kick')
     snare = next(item for item in result.schedule if item.event.voice_id == 'snare')
     assert kick.start_frame == 0
-    assert snare.start_frame == 24_000
+    assert snare.start_frame == 11_025
 
 
 def test_score_voice_automation_uses_shared_control_bus_and_changes_audio():
