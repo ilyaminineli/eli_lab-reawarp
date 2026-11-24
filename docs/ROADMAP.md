@@ -156,72 +156,123 @@ See M16.md for implementation details and the score-render API.
 
 See [M16 — Score-driven render core](M16.md) for the timing/render foundation and detailed M17 migration contract.
 
-## M18: Mixer and routing quality
+## M18: Musical automation and control performance
 
-**Goal:** Make current two-bus routing more transparent and reliable before generalising it.
+**Status:** Planned. M16/M17 provide the Score control bus and typed target registry; user-facing composition-level automation and reusable modulation sources remain future work.
 
-### Scope
+**Goal:** Turn the typed control bus into a compositional instrument. Add inspectable and editable score trajectories for synthesis, role behaviour, spatial motion and selected FX parameters.
 
-- Clear pre/post insert and pre/post fader send semantics.
-- Direct/insert/send/return/master audition and level meters.
-- Peak, RMS and headroom diagnostics at each routing boundary.
-- Better cache invalidation and asynchronous/off-thread render coordination.
-- Explicit tail and alignment rules for inserts and shared returns.
-- Snapshot/compare for routing and automation settings.
-- Preserve existing portable JSON through versioned migration.
+See [M18.md](M18.md).
 
-### Acceptance criteria
+## M19: Harmonic context and voice-leading
 
-- Routing changes refresh only affected processing where safe.
-- Gain/pan/mute/solo behaviour is consistent between preview and export.
-- Dry stems remain unchanged; exports contain complete return tails.
-- Mono compatibility and headroom are checked.
-- All UI controls have documented and testable effect on render or audition.
+**Status:** Planned. Score tuning hooks and frequency-aware notes exist, but harmonic context, sonority planning, optional pitch hierarchy and voice-leading are not yet composition-first.
 
-## M19: Advanced DSP research modules
+**Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 
-**Goal:** Add selected advanced processing only after the core and routing are stable.
+See [M19.md](M19.md).
 
-Potential independent modules:
-- convolution reverb and impulse-response library;
-- spectral delay and frequency-dependent feedback;
-- cross-synthesis and ring/frequency modulation;
-- oversampled nonlinear processing;
-- sidechain envelope extraction and cross-stem detector routing;
-- optional user-defined bus graphs and parallel branches.
+## M20: Perceptual orchestration and multi-scale phrase grammar
 
-Each module must define CPU/memory budget, latency/tail behaviour, optional dependency policy, portability, headroom strategy and regression fixtures. Do not bundle all modules into one milestone.
+**Status:** Planned. M15 supplies motifs, role axes and transitions; explicit foreground/midground/background intent, role-pair grammars, asymmetric phrase hierarchy and attention allocation remain future work.
 
-## M20: Iteration and creative workflow
+**Goal:** Compose relationships between layers and nested time scales, with identity, expectation, negative space and perceptual hierarchy.
 
-**Goal:** Reduce friction when exploring and selecting variations.
+See [M20.md](M20.md).
 
-Potential scope:
-- multi-variation stem browser with seed/parameter comparison;
-- project snapshots and matched-level A/B audition;
-- waveform/spectrogram comparison for dry, processed, send, return and master;
-- contextual sample-library audition and replace/keep workflow;
-- export profiles and project portability checks;
-- extracted UI controllers/services and more modular page construction.
+## M21: Sound-object and hybrid instrument architecture
+
+**Status:** Planned. Existing synthesis palettes and hybrid percussion provide a foundation; a reusable source/envelope/spectrum/modulation/space model and broader hybrid voices remain future work.
+
+**Goal:** Treat instruments as designed sound behaviours with separately controllable transient/body/tail, spectral identity, modulation and spatial intent.
+
+See [M21.md](M21.md).
+
+## M22: Mixer and routing quality
+
+**Status:** Planned. Current two-bus SPACE/ECHO routing and automation are implemented; full signal-path observability, explicit pre/post semantics, robust tail/latency rules and asynchronous FX rendering remain follow-on work.
+
+**Goal:** Make the fixed routing architecture transparent and predictable before considering arbitrary routing graphs.
+
+See [M22.md](M22.md).
+
+## M23: Variation browser and critical-listening workflow
+
+**Status:** Planned. Deterministic stem regeneration and project genealogy exist; candidate batching, matched-level comparison, listening sets and guided notes remain future work.
+
+**Goal:** Make generation a reproducible candidate-selection process while keeping the original project immutable.
+
+See [M23.md](M23.md).
+
+## M24: Advanced DSP research modules
+
+**Status:** Planned research track. Each module is independent and must be justified by a real compositional use-case.
+
+**Goal:** Add convolution, spectral delay, cross-synthesis, oversampling, sidechain routing and feedback networks one at a time, with explicit CPU, latency, tail and portability contracts.
+
+See [M24.md](M24.md).
+
+## M25: Performance, portability and project durability
+
+**Status:** Planned. M14's portable tests and benchmark harness are implemented; target-Windows long-render measurements and Pyo listening remain experimentally unverified.
+
+**Goal:** Establish measured performance budgets, explicit asset portability and durable project/schema migration guarantees.
+
+See [M25.md](M25.md).
 
 ## Cross-cutting engineering requirements
 
 Every milestone should satisfy these requirements:
 
-1. **Determinism:** new random sources use named/versioned streams; unrelated lanes remain independent.
-2. **Non-destructive audio:** dry sources are retained; processing writes separate results.
+1. **Determinism:** new random sources use named/versioned streams; unrelated lanes remain independent where promised.
+2. **Non-destructive audio:** source assets and dry stems remain immutable.
 3. **Portable data:** user-authored settings use validated, versioned schemas.
 4. **Optional dependencies:** experimental/native backends remain optional and lazy-loaded.
-5. **Signal safety:** all outputs are finite, bounded as specified, and report peak/tail behaviour.
-6. **Testability:** musical rules and signal contracts have automated tests; subjective sound requires a listening protocol.
-7. **Documentation accuracy:** mark features as implemented, partial, planned or experimentally unverified.
-8. **Performance evidence:** profile before optimisation and report measured results on the target platform.
+5. **Signal safety:** finite output, documented bounds, peak/headroom, latency and tail behaviour.
+6. **Score authority:** event timing and musical automation stay score-addressed until frame resolution.
+7. **Listening:** each musical milestone includes a matched-level listening protocol; metrics do not claim artistic quality.
+8. **Evidence:** CI, target-machine profiling and subjective listening are reported separately.
+9. **Documentation:** mark capabilities implemented, partially implemented, planned or experimentally unverified.
+
+## Milestone dependency map
+
+```mermaid
+flowchart TD
+    M14[M14 target-machine sign-off] --> M18[M18 musical automation]
+    M17[M17 Score-first pipeline] --> M18
+    M18 --> M19[M19 harmony and voice-leading]
+    M18 --> M20[M20 perceptual orchestration]
+    M19 --> M20
+    M18 --> M21[M21 sound-object architecture]
+    M20 --> M21
+    M21 --> M22[M22 mixer and routing quality]
+    M22 --> M23[M23 variation and listening workflow]
+    M21 --> M24[M24 advanced DSP research]
+    M22 --> M24
+    M14 --> M25[M25 performance and portability]
+    M23 --> M25
+    M24 --> M25
+```
+
+M14 target-machine validation remains a cross-cutting gate and should be completed alongside M18/M22, rather than being inferred from CI success. Advanced DSP is deliberately downstream of the core and does not block the musical milestones.
+
+## Reference documents
+
+- [Architectural and musical reassessment](REASSESSMENT.md)
+- [M18 — Musical automation and control performance](M18.md)
+- [M19 — Harmonic context and voice-leading](M19.md)
+- [M20 — Perceptual orchestration and multi-scale phrase grammar](M20.md)
+- [M21 — Sound-object and hybrid instrument architecture](M21.md)
+- [M22 — Mixer and routing quality](M22.md)
+- [M23 — Variation browser and critical-listening workflow](M23.md)
+- [M24 — Advanced DSP research modules](M24.md)
+- [M25 — Performance, portability and project durability](M25.md)
 
 ## Milestone status policy
 
 - **Implemented:** code exists and has automated coverage for its key behaviour.
 - **Partially implemented:** core workflow exists, but key advertised semantics or integration remain incomplete.
-- **Experimentally unverified:** code exists but depends on target-machine execution/listening not represented in CI.
+- **Experimentally unverified:** code exists but requires target-machine execution/listening not represented in CI.
 - **Planned:** specification only; no claim of implementation.
 
-Use this vocabulary in future milestone documents and the README. Historical M1–M13 specifications should be retained as the development record; this consolidated roadmap is the current forward plan.
+Historical M1–M13 documents remain the development record. This consolidated roadmap is the current post-M17.5 plan.
