@@ -16,7 +16,7 @@ from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
 from reawarp.core.random_streams import RandomStreams, derive_seed
 from reawarp.generators.melody import build_melody_events
-from reawarp.generators.percussion import build_percussion_events
+from reawarp.generators.percussion import build_drum_part_plan, build_percussion_events
 from reawarp.samples.io import read_sample
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
@@ -130,9 +130,6 @@ class ReawarpEngine:
             "ambience": ("ambience_synthesis",),
         }
         sample_stream_groups = {
-            "sample_kick": ("kick_pattern",),
-            "sample_snare": ("snare_pattern",),
-            "sample_hat": ("hat_pattern",),
             "sample_break": ("break_pattern", "break_processing"),
         }
         if regenerate is not None and regenerate not in stream_groups and regenerate not in sample_stream_groups:
@@ -166,6 +163,7 @@ class ReawarpEngine:
         )
         from reawarp.composition.phrase import build_phrase_directives
         phrase_directives = build_phrase_directives(composition_plan.sections)
+        drum_plan = build_drum_part_plan(config, composition_plan)
 
         def phrase_at_time(time_seconds: float):
             for directive in phrase_directives:
@@ -209,8 +207,12 @@ class ReawarpEngine:
                 start_seconds: float,
                 velocity: float,
                 pan: float,
+                gain_scale: float = 1.0,
         ) -> None:
-            shaped = sample * float(np.clip(velocity, 0.0, 1.0)) * 0.72
+            shaped = (
+                sample * float(np.clip(velocity, 0.0, 1.0))
+                * float(np.clip(gain_scale, 0.0, 2.0)) * 0.72
+            )
             place_mono(target, shaped, start_seconds, pan)
 
         percussion_rngs = {
@@ -219,15 +221,13 @@ class ReawarpEngine:
             "hat": streams.get("hat_pattern"),
             "break": streams.get("break_pattern"),
         }
-        percussion = build_percussion_events(config, percussion_rngs, composition_plan)
-        # Imported sample overlays keep their own baseline trigger score. A
-        # procedural lane variation must not mutate a separate sample stem.
-        sample_trigger_patterns = build_percussion_events(config, {
-            "kick": sample_streams.get("kick_pattern"),
-            "snare": sample_streams.get("snare_pattern"),
-            "hat": sample_streams.get("hat_pattern"),
-            "break": sample_streams.get("break_pattern"),
-        }, composition_plan)
+        percussion = build_percussion_events(
+            config, percussion_rngs, composition_plan, drum_plan=drum_plan
+        )
+        # Sample and synthesis layers share the same score. One arrangement
+        # decision drives the complete hybrid voice rather than two trigger
+        # streams that can drift apart.
+        sample_trigger_patterns = percussion
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
 
         # Phrase function modifies event activity as a separate composition
@@ -277,84 +277,191 @@ class ReawarpEngine:
         hat_stem = new_stem("hats")
         break_stem = new_stem("synthetic_break")
 
+        sample_manifest: dict[str, dict[str, Any]] = {}
+        drum_samples: dict[str, np.ndarray] = {}
+        drum_sample_metadata: dict[str, dict[str, Any]] = {}
+        for role in ("kick", "snare", "hat"):
+            sample_path = config.sample_paths.get(role)
+            if not sample_path:
+                continue
+            path = Path(sample_path).expanduser()
+            sample = read_sample(path, sample_rate)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            metadata_source = dict(config.sample_metadata.get(role, {}))
+            drum_samples[role] = sample
+            drum_sample_metadata[role] = metadata_source
+            sample_manifest[role] = {
+                "path": str(path.resolve()),
+                "sha256": digest,
+                "source": metadata_source,
+                "frames_after_resampling": int(len(sample)),
+                "frames_after_processing": int(len(sample)),
+                "duration_after_processing": len(sample) / float(sample_rate),
+                "trigger_count": 0,
+                "trigger_mode": "shared_drum_score",
+                "hybrid_architecture": config.percussion_hybrid_architecture,
+            }
+
+        def percussion_source_levels(role: str, time_seconds: float) -> tuple[float, float]:
+            """Return (synth gain, sample gain) for one role/section."""
+            if role not in drum_samples:
+                return 1.0, 0.0
+            mode = config.percussion_source_mode
+            if mode == "synth":
+                return 1.0, 0.0
+            if mode == "sample":
+                return 0.0, 1.0
+            sample_mix = float(config.percussion_sample_mix)
+            if mode == "automatic":
+                function = phrase_at_time(time_seconds).function
+                section_factor = {
+                    "introduction": 0.35,
+                    "establishment": 0.90,
+                    "continuation": 0.78,
+                    "development": 1.05,
+                    "uplift": 1.18,
+                    "arrival": 1.35,
+                    "drop": 0.32,
+                    "silence": 0.0,
+                    "contrast": 1.08,
+                    "return": 0.92,
+                    "false_return": 0.58,
+                    "transition": 0.72,
+                    "residue": 0.30,
+                    "outro": 0.24,
+                }.get(function, 0.8)
+                sample_mix = float(np.clip(sample_mix * section_factor, 0.0, 0.90))
+            if config.percussion_hybrid_architecture == "transient_body":
+                return 1.0, sample_mix
+            return 1.0 - sample_mix, sample_mix
+
+        def place_role_sample(
+            role: str,
+            target: np.ndarray,
+            event: Any,
+            sample_gain: float,
+        ) -> None:
+            source = drum_samples[role]
+            segment = source
+            if (
+                config.percussion_hybrid_architecture == "transient_body"
+                and config.percussion_source_mode != "sample"
+            ):
+                transient_frames = max(
+                    8, int(round(sample_rate * config.hybrid_transient_ms / 1000.0))
+                )
+                segment = source[:min(len(source), transient_frames)].copy()
+                fade_frames = min(max(2, int(round(sample_rate * 0.002))), len(segment) // 2)
+                if fade_frames:
+                    segment[:fade_frames] *= np.linspace(
+                        0.0, 1.0, fade_frames, endpoint=False, dtype=np.float32
+                    )
+                    segment[-fade_frames:] *= np.linspace(
+                        1.0, 0.0, fade_frames, endpoint=False, dtype=np.float32
+                    )
+            place_sample(
+                target, segment, event.time,
+                event.velocity * sample_gain, event.pan,
+            )
+
         kick_profile = select_profile_name(
             config.kick_profile, KICK_PROFILES, streams.get("kick_profile"),
             auto_choices=AUTO_KICK_PROFILES,
         )
         synthetic_percussion = config.percussion_synthesis in {"minimal", "extended"}
-        for event in percussion["kick"]:
-            if event.velocity <= 1e-7 or not section_for_time(composition_plan, event.time).kick:
-                continue
-            profile = kick_profile
-            if synthetic_percussion:
-                signal = render_synthetic_percussion(
-                    "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump",
-                    sample_rate, streams.get("kick_synthesis"),
-                    velocity=event.velocity, duration=0.19,
-                    pitch_hz=KICK_PROFILES[profile].end_frequency,
-                )
-            else:
-                signal = render_kick(
-                    sample_rate, streams.get("kick_synthesis"), event.velocity, profile=profile
-                )
-            place_mono(kick_stem, signal, event.time, event.pan)
-            record = event.to_dict()
-            record["sound_profile"] = profile
-            event_records.append(record)
+        role_targets = {
+            "kick": kick_stem,
+            "snare": snare_stem,
+            "hat": hat_stem,
+        }
+        selected_profiles = {
+            "kick": kick_profile,
+            "snare": select_profile_name(
+                config.snare_profile, SNARE_PROFILES, streams.get("snare_profile"),
+                auto_choices=AUTO_SNARE_PROFILES,
+            ),
+            "hat": select_profile_name(
+                config.hat_profile, HAT_PROFILES, streams.get("hat_profile"),
+                auto_choices=AUTO_HAT_PROFILES,
+            ),
+        }
+        for role in ("kick", "snare", "hat"):
+            target = role_targets[role]
+            synthesis_rng = streams.get(f"{role}_synthesis")
+            for event in percussion[role]:
+                if event.velocity <= 1e-7:
+                    continue
+                section = section_for_time(composition_plan, event.time)
+                if role == "kick" and not section.kick:
+                    continue
+                if role == "snare" and section.density < 0.14 and event.velocity < 0.70:
+                    continue
+                if role == "hat" and streams.get("section_ornaments").random() > section.percussion_density_scale:
+                    continue
 
-        snare_profile = select_profile_name(
-            config.snare_profile, SNARE_PROFILES, streams.get("snare_profile"),
-            auto_choices=AUTO_SNARE_PROFILES,
-        )
-        for event in percussion["snare"]:
-            if event.velocity <= 1e-7:
-                continue
-            section = section_for_time(composition_plan, event.time)
-            if section.density < 0.14 and event.velocity < 0.70:
-                continue
-            profile = snare_profile
-            if synthetic_percussion:
-                signal = render_synthetic_percussion(
-                    "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim",
-                    sample_rate, streams.get("snare_synthesis"),
-                    velocity=event.velocity, duration=0.17,
-                    pitch_hz=SNARE_PROFILES[profile].body_frequency,
-                )
-            else:
-                signal = render_snare(
-                    sample_rate, streams.get("snare_synthesis"), event.velocity, profile=profile
-                )
-            place_mono(snare_stem, signal, event.time, event.pan)
-            record = event.to_dict()
-            record["sound_profile"] = profile
-            event_records.append(record)
+                synth_gain, sample_gain = percussion_source_levels(role, event.time)
+                profile = selected_profiles[role]
+                signal: np.ndarray | None = None
+                if synth_gain > 1e-7:
+                    velocity = event.velocity * synth_gain
+                    if role == "kick":
+                        if synthetic_percussion:
+                            signal = render_synthetic_percussion(
+                                "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump",
+                                sample_rate, synthesis_rng,
+                                velocity=velocity, duration=0.19,
+                                pitch_hz=KICK_PROFILES[profile].end_frequency,
+                            )
+                        else:
+                            signal = render_kick(
+                                sample_rate, synthesis_rng, velocity, profile=profile
+                            )
+                    elif role == "snare":
+                        if synthetic_percussion:
+                            signal = render_synthetic_percussion(
+                                "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim",
+                                sample_rate, synthesis_rng,
+                                velocity=velocity, duration=0.17,
+                                pitch_hz=SNARE_PROFILES[profile].body_frequency,
+                            )
+                        else:
+                            signal = render_snare(
+                                sample_rate, synthesis_rng, velocity, profile=profile
+                            )
+                    else:
+                        if synthetic_percussion:
+                            signal = render_synthetic_percussion(
+                                "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick",
+                                sample_rate, synthesis_rng,
+                                velocity=velocity, duration=0.085,
+                                pitch_hz=HAT_PROFILES[profile].partials[0][0],
+                            )
+                        else:
+                            signal = render_hat(
+                                sample_rate, synthesis_rng, velocity, profile=profile
+                            )
+                    place_mono(target, signal, event.time, event.pan)
+                if sample_gain > 1e-7 and role in drum_samples:
+                    place_role_sample(role, target, event, sample_gain)
 
-        hat_profile = select_profile_name(
-            config.hat_profile, HAT_PROFILES, streams.get("hat_profile"),
-            auto_choices=AUTO_HAT_PROFILES,
-        )
-        for event in percussion["hat"]:
-            if event.velocity <= 1e-7:
-                continue
-            section = section_for_time(composition_plan, event.time)
-            if streams.get("section_ornaments").random() > section.percussion_density_scale:
-                continue
-            profile = hat_profile
-            if synthetic_percussion:
-                signal = render_synthetic_percussion(
-                    "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick",
-                    sample_rate, streams.get("hat_synthesis"),
-                    velocity=event.velocity, duration=0.085,
-                    pitch_hz=HAT_PROFILES[profile].partials[0][0],
-                )
-            else:
-                signal = render_hat(
-                    sample_rate, streams.get("hat_synthesis"), event.velocity, profile=profile
-                )
-            place_mono(hat_stem, signal, event.time, event.pan)
-            record = event.to_dict()
-            record["sound_profile"] = profile
-            event_records.append(record)
+                record = event.to_dict()
+                record["sound_profile"] = profile if synth_gain > 1e-7 else None
+                record["source_mix"] = {
+                    "mode": config.percussion_source_mode,
+                    "architecture": config.percussion_hybrid_architecture,
+                    "synth_gain": synth_gain,
+                    "sample_gain": sample_gain if role in drum_samples else 0.0,
+                }
+                if role in drum_sample_metadata:
+                    record["sample_metadata"] = drum_sample_metadata[role]
+                event_records.append(record)
+
+        for role in drum_samples:
+            sample_manifest[role]["trigger_count"] = sum(
+                1 for event in event_records
+                if event.get("lane") == role
+                and event.get("source_mix", {}).get("sample_gain", 0.0) > 0.0
+            )
 
         break_profile_rng = streams.get("break_profile")
         break_profiles = {
@@ -507,8 +614,9 @@ class ReawarpEngine:
                 "amount": config.ambience_level,
             })
 
-        sample_manifest: dict[str, dict[str, Any]] = {}
         for role, sample_path in config.sample_paths.items():
+            if role in {"kick", "snare", "hat"}:
+                continue
             path = Path(sample_path).expanduser()
             sample = read_sample(path, sample_rate)
             source_frame_count = int(len(sample))
@@ -535,7 +643,7 @@ class ReawarpEngine:
                 applied_transforms = list(config.break_transforms)
             sample_stem = new_stem(f"sample_{role}")
             role_metadata = dict(config.sample_metadata.get(role, {}))
-            triggers = sample_trigger_patterns[role]
+            triggers = percussion[role]
             if role == "kick":
                 triggers = [
                     event for event in triggers
