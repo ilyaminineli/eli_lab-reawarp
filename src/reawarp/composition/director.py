@@ -7,6 +7,8 @@ from typing import Any
 
 import numpy as np
 
+from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+
 
 @dataclass(frozen=True, slots=True)
 class SectionPlan:
@@ -50,6 +52,8 @@ class CompositionPlan:
     flow: str
     source_structure: str | None
     sections: tuple[SectionPlan, ...]
+    pattern_family: str
+    pattern_relationship: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -59,6 +63,8 @@ class CompositionPlan:
             "structure": self.structure,
             "flow": self.flow,
             "source_structure": self.source_structure,
+            "pattern_family": self.pattern_family,
+            "pattern_relationship": self.pattern_relationship,
             "sections": [section.to_dict() for section in self.sections],
         }
 
@@ -173,6 +179,8 @@ def build_composition_plan(
         energy: float = .62,
         variation: float = .45,
         flow: str = "preset",
+        pattern_family: str = "broken_funk",
+        pattern_relationship: str = "interlock",
 ) -> CompositionPlan:
     """Allocate deterministic, bar-aligned sections over an exact render duration."""
     if duration_seconds <= 0 or bpm <= 0:
@@ -181,6 +189,10 @@ def build_composition_plan(
         raise ValueError(f"unknown structure: {structure}")
     if flow not in {"preset", "mix", "mutate"}:
         raise ValueError("flow must be preset, mix, or mutate")
+    if pattern_family not in PATTERN_FAMILIES:
+        raise ValueError(f"unknown pattern family: {pattern_family}")
+    if pattern_relationship not in PATTERN_RELATIONSHIPS:
+        raise ValueError(f"unknown pattern relationship: {pattern_relationship}")
     if not 0 <= energy <= 1 or not 0 <= variation <= 1:
         raise ValueError("energy and variation must be between zero and one")
 
@@ -303,6 +315,8 @@ def build_composition_plan(
         flow=flow,
         source_structure=source_structure,
         sections=tuple(sections),
+        pattern_family=pattern_family,
+        pattern_relationship=pattern_relationship,
     )
 
 
