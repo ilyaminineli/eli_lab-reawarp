@@ -166,42 +166,43 @@ def load_sound_fx_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     if manifest is None:
         return []
     records: list[IROAsset] = []
-    for family in manifest.get("event_families", []):
-        family_name = str(family.get("name", "event_texture"))
-        for item in family.get("variants", []):
-            relative = str(item.get("file", item.get("path", "")))
-            if not relative:
-                continue
-            asset = _asset(
-                pack_root=SOUND_FX_PACK,
-                relative_path=relative,
-                role="event_texture",
-                family=family_name,
-                pack="sound-fx-211",
-                articulation=str(item.get("variant", "")),
-                expected_sha256=str(item.get("sha256", "")),
-                sample_rate=item.get("sample_rate"),
-                duration_seconds=item.get("duration_seconds"),
-                source_feature_index=item.get("source_feature_index"),
-                seed=item.get("seed"),
-                metadata=dict(item),
-            )
-            if verify_hashes and asset.sha256 and _sha256(asset.path) != asset.sha256:
-                raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
-            records.append(asset)
+    for item in manifest.get("event_families", []):
+        relative = str(item.get("file", ""))
+        if not relative:
+            continue
+        family_name = str(item.get("kind", item.get("name", "event_texture")))
+        asset = _asset(
+            pack_root=SOUND_FX_PACK,
+            relative_path=relative,
+            role="event_texture",
+            family=family_name,
+            pack="sound-fx-211",
+            articulation=str(item.get("variant", "")),
+            expected_sha256=str(item.get("sha256", "")),
+            sample_rate=item.get("sample_rate"),
+            channels=item.get("channels"),
+            duration_seconds=item.get("duration_seconds"),
+            source_feature_index=item.get("source_feature_index"),
+            seed=item.get("seed"),
+            metadata=dict(item),
+        )
+        if verify_hashes and asset.sha256 and _sha256(asset.path) != asset.sha256:
+            raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
+        records.append(asset)
 
     for item in manifest.get("loops", []):
-        relative = str(item.get("file", item.get("path", "")))
+        relative = str(item.get("file", ""))
         if not relative:
             continue
         asset = _asset(
             pack_root=SOUND_FX_PACK,
             relative_path=relative,
             role="event_loop",
-            family=str(item.get("family", item.get("name", "event_loop"))),
+            family=str(item.get("kind", item.get("name", "event_loop"))),
             pack="sound-fx-211",
             expected_sha256=str(item.get("sha256", "")),
             sample_rate=item.get("sample_rate"),
+            channels=item.get("channels"),
             duration_seconds=item.get("duration_seconds"),
             seed=item.get("seed"),
             metadata=dict(item),
@@ -210,7 +211,6 @@ def load_sound_fx_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
             raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
         records.append(asset)
     return records
-
 
 def load_sound_lab_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Read IRO one-shots, loops and stems from the compact sound-lab manifest."""
