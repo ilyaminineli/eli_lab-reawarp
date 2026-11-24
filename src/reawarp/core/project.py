@@ -21,6 +21,7 @@ class ReawarpProject:
     stems: dict[str, np.ndarray]
     events: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    fx_routing: dict[str, Any] = field(default_factory=dict)
 
     @property
     def frame_count(self) -> int:
