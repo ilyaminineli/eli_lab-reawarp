@@ -34,7 +34,7 @@ def percussion_to_score_events(
     index = 0
     for lane in sorted(lanes):
         for source in sorted(lanes[lane], key=lambda item: (int(item.step), str(item.kind or ""))):
-            role = str(getattr(source, 'lane', lane))
+            role = str(getattr(source, "lane", lane))
             kind = str(getattr(source, "kind", "") or "")
             result.append(MusicalEvent(
                 event_id=f"perc-{index:07d}",
@@ -69,7 +69,7 @@ def melody_to_score_events(
     seed: int | None = None,
     voice_id: str = 'melody',
 ) -> tuple[MusicalEvent, ...]:
-    """Convert melody events; onset comes from the exact grid, duration from seconds."""
+    """Convert melody events; onset comes from the exact grid, duration is quantised to rational beats."""
     if bpm <= 0:
         raise ValueError("bpm must be positive")
     result: list[MusicalEvent] = []
