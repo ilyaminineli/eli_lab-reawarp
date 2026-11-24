@@ -52,6 +52,14 @@ The phrase director remains responsible for the larger arc—introduction, estab
 
 See [M15 — Integrated composition-to-production workflow](docs/M15.md) for the shared drum-score, hybrid source and Generator architecture.
 
+### Connected sample, drum and synthesis workflow
+
+The Generator builds role-specific sample banks from the selected anchor, bundled samples and indexed Library material. Drum parts can switch automatically at section or phrase-cycle boundaries; true returns recall the selected anchor and false returns can use a related variant. The same drum-event stream drives both samples and synthesis.
+
+Hybrid percussion now offers transient/body, parallel-layer and feature-guided architectures. The feature-guided mode uses indexed spectral, level, flatness and onset descriptors to steer the synthesized voice. The Generator presents FORM, VOICES and RHYTHM as one scrollable workflow with a persistent **GENERATE TRACK** action bar.
+
+See [Sample banks, drum automation and hybrid composition](docs/SAMPLE_BANKS_HYBRID_COMPOSITION.md).
+
 ### Break transformation (M3)
 - Transient detection from positive short-time energy flux.
 - Automatic frame-accurate slicing with configurable slice limits.
