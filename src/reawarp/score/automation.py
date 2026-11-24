@@ -105,11 +105,11 @@ class AutomationTargetRegistry:
         for point in lane.points:
             if target.minimum is not None and point.value < target.minimum:
                 raise ValueError(
-                    f"automation value for {lane.target_id!r} is below {target.minimum}"
+                    f"automation value for {lane.target_id!r} is below target minimum {target.minimum}"
                 )
             if target.maximum is not None and point.value > target.maximum:
                 raise ValueError(
-                    f"automation value for {lane.target_id!r} exceeds {target.maximum}"
+                    f"automation value for {lane.target_id!r} exceeds target maximum {target.maximum}"
                 )
             if target.value_type == "boolean" and point.value not in (0.0, 1.0):
                 raise ValueError(f"{lane.target_id!r} accepts only boolean values")
