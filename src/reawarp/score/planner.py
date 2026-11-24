@@ -82,7 +82,7 @@ def melody_to_score_events(
     bpm: float,
     seed: int | None = None,
     voice_id: str = "melody",
-    release_seconds: float = 0.28,
+    release_seconds: float = 0.65,
 ) -> tuple[MusicalEvent, ...]:
     """Convert melody events; onset comes from the exact grid, duration is quantised to rational beats."""
     if bpm <= 0 or release_seconds < 0:
@@ -133,7 +133,7 @@ def score_from_planner_events(
     bpm: float = 120.0,
     seed_streams: Mapping[str, Any] | None = None,
     metadata: Mapping[str, Any] | None = None,
-    melody_release_seconds: float = 0.28,
+    melody_release_seconds: float = 0.65,
 ) -> Score:
     """Assemble a score before audio rendering from planner-native grid decisions."""
     if bpm <= 0:
