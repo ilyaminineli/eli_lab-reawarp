@@ -163,6 +163,17 @@ class ReawarpEngine:
             pattern_family=config.pattern_family,
             pattern_relationship=config.pattern_relationship,
         )
+        from reawarp.composition.phrase import build_phrase_directives
+        phrase_directives = build_phrase_directives(composition_plan.sections)
+
+        def phrase_at_time(time_seconds: float):
+            for directive in phrase_directives:
+                start = directive.start_bar * (240.0 / config.bpm)
+                end = directive.end_bar * (240.0 / config.bpm)
+                if start <= time_seconds < end:
+                    return directive
+            return phrase_directives[0] if time_seconds < 0 else phrase_directives[-1]
+
         composition_plan_seconds = perf_counter() - plan_started
         event_generation_started = perf_counter()
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
@@ -217,6 +228,34 @@ class ReawarpEngine:
             "break": sample_streams.get("break_pattern"),
         }, composition_plan)
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
+
+        # Phrase function modifies event activity as a separate composition
+        # layer. The event patterns keep their own deterministic streams; no
+        # new randomness is introduced when a role enters a drop/void.
+        role_activity = {
+            "kick": "kick_activity",
+            "snare": "snare_activity",
+            "hat": "high_activity",
+            "break": "event_activity",
+        }
+        activity_defaults = {"kick": 0.72, "snare": 0.58, "hat": 0.50, "break": 0.46}
+        for role, events in percussion.items():
+            activity_name = role_activity[role]
+            for event in events:
+                directive = phrase_at_time(float(event.time))
+                activity = float(getattr(directive, activity_name))
+                if directive.function == "silence" or activity <= 0.0:
+                    event.velocity = 0.0
+                else:
+                    event.velocity *= min(1.0, activity / activity_defaults[role])
+        for event in melody_events:
+            directive = phrase_at_time(float(event.time))
+            activity = float(directive.melody_activity)
+            if directive.function == "silence" or activity <= 0.0:
+                event.velocity = 0.0
+            else:
+                event.velocity *= min(1.0, activity / 0.55)
+
         event_generation_seconds = perf_counter() - event_generation_started
         synthesis_started = perf_counter()
 
@@ -590,6 +629,9 @@ class ReawarpEngine:
                 "duration_after_processing": len(sample) / float(sample_rate),
                 "trigger_count": len(triggers),
                 "transforms": applied_transforms,
+                "source_pack": role_metadata.get("pack"),
+                "source_family": role_metadata.get("family"),
+                "source_articulation": role_metadata.get("articulation"),
                 "slice_count": len(slice_ranges) if role == "break" else None,
                 "source_bars": source_bars if role == "break" else None,
                 "trigger_mode": "transient_slices" if role == "break" else "one_shot",
@@ -636,6 +678,7 @@ class ReawarpEngine:
                 "melody": f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette",
                 "texture": "coloured noise with low-frequency amplitude modulation",
                 "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
+                "phrase_grammar": "shared phrase functions attenuate role activity; independent role streams remain separate",
                 "break_processing": list(config.break_transforms),
             },
             "synthesis_profiles": {
@@ -653,6 +696,7 @@ class ReawarpEngine:
                 },
             },
             "composition_plan": composition_plan.to_dict(),
+            "phrase_directives": [item.to_dict() for item in phrase_directives],
             "synth_palette": config.synth_palette,
             "break_rhythm": {
                 "style": next(
