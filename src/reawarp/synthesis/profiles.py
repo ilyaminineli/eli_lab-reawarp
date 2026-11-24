@@ -214,7 +214,7 @@ PERCUSSION_VOICES: dict[str, PercussionVoiceProfile] = {
 AUTO_KICK_PROFILES = ("deep_sub", "909_punch", "soft_round", "rubber", "wooden", "long_tail")
 AUTO_SNARE_PROFILES = ("acoustic", "909_crack", "tonal", "soft_brush")
 AUTO_HAT_PROFILES = ("closed", "open", "dark")
-AUTO_MELODY_PROFILES = ("soft_keys", "soft_pluck", "reed_pad", "wood_mallet", "inharmonic_mallet", "metallic_fm", "dark_formant", "soft_spectral_pad")
+AUTO_MELODY_PROFILES = ("dry_pluck", "soft_reed", "thin_bass")
 
 
 def select_profile_name(
