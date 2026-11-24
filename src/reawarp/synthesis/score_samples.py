@@ -161,7 +161,7 @@ def _source_levels(
             sample_mix * _AUTOMATIC_SAMPLE_FACTORS.get(phrase_function, 0.8),
             0.0, 0.90,
         ))
-    if config.percussion_hybrid_architecture in {"transient_body", "feature_guided"}:
+    if config.percussion_hybrid_architecture == "transient_body":
         return 1.0, sample_mix
     return 1.0 - sample_mix, sample_mix
 
