@@ -8,7 +8,7 @@ import reawarp.ui as ui
 
 
 def test_windows_qt_dll_directories_are_registered_and_retained(
-    monkeypatch, tmp_path
+        monkeypatch, tmp_path
 ):
     site_packages = tmp_path / "site-packages"
     pyside_directory = site_packages / "PySide6"

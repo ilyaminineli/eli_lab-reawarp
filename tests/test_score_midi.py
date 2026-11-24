@@ -1,6 +1,5 @@
 from fractions import Fraction
 
-import numpy as np
 import pytest
 
 mido = pytest.importorskip("mido")

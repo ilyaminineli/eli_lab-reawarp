@@ -9,10 +9,10 @@ from typing import Any
 
 import numpy as np
 
+from reawarp.composition.director import build_composition_plan, section_for_time
 from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
 from reawarp.core.random_streams import RandomStreams, derive_seed
-from reawarp.composition.director import build_composition_plan, section_for_time
 from reawarp.generators.melody import build_melody_events
 from reawarp.generators.percussion import build_percussion_events
 from reawarp.samples.io import read_sample
@@ -374,7 +374,7 @@ class ReawarpEngine:
             # Keep the ambience pitch anchor independent of the melody lane,
             # so regenerating melody cannot alter an unrelated stem.
             root_frequency = 55.0 * (
-                2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
+                    2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
             )
             ambience_stem[:] = render_ambience(
                 frame_count,
@@ -442,10 +442,13 @@ class ReawarpEngine:
                     )
                 ]
             elif role == "snare":
-                triggers = [event for event in triggers if section_for_time(composition_plan, event.time).density >= 0.14 or event.velocity >= 0.70]
+                triggers = [event for event in triggers if
+                            section_for_time(composition_plan, event.time).density >= 0.14 or event.velocity >= 0.70]
             elif role == "hat":
                 sample_ornaments = sample_streams.get("section_ornaments")
-                triggers = [event for event in triggers if sample_ornaments.random() <= section_for_time(composition_plan, event.time).percussion_density_scale]
+                triggers = [event for event in triggers if
+                            sample_ornaments.random() <= section_for_time(composition_plan,
+                                                                          event.time).percussion_density_scale]
             slice_ranges: list[tuple[int, int]] = []
             source_bars = 1
             if role == "break":
@@ -518,8 +521,8 @@ class ReawarpEngine:
                         "source_frame_end": frame_end,
                         "rendered_frames": int(len(segment)),
                         "trimmed_to_next_trigger": (
-                            trigger_index + 1 < len(ordered_triggers)
-                            and len(segment) < frame_end - frame_start
+                                trigger_index + 1 < len(ordered_triggers)
+                                and len(segment) < frame_end - frame_start
                         ),
                     })
                 else:

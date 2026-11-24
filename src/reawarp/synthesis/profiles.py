@@ -96,7 +96,6 @@ HAT_PROFILES: dict[str, HatProfile] = {
     "dark": HatProfile(0.68, 0.32, 0.075, 0.90, ((330, 0.24), (494, 0.18), (740, 0.14), (1110, 0.10)), 1.25),
 }
 
-
 MELODY_PROFILES: dict[str, MelodyProfile] = {
     "soft_keys": MelodyProfile(
         ((1.0, 0.72), (2.0, 0.22), (3.0, 0.075), (4.0, 0.025)),

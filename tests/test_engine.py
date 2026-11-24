@@ -80,7 +80,6 @@ def test_unknown_stem_variant_is_rejected():
         ReawarpEngine().generate_variant(small_config(), "master", variation=1)
 
 
-
 def test_regenerating_procedural_lane_keeps_imported_sample_overlays_identical(tmp_path):
     sample = np.sin(np.linspace(0.0, 16.0 * np.pi, 1024)).astype(np.float32) * 0.4
     kick_path = write_wav(tmp_path / "kick.wav", sample, 22_050, 16)
@@ -107,7 +106,6 @@ def test_regenerating_procedural_lane_keeps_imported_sample_overlays_identical(t
             assert np.array_equal(original.stems[name], break_variant.stems[name]), name
 
 
-
 def test_ambience_regeneration_changes_only_its_own_stem():
     engine = ReawarpEngine()
     config = small_config()
@@ -124,7 +122,6 @@ def test_ambience_can_be_disabled_without_changing_other_stems():
     assert "ambience" not in project.stems
     assert "melody" in project.stems
     assert "noise_texture" in project.stems
-
 
 
 def test_melody_regeneration_does_not_change_ambience_or_other_stems():

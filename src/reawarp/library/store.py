@@ -38,6 +38,7 @@ def _asset_id_for_path(path: Path) -> str:
 
 def _similarity_distance(left: dict[str, Any], right: dict[str, Any]) -> float:
     """Return a weighted distance over timbre, dynamics, duration, and rhythm."""
+
     def number(data: dict[str, Any], key: str, default: float = 0.0) -> float:
         value = data.get(key)
         return float(value) if value is not None else default

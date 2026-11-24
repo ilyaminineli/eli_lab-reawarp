@@ -145,7 +145,6 @@ def test_default_project_has_audible_ambience_and_break_provenance():
     assert project.metadata["synthesis_profiles"]["melody"] in MELODY_PROFILES
 
 
-
 def test_auto_timbres_remain_coherent_within_each_lane():
     project = ReawarpEngine().generate(GenerationConfig(
         duration=5.0, sample_rate=22_050, seed=518

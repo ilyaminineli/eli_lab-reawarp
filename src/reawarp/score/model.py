@@ -142,11 +142,11 @@ class Score:
         return project_to_score(project, title=title)
 
     def export_midi(
-        self,
-        path: str | Path,
-        *,
-        ticks_per_beat: int | None = None,
-        tempo_ramp_resolution: str = "1/4",
+            self,
+            path: str | Path,
+            *,
+            ticks_per_beat: int | None = None,
+            tempo_ramp_resolution: str = "1/4",
     ) -> Path:
         from reawarp.score.midi import score_to_midi
 

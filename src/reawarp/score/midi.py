@@ -102,11 +102,11 @@ def _default_channel(event: MusicalEvent, voice_order: dict[str, int]) -> int:
 
 
 def score_to_midi(
-    score: Score,
-    path: str | Path,
-    *,
-    ticks_per_beat: int | None = None,
-    tempo_ramp_resolution: str | Fraction = "1/4",
+        score: Score,
+        path: str | Path,
+        *,
+        ticks_per_beat: int | None = None,
+        tempo_ramp_resolution: str | Fraction = "1/4",
 ) -> Path:
     """Export notes, MIDI CC automation, tempo, and meter to a type-1 MIDI file.
 
@@ -171,7 +171,7 @@ def score_to_midi(
         track.append(mido.MetaMessage("track_name", name=name, time=0))
         previous_tick = 0
         for tick, _priority, _sequence, message in sorted(
-            items, key=lambda item: (item[0], item[1], item[2])
+                items, key=lambda item: (item[0], item[1], item[2])
         ):
             message.time = max(0, tick - previous_tick)
             previous_tick = tick
@@ -348,7 +348,7 @@ def score_from_midi(path: str | Path) -> Score:
                 continue
 
             if message.type in {"note_off", "note_on"} and (
-                message.type == "note_off" or message.velocity == 0
+                    message.type == "note_off" or message.velocity == 0
             ):
                 key = (int(message.channel), int(message.note))
                 if active_notes[key]:
@@ -401,7 +401,7 @@ def score_from_midi(path: str | Path) -> Score:
     events: list[MusicalEvent] = []
     used_ids: set[str] = set()
     for record_index, (
-        track_index, track_name, channel, note, start_tick, end_tick, details
+            track_index, track_name, channel, note, start_tick, end_tick, details
     ) in enumerate(sorted(note_records, key=lambda item: (item[4], item[0], item[2], item[3]))):
         velocity = int(details["velocity"])
         payload = details["payload"]

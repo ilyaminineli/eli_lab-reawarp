@@ -106,13 +106,13 @@ def _seed_value(seed: int | str) -> int:
 
 
 def build_composition_plan(
-    *,
-    duration_seconds: float,
-    bpm: float,
-    seed: int | str,
-    structure: str = "evolving",
-    energy: float = .62,
-    variation: float = .45,
+        *,
+        duration_seconds: float,
+        bpm: float,
+        seed: int | str,
+        structure: str = "evolving",
+        energy: float = .62,
+        variation: float = .45,
 ) -> CompositionPlan:
     """Allocate deterministic, bar-aligned sections over an exact render duration."""
     if duration_seconds <= 0 or bpm <= 0:
@@ -157,7 +157,7 @@ def build_composition_plan(
     edges = np.concatenate(([0], np.cumsum(bars)))
     sections: list[SectionPlan] = []
     for index, ((name, _weight, target, motif), first_bar, last_bar) in enumerate(
-        zip(template, edges[:-1], edges[1:], strict=True)
+            zip(template, edges[:-1], edges[1:], strict=True)
     ):
         section_energy = float(np.clip(
             .68 * target + .32 * energy + rng.normal(0.0, .025 * variation), 0, 1

@@ -86,7 +86,7 @@ def _spectral_descriptors(audio: np.ndarray, sample_rate: int) -> tuple[float, f
 
     positive_power = np.maximum(power[:, 1:], 1e-15)
     flatness = np.exp(np.mean(np.log(positive_power), axis=1)) / (
-        np.mean(positive_power, axis=1) + 1e-15
+            np.mean(positive_power, axis=1) + 1e-15
     )
     return (
         float(np.mean(centroid)),

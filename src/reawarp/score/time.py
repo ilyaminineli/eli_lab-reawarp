@@ -91,8 +91,8 @@ class TempoMap:
         for index, point in enumerate(self.points):
             if index + 1 >= len(self.points) or position < self.points[index + 1].at_beats:
                 if (
-                    index + 1 < len(self.points)
-                    and point.interpolation_to_next == "linear"
+                        index + 1 < len(self.points)
+                        and point.interpolation_to_next == "linear"
                 ):
                     next_point = self.points[index + 1]
                     span = float(next_point.at_beats - point.at_beats)
@@ -104,7 +104,7 @@ class TempoMap:
 
     @staticmethod
     def _segment_seconds(
-        start_bpm: float, end_bpm: float, span_beats: float, linear: bool
+            start_bpm: float, end_bpm: float, span_beats: float, linear: bool
     ) -> float:
         if span_beats <= 0:
             return 0.0
@@ -131,7 +131,7 @@ class TempoMap:
             linear = bool(next_point and point.interpolation_to_next == "linear")
             if linear and next_point is not None:
                 end_bpm = point.bpm + (next_point.bpm - point.bpm) * (
-                    span_used / span_total
+                        span_used / span_total
                 )
             else:
                 end_bpm = point.bpm
@@ -141,7 +141,7 @@ class TempoMap:
         return elapsed
 
     def seconds_to_beat(
-        self, seconds: float, *, max_denominator: int = 1_000_000
+            self, seconds: float, *, max_denominator: int = 1_000_000
     ) -> Beat:
         """Invert the tempo map, returning a rational beat approximation."""
         if not math.isfinite(float(seconds)) or seconds < 0:
@@ -166,7 +166,7 @@ class TempoMap:
                     )
                     instantaneous_bpm = point.bpm * ratio
                     offset = span * (instantaneous_bpm - point.bpm) / (
-                        next_point.bpm - point.bpm
+                            next_point.bpm - point.bpm
                     )
                 offset = min(span, max(0.0, offset))
                 return point.at_beats + Fraction(str(offset)).limit_denominator(max_denominator)
@@ -270,8 +270,8 @@ class MeterMap:
             segment_length = end - start
             bars_before += (segment_length.numerator * bar_length.denominator
                             + segment_length.denominator * bar_length.numerator - 1) // (
-                                segment_length.denominator * bar_length.numerator
-                            )
+                                   segment_length.denominator * bar_length.numerator
+                           )
         point = self.points[active_index]
         offset = position - point.at_beats
         bar_length = point.bar_length_beats

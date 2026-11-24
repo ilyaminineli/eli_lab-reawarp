@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer, Signal, QThreadPool, QEvent
+from PySide6.QtCore import Qt, QTimer, QThreadPool, QEvent
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
@@ -26,8 +26,8 @@ from reawarp.synthesis.profiles import (
 )
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
 from reawarp.ui.audio_player import AudioPlayer
-from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.pages.library import LibraryPage
+from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import RenderWorker
@@ -147,7 +147,8 @@ class MainWindow(QMainWindow):
         self.composition_variation.setRange(0.0, 1.0)
         self.composition_variation.setSingleStep(0.05)
         self.composition_variation.setValue(0.45)
-        self.composition_variation.setToolTip("Changes section proportions and bounded macro values, not hit probability.")
+        self.composition_variation.setToolTip(
+            "Changes section proportions and bounded macro values, not hit probability.")
         form.addRow("Structural variation", self.composition_variation)
 
         self.complexity = QSlider(Qt.Orientation.Horizontal)
@@ -171,7 +172,7 @@ class MainWindow(QMainWindow):
         randomize.setFixedWidth(36)
         randomize.setToolTip("Generate a new reproducible seed")
         randomize.clicked.connect(
-            lambda: self.seed.setText(str(secrets.randbelow(2**31 - 1) + 1))
+            lambda: self.seed.setText(str(secrets.randbelow(2 ** 31 - 1) + 1))
         )
         seed_row.addWidget(randomize)
         seed_widget = QWidget()
@@ -322,8 +323,8 @@ class MainWindow(QMainWindow):
 
     def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason in (
-            QSystemTrayIcon.ActivationReason.Trigger,
-            QSystemTrayIcon.ActivationReason.DoubleClick,
+                QSystemTrayIcon.ActivationReason.Trigger,
+                QSystemTrayIcon.ActivationReason.DoubleClick,
         ):
             self._restore_from_tray()
 
@@ -341,10 +342,10 @@ class MainWindow(QMainWindow):
     def changeEvent(self, event: QEvent) -> None:
         super().changeEvent(event)
         if (
-            event.type() == QEvent.Type.WindowStateChange
-            and self.isMinimized()
-            and self._tray_available
-            and self._tray_icon is not None
+                event.type() == QEvent.Type.WindowStateChange
+                and self.isMinimized()
+                and self._tray_available
+                and self._tray_icon is not None
         ):
             QTimer.singleShot(0, self.hide)
 

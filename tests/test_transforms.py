@@ -27,7 +27,7 @@ def test_transient_detection_and_auto_slicing_find_onsets():
     audio = np.zeros(sample_rate, dtype=np.float32)
     burst = np.sin(np.linspace(0, 35 * np.pi, 220, dtype=np.float32)) * np.hanning(220)
     for start in (800, 3_200, 5_600):
-        audio[start : start + len(burst)] += burst
+        audio[start: start + len(burst)] += burst
     onsets = detect_transients(audio, sample_rate, threshold=0.12, min_interval_ms=80)
     assert len(onsets) >= 2
     slices = auto_slice(audio, sample_rate, max_slices=3)
@@ -189,11 +189,10 @@ def test_break_sample_processing_is_non_destructive_and_written_to_manifest(tmp_
     )
     for current, following in zip(sample_events, sample_events[1:]):
         current_end = (
-            int(round(current["time"] * sample_rate)) + current["rendered_frames"]
+                int(round(current["time"] * sample_rate)) + current["rendered_frames"]
         )
         next_start = int(round(following["time"] * sample_rate))
         assert current_end <= next_start
-
 
 
 def test_reverse_preserves_stereo_channel_order():

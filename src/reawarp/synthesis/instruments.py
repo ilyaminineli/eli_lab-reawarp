@@ -179,9 +179,9 @@ def render_fm_note(
         phase_offset = float(rng.uniform(0.0, 2.0 * np.pi))
         partial_index = index_curve * min(1.0, float(partial_ratio) ** 0.25)
         phase = (
-            2.0 * np.pi * partial_frequency * time
-            + partial_index * modulator
-            + phase_offset
+                2.0 * np.pi * partial_frequency * time
+                + partial_index * modulator
+                + phase_offset
         )
         signal += float(amplitude) * np.sin(phase)
 

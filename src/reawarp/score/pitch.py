@@ -46,7 +46,7 @@ class EqualTemperamentTuning:
         if not math.isfinite(float(pitch)):
             raise ValueError("pitch must be finite")
         return self.reference_frequency_hz * self.period_ratio ** (
-            (float(pitch) - self.reference_pitch) / self.divisions_per_period
+                (float(pitch) - self.reference_pitch) / self.divisions_per_period
         )
 
     def pitch_for_frequency(self, frequency_hz: float) -> float:
@@ -83,7 +83,7 @@ class Pitch:
 
     @classmethod
     def from_frequency(
-        cls, frequency_hz: float, tuning: TuningSystem
+            cls, frequency_hz: float, tuning: TuningSystem
     ) -> "Pitch":
         return cls(
             value=tuning.pitch_for_frequency(float(frequency_hz)),

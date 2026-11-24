@@ -105,7 +105,6 @@ def test_audio_player_rejects_invalid_buffers(fake_sounddevice):
     player.stop()
 
 
-
 def test_audio_player_treats_missing_portaudio_as_unavailable(monkeypatch):
     import builtins
 

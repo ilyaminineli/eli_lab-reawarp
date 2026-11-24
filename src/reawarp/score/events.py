@@ -10,7 +10,6 @@ from typing import Any
 
 from reawarp.score.time import Beat, as_fraction
 
-
 _EVENT_KINDS = {"note", "hit", "grain", "trigger", "control", "marker"}
 
 
@@ -57,7 +56,7 @@ class MusicalEvent:
         if self.pitch is not None and not math.isfinite(float(self.pitch)):
             raise ValueError("pitch must be finite")
         if self.frequency_hz is not None and (
-            not math.isfinite(float(self.frequency_hz)) or self.frequency_hz <= 0
+                not math.isfinite(float(self.frequency_hz)) or self.frequency_hz <= 0
         ):
             raise ValueError("frequency_hz must be positive and finite")
         if self.kind == "note" and self.pitch is None and self.frequency_hz is None:
@@ -213,7 +212,7 @@ class AutomationLane:
                 else:
                     sign = 1.0 if left.value > 0 else -1.0
                     value = sign * abs(left.value) * (
-                        abs(right.value) / abs(left.value)
+                            abs(right.value) / abs(left.value)
                     ) ** t
             else:
                 previous = self.points[segment - 1] if segment > 0 else left
@@ -236,8 +235,8 @@ class AutomationLane:
                 h01 = -2 * t3 + 3 * t2
                 h11 = t3 - t2
                 value = (
-                    h00 * left.value + h10 * tangent_left
-                    + h01 * right.value + h11 * tangent_right
+                        h00 * left.value + h10 * tangent_left
+                        + h01 * right.value + h11 * tangent_right
                 )
         if self.minimum is not None:
             value = max(float(self.minimum), value)
