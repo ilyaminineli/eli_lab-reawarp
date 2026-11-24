@@ -47,6 +47,7 @@ class CompositionPlan:
     bpm: float
     seed: int | str
     structure: str
+    flow: str
     sections: tuple[SectionPlan, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -55,6 +56,7 @@ class CompositionPlan:
             "bpm": self.bpm,
             "seed": self.seed,
             "structure": self.structure,
+            "flow": self.flow,
             "sections": [section.to_dict() for section in self.sections],
         }
 
@@ -97,6 +99,61 @@ STRUCTURES: dict[str, tuple[tuple[str, float, float, str], ...]] = {
         ("DRIFT_C", .20, .42, "fragment"),
         ("RETURN", .20, .52, "return"),
     ),
+    # Classical phrase functions translated into electronic orchestration:
+    # exposition, contrasting subject, development, recapitulation and coda.
+    "classical_arc": (
+        ("EXPOSITION_I", .18, .30, "present"),
+        ("EXPOSITION_II", .16, .42, "present"),
+        ("DEVELOPMENT", .28, .78, "develop"),
+        ("RECAPITULATION", .24, .58, "return"),
+        ("CODA", .14, .16, "dissolve"),
+    ),
+    "sonata_mutation": (
+        ("SUBJECT_A", .17, .34, "present"),
+        ("SUBJECT_B", .16, .55, "present"),
+        ("DEVELOPMENT", .27, .86, "fragment"),
+        ("FALSE_RETURN", .12, .46, "return"),
+        ("REPRISE_TRANSFORMED", .18, .68, "return"),
+        ("CODA", .10, .14, "dissolve"),
+    ),
+    "free_jazz": (
+        ("SPARSE_PROPOSITION", .15, .22, "fragment"),
+        ("COLLECTIVE_IMPROVISATION", .30, .82, "develop"),
+        ("OPEN_SPACE", .13, .20, "fragment"),
+        ("SECOND_WAVE", .24, .72, "develop"),
+        ("AFTERIMAGE", .18, .26, "dissolve"),
+    ),
+    "free_jazz_episodic": (
+        ("GESTURE_A", .18, .35, "present"),
+        ("COUNTER_GESTURE", .17, .55, "develop"),
+        ("COLLISION", .20, .90, "fragment"),
+        ("DECOMPRESSION", .15, .18, "dissolve"),
+        ("GESTURE_B", .18, .62, "develop"),
+        ("RESIDUE", .12, .12, "dissolve"),
+    ),
+    "autechre_like": (
+        ("SEED_OBJECT", .14, .26, "present"),
+        ("RULE_ESTABLISHMENT", .19, .48, "present"),
+        ("PHASE_DRIFT", .23, .72, "develop"),
+        ("SYSTEM_BREAK", .16, .84, "fragment"),
+        ("RECOMBINATION", .18, .62, "return"),
+        ("RESIDUE", .10, .10, "dissolve"),
+    ),
+    "minimal_variation": (
+        ("OBJECT", .28, .34, "present"),
+        ("MICRO_SHIFT", .24, .42, "develop"),
+        ("WITHDRAWAL", .16, .18, "fragment"),
+        ("RETURN_CHANGED", .22, .48, "return"),
+        ("FADE", .10, .10, "dissolve"),
+    ),
+    "hybrid": (
+        ("EXPOSITION", .16, .30, "present"),
+        ("GROOVE", .18, .55, "develop"),
+        ("FREE_SECTION", .20, .82, "fragment"),
+        ("REPRISE", .18, .58, "return"),
+        ("DECONSTRUCTION", .16, .30, "fragment"),
+        ("CODA", .12, .12, "dissolve"),
+    ),
 }
 
 
@@ -113,17 +170,41 @@ def build_composition_plan(
         structure: str = "evolving",
         energy: float = .62,
         variation: float = .45,
+        flow: str = "preset",
 ) -> CompositionPlan:
     """Allocate deterministic, bar-aligned sections over an exact render duration."""
     if duration_seconds <= 0 or bpm <= 0:
         raise ValueError("duration_seconds and bpm must be positive")
     if structure not in STRUCTURES:
         raise ValueError(f"unknown structure: {structure}")
+    if flow not in {"preset", "mix", "mutate"}:
+        raise ValueError("flow must be preset, mix, or mutate")
     if not 0 <= energy <= 1 or not 0 <= variation <= 1:
         raise ValueError("energy and variation must be between zero and one")
 
     rng = np.random.default_rng(np.random.SeedSequence([_seed_value(seed), 0x52454157]))
     template = STRUCTURES[structure]
+    if flow == "mix" and structure not in {"hybrid"}:
+        # A bounded cross-preset blend: retain the chosen form's opening and
+        # ending while borrowing one middle movement from the contrasting form.
+        alternatives = [name for name in STRUCTURES if name != structure]
+        alternate_name = alternatives[int(rng.integers(0, len(alternatives)))]
+        alternate = STRUCTURES[alternate_name]
+        left = list(template)
+        middle = list(alternate[1:-1])
+        if middle:
+            replace_count = max(1, min(len(middle), len(left) - 2))
+            for offset in range(replace_count):
+                target = 1 + offset
+                if target < len(left) - 1:
+                    left[target] = middle[offset % len(middle)]
+        template = tuple(left)
+    elif flow == "mutate":
+        # Keep the form's dramatic contour, but re-sequence middle functions.
+        middle = list(template[1:-1])
+        if len(middle) > 1:
+            order = rng.permutation(len(middle))
+            template = (template[0], *(middle[int(i)] for i in order), template[-1])
     weights = np.asarray([item[1] for item in template], dtype=np.float64)
     if variation:
         noise = rng.normal(0.0, .18 * variation, len(weights))
@@ -215,6 +296,7 @@ def build_composition_plan(
         bpm=float(bpm),
         seed=seed,
         structure=structure,
+        flow=flow,
         sections=tuple(sections),
     )
 
