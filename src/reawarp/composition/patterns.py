@@ -45,6 +45,8 @@ PATTERN_FAMILIES: dict[str, tuple[int, ...]] = {
     "broken_regularity": (0, 4, 7, 8, 12, 15),
 }
 
+PATTERN_RELATIONSHIPS = ("unison", "interlock", "shadow", "call_response", "counter_accent")
+
 MOTIF_TRANSFORMS = (
     "identity", "retrograde", "inversion", "augmentation",
     "diminution", "fragment", "reorder", "displace",
