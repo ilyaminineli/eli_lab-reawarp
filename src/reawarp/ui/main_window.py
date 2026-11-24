@@ -336,9 +336,8 @@ class MainWindow(QMainWindow):
         return page
 
     def _build_tray_icon(self) -> None:
-        packaged_icon = Path(__file__).resolve().parents[1] / "resources" / "icons" / "Icon.ico"
-        source_icon = Path(__file__).resolve().parents[3] / "resources" / "icons" / "Icon.ico"
-        icon_path = packaged_icon if packaged_icon.is_file() else source_icon
+        # The repository now has one authoritative application icon.
+        icon_path = Path(__file__).resolve().parent / "resources" / "icons" / "Icon.ico"
         icon = QIcon(str(icon_path)) if icon_path.is_file() else QIcon()
         if not icon.isNull():
             self.setWindowIcon(icon)
@@ -370,28 +369,30 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
-    def _quit_from_tray(self) -> None:
+    def _shutdown(self) -> None:
+        """Stop all GUI timers and audio, then wait for active offline rendering."""
+        self._timer.stop()
+        self._preview_refresh_timer.stop()
         self.player.stop()
         if self._tray_icon is not None:
             self._tray_icon.hide()
+        pool = QThreadPool.globalInstance()
+        pool.clear()
+        pool.waitForDone(-1)
+        self._worker = None
+
+    def _quit_from_tray(self) -> None:
+        self._shutdown()
         QApplication.instance().quit()
 
     def changeEvent(self, event: QEvent) -> None:
         super().changeEvent(event)
-        if (
-                event.type() == QEvent.Type.WindowStateChange
-                and self.isMinimized()
-                and self._tray_available
-                and self._tray_icon is not None
-        ):
-            QTimer.singleShot(0, self.hide)
 
     def closeEvent(self, event) -> None:
-        if self._tray_available and self._tray_icon is not None:
-            event.ignore()
-            self.hide()
-            return
-        self.player.stop()
+        # Closing the main window always exits. Hiding to tray was confusing
+        # because the terminal process kept running after the user closed it.
+        self._shutdown()
+        event.accept()
         super().closeEvent(event)
 
     def _build_transport_bar(self) -> QWidget:
