@@ -24,6 +24,7 @@ from reawarp.export.wav import write_wav
 from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
 from reawarp.fx_automation import save_fx_automation
 from reawarp.samples.io import read_sample
+from reawarp.samples.iro import IROAsset, load_drum_assets, resolve_iro_sample
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
     SUBTRACTIVE_VOICES,
@@ -327,6 +328,37 @@ class MainWindow(QMainWindow):
         ambience_layout.addWidget(self.ambience_level)
         modules_layout.addWidget(ambience_row)
         voices_layout.addWidget(modules)
+
+        # IRO assets remain separate from procedural profiles. A selected
+        # sample is rendered as a role-aligned stem and its original family,
+        # articulation and feature provenance travel with the event records.
+        iro_group = QGroupBox("IRO / RELEASE SAMPLE BANK")
+        iro_form = QFormLayout(iro_group)
+        self.iro_enabled = QCheckBox("Use selected IRO instruments")
+        self.iro_enabled.setChecked(False)
+        self.iro_enabled.setToolTip(
+            "Layer manifest-backed IRO samples alongside Reawarp's deterministic procedural voices."
+        )
+        iro_form.addRow(self.iro_enabled)
+        self.iro_seed = QLineEdit("211")
+        self.iro_seed.setToolTip("IRO release seed; distinct from the current composition seed.")
+        iro_form.addRow("IRO release seed", self.iro_seed)
+        drum_assets = load_drum_assets()
+        self._iro_assets_by_role: dict[str, list[IROAsset]] = {}
+        for asset in drum_assets:
+            self._iro_assets_by_role.setdefault(asset.role, []).append(asset)
+        self.iro_selectors: dict[str, QComboBox] = {}
+        for label, role in (("Kick", "kick"), ("Snare", "snare"), ("Closed hat", "closed_hat")):
+            selector = QComboBox()
+            selector.addItem("PROCEDURAL / OFF", None)
+            for asset in self._iro_assets_by_role.get(role, []):
+                selector.addItem(
+                    f"{asset.family.upper()} · {asset.articulation or 'VARIANT'}",
+                    asset,
+                )
+            self.iro_selectors[role] = selector
+            iro_form.addRow(label, selector)
+        voices_layout.addWidget(iro_group)
 
         profiles = QGroupBox("SYNTH VOICE CATALOGUE")
         profile_form = QFormLayout(profiles)
@@ -770,6 +802,39 @@ class MainWindow(QMainWindow):
             name for name, checkbox in self.break_transform_checks.items()
             if checkbox.isChecked()
         )
+        sample_paths: dict[str, str] = {}
+        sample_metadata: dict[str, dict[str, Any]] = {}
+        if self.iro_enabled.isChecked():
+            release_seed_text = self.iro_seed.text().strip() or "211"
+            release_seed: int | str = (
+                int(release_seed_text)
+                if release_seed_text.lstrip("-+").isdigit()
+                else release_seed_text
+            )
+            for role, selector in self.iro_selectors.items():
+                asset = selector.currentData()
+                if asset is None:
+                    continue
+                render_role = "hat" if role == "closed_hat" else role
+                sample_paths[render_role] = str(asset.path)
+                sample_metadata[render_role] = {
+                    "provider": "IRO",
+                    "pack": asset.pack,
+                    "asset_id": asset.asset_id,
+                    "relative_path": asset.relative_path,
+                    "source_role": asset.role,
+                    "family": asset.family,
+                    "articulation": asset.articulation,
+                    "sha256": asset.sha256,
+                    "release_seed": release_seed,
+                    "source_feature_index": asset.source_feature_index,
+                    "sample_rate": asset.sample_rate,
+                    "duration_seconds": asset.duration_seconds,
+                    "midi_note": asset.midi_note,
+                    "manifest_metadata": asset.metadata or {},
+                }
+        if self._break_path:
+            sample_paths["break"] = self._break_path
         return GenerationConfig(
             bpm=self.bpm.value(),
             duration=self.duration.value(),
@@ -789,7 +854,8 @@ class MainWindow(QMainWindow):
             include_texture=self.texture_enabled.isChecked(),
             include_ambience=self.ambience_enabled.isChecked(),
             ambience_level=self.ambience_level.value(),
-            sample_paths={"break": self._break_path} if self._break_path else {},
+            sample_paths=sample_paths,
+            sample_metadata=sample_metadata,
             kick_profile=self.kick_profile.currentText(),
             snare_profile=self.snare_profile.currentText(),
             hat_profile=self.hat_profile.currentText(),
