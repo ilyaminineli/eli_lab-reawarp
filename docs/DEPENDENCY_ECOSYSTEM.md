@@ -1,6 +1,6 @@
 # Reawarp dependency and research ecosystem
 
-This document records the role and adoption decision for every library and dataset discussed during the M3 architecture review. The list is a capability map, not a requirement to install everything.
+This document records the role and adoption decision for the libraries and tools discussed in the architecture and sound-design guides. `requirements.txt` is the full dependency inventory; `pyproject.toml` extras remain the supported install groups. The inventory is a capability map, not a requirement to install everything.
 
 ## Architectural rule
 
@@ -20,7 +20,7 @@ Before bundling any dependency in a desktop release, re-check the current suppor
 | ctcsound / Csound | Offline physical modelling, resonators, and complex modulation | External backend candidate; Python bindings must match the installed Csound API, especially across the 6/7 API boundary |
 | SuperCollider / sc3nb | Interactive synthesis graphs and sonification | External experimental backend; keep independent of the core runtime |
 
-The implementation remains NumPy-first. Reawarp's M8 reference renderer covers additive and inharmonic partial banks, modal resonator approximations, granular micro-clouds, and scanned/pulsar-style wavetable motion without a native dependency. Pyo remains a candidate for real-time audition and synthesis; Pippi remains an experimental buffer/sound-design adapter. FluidSynth is useful as a source instrument, not as the central renderer.
+The implementation remains NumPy-first. M9 adds a genuine subtractive voice path and a transient/body/tail percussion renderer that does not call the melodic FM engine. The `minimal` percussion mode is the default; `extended` adds resonant detail; `samples` retains the existing profile-based drum path. The M8 additive, inharmonic, modal, granular and scanned reference voices remain available as explicit lead architectures, while Pyo and Pippi remain optional future backends. FluidSynth is useful as a source instrument, not as the central renderer.
 
 ### M8 sound-design library decisions
 
@@ -89,7 +89,7 @@ The M3 research notes recorded HSMusic as a collection of approximately 130,943 
 
 ## 5. Optional installation groups
 
-The installable extras in `pyproject.toml` are deliberately limited to adapters with a clear Python package boundary:
+The installable extras in `pyproject.toml` are deliberately limited to adapters with a clear Python package boundary. The root `requirements.txt` lists implemented packages plus commented planned packages from this document and the curated audio ecosystem; commented lines are inventory entries, not packages installed by `pip install -r requirements.txt`.
 
 | Extra | Packages | Role |
 |---|---|---|
@@ -101,7 +101,7 @@ The installable extras in `pyproject.toml` are deliberately limited to adapters 
 | `soundfont` | pyFluidSynth | Optional SF2 source synthesis |
 | `ui` | PySide6, pyqtgraph 0.14.x | Desktop interface and visual analysis |
 | `m4` | PySide6, pyqtgraph 0.14.x, SoundDevice | Combined desktop and playback installation |
-| `dev` | pytest, Ruff | Tests and development checks |
+| `synthesis` | SciPy, Pedalboard | Optional higher-level filters, resampling and effects research |\n| `research` | Pippi, librosa | Experimental buffer synthesis and feature research |\n| `dev` | pytest, Ruff | Development checks; the repository may temporarily omit a local test suite during milestone transitions |
 
 Pyo, Pippi, ctcsound, SuperCollider, Essentia, aubio, Xenharmlib, MusPy, and dataset repositories are not added as unconditional dependencies. Some require native software, have platform restrictions, are experimental, or have licensing implications that need a dedicated release review.
 
