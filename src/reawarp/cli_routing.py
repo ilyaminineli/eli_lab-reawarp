@@ -10,7 +10,7 @@ import numpy as np
 
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import (
-    default_fx_routing, load_fx_routing, normalise_fx_routing,
+    default_fx_routing, load_fx_routing,
     render_fx_routing, render_master_with_returns, save_fx_routing,
 )
 
@@ -31,6 +31,8 @@ def main() -> None:
     sample_rate = int(manifest["sample_rate"])
     routing_path = args.routing
     if routing_path is None:
+        if args.validate:
+            raise SystemExit("--routing is required with --validate")
         routing_path = args.output / "routing.json"
         save_fx_routing(routing_path, default_fx_routing(names), names, sample_rate)
     try:
