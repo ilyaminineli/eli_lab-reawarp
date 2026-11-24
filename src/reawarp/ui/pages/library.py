@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp.samples.io import read_sample
+from reawarp.samples.iro import IROAsset, load_iro_assets, verify_iro_assets
 from reawarp.ui.visualization import AudioPreview
 from reawarp.ui.workers import RenderWorker
 
@@ -67,6 +68,24 @@ class LibraryPage(QWidget):
         search_row.addWidget(self.similar_button)
         layout.addLayout(search_row)
 
+        iro_row = QHBoxLayout()
+        self.iro_source = QComboBox()
+        self.iro_source.addItems([
+            "ALL IRO", "DRUM KIT", "MATH ENTITIES", "SOUND LAB", "SOUND FX"
+        ])
+        iro_row.addWidget(QLabel("IRO CATALOG"))
+        iro_row.addWidget(self.iro_source, 1)
+        self.iro_search = QLineEdit()
+        self.iro_search.setPlaceholderText("family, articulation or asset name")
+        iro_row.addWidget(self.iro_search, 2)
+        self.iro_load_button = QPushButton("BROWSE IRO")
+        self.iro_load_button.clicked.connect(self._search_iro)
+        iro_row.addWidget(self.iro_load_button)
+        self.iro_verify_button = QPushButton("VERIFY HASHES")
+        self.iro_verify_button.clicked.connect(self._verify_iro)
+        iro_row.addWidget(self.iro_verify_button)
+        layout.addLayout(iro_row)
+
         collection_row = QHBoxLayout()
         self.collections = QComboBox()
         self.collections.setMinimumWidth(180)
@@ -85,6 +104,8 @@ class LibraryPage(QWidget):
         self.results = QComboBox()
         self.results.currentIndexChanged.connect(self._preview_selected)
         layout.addWidget(self.results)
+        self._iro_assets: dict[str, IROAsset] = {}
+        self._result_source = "library"
         self.details = QLabel(
             "Index an audio folder to search samples, generated stems, and project masters."
         )
@@ -94,6 +115,55 @@ class LibraryPage(QWidget):
         self.preview = AudioPreview()
         layout.addWidget(self.preview, 1)
         self._refresh_collections()
+
+    def _search_iro(self) -> None:
+        scope = self.iro_source.currentText()
+        catalog = load_iro_assets()
+        packs = {
+            "DRUM KIT": {"experimental-drum-kit-211"},
+            "MATH ENTITIES": {"entities"},
+            "SOUND LAB": {"sound-lab-211"},
+            "SOUND FX": {"sound-fx-211"},
+        }
+        if scope in packs:
+            catalog = [item for item in catalog if item.pack in packs[scope]]
+        query = self.iro_search.text().strip().lower()
+        if query:
+            catalog = [
+                item for item in catalog
+                if query in " ".join((
+                    item.relative_path, item.role, item.family, item.articulation, item.pack
+                )).lower()
+            ]
+        self._iro_assets = {item.asset_id: item for item in catalog}
+        self._result_source = "iro"
+        self.results.blockSignals(True)
+        self.results.clear()
+        for item in catalog:
+            duration = f"{item.duration_seconds:.2f}s" if item.duration_seconds is not None else "duration n/a"
+            self.results.addItem(
+                f"{item.family} · {item.articulation or item.role} · {duration}",
+                item.asset_id,
+            )
+        self.results.blockSignals(False)
+        self.details.setText(
+            f"{len(catalog)} IRO asset(s) · source pack metadata retained · originals are read-only"
+        )
+        if catalog:
+            self.results.setCurrentIndex(0)
+        else:
+            self.preview.set_audio(None)
+
+    def _verify_iro(self) -> None:
+        try:
+            report = verify_iro_assets()
+            self.details.setText(
+                f"IRO integrity · {report['verified']} verified · "
+                f"{len(report['unverified'])} without supplied hash · "
+                f"{len(report['missing'])} missing · {len(report['mismatched'])} mismatch"
+            )
+        except Exception as exc:
+            self.details.setText(f"IRO integrity check failed: {exc}")
 
     def _browse_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
@@ -163,6 +233,8 @@ class LibraryPage(QWidget):
             self.preview.set_audio(None)
 
     def _search(self, similar_to: str | None = None) -> None:
+        self._result_source = "library"
+        self._iro_assets = {}
         from reawarp.library.store import SampleLibrary
 
         asset_type = self.asset_type.currentText()
@@ -266,11 +338,27 @@ class LibraryPage(QWidget):
             self.details.setText(f"Could not open collection: {exc}")
 
     def _preview_selected(self, *_args: Any) -> None:
-        from reawarp.library.store import SampleLibrary
-
         asset_id = self.results.currentData()
         if not asset_id:
             return
+        if self._result_source == "iro":
+            asset = self._iro_assets.get(str(asset_id))
+            if asset is None:
+                return
+            meta = asset.metadata or {}
+            self.details.setText(
+                f"IRO · {asset.pack} · {asset.relative_path}\\n"
+                f"Role {asset.role} · family {asset.family} · articulation {asset.articulation or '—'}\\n"
+                f"Release seed {meta.get('seed', asset.seed) or 'n/a'} · "
+                f"source feature {asset.source_feature_index if asset.source_feature_index is not None else 'n/a'}"
+            )
+            try:
+                self.preview.set_audio(read_sample(asset.path, 48_000), 48_000)
+            except Exception as exc:
+                self.details.setText(f"IRO preview failed: {exc}")
+            return
+
+        from reawarp.library.store import SampleLibrary
         try:
             with SampleLibrary() as library:
                 asset = library.get_asset(str(asset_id))
