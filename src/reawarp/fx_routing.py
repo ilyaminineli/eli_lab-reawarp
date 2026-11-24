@@ -195,9 +195,12 @@ def render_fx_routing(
         if dry.shape != (frames, channels):
             raise ValueError("all stems must share the same frame and channel dimensions")
         record = config["stems"][name]
-        processed = _render_chain(dry.copy(), sample_rate, record["insert"])
+        if record["insert"]["kind"] == "bypass" or record["insert"]["wet"] <= 0.0:
+            processed = dry.copy()
+        else:
+            processed = _render_chain(dry.copy(), sample_rate, record["insert"])
         processed = _fit_frames(processed, frames, channels)
-        outputs[name] = np.ascontiguousarray(dry + (processed - dry), dtype=np.float32)
+        outputs[name] = np.ascontiguousarray(processed, dtype=np.float32)
         for bus, amount in record["sends"].items():
             if amount > 0:
                 bus_inputs[bus] += processed * float(amount)
