@@ -190,6 +190,7 @@ def render_fx_routing(
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
     bus_tail_frames = 0
     active_stems: list[str] = []
+    active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     for name, source in dry_stems.items():
         dry = np.asarray(source, dtype=np.float32)
         if dry.shape != (frames, channels):
@@ -206,6 +207,8 @@ def render_fx_routing(
                 bus_inputs[bus] += processed * float(amount)
                 if name not in active_stems:
                     active_stems.append(name)
+                if name not in active_stems_by_bus[bus]:
+                    active_stems_by_bus[bus].append(name)
     returns: dict[str, np.ndarray] = {}
     for bus, source in bus_inputs.items():
         record = config["buses"][bus]
@@ -231,6 +234,7 @@ def render_fx_routing(
         "buses": config["buses"],
         "rendered_returns": list(returns),
         "active_send_stems": active_stems,
+        "active_send_stems_by_bus": active_stems_by_bus,
     }
     metadata["bus_returns_audio"] = returns
     return outputs, metadata
