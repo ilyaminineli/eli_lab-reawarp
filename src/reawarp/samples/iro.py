@@ -125,42 +125,51 @@ def _asset(
 
 
 def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
-    """Read the 96-hit experimental drum pack and its MIDI/articulation map."""
-    manifest = _load_json(DRUM_PACK / "drum-kit-manifest.json")
-    if manifest is None:
-        return []
+    """Read the generated drum-kit index and mark absent WAV payloads explicitly.
+
+    The release-level drum-kit-manifest.json records immutable source assets;
+    drum-kit-index.csv records generated kit hits. Never substitute the former
+    source files for the latter generated files.
+    """
     drum_map = _load_json(DRUM_PACK / "drum-map.json") or {}
     midi_by_role: dict[str, int] = {}
     for instrument in drum_map.get("instruments", []):
         midi_by_role[str(instrument.get("name", ""))] = int(instrument.get("midi_note", 0))
 
+    flat_index = _read_csv_rows(DRUM_PACK / "drum-kit-index.csv")
     records: list[IROAsset] = []
-    for item in manifest.get("assets", []):
+    for item in flat_index:
         relative = str(item.get("file", ""))
+        role = str(item.get("instrument", item.get("role", "percussion")))
+        if not relative:
+            continue
         asset = _asset(
             pack_root=DRUM_PACK,
             relative_path=relative,
-            role=str(item.get("role", "percussion")),
-            family=str(item.get("family", item.get("role", "percussion"))),
+            role=role,
+            family=str(item.get("family", role)),
             pack="experimental-drum-kit-211",
             articulation=str(item.get("articulation", "")),
             expected_sha256=str(item.get("sha256", "")),
             sample_rate=item.get("sample_rate"),
             duration_seconds=item.get("duration_seconds"),
-            source_feature_index=item.get("source_feature_index"),
-            seed=item.get("seed"),
-            midi_note=midi_by_role.get(str(item.get("role", ""))),
+            seed=211,
+            midi_note=midi_by_role.get(role),
             metadata={
-                key: value for key, value in item.items()
-                if key not in {"file", "role", "family", "articulation", "sha256",
-                               "sample_rate", "duration_seconds", "source_feature_index", "seed"}
+                "variant": item.get("variant"),
+                "bit_depth": item.get("bit_depth"),
+                "frequency_hz": item.get("frequency_hz"),
+                "rms": item.get("rms"),
+                "peak": item.get("peak"),
+                "source_asset_path": item.get("source_asset_path"),
+                "source_asset_sha256": item.get("source_asset_sha256"),
+                "reused_existing_output": item.get("reused_existing_output"),
             },
         )
         if verify_hashes and asset.available and asset.sha256 and _sha256(asset.path) != asset.sha256:
             raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
         records.append(asset)
     return records
-
 
 def load_sound_fx_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Read release-driven long events and loops without flattening families."""
