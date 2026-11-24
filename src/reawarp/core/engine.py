@@ -586,6 +586,7 @@ class ReawarpEngine:
                 "melody": melody_profile,
                 "palette": config.synth_palette,
                 "available_palettes": ["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"],
+                "extended_melody_voices": ["inharmonic_mallet", "metallic_fm", "dark_formant", "soft_spectral_pad"],
                 "catalogue_counts": {
                     "kick": len(KICK_PROFILES),
                     "snare": len(SNARE_PROFILES),
