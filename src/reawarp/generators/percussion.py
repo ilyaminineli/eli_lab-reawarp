@@ -250,7 +250,11 @@ def _build_break_events(
             if absolute_step >= step_count or time_seconds >= config.duration:
                 continue
             velocity = float(base_velocity)
-            if is_phrase_end and config.break_variation > 0.0:
+            if (
+                is_phrase_end
+                and config.break_variation > 0.0
+                and not ((bar + 1) % int(config.break_cycle_bars) == 0)
+            ):
                 spread = 0.10 * float(config.break_variation)
                 velocity *= float(rng.uniform(1.0 - spread, 1.0 + spread))
             events.append(PercussionEvent(
