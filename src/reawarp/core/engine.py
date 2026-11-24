@@ -35,6 +35,7 @@ from reawarp.synthesis.profiles import (
     KICK_PROFILES,
     MELODY_PROFILES,
     SNARE_PROFILES,
+    SUBTRACTIVE_VOICES,
     select_profile_name,
 )
 from reawarp.transforms.analysis import auto_slice
@@ -319,7 +320,7 @@ class ReawarpEngine:
             if config.synth_palette == "subtractive":
                 melody_profile = select_profile_name(
                     config.melody_profile,
-                    __import__("reawarp.synthesis.profiles", fromlist=["SUBTRACTIVE_VOICES"]).SUBTRACTIVE_VOICES,
+                    SUBTRACTIVE_VOICES,
                     streams.get("melody_profile"),
                     auto_choices=AUTO_MELODY_PROFILES,
                 )
