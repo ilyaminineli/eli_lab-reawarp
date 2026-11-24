@@ -81,8 +81,14 @@ def main() -> None:
     save_fx_automation(output / "fx_automation.json", automation, names)
     master = render_master_with_returns(processed, returns, master_wet=meta["master_wet"])
     write_wav(output / "master.wav", master, sample_rate, 24)
-    (output / "routing.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"Routed render complete · {len(processed)} stems · {len(returns)} active return(s) · {output.resolve()}")
+    save_fx_routing(output / "fx_routing.json", routing, names, sample_rate)
+    (output / "render.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    print(
+        f"Routed render complete · {len(processed)} stems · {len(returns)} active return(s) · "
+        f"{len(automation['lanes'])} automation lane(s) · {output.resolve()}"
+    )
 
 
 if __name__ == "__main__":
