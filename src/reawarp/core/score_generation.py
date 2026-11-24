@@ -723,7 +723,18 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
             })
             continue
 
-        records.append({
+        families = score.metadata.get("generator_families", {})
+        source_mix = {
+            "mode": parameters.get(
+                "sample_source_mode", families.get("drum_source_mode", "synth")
+            ),
+            "architecture": parameters.get(
+                "sample_architecture", families.get("hybrid_architecture")
+            ),
+            "synth_gain": float(parameters.get("synth_gain", 1.0)),
+            "sample_gain": float(parameters.get("sample_gain", 0.0)),
+        }
+        record = {
             **base,
             "lane": event.voice_id,
             "kind": str(parameters.get("source_kind", event.kind)),
@@ -733,7 +744,35 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
             "section_name": parameters.get("section_name"),
             "phrase_function": parameters.get("phrase_function"),
             "sound_profile": parameters.get("sound_profile"),
-        })
+            "source_mix": source_mix,
+        }
+        if parameters.get("synthesis_guidance") is not None:
+            record["synthesis_guidance"] = dict(parameters["synthesis_guidance"])
+        sample_asset_id = parameters.get("sample_asset_id")
+        if sample_asset_id is not None:
+            sample_schedule = score.metadata.get("sample_schedule", {})
+            role_source = sample_schedule.get("sources", {}).get(event.voice_id, {})
+            variants = role_source.get("variants", [])
+            variant_index = int(parameters.get("sample_variant_index", 0))
+            variant = next(
+                (
+                    item for item in variants
+                    if int(item.get("index", -1)) == variant_index
+                ),
+                {},
+            )
+            record["sample_source"] = {
+                "asset_id": str(sample_asset_id),
+                "path": variant.get("path"),
+                "sha256": variant.get("sha256"),
+                "label": variant.get("label"),
+                "variant_index": variant_index,
+            }
+            if variant.get("metadata") is not None:
+                record["sample_metadata"] = dict(variant["metadata"])
+            if variant.get("features") is not None:
+                record["sample_features"] = dict(variant["features"])
+        records.append(record)
 
     records.sort(key=lambda item: (
         float(item.get("time", 0.0)), str(item.get("lane", "")),
