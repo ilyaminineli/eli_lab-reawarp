@@ -37,6 +37,10 @@ class AudioFeatures:
     onset_interval_cv: float
     tempo_bpm: float | None
     rhythm_histogram: tuple[float, ...]
+    harmonic_rms: float | None = None
+    percussive_rms: float | None = None
+    librosa_onset_density: float | None = None
+    analysis_backends: tuple[str, ...] = ("numpy",)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -154,6 +158,31 @@ def analyze_audio_file(path: str | Path) -> tuple[dict[str, int], AudioFeatures]
     density, interval_cv, tempo, histogram = _rhythm_descriptors(
         onsets, ANALYSIS_SAMPLE_RATE, duration
     )
+    harmonic_rms: float | None = None
+    percussive_rms: float | None = None
+    librosa_onset_density: float | None = None
+    analysis_backends = ["numpy"]
+    try:
+        import librosa
+
+        harmonic, percussive = librosa.effects.hpss(audio)
+        harmonic_rms = float(np.sqrt(np.mean(np.square(harmonic, dtype=np.float64))))
+        percussive_rms = float(np.sqrt(np.mean(np.square(percussive, dtype=np.float64))))
+        onset_envelope = librosa.onset.onset_strength(
+            y=audio, sr=ANALYSIS_SAMPLE_RATE, hop_length=512
+        )
+        onset_frames = librosa.onset.onset_detect(
+            onset_envelope=onset_envelope,
+            sr=ANALYSIS_SAMPLE_RATE,
+            hop_length=512,
+            backtrack=False,
+        )
+        librosa_onset_density = float(len(onset_frames) / max(duration, 1e-9))
+        analysis_backends.append("librosa_hpss_onset")
+    except Exception:
+        # Analysis must remain available on NumPy-only installs and when an
+        # optional librosa backend cannot initialise on a target machine.
+        pass
     info = {
         "source_sample_rate": int(source_rate),
         "channels": int(channels),
@@ -177,5 +206,9 @@ def analyze_audio_file(path: str | Path) -> tuple[dict[str, int], AudioFeatures]
         onset_interval_cv=interval_cv,
         tempo_bpm=tempo,
         rhythm_histogram=histogram,
+        harmonic_rms=harmonic_rms,
+        percussive_rms=percussive_rms,
+        librosa_onset_density=librosa_onset_density,
+        analysis_backends=tuple(analysis_backends),
     )
     return info, features
