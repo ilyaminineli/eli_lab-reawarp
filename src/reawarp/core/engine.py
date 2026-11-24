@@ -154,6 +154,8 @@ class ReawarpEngine:
             energy=config.composition_energy,
             variation=config.composition_variation,
             flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
         )
         sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
