@@ -344,9 +344,17 @@ class MainWindow(QMainWindow):
         self.iro_seed.setToolTip("IRO release seed; distinct from the current composition seed.")
         iro_form.addRow("IRO release seed", self.iro_seed)
         drum_assets = load_drum_assets()
+        available_drum_assets = [asset for asset in drum_assets if asset.available]
         self._iro_assets_by_role: dict[str, list[IROAsset]] = {}
-        for asset in drum_assets:
+        for asset in available_drum_assets:
             self._iro_assets_by_role.setdefault(asset.role, []).append(asset)
+        self.iro_availability_note = QLabel(
+            f"{len(available_drum_assets)} available / {len(drum_assets)} manifest entries. "
+            "Missing files remain visible in the Library integrity report."
+        )
+        self.iro_availability_note.setObjectName("muted")
+        self.iro_availability_note.setWordWrap(True)
+        iro_form.addRow(self.iro_availability_note)
         self.iro_selectors: dict[str, QComboBox] = {}
         for label, role in (("Kick", "kick"), ("Snare", "snare"), ("Closed hat", "closed_hat")):
             selector = QComboBox()
