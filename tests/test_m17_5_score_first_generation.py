@@ -79,7 +79,9 @@ def test_generate_uses_score_renderer_and_projects_legacy_events_from_score():
     timeline = RenderTimeline(
         config.sample_rate, project.score.tempo_map, project.score.meter_map
     )
-    rendered = engine.render_score(project.score, sample_rate=config.sample_rate)
+    rendered = engine.render_score(
+        project.score, sample_rate=config.sample_rate, frame_count=project.frame_count
+    )
     assert rendered.frame_count == config.frame_count
     assert rendered.score is project.score
     for scheduled in rendered.schedule:
