@@ -33,7 +33,7 @@ Optional libraries must not replace Reawarp's event model, deterministic random-
 
 ## Validation policy
 
-The repository currently uses compile, CLI, library, and desktop-import smoke checks in GitHub Actions. There is no active unit-test suite in the repository; do not recreate a test suite as part of routine cleanup or milestones without an explicit request.
+The repository maintains a pytest regression suite for deterministic streams, composition planning, audio diagnostics, transforms, score/MIDI interchange, project export/reopen, FX contracts and offscreen UI navigation. GitHub Actions runs the suite on Python 3.10–3.12 on Linux and Python 3.11 on Windows, alongside CLI and benchmark smoke checks. Target-machine long-render profiling and Pyo listening remain separate validation tasks.
 
 ## Milestone status
 

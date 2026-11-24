@@ -218,6 +218,22 @@ class GenerationConfig:
     def sixteenth_seconds(self) -> float:
         return 60.0 / float(self.bpm) / 4.0
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "GenerationConfig":
+        """Reconstruct a validated configuration from a project record."""
+        if not isinstance(data, dict):
+            raise ValueError("generation config must be a JSON object")
+        known_fields = set(cls.__dataclass_fields__)
+        unknown = set(data) - known_fields
+        if unknown:
+            raise ValueError(
+                "unknown generation config fields: " + ", ".join(sorted(unknown))
+            )
+        try:
+            return cls(**dict(data))
+        except TypeError as exc:
+            raise ValueError(f"invalid generation config: {exc}") from exc
+
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["sample_paths"] = {role: str(Path(path)) for role, path in self.sample_paths.items()}

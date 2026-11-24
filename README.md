@@ -331,3 +331,6 @@ The current implementation baseline is **M13 with M14 in progress**. M14 has add
 - [Consolidated Roadmap](docs/ROADMAP.md) — implementation status and M14–M20 forward plan.
 - [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
+
+
+Exported project folders can be reopened and validated with `ReawarpProject.load("output/my_idm_project")`. The loader restores the validated configuration, event records and aligned PCM stems, and verifies the score metadata.
