@@ -24,7 +24,10 @@ from reawarp.export.wav import write_wav
 from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
 from reawarp.fx_automation import save_fx_automation
 from reawarp.samples.io import read_sample
-from reawarp.samples.iro import IROAsset, load_drum_assets, resolve_iro_sample
+from reawarp.samples.catalog import (
+    BundledSample, default_sample_for_role, discover_bundled_samples, sample_library_counts,
+)
+from reawarp.mathematics.theory import ROOT_NAMES, SCALE_STEPS
 from reawarp.synthesis.profiles import (
     HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
     SUBTRACTIVE_VOICES,
@@ -256,13 +259,26 @@ class MainWindow(QMainWindow):
         self.pattern_relationship.addItems(list(PATTERN_RELATIONSHIPS))
         self.pattern_relationship.setCurrentText("interlock")
         form.addRow("Pattern relationship", self.pattern_relationship)
-        self.pattern_follow_structure = QCheckBox("Auto-switch patterns at formal sections")
-        self.pattern_follow_structure.setChecked(False)
+        self.pattern_follow_structure = QCheckBox("Automatically evolve all drum parts")
+        self.pattern_follow_structure.setChecked(True)
         self.pattern_follow_structure.setToolTip(
-            "When enabled, change the break pattern family at formal section boundaries. "
-            "Off preserves the existing break phrase grammar."
+            "Kick, snare and hat patterns evolve with section functions. Returns recall the opening anchor; "
+            "fills and phase changes stay bounded by the variation budget."
         )
-        form.addRow("Pattern development", self.pattern_follow_structure)
+        form.addRow("Drum arrangement", self.pattern_follow_structure)
+        self.drum_change_intensity = QDoubleSpinBox()
+        self.drum_change_intensity.setRange(0.0, 1.0)
+        self.drum_change_intensity.setSingleStep(0.05)
+        self.drum_change_intensity.setValue(0.68)
+        self.drum_change_intensity.setToolTip(
+            "How strongly drum roles mutate between sections and phrase cycles."
+        )
+        form.addRow("Drum evolution", self.drum_change_intensity)
+        self.drum_part_cycle_bars = QComboBox()
+        for bars in (1, 2, 4):
+            self.drum_part_cycle_bars.addItem(f"{bars} bar" if bars == 1 else f"{bars} bars", bars)
+        self.drum_part_cycle_bars.setCurrentIndex(1)
+        form.addRow("Drum phrase cycle", self.drum_part_cycle_bars)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
@@ -329,44 +345,71 @@ class MainWindow(QMainWindow):
         modules_layout.addWidget(ambience_row)
         voices_layout.addWidget(modules)
 
-        # IRO assets remain separate from procedural profiles. A selected
-        # sample is rendered as a role-aligned stem and its original family,
-        # articulation and feature provenance travel with the event records.
-        iro_group = QGroupBox("IRO / RELEASE SAMPLE BANK")
-        iro_form = QFormLayout(iro_group)
-        self.iro_enabled = QCheckBox("Use selected IRO instruments")
-        self.iro_enabled.setChecked(False)
-        self.iro_enabled.setToolTip(
-            "Layer manifest-backed IRO samples alongside Reawarp's deterministic procedural voices."
-        )
-        iro_form.addRow(self.iro_enabled)
-        self.iro_seed = QLineEdit("211")
-        self.iro_seed.setToolTip("IRO release seed; distinct from the current composition seed.")
-        iro_form.addRow("IRO release seed", self.iro_seed)
-        drum_assets = load_drum_assets()
-        available_drum_assets = [asset for asset in drum_assets if asset.available]
-        self._iro_assets_by_role: dict[str, list[IROAsset]] = {}
-        for asset in available_drum_assets:
-            self._iro_assets_by_role.setdefault(asset.role, []).append(asset)
-        self.iro_availability_note = QLabel(
-            f"{len(available_drum_assets)} WAVs available / {len(drum_assets)} indexed entries. "
-            "The present repository snapshot has index metadata but no generated kit WAVs."
-        )
-        self.iro_availability_note.setObjectName("muted")
-        self.iro_availability_note.setWordWrap(True)
-        iro_form.addRow(self.iro_availability_note)
-        self.iro_selectors: dict[str, QComboBox] = {}
-        for label, role in (("Kick", "kick"), ("Snare", "snare"), ("Closed hat", "closed_hat")):
+        source_group = QGroupBox("BUNDLED PERCUSSION SOURCES")
+        source_form = QFormLayout(source_group)
+        self.sample_selectors: dict[str, QComboBox] = {}
+        self.sample_library = {
+            role: discover_bundled_samples(role=role)
+            for role in ("kick", "snare", "hat")
+        }
+        for role, label in (("kick", "Kick source"), ("snare", "Snare source"), ("hat", "Hat / cymbal")):
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
             selector = QComboBox()
-            selector.addItem("PROCEDURAL / OFF", None)
-            for asset in self._iro_assets_by_role.get(role, []):
-                selector.addItem(
-                    f"{asset.family.upper()} · {asset.articulation or 'VARIANT'}",
-                    asset,
-                )
-            self.iro_selectors[role] = selector
-            iro_form.addRow(label, selector)
-        voices_layout.addWidget(iro_group)
+            selector.addItem("NONE · SYNTH ONLY", None)
+            samples = self.sample_library[role]
+            for asset in samples:
+                selector.addItem(asset.label, str(asset.path))
+            preferred = default_sample_for_role(role)
+            if preferred is not None:
+                selected_index = selector.findData(str(preferred.path))
+                if selected_index >= 0:
+                    selector.setCurrentIndex(selected_index)
+            self.sample_selectors[role] = selector
+            row_layout.addWidget(selector, 1)
+            browse_sample = QPushButton("…")
+            browse_sample.setFixedWidth(34)
+            browse_sample.setToolTip(f"Choose a custom {role} sample")
+            browse_sample.clicked.connect(
+                lambda _checked=False, selected_role=role: self._choose_drum_sample(selected_role)
+            )
+            row_layout.addWidget(browse_sample)
+            source_form.addRow(label, row)
+
+        sample_counts = sample_library_counts()
+        self.sample_library_note = QLabel(
+            f"LOCAL LIBRARY  ·  {sample_counts['kick']} kick · "
+            f"{sample_counts['snare']} snare / clap · {sample_counts['hat']} hat / cymbal sources"
+        )
+        self.sample_library_note.setObjectName("muted")
+        self.sample_library_note.setWordWrap(True)
+        source_form.addRow(self.sample_library_note)
+        voices_layout.addWidget(source_group)
+
+        hybrid_group = QGroupBox("PERCUSSION SOURCE ENGINE")
+        hybrid_form = QFormLayout(hybrid_group)
+        self.percussion_source_mode = QComboBox()
+        self.percussion_source_mode.addItem("AUTOMATIC · SECTION-AWARE", "automatic")
+        self.percussion_source_mode.addItem("SYNTHESIS ONLY", "synth")
+        self.percussion_source_mode.addItem("HYBRID · FIXED BLEND", "hybrid")
+        self.percussion_source_mode.addItem("SAMPLE ONLY", "sample")
+        hybrid_form.addRow("Source mode", self.percussion_source_mode)
+        self.percussion_hybrid_architecture = QComboBox()
+        self.percussion_hybrid_architecture.addItem("TRANSIENT SAMPLE + SYNTH BODY", "transient_body")
+        self.percussion_hybrid_architecture.addItem("PARALLEL FULL LAYERS", "layered")
+        hybrid_form.addRow("Hybrid architecture", self.percussion_hybrid_architecture)
+        self.percussion_sample_mix = QDoubleSpinBox()
+        self.percussion_sample_mix.setRange(0.0, 1.0)
+        self.percussion_sample_mix.setSingleStep(0.05)
+        self.percussion_sample_mix.setValue(0.46)
+        hybrid_form.addRow("Sample contribution", self.percussion_sample_mix)
+        self.hybrid_transient_ms = QDoubleSpinBox()
+        self.hybrid_transient_ms.setRange(5.0, 200.0)
+        self.hybrid_transient_ms.setSingleStep(1.0)
+        self.hybrid_transient_ms.setValue(28.0)
+        hybrid_form.addRow("Transient window / ms", self.hybrid_transient_ms)
+        voices_layout.addWidget(hybrid_group)
 
         profiles = QGroupBox("SYNTH VOICE CATALOGUE")
         profile_form = QFormLayout(profiles)
@@ -395,7 +438,16 @@ class MainWindow(QMainWindow):
             "Minimal uses dry transient/body/tail synthesis; extended adds resonant detail; "
             "samples uses the profiled legacy drum synthesis."
         )
-        profile_form.addRow("Percussion synthesis", self.percussion_synthesis)
+        profile_form.addRow("Synth drum architecture", self.percussion_synthesis)
+        self.melody_scale = QComboBox()
+        self.melody_scale.addItems(list(SCALE_STEPS))
+        self.melody_scale.setCurrentText("chromatic")
+        profile_form.addRow("Melody pitch field", self.melody_scale)
+        self.melody_root = QComboBox()
+        for pitch_class, name in enumerate(ROOT_NAMES):
+            self.melody_root.addItem(name, pitch_class)
+        self.melody_root.setCurrentIndex(0)
+        profile_form.addRow("Pitch-field root", self.melody_root)
         voices_layout.addWidget(profiles)
 
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
