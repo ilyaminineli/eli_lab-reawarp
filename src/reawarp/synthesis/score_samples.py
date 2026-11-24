@@ -411,7 +411,7 @@ def prepare_score_sample_renderers(
                 "duration_seconds": item["duration_seconds"],
             } for index, item in enumerate(bank)],
             "trigger_count": 0,
-            "trigger_mode": "score-trigger",
+            "trigger_mode": "shared_drum_score",
             "selection_mode": config.drum_sample_automation,
             "hybrid_architecture": config.percussion_hybrid_architecture,
             "switch_points": switch_history[role],
@@ -610,6 +610,13 @@ def prepare_score_sample_renderers(
     }
     if break_voice_renderer is not None:
         voice_renderers["sample_break"] = break_voice_renderer
+
+    for role, source in manifest.items():
+        if role in variant_usage:
+            source["variant_usage"] = dict(variant_usage[role])
+            source["final_variant_count"] = sum(
+                1 for count in variant_usage[role].values() if count > 0
+            )
 
     # Persist the variant decisions on score metadata as well as on each trigger.
     updated_metadata = dict(score.metadata)
