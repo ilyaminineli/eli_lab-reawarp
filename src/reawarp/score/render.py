@@ -51,6 +51,7 @@ class ScoreRenderResult:
     timeline: RenderTimeline
     sample_rate: int
     frame_count: int
+    score: Score | None = None
 
     def render_master(self) -> np.ndarray:
         if not self.stems:
@@ -261,4 +262,5 @@ class ScoreRenderer:
             timeline=timeline,
             sample_rate=sample_rate,
             frame_count=frame_count,
+            score=score,
         )
