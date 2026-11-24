@@ -592,6 +592,8 @@ class ReawarpEngine:
                 "snare": config.snare_profile,
                 "hat": config.hat_profile,
                 "melody": melody_profile,
+                "palette": config.synth_palette,
+                "available_palettes": ["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"],
                 "catalogue_counts": {
                     "kick": len(KICK_PROFILES),
                     "snare": len(SNARE_PROFILES),
