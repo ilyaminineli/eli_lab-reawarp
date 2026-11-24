@@ -349,8 +349,8 @@ class MainWindow(QMainWindow):
         for asset in available_drum_assets:
             self._iro_assets_by_role.setdefault(asset.role, []).append(asset)
         self.iro_availability_note = QLabel(
-            f"{len(available_drum_assets)} available / {len(drum_assets)} manifest entries. "
-            "Missing files remain visible in the Library integrity report."
+            f"{len(available_drum_assets)} WAVs available / {len(drum_assets)} indexed entries. "
+            "The present repository snapshot has index metadata but no generated kit WAVs."
         )
         self.iro_availability_note.setObjectName("muted")
         self.iro_availability_note.setWordWrap(True)
