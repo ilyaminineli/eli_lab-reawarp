@@ -141,9 +141,9 @@ class LibraryPage(QWidget):
         self.results.clear()
         for item in catalog:
             duration = f"{item.duration_seconds:.2f}s" if item.duration_seconds is not None else "duration n/a"
-            availability = "" if item.available else " · MISSING WAV"
+            availability = "PLAYABLE" if item.available else "INDEX ONLY · WAV MISSING"
             self.results.addItem(
-                f"{item.family} · {item.articulation or item.role} · {duration}{availability}",
+                f"{item.family} · {item.articulation or item.role} · {duration} · {availability}",
                 item.asset_id,
             )
         self.results.blockSignals(False)
