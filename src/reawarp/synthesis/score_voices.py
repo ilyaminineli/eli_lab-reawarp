@@ -158,18 +158,15 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
         if gate_value is None:
             gate_frames = scheduled.duration_frames
         else:
-            _gate_start, gate_end = scheduled.event.parameters.get('_unused', (0, 0))
-            del _gate_start, gate_end
             gate_start_frame = scheduled.start_frame
-            gate_end_frame = scheduled.start_frame + scheduled.duration_frames
             try:
                 gate_beats = Fraction(str(gate_value))
-                _start_frame, gate_end_frame = controls.timeline.beat_span_to_frames(
+                _event_start, gate_end_frame = controls.timeline.beat_span_to_frames(
                     event.onset_beats, gate_beats
                 )
+                gate_frames = max(1, gate_end_frame - gate_start_frame)
             except (TypeError, ValueError, ZeroDivisionError):
-                gate_end_frame = scheduled.end_frame
-            gate_frames = max(1, gate_end_frame - gate_start_frame)
+                gate_frames = scheduled.duration_frames
         gate_seconds = gate_frames / float(sample_rate)
         rng = _event_rng(event, config.seed, 'melody')
         brightness = float(np.clip(parameters.get('brightness', config.tonal_brightness), 0.0, 1.0))
