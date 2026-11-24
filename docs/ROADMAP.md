@@ -123,7 +123,7 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 See M16.md for implementation details and the score-render API.
 ## M17: Canonical score-native composition pipeline
 
-**Status:** Partially implemented. Planner adapters and deterministic score fixtures are present; the generation production loop still uses legacy event objects and time-based render calls.
+**Status:** Partially implemented. M17.1 planner adapters and M17.2 deterministic production voice callbacks are in place. The legacy `ReawarpEngine.generate()` path still renders using its existing event loop; the canonical score is not yet the end-to-end generation authority.
 
 **Goal:** Make the universal score the only event-scheduling authority while preserving the existing M8–M15 musical grammar, instrument catalogue, sample bank logic and non-destructive production workflow.
 
@@ -138,9 +138,9 @@ See M16.md for implementation details and the score-render API.
 
 ### Implementation slices
 
-1. **M17.1 — Planner emission:** percussion and melody planner adapters now emit MusicalEvent from sixteenth-grid positions; stable motif/style/role metadata and named stream seeds are retained. A compatibility projection exists for legacy consumers.
-2. **M17.2 — Production voices:** adapt existing specialist voices to ScheduledScoreEvent and shared AutomationControlBus.
-3. **M17.3 — Samples and breaks:** schedule sample triggers and break slices against absolute score frames.
+1. **M17.1 — Planner emission:** percussion and melody planner adapters emit MusicalEvent from sixteenth-grid positions; stable motif/style/role metadata and named stream seeds are retained. A compatibility projection exists for legacy consumers. Melody notes carry separate gate and scheduled release spans.
+2. **M17.2 — Production voices (implemented adapter layer):** `synthesis/score_voices.py` supplies deterministic per-event callbacks for subtractive, FM/hybrid and extended melody palettes, profile-based kick/snare/hat, and synthetic break voices. `ReawarpEngine.render_score(score, config=config)` builds the callbacks automatically; callers can still supply explicit custom callbacks. Callbacks use event-derived random streams and the shared control bus for pitch-at-onset, cutoff/resonance and gain automation. Each result is fitted to the exact scheduled frame span. This does not yet replace the legacy `generate()` rendering path.
+3. **M17.3 — Samples and breaks:** schedule sample-bank triggers, hybrid transient/body layers and imported break slices against absolute score frames. Sample-only production callbacks currently return silence until this adapter lands.
 4. **M17.4 — FX automation:** map M13 curves and routing targets to typed score automation without breaking JSON import/export.
 5. **M17.5 — Cutover:** generate the canonical Score before audio rendering; make project event records a derived compatibility/export view.
 
@@ -148,6 +148,7 @@ See M16.md for implementation details and the score-render API.
 
 - Fixed seeds produce identical score JSON and repeatable stems.
 - No event time is routed through a seconds-based intermediate before frame placement.
+- Specialist voice callbacks use the event schedule, return exact-length finite buffers and do not share mutable RNG state.
 - Sample variant switching, motif cross-role relationships, hybrid percussion and break-slice trimming preserve existing musical semantics.
 - Existing exported projects and automation files remain readable.
 - All event-backed production lanes render through ScoreRenderer; texture/ambience whole-field renderers may remain specialised until they have event-level semantics.
