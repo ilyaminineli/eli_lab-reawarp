@@ -853,6 +853,24 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.mixer_stack, 1)
         return page
 
+    def _choose_drum_sample(self, role: str) -> None:
+        selector = self.sample_selectors.get(role)
+        if selector is None:
+            return
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            f"Choose {role} sample",
+            str(Path.cwd()),
+            "Audio files (*.wav *.flac *.aiff *.aif *.ogg);;All files (*.*)",
+        )
+        if not path:
+            return
+        selected = selector.findData(path)
+        if selected < 0:
+            selector.addItem(f"{Path(path).name} · CUSTOM", path)
+            selected = selector.count() - 1
+        selector.setCurrentIndex(selected)
+
     def _choose_break_sample(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Select a break sample", str(Path.cwd()),
