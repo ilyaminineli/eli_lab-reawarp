@@ -141,19 +141,28 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
 
         kick_activity = _clamp((0.82 * density + 0.18 * energy) * (1.0 - silence_ratio))
         if function in {"introduction", "drop", "silence", "residue", "outro"}:
-            kick_activity *= {"introduction": 0.28, "drop": 0.18, "silence": 0.0, "residue": 0.12, "outro": 0.0}[function]
+            kick_activity *= {"introduction": 0.28, "drop": 0.0, "silence": 0.0, "residue": 0.12, "outro": 0.0}[function]
         snare_activity = _clamp((0.55 * density + 0.45 * energy) * (1.0 - silence_ratio))
         if function in {"introduction", "drop", "silence", "residue", "outro"}:
-            snare_activity *= {"introduction": 0.20, "drop": 0.16, "silence": 0.0, "residue": 0.10, "outro": 0.0}[function]
+            snare_activity *= {"introduction": 0.20, "drop": 0.10, "silence": 0.0, "residue": 0.10, "outro": 0.0}[function]
         high_activity = _clamp((0.42 * density + 0.58 * instability) * (1.0 - silence_ratio))
+        if function == "drop":
+            high_activity = max(high_activity, 0.22 * instability)
         melody_activity = _clamp((0.55 * energy + 0.45 * (1.0 - density)) * (1.0 - silence_ratio))
         texture_activity = _clamp((0.55 * energy + 0.45 * instability) * (1.0 - silence_ratio))
+        if function == "drop":
+            melody_activity = max(melody_activity, 0.12)
+            texture_activity *= 0.18
         ambience_activity = _clamp(0.30 + 0.70 * space)
         if function in {"silence", "outro"}:
             ambience_activity = _clamp(space * 0.75)
         if function == "arrival":
             high_activity = _clamp(high_activity * 0.85)
             texture_activity = _clamp(texture_activity * 0.70)
+        if function == "uplift":
+            event_activity = _clamp(energy * 1.12)
+            high_activity = _clamp(high_activity * 1.16)
+            melody_activity = _clamp(melody_activity * 1.08)
         if function == "return":
             melody_activity = max(melody_activity, 0.55)
         if function == "false_return":
@@ -196,7 +205,7 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
             motif_mode=section.motif_mode,
             rhythm_mode=rhythm_mode,
             density_scale=_clamp(section.density * (1.0 - silence_ratio)),
-            event_activity=_clamp(energy * (1.0 - silence_ratio)),
+            event_activity=locals().get("event_activity", _clamp(energy * (1.0 - silence_ratio))),
             kick_activity=kick_activity,
             snare_activity=snare_activity,
             high_activity=high_activity,
