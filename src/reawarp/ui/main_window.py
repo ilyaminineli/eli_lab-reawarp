@@ -966,6 +966,13 @@ class MainWindow(QMainWindow):
         phrase_line = " → ".join(
             str(item.get("function", "")).upper() for item in phrase_report
         )
+        phrase_detail = " | ".join(
+            f"{str(item.get('function', '')).upper()} "
+            f"b{item.get('start_bar', 0) + 1}–{item.get('end_bar', 0)} "
+            f"({float(item.get('start_bar', 0)) * 240.0 / result.config.bpm:.1f}–"
+            f"{float(item.get('end_bar', 0)) * 240.0 / result.config.bpm:.1f}s)"
+            for item in phrase_report
+        )
         iro_roles = [
             f"{role}:{source.get('family', 'IRO')}"
             for role, source in result.metadata.get("sample_sources", {}).items()
@@ -976,6 +983,7 @@ class MainWindow(QMainWindow):
             f"{len(result.stems)} stems · {len(result.events)} events · "
             f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}\n"
             f"PHRASES: {phrase_line or 'n/a'}"
+            + (f"\nFORM MAP: {phrase_detail}" if phrase_detail else "")
             + (f"\nIRO: {', '.join(iro_roles)}" if iro_roles else "")
         )
         self.statusBar().showMessage(
