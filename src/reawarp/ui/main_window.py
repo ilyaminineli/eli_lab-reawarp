@@ -864,37 +864,30 @@ class MainWindow(QMainWindow):
         )
         sample_paths: dict[str, str] = {}
         sample_metadata: dict[str, dict[str, Any]] = {}
-        if self.iro_enabled.isChecked():
-            release_seed_text = self.iro_seed.text().strip() or "211"
-            release_seed: int | str = (
-                int(release_seed_text)
-                if release_seed_text.lstrip("-+").isdigit()
-                else release_seed_text
+        for role, selector in self.sample_selectors.items():
+            selected_path = selector.currentData()
+            if not selected_path:
+                continue
+            sample_paths[role] = str(selected_path)
+            matching = next(
+                (
+                    asset for asset in self.sample_library.get(role, [])
+                    if str(asset.path) == str(selected_path)
+                ),
+                None,
             )
-            for role, selector in self.iro_selectors.items():
-                asset = selector.currentData()
-                if asset is None:
-                    continue
-                render_role = "hat" if role == "closed_hat" else role
-                sample_paths[render_role] = str(asset.path)
-                sample_metadata[render_role] = {
-                    "provider": "IRO",
-                    "pack": asset.pack,
-                    "asset_id": asset.asset_id,
-                    "relative_path": asset.relative_path,
-                    "source_role": asset.role,
-                    "family": asset.family,
-                    "articulation": asset.articulation,
-                    "sha256": asset.sha256,
-                    "release_seed": release_seed,
-                    "source_feature_index": asset.source_feature_index,
-                    "sample_rate": asset.sample_rate,
-                    "duration_seconds": asset.duration_seconds,
-                    "midi_note": asset.midi_note,
-                    "manifest_metadata": asset.metadata or {},
-                }
+            sample_metadata[role] = {
+                "provider": "bundled_sample_library" if matching else "custom_sample",
+                "relative_path": matching.relative_path if matching else Path(str(selected_path)).name,
+                "role": role,
+                "source_name": Path(str(selected_path)).name,
+            }
         if self._break_path:
             sample_paths["break"] = self._break_path
+            sample_metadata["break"] = {
+                "provider": "break_lab",
+                "source_name": Path(self._break_path).name,
+            }
         return GenerationConfig(
             bpm=self.bpm.value(),
             duration=self.duration.value(),
@@ -903,8 +896,16 @@ class MainWindow(QMainWindow):
             pattern_family=self.pattern_family.currentText(),
             pattern_relationship=self.pattern_relationship.currentText(),
             pattern_follow_structure=self.pattern_follow_structure.isChecked(),
+            drum_change_intensity=self.drum_change_intensity.value(),
+            drum_part_cycle_bars=int(self.drum_part_cycle_bars.currentData()),
             synth_palette=self.synth_palette.currentText(),
             percussion_synthesis=self.percussion_synthesis.currentText(),
+            percussion_source_mode=str(self.percussion_source_mode.currentData()),
+            percussion_hybrid_architecture=str(self.percussion_hybrid_architecture.currentData()),
+            percussion_sample_mix=self.percussion_sample_mix.value(),
+            hybrid_transient_ms=self.hybrid_transient_ms.value(),
+            melody_scale=self.melody_scale.currentText(),
+            melody_root=int(self.melody_root.currentData()),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
             sample_rate=48_000,
