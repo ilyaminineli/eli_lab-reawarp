@@ -14,7 +14,13 @@ SUPPORTED_SAMPLE_SUFFIXES = {".wav", ".flac", ".aif", ".aiff", ".ogg"}
 SAMPLE_ROOT = Path(__file__).resolve().parents[3] / "samples"
 
 _ROLE_TOKENS = {
-    "kick": ("kick", "bass_drum", "bassdrum", "_bd", "bd_"),
+    # These named bass one-shots are intentional low-end source candidates.
+    # Avoid a generic "bass" token so melodic bass loops are not classified
+    # as kick samples by accident.
+    "kick": (
+        "kick", "bass_drum", "bassdrum", "_bd", "bd_",
+        "808_bass", "synth_bass", "sub_bass",
+    ),
     "snare": ("snare", "clap", "rim"),
     "hat": ("hihat", "hi_hat", "hat", "cymbal", "ride", "crash"),
 }
