@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from reawarp.config import GenerationConfig
@@ -7,7 +5,7 @@ from reawarp.samples.iro import load_drum_assets
 
 
 def test_iro_sample_configuration_retains_provenance():
-    asset = next(item for item in load_drum_assets() if item.role == "kick")
+    asset = next(item for item in load_drum_assets() if item.available and item.role == "kick")
     config = GenerationConfig(
         duration=5.0,
         sample_rate=22_050,
