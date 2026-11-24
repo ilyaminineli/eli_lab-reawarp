@@ -350,22 +350,30 @@ class LibraryPage(QWidget):
             if asset is None:
                 return
             meta = asset.metadata or {}
-            if not asset.available:
-                self.details.setText(
-                    f"IRO manifest entry is present, but its WAV is absent: {asset.relative_path}"
-                )
-                self.preview.set_audio(None)
-                return
-            self.details.setText(
+            detail = (
                 f"IRO · {asset.pack} · {asset.relative_path}\\n"
                 f"Role {asset.role} · family {asset.family} · articulation {asset.articulation or '—'}\\n"
                 f"Release seed {meta.get('seed', asset.seed) or 'n/a'} · "
                 f"source feature {asset.source_feature_index if asset.source_feature_index is not None else 'n/a'}"
             )
+            identity = str(meta.get("sonic_identity", ""))
+            approach = str(meta.get("synthesis_approach", ""))
+            equation = str(meta.get("equation", ""))
+            if identity:
+                detail += f"\\nSONIC IDENTITY: {identity}"
+            if approach:
+                detail += f"\\nSYNTHESIS: {approach}"
+            if equation:
+                detail += f"\\nEQUATION: {equation}"
+            if not asset.available:
+                self.details.setText(detail + f"\\nWAV MISSING: {asset.relative_path}")
+                self.preview.set_audio(None)
+                return
+            self.details.setText(detail)
             try:
                 self.preview.set_audio(read_sample(asset.path, 48_000), 48_000)
             except Exception as exc:
-                self.details.setText(f"IRO preview failed: {exc}")
+                self.details.setText(detail + f"\\nIRO preview failed: {exc}")
             return
 
         from reawarp.library.store import SampleLibrary
