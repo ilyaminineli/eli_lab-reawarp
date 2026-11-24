@@ -150,6 +150,7 @@ class LibraryPage(QWidget):
         self.details.setText(
             f"{len(catalog)} IRO manifest entries · "
             f"{sum(item.available for item in catalog)} WAVs available · "
+            f"{sum(not item.available for item in catalog)} WAVs missing · "
             "source pack metadata retained · originals are read-only"
         )
         if catalog:
