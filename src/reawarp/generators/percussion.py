@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from reawarp.config import GenerationConfig
-from reawarp.composition.patterns import pattern_for_section
+from reawarp.composition.patterns import pattern_for_section, relate_patterns
 from reawarp.composition.director import section_for_time
 from reawarp.mathematics.rhythms import euclidean_rhythm
 from reawarp.mathematics.sequences import fibonacci, logistic_map, primes
@@ -178,6 +178,13 @@ def _build_break_events(
             density=float(section.density),
             rng=rng,
         )
+        # Treat the second pattern as a companion line. The selected relation
+        # determines whether it reinforces, answers, shadows or interlocks.
+        companion_steps, family_steps = relate_patterns(
+            family_steps, family_steps,
+            relationship=config.pattern_relationship,
+            cycle_steps=16,
+        )
         # Remap secondary hits into the chosen pattern family, retaining the
         # four structural break anchors from the selected break style.
         bar_hits = list(selected)
@@ -185,11 +192,12 @@ def _build_break_events(
             anchors = [item for item in bar_hits if item[0] in {0, 4, 8, 12}]
             ornaments = [item for item in bar_hits if item[0] not in {0, 4, 8, 12}]
             remapped = []
+            selected_steps = companion_steps if config.pattern_relationship in {"shadow", "call_response", "counter_accent"} else family_steps
             for index, item in enumerate(ornaments):
-                if index >= len(family_steps):
+                if index >= len(selected_steps):
                     break
                 step, kind, priority, velocity, pan = item
-                remapped.append((family_steps[index], kind, priority, velocity, pan))
+                remapped.append((selected_steps[index], kind, priority, velocity, pan))
             bar_hits = sorted(anchors + remapped, key=lambda item: item[0])
         is_phrase_end = (bar + 1) % int(config.break_cycle_bars) == 0
         if is_phrase_end and config.break_variation > 0.0:
