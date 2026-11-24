@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp.samples.io import read_sample
+from reawarp.samples.catalog import BundledSample, discover_bundled_samples
 from reawarp.samples.iro import IROAsset, load_iro_assets, verify_iro_assets
 from reawarp.ui.visualization import AudioPreview
 from reawarp.ui.workers import RenderWorker
@@ -68,6 +69,10 @@ class LibraryPage(QWidget):
         self.similar_button.setToolTip("Find assets with similar timbral and rhythmic descriptors.")
         self.similar_button.clicked.connect(self._search_similar)
         search_row.addWidget(self.similar_button)
+        bundled_button = QPushButton("BUNDLED SAMPLES")
+        bundled_button.setToolTip("Browse the audio files already shipped in samples/ without indexing them first.")
+        bundled_button.clicked.connect(self._browse_bundled_samples)
+        search_row.addWidget(bundled_button)
         layout.addLayout(search_row)
 
         iro_row = QHBoxLayout()
@@ -107,6 +112,7 @@ class LibraryPage(QWidget):
         self.results.currentIndexChanged.connect(self._preview_selected)
         layout.addWidget(self.results)
         self._iro_assets: dict[str, IROAsset] = {}
+        self._bundled_assets: dict[str, BundledSample] = {}
         self._result_source = "library"
         use_row = QHBoxLayout()
         use_row.addWidget(QLabel("USE SELECTED IN GENERATOR"))
@@ -141,7 +147,14 @@ class LibraryPage(QWidget):
         selected_role = str(self.use_role.currentData() or "auto")
         path: Path
         inferred_role: str | None = None
-        if self._result_source == "iro":
+        if self._result_source == "bundled":
+            asset = self._bundled_assets.get(str(asset_id))
+            if asset is None:
+                return
+            path = asset.path
+            inferred_role = asset.role
+        elif self._result_source == "iro":
+
             asset = self._iro_assets.get(str(asset_id))
             if asset is None:
                 return
@@ -187,6 +200,39 @@ class LibraryPage(QWidget):
             f"SENT TO GENERATOR · {selected_role.upper()} · {path.name}"
         )
 
+    def _browse_bundled_samples(self) -> None:
+        selected_role = self.role.currentText()
+        catalog = discover_bundled_samples(
+            role=None if selected_role == "all" else selected_role
+        )
+        query = self.query.text().strip().casefold()
+        if query:
+            catalog = [
+                item for item in catalog
+                if query in f"{item.label} {item.relative_path} {item.role}".casefold()
+            ]
+        self._bundled_assets = {
+            f"bundled:{item.relative_path}": item for item in catalog
+        }
+        self._iro_assets = {}
+        self._result_source = "bundled"
+        self.results.blockSignals(True)
+        self.results.clear()
+        for asset_id, item in self._bundled_assets.items():
+            self.results.addItem(
+                f"{item.path.name} · {item.role.upper()} · {item.path.parent.name}",
+                asset_id,
+            )
+        self.results.blockSignals(False)
+        self.details.setText(
+            f"{len(catalog)} bundled sample(s) · source files in samples/ · "
+            "read-only · choose a role and send directly to Generator"
+        )
+        if catalog:
+            self.results.setCurrentIndex(0)
+        else:
+            self.preview.set_audio(None)
+
     def _search_iro(self) -> None:
 
         scope = self.iro_source.currentText()
@@ -208,6 +254,7 @@ class LibraryPage(QWidget):
                 )).lower()
             ]
         self._iro_assets = {item.asset_id: item for item in catalog}
+        self._bundled_assets = {}
         self._result_source = "iro"
         self.results.blockSignals(True)
         self.results.clear()
@@ -311,6 +358,7 @@ class LibraryPage(QWidget):
     def _search(self, similar_to: str | None = None) -> None:
         self._result_source = "library"
         self._iro_assets = {}
+        self._bundled_assets = {}
         from reawarp.library.store import SampleLibrary
 
         asset_type = self.asset_type.currentText()
@@ -417,6 +465,21 @@ class LibraryPage(QWidget):
         asset_id = self.results.currentData()
         if not asset_id:
             return
+        if self._result_source == "bundled":
+            asset = self._bundled_assets.get(str(asset_id))
+            if asset is None:
+                return
+            detail = (
+                f"BUNDLED SAMPLE · {asset.relative_path}\\n"
+                f"Role {asset.role} · source file is read-only"
+            )
+            self.details.setText(detail)
+            try:
+                self.preview.set_audio(read_sample(asset.path, 48_000), 48_000)
+            except Exception as exc:
+                self.details.setText(detail + f"\\nPreview failed: {exc}")
+            return
+
         if self._result_source == "iro":
             asset = self._iro_assets.get(str(asset_id))
             if asset is None:
