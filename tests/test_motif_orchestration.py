@@ -17,9 +17,11 @@ from reawarp.composition.orchestration import (
     build_transition_plan,
     render_role_envelope,
     role_activity_at_time,
+    shape_role_events,
 )
 from reawarp.composition.phrase import build_phrase_directives
 from reawarp.generators.melody import build_melody_events
+from reawarp.generators.percussion import PercussionEvent
 
 
 def _build(config):
@@ -206,3 +208,59 @@ def test_invalid_motif_operation_is_rejected():
     assert motif is not None
     with pytest.raises(ValueError, match="unknown motif transformation"):
         transform_motif(motif.anchor, "randomise_everything")
+
+
+
+def test_density_thins_non_anchors_and_syncopation_moves_eligible_hits():
+    base = GenerationConfig(
+        duration=60.0,
+        bpm=120.0,
+        seed="m15-density-syncopation",
+        structure="uplift_drop_return",
+        arrangement_density=0.55,
+        rhythmic_syncopation=0.0,
+    )
+    composition, phrases, _melody = _build(base)
+    low_plan = build_section_orchestration_plan(composition, phrases, base)
+    dense_config = replace(base, arrangement_density=1.0)
+    dense_plan = build_section_orchestration_plan(composition, phrases, dense_config)
+    sync_config = replace(base, rhythmic_syncopation=1.0)
+    sync_plan = build_section_orchestration_plan(composition, phrases, sync_config)
+
+    source_events = [
+        PercussionEvent(
+            lane="hat",
+            step=bar * 16 + position,
+            time=(bar * 16 + position) * base.sixteenth_seconds,
+            velocity=0.3,
+            kind="metal_noise",
+        )
+        for bar in range(20)
+        for position in (2, 6, 10, 14)
+    ]
+    low_density = shape_role_events(
+        "hat", source_events, composition, low_plan,
+        step_seconds=base.sixteenth_seconds, seed=base.seed,
+    )
+    high_density = shape_role_events(
+        "hat", source_events, composition, dense_plan,
+        step_seconds=base.sixteenth_seconds, seed=base.seed,
+    )
+    straight = shape_role_events(
+        "hat", high_density, composition, dense_plan,
+        step_seconds=base.sixteenth_seconds, seed=base.seed,
+    )
+    syncopated = shape_role_events(
+        "hat", high_density, composition, sync_plan,
+        step_seconds=base.sixteenth_seconds, seed=base.seed,
+    )
+
+    assert len(high_density) >= len(low_density)
+    assert len(syncopated) == len(straight)
+    assert sum(event.step % 2 for event in syncopated) > sum(
+        event.step % 2 for event in straight
+    )
+    assert all(
+        event.time == pytest.approx(event.step * base.sixteenth_seconds)
+        for event in syncopated
+    )

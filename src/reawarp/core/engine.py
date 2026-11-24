@@ -21,6 +21,7 @@ from reawarp.composition.orchestration import (
     render_role_envelope,
     role_activity_at_time,
     role_intent_at_time,
+    shape_role_events,
 )
 from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
@@ -299,8 +300,9 @@ class ReawarpEngine:
                     motif_relation=accent.motif_relation,
                 ))
         for role in percussion:
-            percussion[role] = sorted(
-                percussion[role], key=lambda event: (event.step, event.kind or "")
+            percussion[role] = shape_role_events(
+                role, percussion[role], composition_plan, section_orchestration,
+                step_seconds=config.sixteenth_seconds, seed=config.seed,
             )
 
         # Continuous role envelopes consume the same section/transition plan

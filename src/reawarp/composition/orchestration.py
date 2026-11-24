@@ -1,7 +1,8 @@
 """Section-level role intent and phrase-boundary transition planning."""
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+import hashlib
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -90,6 +91,91 @@ class TransitionGesture:
         data = asdict(self)
         data["affected_roles"] = list(self.affected_roles)
         return data
+
+
+def _stable_role_value(
+        seed: int | str, role: str, section_index: int, step: int,
+        kind: str, purpose: str,
+) -> float:
+    payload = f"{seed}:{role}:{section_index}:{step}:{kind}:{purpose}".encode("utf-8")
+    digest = hashlib.blake2b(payload, digest_size=8).digest()
+    return int.from_bytes(digest, "little") / float(2 ** 64)
+
+
+def shape_role_events(
+        role: str,
+        events: Sequence[Any],
+        composition_plan: Any,
+        orchestration_plan: Sequence[SectionOrchestrationPlan],
+        *,
+        step_seconds: float,
+        seed: int | str,
+) -> list[Any]:
+    """Apply section density and syncopation without consuming generator RNG streams.
+
+    Metric anchors and motif-carried cross-role events are protected. Other hits
+    are deterministically thinned by the role's density intent, then selected
+    even sixteenth-note positions may move one cell forward according to the
+    role's syncopation intent. A shift never crosses a bar boundary.
+    """
+    if role not in {"kick", "snare", "hat", "break"}:
+        raise KeyError(f"role {role!r} does not accept percussion events")
+    if step_seconds <= 0:
+        raise ValueError("step_seconds must be positive")
+    plans = {item.section_index: item for item in orchestration_plan}
+    result = []
+    for event in events:
+        section = section_for_time(composition_plan, float(event.time))
+        plan = plans.get(int(section.index))
+        if plan is None:
+            raise ValueError(f"no orchestration plan for section {section.index}")
+        intent = plan.role(role)
+        step = int(event.step)
+        position = step % 16
+        kind = str(event.kind or "")
+        motif_relation = getattr(event, "motif_relation", None)
+        motif_carried = motif_relation in {"shadow", "response"}
+        anchor = (
+            (role == "kick" and position in {0, 8})
+            or (role == "snare" and position in {4, 12})
+            or (
+                role == "break"
+                and (
+                    (kind == "kick" and position == 0)
+                    or (kind == "snare" and position in {4, 12})
+                )
+            )
+        )
+        if not anchor and not motif_carried:
+            keep_probability = 0.15 + 0.85 * float(intent.density)
+            keep_value = _stable_role_value(
+                seed, role, section.index, step, kind, "density"
+            )
+            if keep_value >= keep_probability:
+                continue
+
+        adjusted = event
+        if (
+            role in {"snare", "hat", "break"}
+            and not motif_carried
+            and position % 2 == 0
+            and not (role == "snare" and position in {4, 12})
+        ):
+            shift_probability = 0.50 * float(intent.syncopation)
+            shift_value = _stable_role_value(
+                seed, role, section.index, step, kind, "syncopation"
+            )
+            shifted_step = step + 1
+            if (
+                shift_value < shift_probability
+                and shifted_step // 16 == step // 16
+            ):
+                adjusted = replace(
+                    event, step=shifted_step, time=shifted_step * step_seconds
+                )
+        result.append(adjusted)
+
+    return sorted(result, key=lambda item: (item.step, item.kind or ""))
 
 
 def build_section_orchestration_plan(

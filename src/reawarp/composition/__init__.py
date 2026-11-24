@@ -27,6 +27,7 @@ from reawarp.composition.orchestration import (
     render_role_envelope,
     role_activity_at_time,
     role_intent_at_time,
+    shape_role_events,
 )
 
 __all__ = [
@@ -50,6 +51,7 @@ __all__ = [
     "render_role_envelope",
     "role_activity_at_time",
     "role_intent_at_time",
+    "shape_role_events",
     "section_for_time",
     "transform_motif",
 ]
