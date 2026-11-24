@@ -31,6 +31,20 @@ jobs:
         run: python -m compileall -q src/reawarp
       - name: Run M14 regression suite
         run: python -m pytest -q
+      - name: Validate IRO sample catalog and phrase grammar
+        run: |
+          python - <<'PY'
+          from reawarp.samples.iro import load_drum_assets, load_entity_assets, load_sound_fx_assets, load_sound_lab_assets, verify_iro_assets
+          drums = load_drum_assets()
+          entities = load_entity_assets()
+          sound_fx = load_sound_fx_assets()
+          sound_lab = load_sound_lab_assets()
+          assert drums and entities and sound_fx and sound_lab
+          report = verify_iro_assets()
+          assert report["ok"], report
+          assert len({item.family for item in entities}) >= 8
+          print(f"IRO catalog OK · {len(drums)} drums · {len(entities)} entities · {len(sound_fx)} FX events/loops · {len(sound_lab)} sound-lab assets · {report['verified']} hashes verified")
+          PY
       - name: Run short M14 benchmark fixture
         run: python scripts/benchmark_generation.py --durations 5 --palettes subtractive --sample-rate 22050 --output /tmp/reawarp-m14-benchmark.json
       - name: Smoke-test CLI
@@ -189,4 +203,4 @@ jobs:
       - name: Smoke-test desktop entry point
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -c "from PySide6.QtWidgets import QApplication; from reawarp.ui.main_window import MainWindow; app=QApplication([]); window=MainWindow(); assert window.tabs.count() == 5; assert window.navigator.workspace_count() == 5; window.navigator.register_group(('COMPOSE', 'GENERATOR', 'ADVANCED')); assert window.navigator.topLevelItemCount() == 3; assert window.mixer_stack.currentIndex() == 0; assert window.preview.waveform_stack.currentWidget() is window.preview.waveform_empty; window.preview.set_audio([0.0, 0.1], 48000); assert window.preview.waveform_stack.currentWidget() is window.preview.waveform; window.preview.set_audio(None); assert window.fx_lab_page.stage_list.count() == 3; assert window.fx_routing_editor.stem.count() == 0; assert window.fx_automation_editor.lane.count() == 0; assert window.fx_workspace_tabs.count() == 2; window._set_workspace(2); assert window.workspace_stack.currentIndex() == 2; window._set_workspace(0); window.close(); app.processEvents(); print('Reawarp grouped navigation, empty mixer and FX workspaces OK')"
+        run: python -c "from PySide6.QtWidgets import QApplication; from reawarp.ui.main_window import MainWindow; app=QApplication([]); window=MainWindow(); assert window.tabs.count() == 5; assert window.navigator.workspace_count() == 5; assert len(window.iro_selectors['kick'].model().stringList()) >= 1; window.navigator.register_group(('COMPOSE', 'GENERATOR', 'ADVANCED')); assert window.navigator.topLevelItemCount() == 3; assert window.mixer_stack.currentIndex() == 0; assert window.preview.waveform_stack.currentWidget() is window.preview.waveform_empty; window.preview.set_audio([0.0, 0.1], 48000); assert window.preview.waveform_stack.currentWidget() is window.preview.waveform; window.preview.set_audio(None); assert window.fx_lab_page.stage_list.count() == 3; assert window.fx_routing_editor.stem.count() == 0; assert window.fx_automation_editor.lane.count() == 0; assert window.fx_workspace_tabs.count() == 2; window._set_workspace(2); assert window.workspace_stack.currentIndex() == 2; window._set_workspace(0); window.close(); app.processEvents(); print('Reawarp grouped navigation, empty mixer and FX workspaces OK')"
