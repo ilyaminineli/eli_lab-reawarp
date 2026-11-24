@@ -304,8 +304,16 @@ def render_extended_note(
             signal += amp * np.sin(2*np.pi*partial*t + rng_phase[index])
     elif palette == "modal" or palette == "physical":
         # Modal bank: inharmonic frequencies with individual decay constants.
-        modes = ((1.0, .62, .55), (2.32, .28, .42), (4.18, .19, .32),
-                 (6.71, .12, .25), (9.4, .075, .18), (13.2, .04, .13))
+        mode_profile = EXTENDED_MELODY_PROFILES.get(
+            "inharmonic_mallet" if palette == "physical" else "metallic_fm"
+        )
+        ratios = mode_profile.partials if mode_profile is not None else (
+            (1.0, .62), (2.32, .28), (4.18, .19), (6.71, .12), (9.4, .075), (13.2, .04)
+        )
+        modes = tuple(
+            (ratio, amplitude, max(.10, .65 - index * .075))
+            for index, (ratio, amplitude) in enumerate(ratios)
+        )
         excitation = np.exp(-t / (0.004 + (1.0-brightness)*0.012))
         for index, (ratio, amp, decay) in enumerate(modes):
             mode = np.sin(2*np.pi*frequency*ratio*t + rng_phase[index])
