@@ -6,8 +6,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from reawarp.synthesis.profiles import HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.synthesis.profiles import (
+    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
+)
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 
