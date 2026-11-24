@@ -164,6 +164,53 @@ EXTENDED_MELODY_PROFILES: dict[str, MelodyProfile] = {
     ),
 }
 
+
+# M9 role-driven minimal voices. Profiles describe sound-object behaviour rather
+# than genre labels: short transients, sparse partials, restrained decay and
+# explicit identity. These are separate from the legacy FM profile catalogue.
+@dataclass(frozen=True, slots=True)
+class PercussionVoiceProfile:
+    body_hz: float
+    body_decay: float
+    transient_gain: float
+    transient_decay: float
+    noise_gain: float
+    tail_gain: float
+    tail_decay: float
+    inharmonicity: float = 0.0
+
+
+@dataclass(frozen=True, slots=True)
+class SubtractiveVoiceProfile:
+    harmonics: tuple[float, ...]
+    cutoff_ratio: float
+    resonance: float
+    attack: float
+    decay: float
+    sustain: float
+    release: float
+    filter_env_amount: float
+    drift_cents: float = 0.0
+
+
+SUBTRACTIVE_VOICES: dict[str, SubtractiveVoiceProfile] = {
+    "soft_reed": SubtractiveVoiceProfile((1.0, .24, .09, .035), 5.0, .12, .018, .28, .42, .24, .18, .7),
+    "dry_pluck": SubtractiveVoiceProfile((1.0, .38, .12, .035, .01), 8.0, .08, .002, .14, .10, .08, .38, .15),
+    "dark_pulse": SubtractiveVoiceProfile((1.0, .28, .19, .08, .03), 3.2, .22, .006, .22, .24, .16, .22, .25),
+    "thin_bass": SubtractiveVoiceProfile((1.0, .18, .045), 2.6, .06, .004, .20, .28, .12, .16, .1),
+}
+
+PERCUSSION_VOICES: dict[str, PercussionVoiceProfile] = {
+    "dry_thump": PercussionVoiceProfile(68.0, .105, .55, .003, .025, .0, .02, .0),
+    "soft_kick": PercussionVoiceProfile(55.0, .155, .28, .004, .015, .0, .02, .0),
+    "wood_tap": PercussionVoiceProfile(185.0, .055, .72, .0018, .025, .03, .035, .12),
+    "paper_snare": PercussionVoiceProfile(175.0, .065, .32, .002, .22, .08, .055, .08),
+    "metal_tick": PercussionVoiceProfile(620.0, .085, .52, .0012, .045, .18, .16, .62),
+    "glass_ping": PercussionVoiceProfile(880.0, .24, .35, .001, .0, .42, .32, .74),
+    "muted_rim": PercussionVoiceProfile(930.0, .028, .58, .0008, .01, .0, .015, .3),
+    "noise_hat": PercussionVoiceProfile(0.0, .035, .0, .0008, .20, .0, .04, 0.0),
+}
+
 AUTO_KICK_PROFILES = ("deep_sub", "909_punch", "soft_round", "rubber", "wooden", "long_tail")
 AUTO_SNARE_PROFILES = ("acoustic", "909_crack", "tonal", "soft_brush")
 AUTO_HAT_PROFILES = ("closed", "open", "dark")
