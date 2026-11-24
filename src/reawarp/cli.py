@@ -16,12 +16,14 @@ from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="reawarp",
-        description="Generate deterministic mathematical IDM loops and stems.",
+        description="Generate deterministic, structure-aware IDM compositions and stems.",
     )
     parser.add_argument("--bpm", type=float, default=137.0, help="tempo in BPM (60–220)")
-    parser.add_argument("--duration", type=float, default=24.0, help="duration in seconds (5–45)")
-    parser.add_argument("--structure", choices=("evolving", "additive", "subtractive", "episodic", "drift"),
+    parser.add_argument("--duration", type=float, default=24.0, help="duration in seconds (5–180)")
+    parser.add_argument("--structure", choices=("evolving", "additive", "subtractive", "episodic", "drift", "classical_arc", "sonata_mutation", "free_jazz", "free_jazz_episodic", "autechre_like", "minimal_variation", "hybrid"),
                         default="evolving", help="formal composition trajectory")
+    parser.add_argument("--flow", choices=("preset", "mix", "mutate"), default="preset", help="keep the preset, cross-mix its sections, or mutate its middle flow")
+    parser.add_argument("--synth-palette", choices=("hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"), default="hybrid", help="lead synthesis architecture palette")
     parser.add_argument("--energy", type=float, default=0.62, help="composition energy target, not output gain (0–1)")
     parser.add_argument("--variation", type=float, default=0.45, help="bounded formal variation (0–1)")
     parser.add_argument("--seed", default="20261123", help="integer or text seed")
@@ -104,6 +106,8 @@ def main() -> None:
         bpm=args.bpm,
         duration=args.duration,
         structure=args.structure,
+        composition_flow=args.flow,
+        synth_palette=args.synth_palette,
         composition_energy=args.energy,
         composition_variation=args.variation,
         sample_rate=args.sample_rate,
