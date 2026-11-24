@@ -134,6 +134,238 @@ class ReawarpEngine:
             automation_registry=automation_registry,
         )
 
+    def plan_score(
+            self,
+            config: GenerationConfig | None = None,
+            *,
+            regenerate: str | None = None,
+            variation: int = 1,
+            **overrides: Any,
+    ) -> Score:
+        """Plan the complete symbolic composition without rendering audio."""
+        if config is None:
+            config = GenerationConfig(**overrides)
+        elif overrides:
+            raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
+        from reawarp.core.score_generation import build_score_generation_plan
+
+        return build_score_generation_plan(
+            config, regenerate=regenerate, variation=variation
+        ).score
+
+    def _generate_legacy(
+            self,
+            config: GenerationConfig | None = None,
+            *,
+            regenerate: str | None = None,
+            variation: int = 1,
+            **overrides: Any,
+    ) -> ReawarpProject:
+        """Generate from a canonical Score, then render its scheduled events."""
+        if config is None:
+            config = GenerationConfig(**overrides)
+        elif overrides:
+            raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
+        if variation < 1:
+            raise ValueError("variation must be a positive integer")
+
+        from reawarp.core.score_generation import (
+            build_score_generation_plan,
+            score_to_legacy_project_events,
+        )
+
+        total_started = perf_counter()
+        planning_started = perf_counter()
+        plan = build_score_generation_plan(
+            config, regenerate=regenerate, variation=variation
+        )
+        planning_seconds = perf_counter() - planning_started
+
+        score_render_started = perf_counter()
+        rendered = self.render_score(plan.score, config=config)
+        score_render_seconds = perf_counter() - score_render_started
+        canonical_score = rendered.score or plan.score
+
+        frame_count = config.frame_count
+        sample_rate = config.sample_rate
+        stems: dict[str, np.ndarray] = {}
+        stem_aliases = {"hat": "hats", "break": "synthetic_break"}
+        for voice_id, audio in rendered.stems.items():
+            stems[stem_aliases.get(voice_id, voice_id)] = np.asarray(
+                audio, dtype=np.float32
+            ).copy()
+
+        # Keep the historical project stem contract even for an empty lane.
+        required_stems = ["kick", "snare", "hats", "synthetic_break"]
+        if config.include_melody:
+            required_stems.append("melody")
+        if config.include_texture:
+            required_stems.append("noise_texture")
+        if config.include_ambience:
+            required_stems.append("ambience")
+        if "break" in config.sample_paths:
+            required_stems.append("sample_break")
+        for name in required_stems:
+            stems.setdefault(
+                name, np.zeros((frame_count, 2), dtype=np.float32)
+            )
+
+        field_render_started = perf_counter()
+        if config.include_texture:
+            texture_envelope = render_role_envelope(
+                "texture", frame_count, sample_rate,
+                plan.composition_plan, plan.section_orchestration,
+                plan.transition_plan,
+            )
+            texture = render_noise_texture(
+                frame_count,
+                sample_rate,
+                plan.streams.get("texture_synthesis"),
+                amount=0.055 + config.complexity * 0.045,
+            )
+            delayed = (
+                np.concatenate((np.zeros(97, dtype=np.float32), texture[:-97]))
+                if len(texture) > 97 else texture
+            )
+            stems["noise_texture"][:, 0] += texture * texture_envelope * 0.72
+            stems["noise_texture"][:, 1] += delayed * texture_envelope * 0.72
+
+        if config.include_ambience:
+            ambience_envelope = render_role_envelope(
+                "ambience", frame_count, sample_rate,
+                plan.composition_plan, plan.section_orchestration,
+                plan.transition_plan,
+            )
+            root_frequency = 55.0 * (
+                2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
+            )
+            stems["ambience"][:] = render_ambience(
+                frame_count,
+                sample_rate,
+                plan.streams.get("ambience_synthesis"),
+                root_frequency=root_frequency,
+                amount=config.ambience_level,
+            )
+            stems["ambience"] *= ambience_envelope[:, None]
+        field_render_seconds = perf_counter() - field_render_started
+
+        headroom_started = perf_counter()
+        peak_ceiling = 10.0 ** (-1.0 / 20.0)
+        stem_headroom_gains: dict[str, float] = {}
+        for stem_name, audio in stems.items():
+            peak = float(np.max(np.abs(audio))) if audio.size else 0.0
+            gain = min(1.0, peak_ceiling / peak) if peak > 0.0 else 1.0
+            if gain < 1.0:
+                audio *= gain
+            stem_headroom_gains[stem_name] = gain
+        headroom_seconds = perf_counter() - headroom_started
+
+        sample_schedule = canonical_score.metadata.get("sample_schedule", {})
+        if not isinstance(sample_schedule, dict):
+            sample_schedule = {}
+        sample_sources = dict(sample_schedule.get("sources", {}))
+        renderer_version = "reawarp-score-renderer/1.0.0"
+        render_provenance = {
+            "score_renderer_version": "1.0.0",
+            "engine_algorithm_version": self.VERSION,
+            "event_source": "Score.events",
+            "event_timebase": (
+                "rational quarter-note beats; frame placement resolved by RenderTimeline"
+            ),
+            "root_seed": config.seed,
+            "sample_rate": sample_rate,
+            "frame_count": frame_count,
+            "duration_seconds": frame_count / float(sample_rate),
+            "seed_streams": dict(canonical_score.metadata.get("seed_streams", {})),
+            "generator_families": dict(canonical_score.metadata.get("generator_families", {})),
+        }
+        score_metadata = dict(canonical_score.metadata)
+        score_metadata.update({
+            "render_stems": list(stems),
+            "renderer_version": renderer_version,
+            "render_provenance": render_provenance,
+            "stem_headroom_gains": stem_headroom_gains,
+        })
+        project_score = replace(canonical_score, metadata=score_metadata)
+        project_events = score_to_legacy_project_events(project_score)
+
+        performance = {
+            "planning_seconds": planning_seconds,
+            "score_render_seconds": score_render_seconds,
+            "field_render_seconds": field_render_seconds,
+            "headroom_seconds": headroom_seconds,
+            "total_engine_seconds": perf_counter() - total_started,
+        }
+        metadata = dict(project_score.metadata)
+        metadata.update({
+            "algorithm_version": self.VERSION,
+            "renderer_version": renderer_version,
+            "variation": {"stem": regenerate, "index": variation} if regenerate else None,
+            "sample_sources": sample_sources,
+            "sample_switch_summary": dict(sample_schedule.get("switch_summary", {})),
+            "synthesis_profiles": {
+                "kick": config.kick_profile,
+                "snare": config.snare_profile,
+                "hat": config.hat_profile,
+                "melody": plan.melody_profile,
+                "break": dict(plan.break_profiles),
+                "section_profiles": {
+                    role: {
+                        section.name: plan.selected_profiles[role][section.index]
+                        for section in plan.composition_plan.sections
+                    }
+                    for role in ("kick", "snare", "hat")
+                },
+                "palette": config.synth_palette,
+                "percussion_source_mode": config.percussion_source_mode,
+                "percussion_hybrid_architecture": config.percussion_hybrid_architecture,
+                "percussion_sample_mix": config.percussion_sample_mix,
+                "drum_sample_automation": config.drum_sample_automation,
+                "sample_bank_sizes": {
+                    role: int(record.get("bank_count", 0))
+                    for role, record in sample_sources.items()
+                },
+                "melody_scale": config.melody_scale,
+                "melody_root": config.melody_root,
+            },
+            "drum_source_mode": config.percussion_source_mode,
+            "drum_hybrid_architecture": config.percussion_hybrid_architecture,
+            "drum_sample_mix": config.percussion_sample_mix,
+            "drum_sample_automation": config.drum_sample_automation,
+            "synth_palette": config.synth_palette,
+            "event_count": len(project_events),
+            "stem_headroom_gains": stem_headroom_gains,
+            "performance": performance,
+        })
+        score_metadata = dict(project_score.metadata)
+        score_metadata.update({
+            "event_count": len(project_events),
+            "performance": performance,
+        })
+        project_score = replace(project_score, metadata=score_metadata)
+
+        return ReawarpProject(
+            config=config,
+            sample_rate=sample_rate,
+            stems=stems,
+            events=project_events,
+            metadata=metadata,
+            score=project_score,
+        )
+
+    def generate_legacy(
+            self,
+            config: GenerationConfig | None = None,
+            *,
+            regenerate: str | None = None,
+            variation: int = 1,
+            **overrides: Any,
+    ) -> ReawarpProject:
+        """Run the pre-M17.5 renderer for reproducibility comparisons."""
+        return self._generate_legacy(
+            config, regenerate=regenerate, variation=variation, **overrides
+        )
+
     def generate_variant(
             self,
             config: GenerationConfig,
@@ -142,7 +374,7 @@ class ReawarpEngine:
             *,
             base_project: ReawarpProject | None = None,
     ) -> ReawarpProject:
-        """Regenerate one layer and optionally merge it into a frozen base project."""
+        """Regenerate one canonical score voice and merge it into a frozen project."""
         variant = self.generate(config, regenerate=stem, variation=variation)
         if base_project is None:
             return variant
@@ -150,39 +382,55 @@ class ReawarpEngine:
             raise ValueError("base_project configuration must match")
         if stem not in base_project.stems or stem not in variant.stems:
             raise ValueError(f"layer {stem!r} is not present in both projects")
+
+        from reawarp.core.score_generation import score_to_legacy_project_events
+
         merged_stems = dict(base_project.stems)
         merged_stems[stem] = variant.stems[stem]
-        target_lane = self._event_lane_for_stem(stem)
-        merged_events = [event for event in base_project.events if event.get("lane") != target_lane]
-        merged_events.extend(event for event in variant.events if event.get("lane") == target_lane)
-        merged_events.sort(
-            key=lambda event: (float(event.get("time", 0.0)), str(event.get("lane", "")))
+        target_voice = self._event_lane_for_stem(stem)
+        base_score = base_project.to_score()
+        variant_score = variant.to_score()
+        merged_score_events = [
+            event for event in base_score.events if event.voice_id != target_voice
+        ]
+        merged_score_events.extend(
+            event for event in variant_score.events if event.voice_id == target_voice
         )
-        metadata = dict(base_project.metadata)
-        metadata["variation"] = {"stem": stem, "index": variation}
-        metadata["variation_parent_seed"] = config.seed
+
+        metadata = dict(variant_score.metadata)
         gains = dict(base_project.metadata.get("stem_headroom_gains", {}))
         gains[stem] = variant.metadata.get("stem_headroom_gains", {}).get(stem, 1.0)
         metadata["stem_headroom_gains"] = gains
-        metadata["event_count"] = len(merged_events)
-        metadata["seed_streams"] = dict(variant.metadata.get("seed_streams", {}))
-        metadata["sample_trigger_seed_streams"] = dict(
-            variant.metadata.get("sample_trigger_seed_streams", {})
+        metadata["variation"] = {"stem": stem, "index": variation}
+        metadata["variation_parent_seed"] = config.seed
+        merged_score = replace(
+            variant_score, events=tuple(merged_score_events), metadata=metadata
         )
-        metadata["sample_sources"] = dict(variant.metadata.get("sample_sources", {}))
-        if stem.startswith("sample_"):
-            role = stem.removeprefix("sample_")
-            source_records = dict(metadata["sample_sources"])
-            if role in source_records:
-                role_record = dict(source_records[role])
-                role_record["trigger_count"] = sum(
-                    event.get("lane") == stem for event in merged_events
-                )
-                source_records[role] = role_record
-                metadata["sample_sources"] = source_records
+        merged_events = score_to_legacy_project_events(merged_score)
+
+        project_metadata = dict(base_project.metadata)
+        project_metadata.update({
+            "variation": {"stem": stem, "index": variation},
+            "variation_parent_seed": config.seed,
+            "stem_headroom_gains": gains,
+            "event_count": len(merged_events),
+            "seed_streams": dict(variant.metadata.get("seed_streams", {})),
+            "sample_trigger_seed_streams": dict(
+                variant.metadata.get("sample_trigger_seed_streams", {})
+            ),
+            "sample_sources": dict(variant.metadata.get("sample_sources", {})),
+            "sample_switch_summary": dict(
+                variant.metadata.get("sample_switch_summary", {})
+            ),
+            "performance": dict(variant.metadata.get("performance", {})),
+        })
         return ReawarpProject(
-            config=config, sample_rate=base_project.sample_rate,
-            stems=merged_stems, events=merged_events, metadata=metadata,
+            config=config,
+            sample_rate=base_project.sample_rate,
+            stems=merged_stems,
+            events=merged_events,
+            metadata=project_metadata,
+            score=merged_score,
         )
 
     @staticmethod
