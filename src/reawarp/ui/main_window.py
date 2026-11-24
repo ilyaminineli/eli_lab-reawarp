@@ -408,6 +408,13 @@ class MainWindow(QMainWindow):
             "Adds indexed audio with matching kick/snare/hat roles or recognizable file/folder names to the role banks."
         )
         automation_form.addRow(self.include_indexed_library_samples)
+        self.sample_features_note = QLabel(
+            "Feature-guided choice uses indexed spectral centroid, flatness, onset density and crest factor. "
+            "Index the sample folder in Library to unlock those descriptors for bundled sounds."
+        )
+        self.sample_features_note.setObjectName("muted")
+        self.sample_features_note.setWordWrap(True)
+        automation_form.addRow(self.sample_features_note)
         self.drum_sample_automation = QComboBox()
         self.drum_sample_automation.addItem("AUTOMATIC · PHRASE AWARE", "automatic")
         self.drum_sample_automation.addItem("CHANGE AT EACH SECTION", "section")
@@ -428,6 +435,10 @@ class MainWindow(QMainWindow):
         self.percussion_hybrid_architecture.addItem("TRANSIENT SAMPLE + SYNTH BODY", "transient_body")
         self.percussion_hybrid_architecture.addItem("PARALLEL FULL LAYERS", "layered")
         self.percussion_hybrid_architecture.addItem("FEATURE-GUIDED HYBRID", "feature_guided")
+        self.percussion_hybrid_architecture.setToolTip(
+            "Transient/body mode uses the sample onset and synthesized body. Parallel mode blends full layers. "
+            "Feature-guided mode steers synthesized brightness, pitch and transient energy from the selected asset's analysis."
+        )
         hybrid_form.addRow("Hybrid architecture", self.percussion_hybrid_architecture)
         self.percussion_sample_mix = QDoubleSpinBox()
         self.percussion_sample_mix.setRange(0.0, 1.0)
