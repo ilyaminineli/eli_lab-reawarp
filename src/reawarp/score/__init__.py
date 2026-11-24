@@ -8,6 +8,12 @@ from reawarp.score.automation import (
 from reawarp.score.render import ScheduledScoreEvent, ScoreRenderResult, ScoreRenderer
 from reawarp.score.timeline import RenderTimeline
 from reawarp.score.model import Score
+from reawarp.score.planner import (
+    melody_to_score_events,
+    percussion_to_score_events,
+    score_from_planner_events,
+    score_to_legacy_grid_events,
+)
 from reawarp.score.pitch import EqualTemperamentTuning, Pitch, TuningSystem
 from reawarp.score.time import (
     Beat,
@@ -41,4 +47,8 @@ __all__ = [
     "TempoPoint",
     "TuningSystem",
     "as_fraction",
+    "melody_to_score_events",
+    "percussion_to_score_events",
+    "score_from_planner_events",
+    "score_to_legacy_grid_events",
 ]
