@@ -286,6 +286,9 @@ def render_extended_note(
     # Data-driven inharmonic/modal-style voices provide reproducible partial recipes.
     # For these palettes, the recipe is used to distribute partial ratios/decays.
     if palette in {"additive", "inharmonic"}:
+        extended_profile = EXTENDED_MELODY_PROFILES.get(
+            "inharmonic_mallet" if palette == "inharmonic" else "soft_spectral_pad"
+        )
         ratios = (
             (1.0, .60), (2.0, .24), (3.0, .12), (4.0, .07), (5.0, .035),
             (6.0, .02), (7.0, .012), (8.0, .008),
