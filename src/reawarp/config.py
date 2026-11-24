@@ -37,6 +37,7 @@ class GenerationConfig:
     hat_profile: str = "auto"
     melody_profile: str = "auto"
     synth_palette: str = "subtractive"
+    percussion_synthesis: str = "minimal"
     break_style: str = "broken_funk"
     break_density: float = 0.50
     break_variation: float = 0.25
@@ -70,6 +71,8 @@ class GenerationConfig:
             raise ValueError(f"unknown pattern relationship: {self.pattern_relationship}")
         if self.synth_palette not in SYNTH_PALETTES:
             raise ValueError("unknown synth palette")
+        if self.percussion_synthesis not in {"minimal", "extended", "samples"}:
+            raise ValueError("percussion_synthesis must be minimal, extended, or samples")
         if not 0.0 <= float(self.composition_energy) <= 1.0:
             raise ValueError("composition_energy must be between 0 and 1")
         if not 0.0 <= float(self.composition_variation) <= 1.0:
