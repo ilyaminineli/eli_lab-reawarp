@@ -89,6 +89,271 @@ BREAK_PATTERNS: dict[str, tuple[tuple[int, str, float, float, float], ...]] = {
 BREAK_STYLE_NAMES = tuple(BREAK_PATTERNS)
 
 
+@dataclass(frozen=True, slots=True)
+class DrumSectionPlan:
+    section_index: int
+    section_name: str
+    start_bar: int
+    end_bar: int
+    kick_family: str
+    snare_family: str
+    hat_family: str
+    relationship: str
+    kick_steps: tuple[int, ...]
+    snare_steps: tuple[int, ...]
+    hat_steps: tuple[int, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+def _drum_section_function(name: str) -> str:
+    token = name.upper()
+    if any(part in token for part in ("INTRO", "SIGNAL", "ORIGIN", "SEED_OBJECT")):
+        return "intro"
+    if any(part in token for part in ("FOUNDATION", "CONSTRUCTION", "ESTABLISH", "EXPOSITION")):
+        return "establishment"
+    if any(part in token for part in ("UPLIFT", "SURGE", "RAMP", "PICKUP")):
+        return "uplift"
+    if any(part in token for part in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL", "CLIMAX")):
+        return "arrival"
+    if any(part in token for part in ("NULL", "VOID", "SILENCE", "SUSPENSION")):
+        return "void"
+    if any(part in token for part in ("DROP", "BREAKDOWN", "WITHDRAWAL", "EXPOSE", "DECOMPRESSION")):
+        return "drop"
+    if any(part in token for part in ("CONTRAST", "COUNTER", "SCENE_B")):
+        return "contrast"
+    if any(part in token for part in ("RETURN", "REPRISE", "RECAP", "REASSEMBLY")):
+        return "return"
+    if any(part in token for part in ("RESIDUE", "AFTERSHOCK", "AFTERIMAGE", "UNRAVEL", "CODA", "OUTRO", "FADE")):
+        return "residue"
+    if any(part in token for part in ("DEVELOP", "ORBIT", "DRIFT", "MUTATION", "EXPANSION")):
+        return "development"
+    return "continuation"
+
+
+def _family_for_role(function: str, role: str, anchor_family: str) -> str:
+    """Choose a role pattern family from formal function, preserving a return anchor."""
+    choices = {
+        "intro": {
+            "kick": ("sparse", "omission"),
+            "snare": ("omission", "sparse"),
+            "hat": ("phase_shadow", "offbeat_cells"),
+        },
+        "establishment": {
+            "kick": (anchor_family,),
+            "snare": ("half_time", "broken_funk"),
+            "hat": ("offbeat_cells", "phase_shadow"),
+        },
+        "continuation": {
+            "kick": (anchor_family, "broken_regularity"),
+            "snare": ("half_time", "ghost_break"),
+            "hat": ("offbeat_cells", "rotating_cycle"),
+        },
+        "development": {
+            "kick": ("asymmetric_5", "interlock_a", "rotating_cycle", anchor_family),
+            "snare": ("ghost_break", "asymmetric_7", "interlock_b"),
+            "hat": ("offbeat_cells", "cross_accent", "phase_shadow"),
+        },
+        "uplift": {
+            "kick": ("ratchet", "cross_accent", "rotating_cycle"),
+            "snare": ("ghost_break", "cross_accent", "asymmetric_7"),
+            "hat": ("dense_cloud", "irregular_burst", "ratchet"),
+        },
+        "arrival": {
+            "kick": ("cross_accent", "broken_funk", "ratchet"),
+            "snare": ("ghost_break", "broken_regularity", "cross_accent"),
+            "hat": ("dense_cloud", "irregular_burst", "offbeat_cells"),
+        },
+        "drop": {
+            "kick": ("omission", "sparse"),
+            "snare": ("omission", "sparse"),
+            "hat": ("phase_shadow", "sparse", "offbeat_cells"),
+        },
+        "void": {
+            "kick": ("omission",),
+            "snare": ("omission",),
+            "hat": ("omission",),
+        },
+        "contrast": {
+            "kick": ("half_time", "asymmetric_7"),
+            "snare": ("asymmetric_5", "clave_displaced"),
+            "hat": ("rotating_cycle", "phase_shadow", "offbeat_cells"),
+        },
+        "return": {
+            "kick": (anchor_family,),
+            "snare": ("half_time", "broken_funk"),
+            "hat": ("offbeat_cells", "phase_shadow"),
+        },
+        "residue": {
+            "kick": ("sparse", "omission"),
+            "snare": ("omission", "sparse"),
+            "hat": ("phase_shadow", "sparse"),
+        },
+    }
+    options = choices.get(function, choices["continuation"])[role]
+    return options[0] if len(options) == 1 else options[0]
+
+
+def build_drum_part_plan(
+    config: GenerationConfig,
+    composition_plan: CompositionPlan,
+) -> tuple[DrumSectionPlan, ...]:
+    """Create linked kick/snare/hat grammars for every formal section.
+
+    Section families evolve in relation to the formal role. Returns recall the
+    opening anchor family; cycle drift and fills are applied later at bar scale.
+    """
+    if not config.pattern_follow_structure:
+        return ()
+    anchor_family = config.pattern_family
+    plans: list[DrumSectionPlan] = []
+    for section in composition_plan.sections:
+        function = _drum_section_function(section.name)
+        kick_family = _family_for_role(function, "kick", anchor_family)
+        snare_family = _family_for_role(function, "snare", anchor_family)
+        hat_family = _family_for_role(function, "hat", anchor_family)
+
+        def role_steps(role: str, family: str) -> tuple[int, ...]:
+            seed = derive_seed(
+                config.seed,
+                f"drum-section:{section.index}:{section.name}:{role}:{family}",
+            )
+            rng = np.random.default_rng(seed)
+            density = float(np.clip(
+                section.density * (0.55 + 0.45 * config.drum_change_intensity),
+                0.08, 1.0,
+            ))
+            variation = float(np.clip(
+                config.composition_variation * config.drum_change_intensity,
+                0.0, 1.0,
+            ))
+            return pattern_for_section(
+                family,
+                section_index=section.index,
+                section_name=section.name,
+                variation=variation,
+                density=density,
+                rng=rng,
+            )
+
+        kick_steps = role_steps("kick", kick_family)
+        snare_seed = derive_seed(
+            config.seed, f"drum-relate:{section.index}:snare:{config.pattern_relationship}"
+        )
+        snare_rng = np.random.default_rng(snare_seed)
+        snare_steps = role_steps("snare", snare_family)
+        kick_steps, snare_steps = relate_patterns(
+            kick_steps, snare_steps,
+            relationship=config.pattern_relationship,
+            cycle_steps=16,
+        )
+        hat_steps = role_steps("hat", hat_family)
+        # Hats act as the upper surface: use the role's own family but avoid
+        # needless doubling of every kick accent when using complementary modes.
+        if config.pattern_relationship in {"interlock", "counter_accent", "call_response"}:
+            hat_steps = tuple(step for step in hat_steps if step not in set(kick_steps))
+        if function == "establishment":
+            anchor_family = kick_family
+        plans.append(DrumSectionPlan(
+            section_index=section.index,
+            section_name=section.name,
+            start_bar=section.start_bar,
+            end_bar=section.end_bar,
+            kick_family=kick_family,
+            snare_family=snare_family,
+            hat_family=hat_family,
+            relationship=config.pattern_relationship,
+            kick_steps=tuple(sorted(set(kick_steps))),
+            snare_steps=tuple(sorted(set(snare_steps))),
+            hat_steps=tuple(sorted(set(hat_steps))),
+        ))
+    return tuple(plans)
+
+
+def _build_section_aware_drum_events(
+    config: GenerationConfig,
+    composition_plan: CompositionPlan,
+    rngs: dict[str, np.random.Generator],
+    drum_plan: tuple[DrumSectionPlan, ...],
+) -> dict[str, list[PercussionEvent]]:
+    """Render section-aware role patterns with controlled cycle-level evolution."""
+    result: dict[str, list[PercussionEvent]] = {"kick": [], "snare": [], "hat": []}
+    step_seconds = config.sixteenth_seconds
+    cycle_bars = int(config.drum_part_cycle_bars)
+    intensity = float(config.drum_change_intensity)
+    function_by_section = {
+        item.section_index: _drum_section_function(item.section_name) for item in drum_plan
+    }
+    for plan in drum_plan:
+        function = function_by_section[plan.section_index]
+        section_rng = np.random.default_rng(
+            derive_seed(config.seed, f"drum-cycle:{plan.section_index}:{plan.section_name}")
+        )
+        for bar in range(plan.start_bar, plan.end_bar):
+            if bar * 16 * step_seconds >= config.duration:
+                continue
+            cycle_index = (bar - plan.start_bar) // cycle_bars
+            # A very small phase walk stops the pattern becoming a static bar
+            # copy while preserving its original accents and role relationship.
+            drift_limit = int(round(intensity * 2.0))
+            drift = 0
+            if cycle_index and drift_limit:
+                drift = int(round(
+                    np.sin((cycle_index + 1) * 1.61803398875 + plan.section_index) * drift_limit
+                ))
+            ending_bar = bar == plan.end_bar - 1
+            for role, base_steps, family in (
+                ("kick", plan.kick_steps, plan.kick_family),
+                ("snare", plan.snare_steps, plan.snare_family),
+                ("hat", plan.hat_steps, plan.hat_family),
+            ):
+                steps = sorted({(step + drift) % 16 for step in base_steps})
+                if ending_bar and intensity > 0.35 and function in {"development", "uplift", "arrival", "contrast"}:
+                    # One concise transition gesture: add only one or two
+                    # upper-role events to prepare the next formal state.
+                    if role == "hat":
+                        fill = (13, 14, 15) if function in {"uplift", "arrival"} else (11, 15)
+                        steps = sorted(set(steps) | set(fill[:1 + int(intensity > 0.72)]))
+                    elif role == "snare" and function in {"uplift", "arrival"}:
+                        steps = sorted(set(steps) | {15})
+
+                for pos, position in enumerate(steps):
+                    absolute_step = bar * 16 + position
+                    time_seconds = absolute_step * step_seconds
+                    if time_seconds >= config.duration:
+                        continue
+                    if role == "kick":
+                        velocity = float(np.clip(
+                            0.50 + 0.22 * composition_plan.sections[plan.section_index].energy
+                            + (0.12 if position == 0 else 0.0)
+                            + section_rng.uniform(-0.055, 0.055),
+                            0.22, 0.92,
+                        ))
+                        kind, pan = "synth_kick", 0.0
+                    elif role == "snare":
+                        anchor = position in (4, 8, 12)
+                        velocity = float(np.clip(
+                            (0.48 if anchor else 0.28)
+                            + 0.16 * composition_plan.sections[plan.section_index].energy
+                            + section_rng.uniform(-0.07, 0.07),
+                            0.12, 0.84,
+                        ))
+                        kind, pan = "noise_snare", 0.0
+                    else:
+                        velocity = float(np.clip(
+                            0.12 + 0.17 * composition_plan.sections[plan.section_index].instability
+                            + section_rng.uniform(-0.035, 0.035),
+                            0.06, 0.42,
+                        ))
+                        pan = float(np.clip(np.sin(absolute_step * 0.31) * 0.18, -0.24, 0.24))
+                        kind = "metal_noise"
+                    result[role].append(PercussionEvent(
+                        role, absolute_step, time_seconds, velocity, pan, kind, family
+                    ))
+    return result
+
+
 def _mutate_break_bar(
         hits: list[tuple[int, str, float, float, float]],
         rng: np.random.Generator,
@@ -275,67 +540,79 @@ def build_percussion_events(
         rngs: dict[str, np.random.Generator],
         composition_plan: CompositionPlan | None = None,
 ) -> dict[str, list[PercussionEvent]]:
-    """Build four related percussion lanes with independent control streams."""
-    step_seconds = config.sixteenth_seconds
-    step_count = int(np.ceil(config.duration / step_seconds))
-    complexity = config.complexity
-
-    lane_events: dict[str, list[PercussionEvent]] = {
-        "kick": [], "snare": [], "hat": [], "break": []
-    }
-    kick_rng, snare_rng = rngs["kick"], rngs["snare"]
-    hat_rng, break_rng = rngs["hat"], rngs["break"]
-    chaos = logistic_map(step_count, r=3.72 + 0.25 * complexity, x0=0.193)
-    prime_values = set(primes(max(32, step_count // 3 + 8)))
-    fib_values = set(fibonacci(18))
-
-    # Minimal IDM default: a stable low-end anchor, occasional backbeat and
-    # sparse high-frequency punctuation. Complexity enriches the phrase slowly;
-    # it does not mean "fill every sixteenth-note slot".
-    sparse_kick_pulses = 2 + int(round(complexity * 1.4))
-    sparse_snare_pulses = 1 + int(round(complexity * 0.9))
-    sparse_hat_pulses = 2 + int(round(complexity * 2.0))
-    for step in range(step_count):
-        if step * step_seconds >= config.duration:
-            continue
-        bar, position = divmod(step, 16)
-
-        kick_rotation = (bar * (1 + int(complexity * 2))) % 16
-        kick_hit = euclidean_rhythm(sparse_kick_pulses, 16, rotation=kick_rotation)[position]
-        # Rare, seed-stable syncopations are ornaments, never a second full groove.
-        if not kick_hit and position in (3, 7, 11, 15):
-            kick_hit = bool(kick_rng.random() < 0.018 + complexity * 0.035)
-        if kick_hit:
-            velocity = float(kick_rng.uniform(0.53, 0.78))
-            if position == 0:
-                velocity = min(0.88, velocity + 0.10)
-            lane_events["kick"].append(
-                PercussionEvent("kick", step, step * step_seconds, velocity, 0.0, "synth_kick")
+    """Build related percussion lanes, optionally evolving them by formal section."""
+    if composition_plan is None:
+        composition_plan = build_composition_plan(
+            duration_seconds=config.duration,
+            bpm=config.bpm,
+            seed=config.seed,
+            structure=config.structure,
+            energy=config.composition_energy,
+            variation=config.composition_variation,
+            flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
+        )
+    if config.pattern_follow_structure:
+        drum_plan = build_drum_part_plan(config, composition_plan)
+        lane_events = _build_section_aware_drum_events(
+            config, composition_plan, rngs, drum_plan
+        )
+    else:
+        # Preserve the original sparse, slowly rotating generator as a manual
+        # alternative. The default path now evolves all three percussion roles.
+        step_seconds = config.sixteenth_seconds
+        step_count = int(np.ceil(config.duration / step_seconds))
+        complexity = config.complexity
+        lane_events: dict[str, list[PercussionEvent]] = {
+            "kick": [], "snare": [], "hat": []
+        }
+        kick_rng, snare_rng, hat_rng = rngs["kick"], rngs["snare"], rngs["hat"]
+        sparse_kick_pulses = 2 + int(round(complexity * 1.4))
+        sparse_snare_pulses = 1 + int(round(complexity * 0.9))
+        sparse_hat_pulses = 2 + int(round(complexity * 2.0))
+        for step in range(step_count):
+            time_seconds = step * step_seconds
+            if time_seconds >= config.duration:
+                continue
+            bar, position = divmod(step, 16)
+            kick_rotation = (bar * (1 + int(complexity * 2))) % 16
+            kick_hit = euclidean_rhythm(
+                sparse_kick_pulses, 16, rotation=kick_rotation
+            )[position]
+            if not kick_hit and position in (3, 7, 11, 15):
+                kick_hit = bool(kick_rng.random() < 0.018 + complexity * 0.035)
+            if kick_hit:
+                velocity = float(kick_rng.uniform(0.53, 0.78))
+                if position == 0:
+                    velocity = min(0.88, velocity + 0.10)
+                lane_events["kick"].append(
+                    PercussionEvent("kick", step, time_seconds, velocity, 0.0, "synth_kick")
+                )
+            snare_rotation = 4 if bar % 2 == 0 else 12
+            snare_hit = position == snare_rotation
+            ghost_snare = position in (6, 14) and snare_rng.random() < complexity * 0.025
+            if snare_hit or ghost_snare:
+                velocity = float(
+                    snare_rng.uniform(0.16, 0.30)
+                    if ghost_snare else snare_rng.uniform(0.38, 0.62)
+                )
+                lane_events["snare"].append(
+                    PercussionEvent("snare", step, time_seconds, velocity, 0.0, "noise_snare")
+                )
+            hat_pattern = euclidean_rhythm(
+                sparse_hat_pulses, 16, rotation=(bar * 3 + 2) % 16
             )
+            hat_probability = 0.015 + complexity * 0.025
+            if hat_pattern[position] and hat_rng.random() < 0.62 or hat_rng.random() < hat_probability:
+                velocity = float(hat_rng.uniform(0.10, 0.24))
+                pan = float(np.clip(np.sin(step * 0.31) * 0.16, -0.22, 0.22))
+                lane_events["hat"].append(
+                    PercussionEvent("hat", step, time_seconds, velocity, pan, "metal_noise")
+                )
 
-        # One clear backbeat event per bar on average; sparse ghost notes only
-        # appear at high complexity and never compete with the main accent.
-        snare_rotation = 4 if bar % 2 == 0 else 12
-        snare_hit = position == snare_rotation
-        ghost_snare = position in (6, 14) and snare_rng.random() < complexity * 0.025
-        if snare_hit or ghost_snare:
-            velocity = float(
-                snare_rng.uniform(0.16, 0.30)
-                if ghost_snare else snare_rng.uniform(0.38, 0.62)
-            )
-            lane_events["snare"].append(
-                PercussionEvent("snare", step, step * step_seconds, velocity, 0.0, "noise_snare")
-            )
-
-        # Hats are punctuation, not a constant eighth-note grid.
-        hat_pattern = euclidean_rhythm(sparse_hat_pulses, 16, rotation=(bar * 3 + 2) % 16)
-        hat_probability = 0.015 + complexity * 0.025
-        if hat_pattern[position] and hat_rng.random() < 0.62 or hat_rng.random() < hat_probability:
-            velocity = float(hat_rng.uniform(0.10, 0.24))
-            pan = float(np.clip(np.sin(step * 0.31) * 0.16, -0.22, 0.22))
-            lane_events["hat"].append(
-                PercussionEvent("hat", step, step * step_seconds, velocity, pan, "metal_noise")
-            )
-
-    lane_events["break"] = _build_break_events(config, break_rng, step_count, composition_plan)
+    lane_events["break"] = _build_break_events(
+        config, rngs["break"], int(np.ceil(config.duration / config.sixteenth_seconds)),
+        composition_plan,
+    )
     return lane_events
