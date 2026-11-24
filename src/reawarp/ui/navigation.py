@@ -1,8 +1,9 @@
 """Grouped workspace navigation for the Reawarp desktop application.
 
-The navigator is deliberately data-driven: a future workspace can be added to
-an existing group or registered in a new group without extending a flat tab bar.
-Each workspace still operates on the shared MainWindow project/session context.
+The navigator is deliberately data-driven and supports arbitrary group depth.
+A future sub-workspace can be registered under a path such as
+("COMPOSE", "GENERATOR", "ADVANCED") without growing a flat tab strip. All
+workspaces continue to operate on the shared MainWindow project/session context.
 """
 from __future__ import annotations
 
@@ -38,20 +39,57 @@ class WorkspaceNavigator(QTreeWidget):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._workspace_items: dict[int, QTreeWidgetItem] = {}
+        self._group_items: dict[tuple[str, ...], QTreeWidgetItem] = {}
 
         for group_name, entries in groups:
-            group = QTreeWidgetItem([str(group_name).upper()])
-            group.setFlags(Qt.ItemFlag.ItemIsEnabled)
-            self.addTopLevelItem(group)
-            group.setExpanded(True)
             for label, description, index in entries:
-                item = QTreeWidgetItem([str(label)])
-                item.setData(0, Qt.ItemDataRole.UserRole, int(index))
-                item.setToolTip(0, str(description))
-                group.addChild(item)
-                self._workspace_items[int(index)] = item
+                self.register_workspace(
+                    (str(group_name),), str(label), str(description), int(index)
+                )
 
         self.itemClicked.connect(self._on_item_clicked)
+
+    def register_group(self, path: Sequence[str]) -> QTreeWidgetItem:
+        """Create or return a nested category path, preserving existing groups."""
+        parts = tuple(str(part).strip() for part in path)
+        if not parts or any(not part for part in parts):
+            raise ValueError("group path must contain non-empty names")
+
+        parent = None
+        current_path: tuple[str, ...] = ()
+        for part in parts:
+            current_path += (part,)
+            item = self._group_items.get(current_path)
+            if item is None:
+                item = QTreeWidgetItem([part.upper()])
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                if parent is None:
+                    self.addTopLevelItem(item)
+                else:
+                    parent.addChild(item)
+                item.setExpanded(True)
+                self._group_items[current_path] = item
+            parent = item
+        return parent
+
+    def register_workspace(
+        self,
+        group_path: Sequence[str],
+        label: str,
+        description: str,
+        index: int,
+    ) -> QTreeWidgetItem:
+        """Register a selectable page beneath any existing or new group path."""
+        index = int(index)
+        if index in self._workspace_items:
+            raise ValueError(f"workspace index {index} is already registered")
+        parent = self.register_group(group_path)
+        item = QTreeWidgetItem([str(label)])
+        item.setData(0, Qt.ItemDataRole.UserRole, index)
+        item.setToolTip(0, str(description))
+        parent.addChild(item)
+        self._workspace_items[index] = item
+        return item
 
     def _on_item_clicked(self, item: QTreeWidgetItem, _column: int) -> None:
         index = item.data(0, Qt.ItemDataRole.UserRole)
