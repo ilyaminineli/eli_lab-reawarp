@@ -199,7 +199,7 @@ class ReawarpEngine:
             "hat": streams.get("hat_pattern"),
             "break": streams.get("break_pattern"),
         }
-        percussion = build_percussion_events(config, percussion_rngs)
+        percussion = build_percussion_events(config, percussion_rngs, composition_plan)
         # Imported sample overlays keep their own baseline trigger score. A
         # procedural lane variation must not mutate a separate sample stem.
         sample_trigger_patterns = build_percussion_events(config, {
@@ -207,7 +207,7 @@ class ReawarpEngine:
             "snare": sample_streams.get("snare_pattern"),
             "hat": sample_streams.get("hat_pattern"),
             "break": sample_streams.get("break_pattern"),
-        })
+        }, composition_plan)
         melody_events = build_melody_events(config, streams.get("melody_pattern"))
 
         kick_stem = new_stem("kick")
