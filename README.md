@@ -301,3 +301,11 @@ Composition energy is not master gain. Structural variation changes section allo
 The Generator is divided into Form, Voices, and Rhythm sub-pages. Main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
 
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.
+
+## Current roadmap
+
+The current implementation baseline is M13. The next planned milestone is **M14 — Reliability and Performance Baseline**, followed by deeper composition direction, score-driven rendering, synthesis automation, mixer quality and selected advanced DSP modules.
+
+- [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
+- [Consolidated Roadmap](docs/ROADMAP.md) — implementation status and M14–M20 forward plan.
+- [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
