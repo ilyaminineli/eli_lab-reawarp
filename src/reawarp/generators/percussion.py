@@ -13,7 +13,7 @@ import numpy as np
 
 from reawarp.config import GenerationConfig
 from reawarp.composition.patterns import pattern_for_section, relate_patterns
-from reawarp.composition.director import build_composition_plan, section_for_time
+from reawarp.composition.director import CompositionPlan, build_composition_plan, section_for_time
 from reawarp.mathematics.rhythms import euclidean_rhythm
 from reawarp.mathematics.sequences import fibonacci, logistic_map, primes
 
@@ -141,6 +141,7 @@ def _build_break_events(
         config: GenerationConfig,
         rng: np.random.Generator,
         step_count: int,
+        composition_plan: CompositionPlan | None = None,
 ) -> list[PercussionEvent]:
     """Build repeated 16-step break phrases with bounded bar-end mutations."""
     style = config.break_style
@@ -156,13 +157,14 @@ def _build_break_events(
         sorted(template, key=lambda item: item[2], reverse=True)[:target_count],
         key=lambda item: item[0],
     )
-    composition_plan = build_composition_plan(
-        duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
-        structure=config.structure, energy=config.composition_energy,
-        variation=config.composition_variation, flow=config.composition_flow,
-        pattern_family=config.pattern_family,
-        pattern_relationship=config.pattern_relationship,
-    )
+    if composition_plan is None:
+        composition_plan = build_composition_plan(
+            duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
+            structure=config.structure, energy=config.composition_energy,
+            variation=config.composition_variation, flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
+        )
 
     step_seconds = config.sixteenth_seconds
     bar_count = (step_count + 15) // 16
@@ -253,6 +255,7 @@ def _build_break_events(
 def build_percussion_events(
         config: GenerationConfig,
         rngs: dict[str, np.random.Generator],
+        composition_plan: CompositionPlan | None = None,
 ) -> dict[str, list[PercussionEvent]]:
     """Build four related percussion lanes with independent control streams."""
     step_seconds = config.sixteenth_seconds
@@ -316,5 +319,5 @@ def build_percussion_events(
                 PercussionEvent("hat", step, step * step_seconds, velocity, pan, "metal_noise")
             )
 
-    lane_events["break"] = _build_break_events(config, break_rng, step_count)
+    lane_events["break"] = _build_break_events(config, break_rng, step_count, composition_plan)
     return lane_events
