@@ -62,4 +62,14 @@ QToolTip { background: #151515; color: #eee; border: 1px solid #555; padding: 5p
 QMessageBox QLabel { color: #eee; min-width: 280px; }
 QFrame#header { background: #090909; border-bottom: 1px solid #252525; }
 QFrame#transportBar { background: #101010; border: 1px solid #303030; }
+QFrame#workspaceHeader { background: #0b0b0b; border-bottom: 1px solid #282828; }
+QFrame#emptyState { background: #0d0d0d; border: 1px solid #303030; }
+QLabel#workspaceTitle { color: #f0f0f0; font-family: "Newsreader", "Georgia", serif; font-size: 15pt; font-weight: 400; }
+QLabel#projectContext { color: #a6a6a6; font-family: "DM Mono", "Consolas", monospace; font-size: 7.5pt; letter-spacing: 0.04em; }
+QTreeWidget#workspaceNavigator { background: #0c0c0c; border: 1px solid #292929; padding: 7px 5px; outline: 0; }
+QTreeWidget#workspaceNavigator::item { padding: 8px 8px; margin: 1px 2px; border: 0; }
+QTreeWidget#workspaceNavigator::item:hover { background: #171717; color: #fff; }
+QTreeWidget#workspaceNavigator::item:selected { background: #e7e7e7; color: #090909; }
+QTreeWidget#workspaceNavigator::branch { background: transparent; }
+QTreeWidget#workspaceNavigator::item:has-children { color: #858585; font-family: "DM Mono", "Consolas", monospace; font-size: 7.5pt; font-weight: 600; padding-top: 12px; padding-bottom: 5px; }
 """
