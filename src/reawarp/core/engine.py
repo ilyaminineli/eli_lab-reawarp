@@ -361,10 +361,14 @@ class ReawarpEngine:
                 mode = config.drum_sample_automation
                 if mode == "section":
                     key = (role, section.index, -1)
-                    should_switch = True
+                    should_switch = function not in {
+                        "introduction", "establishment", "return", "silence", "outro"
+                    }
                 elif mode == "cycle":
                     key = (role, section.index, cycle_index)
-                    should_switch = True
+                    should_switch = function not in {
+                        "introduction", "establishment", "return", "silence", "outro"
+                    }
                 else:
                     key = (role, section.index, cycle_index)
                     should_switch = function in {
@@ -582,7 +586,10 @@ class ReawarpEngine:
                 if role == "hat" and streams.get("section_ornaments").random() > section.percussion_density_scale:
                     continue
 
-                source_entry = select_role_sample(role, event)
+                source_entry = (
+                    None if config.percussion_source_mode == "synth"
+                    else select_role_sample(role, event)
+                )
                 synth_gain, sample_gain = percussion_source_levels(role, event.time)
                 if source_entry is None:
                     sample_gain = 0.0
