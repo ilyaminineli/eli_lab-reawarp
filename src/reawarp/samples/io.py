@@ -1,7 +1,8 @@
-"""Small WAV sample reader with optional SoundFile support."""
+"""Audio sample reader with optional SoundFile and SciPy support."""
 
 from __future__ import annotations
 
+import math
 import wave
 from pathlib import Path
 
@@ -69,7 +70,21 @@ def read_sample(path: str | Path, target_sample_rate: int) -> np.ndarray:
 
     if source_rate != target_sample_rate:
         new_length = max(1, int(round(len(audio) * target_sample_rate / source_rate)))
-        old_positions = np.arange(len(audio), dtype=np.float64)
-        new_positions = np.linspace(0.0, max(0.0, len(audio) - 1.0), new_length)
-        audio = np.interp(new_positions, old_positions, audio).astype(np.float32)
+        try:
+            from scipy.signal import resample_poly
+
+            divisor = math.gcd(int(source_rate), int(target_sample_rate))
+            up = int(target_sample_rate) // divisor
+            down = int(source_rate) // divisor
+            resampled = resample_poly(audio, up, down).astype(np.float32, copy=False)
+            if len(resampled) >= new_length:
+                audio = resampled[:new_length]
+            else:
+                audio = np.pad(resampled, (0, new_length - len(resampled))).astype(np.float32)
+        except ImportError:
+            # NumPy remains the mandatory baseline; SciPy is an optional,
+            # higher-quality polyphase anti-aliasing resampler.
+            old_positions = np.arange(len(audio), dtype=np.float64)
+            new_positions = np.linspace(0.0, max(0.0, len(audio) - 1.0), new_length)
+            audio = np.interp(new_positions, old_positions, audio).astype(np.float32)
     return audio
