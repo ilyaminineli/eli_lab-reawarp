@@ -62,6 +62,8 @@ QToolTip { background: #151515; color: #eee; border: 1px solid #555; padding: 5p
 QMessageBox QLabel { color: #eee; min-width: 280px; }
 QFrame#header { background: #090909; border-bottom: 1px solid #252525; }
 QFrame#transportBar { background: #101010; border: 1px solid #303030; }
+QWidget#previewEmptyState { background: #101318; border: 1px solid #252b33; }
+QLabel#previewEmptyTitle { color: #c7cbd1; font-family: "DM Mono", "Consolas", monospace; font-size: 8.5pt; letter-spacing: 0.12em; padding: 4px; }
 QFrame#workspaceHeader { background: #0b0b0b; border-bottom: 1px solid #282828; }
 QFrame#emptyState { background: #0d0d0d; border: 1px solid #303030; }
 QLabel#workspaceTitle { color: #f0f0f0; font-family: "Newsreader", "Georgia", serif; font-size: 15pt; font-weight: 400; }
