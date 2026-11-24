@@ -18,6 +18,7 @@ from reawarp.core.random_streams import RandomStreams, derive_seed
 from reawarp.generators.melody import build_melody_events
 from reawarp.generators.percussion import build_drum_part_plan, build_percussion_events
 from reawarp.samples.io import read_sample
+from reawarp.samples.selection import select_sample_variant
 from reawarp.synthesis.ambience import render_ambience
 from reawarp.synthesis.instruments import (
     render_extended_note,
@@ -275,33 +276,147 @@ class ReawarpEngine:
         break_stem = new_stem("synthetic_break")
 
         sample_manifest: dict[str, dict[str, Any]] = {}
-        drum_samples: dict[str, np.ndarray] = {}
-        drum_sample_metadata: dict[str, dict[str, Any]] = {}
+        drum_sample_banks: dict[str, list[dict[str, Any]]] = {}
+        sample_selection_cache: dict[tuple[str, int, int], int] = {}
+        sample_switch_history: dict[str, list[dict[str, Any]]] = {
+            role: [] for role in ("kick", "snare", "hat")
+        }
+        sample_variant_usage: dict[str, dict[str, int]] = {
+            role: {} for role in ("kick", "snare", "hat")
+        }
+        current_sample_index = {role: 0 for role in ("kick", "snare", "hat")}
+
         for role in ("kick", "snare", "hat"):
-            sample_path = config.sample_paths.get(role)
-            if not sample_path:
-                continue
-            path = Path(sample_path).expanduser()
-            sample = read_sample(path, sample_rate)
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            metadata_source = dict(config.sample_metadata.get(role, {}))
-            drum_samples[role] = sample
-            drum_sample_metadata[role] = metadata_source
-            sample_manifest[role] = {
-                "path": str(path.resolve()),
-                "sha256": digest,
-                "source": metadata_source,
-                "frames_after_resampling": int(len(sample)),
-                "frames_after_processing": int(len(sample)),
-                "duration_after_processing": len(sample) / float(sample_rate),
-                "trigger_count": 0,
-                "trigger_mode": "shared_drum_score",
-                "hybrid_architecture": config.percussion_hybrid_architecture,
-            }
+            raw_entries = list(config.sample_banks.get(role, ()))
+            if not raw_entries and config.sample_paths.get(role):
+                raw_entries = [{
+                    "path": config.sample_paths[role],
+                    "metadata": config.sample_metadata.get(role, {}),
+                    "features": {},
+                }]
+            loaded_entries: list[dict[str, Any]] = []
+            for raw_entry in raw_entries:
+                path = Path(str(raw_entry.get("path", ""))).expanduser()
+                if not path.is_file():
+                    raise FileNotFoundError(f"{role} sample-bank file does not exist: {path}")
+                audio = read_sample(path, sample_rate)
+                metadata_source = dict(raw_entry.get("metadata") or {})
+                features = dict(raw_entry.get("features") or {})
+                digest = str(raw_entry.get("sha256") or hashlib.sha256(path.read_bytes()).hexdigest())
+                loaded_entries.append({
+                    "path": str(path.resolve()),
+                    "audio": audio,
+                    "sha256": digest,
+                    "metadata": metadata_source,
+                    "features": features,
+                    "asset_id": str(raw_entry.get("asset_id") or digest[:16]),
+                    "label": str(raw_entry.get("label") or path.name),
+                    "duration_seconds": len(audio) / float(sample_rate),
+                })
+            if not loaded_entries and config.sample_paths.get(role):
+                raise ValueError(f"{role} sample bank did not produce a usable source")
+            if loaded_entries:
+                drum_sample_banks[role] = loaded_entries
+                anchor = loaded_entries[0]
+                sample_manifest[role] = {
+                    "path": anchor["path"],
+                    "sha256": anchor["sha256"],
+                    "source": anchor["metadata"],
+                    "bank_count": len(loaded_entries),
+                    "variants": [
+                        {
+                            "index": index,
+                            "asset_id": entry["asset_id"],
+                            "path": entry["path"],
+                            "sha256": entry["sha256"],
+                            "label": entry["label"],
+                            "metadata": entry["metadata"],
+                            "features": entry["features"],
+                        }
+                        for index, entry in enumerate(loaded_entries)
+                    ],
+                    "frames_after_resampling": int(len(anchor["audio"])),
+                    "frames_after_processing": int(len(anchor["audio"])),
+                    "duration_after_processing": anchor["duration_seconds"],
+                    "trigger_count": 0,
+                    "trigger_mode": "shared_drum_score",
+                    "selection_mode": config.drum_sample_automation,
+                    "hybrid_architecture": config.percussion_hybrid_architecture,
+                    "switch_points": sample_switch_history[role],
+                    "variant_usage": sample_variant_usage[role],
+                }
+
+        def select_role_sample(role: str, event: Any) -> dict[str, Any] | None:
+            bank = drum_sample_banks.get(role)
+            if not bank:
+                return None
+            if len(bank) == 1 or config.drum_sample_automation == "fixed":
+                selected_index = 0
+            else:
+                section = section_for_time(composition_plan, float(event.time))
+                directive = phrase_at_time(float(event.time))
+                bar = int(np.floor(float(event.time) / max(240.0 / config.bpm, 1e-9)))
+                cycle_index = max(0, (bar - section.start_bar) // int(config.drum_part_cycle_bars))
+                function = directive.function
+                mode = config.drum_sample_automation
+                if mode == "section":
+                    key = (role, section.index, -1)
+                    should_switch = True
+                elif mode == "cycle":
+                    key = (role, section.index, cycle_index)
+                    should_switch = True
+                else:
+                    key = (role, section.index, cycle_index)
+                    should_switch = function in {
+                        "development", "uplift", "arrival", "contrast", "transition", "false_return"
+                    }
+                    if function in {"introduction", "establishment"}:
+                        should_switch = False
+                if function == "return":
+                    selected_index = 0
+                    sample_selection_cache[key] = 0
+                elif not should_switch:
+                    selected_index = current_sample_index[role]
+                elif key in sample_selection_cache:
+                    selected_index = sample_selection_cache[key]
+                else:
+                    switch_seed = derive_seed(
+                        config.seed,
+                        f"sample-switch:{role}:{section.index}:{cycle_index}:{function}",
+                    )
+                    selected_index = select_sample_variant(
+                        bank,
+                        role=role,
+                        phrase_function=function,
+                        seed=switch_seed,
+                        anchor_index=0,
+                        previous_index=current_sample_index[role],
+                        intensity=config.drum_change_intensity,
+                    )
+                    sample_selection_cache[key] = selected_index
+
+                previous_index = current_sample_index[role]
+                current_sample_index[role] = int(selected_index)
+                if selected_index != previous_index:
+                    switch_record = {
+                        "time": float(event.time),
+                        "bar": bar + 1,
+                        "section": section.name,
+                        "function": function,
+                        "from_index": int(previous_index),
+                        "to_index": int(selected_index),
+                        "asset_id": bank[selected_index]["asset_id"],
+                        "label": bank[selected_index]["label"],
+                    }
+                    sample_switch_history[role].append(switch_record)
+            entry = bank[int(selected_index)]
+            usage = sample_variant_usage[role]
+            usage[str(selected_index)] = usage.get(str(selected_index), 0) + 1
+            return entry
 
         def percussion_source_levels(role: str, time_seconds: float) -> tuple[float, float]:
             """Return (synth gain, sample gain) for one role/section."""
-            if role not in drum_samples:
+            if role not in drum_sample_banks:
                 return 1.0, 0.0
             mode = config.percussion_source_mode
             if mode == "synth":
@@ -337,16 +452,18 @@ class ReawarpEngine:
             target: np.ndarray,
             event: Any,
             sample_gain: float,
+            source_entry: dict[str, Any],
         ) -> None:
-            source = drum_samples[role]
+            source = source_entry["audio"]
             segment = source
-            if (
-                config.percussion_hybrid_architecture == "transient_body"
-                and config.percussion_source_mode != "sample"
-            ):
-                transient_frames = max(
-                    8, int(round(sample_rate * config.hybrid_transient_ms / 1000.0))
-                )
+            architecture = config.percussion_hybrid_architecture
+            if architecture in {"transient_body", "feature_guided"} and config.percussion_source_mode != "sample":
+                transient_ms = float(config.hybrid_transient_ms)
+                if architecture == "feature_guided":
+                    features = source_entry.get("features", {})
+                    crest = float(features.get("crest_factor_db", 6.0))
+                    transient_ms *= float(np.clip(0.72 + crest / 35.0, 0.65, 1.35))
+                transient_frames = max(8, int(round(sample_rate * transient_ms / 1000.0)))
                 segment = source[:min(len(source), transient_frames)].copy()
                 fade_frames = min(max(2, int(round(sample_rate * 0.002))), len(segment) // 2)
                 if fade_frames:
