@@ -37,6 +37,7 @@ class IROAsset:
     seed: int | None = None
     midi_note: int | None = None
     metadata: dict[str, Any] | None = None
+    available: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +56,7 @@ class IROAsset:
             "seed": self.seed,
             "midi_note": self.midi_note,
             "metadata": self.metadata or {},
+            "available": self.available,
         }
 
 
@@ -101,8 +103,7 @@ def _asset(
     metadata: dict[str, Any] | None = None,
 ) -> IROAsset:
     path = _safe_path(pack_root, relative_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"IRO manifest references a missing asset: {path}")
+    available = path.is_file()
     return IROAsset(
         asset_id=f"{pack}:{relative_path}",
         path=path,
@@ -119,6 +120,7 @@ def _asset(
         seed=int(seed) if seed is not None else None,
         midi_note=int(midi_note) if midi_note is not None else None,
         metadata=dict(metadata or {}),
+        available=available,
     )
 
 
@@ -154,7 +156,7 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
                                "sample_rate", "duration_seconds", "source_feature_index", "seed"}
             },
         )
-        if verify_hashes and asset.sha256 and _sha256(asset.path) != asset.sha256:
+        if verify_hashes and asset.available and asset.sha256 and _sha256(asset.path) != asset.sha256:
             raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
         records.append(asset)
     return records
@@ -302,7 +304,7 @@ def resolve_iro_sample(
     """Resolve an IRO drum asset deterministically by role and optional facets."""
     candidates = [
         item for item in load_drum_assets()
-        if item.role == role
+        if item.available and item.role == role
         and (family is None or item.family == family)
         and (articulation is None or item.articulation == articulation)
         and (variant is None or int((item.metadata or {}).get("variant", 0)) == variant)
@@ -337,11 +339,12 @@ def verify_iro_assets(assets: Iterable[IROAsset] | None = None) -> dict[str, Any
             verified += 1
     return {
         "total": len(selected),
+        "available": len(selected) - len(missing),
         "verified": verified,
         "unverified": unverified,
         "missing": missing,
         "mismatched": mismatched,
-        "ok": not missing and not mismatched,
+        "ok": not mismatched,
     }
 
 
