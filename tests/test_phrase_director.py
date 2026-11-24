@@ -26,6 +26,11 @@ def test_iro_metamorphosis_has_recognisable_phrase_arc_and_exact_duration():
         "OVERLOAD", "NULL_DROP", "AFTERSHOCK", "UNRAVEL", "FALSE_RETURN",
         "RESIDUE_CODA",
     ]
+    assert all(section.end_bar - section.start_bar >= 1 for section in first.sections)
+    assert [section.start_bar for section in first.sections] == sorted(
+        section.start_bar for section in first.sections
+    )
+    assert sum(section.end_bar - section.start_bar for section in first.sections) == 45
 
 
 def test_phrase_directives_distinguish_uplift_arrival_drop_and_void():
