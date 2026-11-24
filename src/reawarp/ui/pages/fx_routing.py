@@ -162,13 +162,27 @@ class FXRoutingEditor(QGroupBox):
             self.bus_wet[bus].setValue(round(record["wet"] * 100))
             self.bus_tail[bus].setValue(record["tail_seconds"])
             if bus in self.bus_sync:
-                self.bus_sync[bus].setCurrentIndex(
-                    max(0, self.bus_sync[bus].findData(record.get("delay_sync", "off")))
+                sync = self.bus_sync[bus]
+                sync.blockSignals(True)
+                sync.setCurrentIndex(max(0, sync.findData(record.get("delay_sync", "off"))))
+                sync.blockSignals(False)
+                has_delay = any(
+                    stage.get("type") == "delay" for stage in FX_PRESETS[record["chain"]]
                 )
+                sync.setEnabled(has_delay)
 
     def _store_buses(self, *_args: Any) -> None:
         if not hasattr(self, "bus_chain"):
             return
+        echo_preset = str(self.bus_chain["echo"].currentData())
+        echo_has_delay = any(
+            stage.get("type") == "delay" for stage in FX_PRESETS[echo_preset]
+        )
+        if not echo_has_delay and self.bus_sync["echo"].currentData() != "off":
+            self.bus_sync["echo"].blockSignals(True)
+            self.bus_sync["echo"].setCurrentIndex(self.bus_sync["echo"].findData("off"))
+            self.bus_sync["echo"].blockSignals(False)
+        self.bus_sync["echo"].setEnabled(echo_has_delay)
         self._routing["buses"] = {
             bus: {
                 "chain": self.bus_chain[bus].currentData(),
