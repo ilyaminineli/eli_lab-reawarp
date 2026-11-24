@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-24  
-**Current implementation baseline:** M13 merged; M14 portable regression suite and Windows CI landed and passed on `main`; target-machine profiling and listening remain pending  
+**Current implementation baseline:** M15 composition director implementation in progress on `main`; M14 portable regression suite and Windows CI passed; target-machine profiling and listening remain pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -31,7 +31,7 @@ The current application has strong components at most of these stages, but score
 | Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
 | GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
-| Regression testing | Implemented | 59-test pytest suite covers deterministic streams, transform edge cases, score/MIDI and project round trips, FX contracts, stem isolation and offscreen UI navigation; passing on Linux Python 3.10–3.12 and Windows Python 3.11 |
+| Regression testing | Implemented | M14 suite covers deterministic streams, transform edge cases, score/MIDI and project round trips, FX contracts, stem isolation and offscreen UI navigation; M15 motif/orchestration fixtures are being added |
 | Target-machine DSP listening validation | Pending | Requires Pyo-enabled Windows render and critical audition |
 | Performance benchmark baseline | Partially implemented | Reproducible benchmark harness and phase timings are present; target-Windows 30/180-second results are pending |
 
@@ -60,25 +60,32 @@ No new synthesis palette, arbitrary routing graph, convolution engine or GPU por
 
 ## M15: Composition Director 2.0 — motifs, roles and transitions
 
+**Status:** Implementation in progress on `main`.
+
 **Goal:** Make long-form arrangements feel composed rather than like a sequence of section-level parameter states.
 
-### Scope
+### Delivered in this increment
 
-- A stable motif model: identity, source phrase, role, register, rhythmic/pitch contour and transformation history.
-- Shared motif transformations across roles: repetition, displacement, fragmentation, augmentation/diminution, inversion/retrograde where musically applicable, rhythmic shadow and call-response.
-- A per-section role plan for kick, snare, hats, break, melody, texture and ambience.
-- Role entrances/exits, density/activity, register, brightness and spatial intention.
-- Transition gestures: fills, subtraction, silence, pickups, reverse swells, rhythmic collapse, register shifts, echo handoffs and motif previews.
-- Phrase-aware repetition: retain anchors while changing selected details.
-- Clear controls that separate density, syncopation, instability, melodic activity, register, brightness and space.
+- Stable motif identity extracted from a named source phrase; section instances share the identity and carry explicit transformation history.
+- Deterministic repetition, displacement, fragmentation, augmentation/diminution, inversion, retrograde, rhythmic shadow, call/response, return and dissolve transformations.
+- Motif-driven melody events on the shared sixteenth-note clock. The same phrase rhythm can create restrained hi-hat shadows and snare responses.
+- Seven-role section orchestration plans for kick, snare, hats, break, melody, texture and ambience, each with activity, density, syncopation, register, brightness, space and motif relation.
+- Bar-aligned transition windows derived from the phrase grammar. Transition envelopes implement pickups/fills, subtraction, rhythmic collapse, hard cuts/silence gates, reverse-swell/riser intentions, call/response reassembly and echo handoffs.
+- Independent Generator controls for density, syncopation, instability, melodic activity, register, tonal brightness and spatial intent.
+- Project metadata records the motif, every section instance, role plans, transition gestures and the axis values used.
 
 ### Acceptance criteria
 
-- Fixed seeds produce recognisable motif identity across multiple sections.
-- Each section has a distinguishable orchestration purpose, not just a higher or lower energy scalar.
-- Transition gestures fit within bar/phrase boundaries and do not create accidental truncation or timing drift.
-- Tests cover motif transformation and role-plan determinism.
-- Listening fixtures demonstrate contrast, continuity and intentional negative space.
+- Fixed seeds reproduce motif identity, section transformations, cross-role accents and role/transition plans.
+- Return sections recall the source motif; development/contrast sections change selected dimensions while retaining identity.
+- Each section has a distinguishable orchestration purpose independent of a single energy scalar.
+- Transition gestures remain inside their source phrase/bar window; all rendered buffers retain exact duration and aligned stems.
+- Regenerating melody does not mutate the other role stems; named random streams remain isolated.
+- Tests cover transformation rules, role-plan determinism, transition boundaries, cross-role motif use and full-engine integration.
+
+### Listening protocol
+
+Compare the same seed in a full render and in isolated kick/snare/hat/melody/texture/ambience stems. Listen for the anchor phrase in establishment and return sections, controlled transformation in development, a recognisable call/response in contrast, deliberate subtraction through drop/void sections, and enough negative space around transitions. Numeric tests establish timing and repeatability, not subjective musical quality.
 
 ## M16: Score-driven render core
 

@@ -12,11 +12,23 @@ from typing import Any
 import numpy as np
 
 from reawarp.composition.director import build_composition_plan, section_for_time
+from reawarp.composition.motifs import (
+    build_motif_plan, build_motif_role_accents, render_motif_events,
+)
+from reawarp.composition.orchestration import (
+    build_section_orchestration_plan,
+    build_transition_plan,
+    render_role_envelope,
+    role_activity_at_time,
+    role_intent_at_time,
+)
 from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
 from reawarp.core.random_streams import RandomStreams, derive_seed
 from reawarp.generators.melody import build_melody_events
-from reawarp.generators.percussion import build_drum_part_plan, build_percussion_events
+from reawarp.generators.percussion import (
+    PercussionEvent, build_drum_part_plan, build_percussion_events,
+)
 from reawarp.samples.io import read_sample
 from reawarp.samples.selection import select_sample_variant
 from reawarp.synthesis.ambience import render_ambience
@@ -225,40 +237,113 @@ class ReawarpEngine:
         percussion = build_percussion_events(
             config, percussion_rngs, composition_plan, drum_plan=drum_plan
         )
-        # Sample and synthesis layers share the exact same role events.
-        melody_events = build_melody_events(config, streams.get("melody_pattern"))
+        # The motif source uses its own named stream. Regenerating the melody
+        # can vary that stem without changing the rhythmic shadow carried by hats
+        # and snare responses in the other stems.
+        melody_variation_events = build_melody_events(config, streams.get("melody_pattern"))
+        motif_anchor_streams = RandomStreams(config.seed)
+        motif_source_events = build_melody_events(
+            config, motif_anchor_streams.get("motif_anchor")
+        )
+        motif_plan = build_motif_plan(
+            motif_source_events,
+            composition_plan,
+            phrase_directives,
+            bpm=config.bpm,
+            seed=config.seed,
+        )
+        melody_events = (
+            render_motif_events(
+                motif_plan, bpm=config.bpm, duration_seconds=config.duration
+            )
+            if motif_plan is not None else melody_variation_events
+        )
+        if motif_plan is not None and melody_variation_events:
+            # Keep motif identity/rhythm fixed while allowing an isolated melody
+            # regeneration to alter expressive velocity and stereo motion.
+            melody_events = [
+                replace(
+                    event,
+                    velocity=float(np.clip(
+                        event.velocity * (
+                            0.90 + 0.20 * melody_variation_events[index % len(melody_variation_events)].velocity
+                        ),
+                        0.0, 1.0,
+                    )),
+                    pan=float(np.clip(
+                        event.pan * 0.86
+                        + 0.14 * melody_variation_events[index % len(melody_variation_events)].pan,
+                        -0.85, 0.85,
+                    )),
+                )
+                for index, event in enumerate(melody_events)
+            ]
 
-        # Phrase function modifies event activity as a separate composition
-        # layer. The event patterns keep their own deterministic streams; no
-        # new randomness is introduced when a role enters a drop/void.
-        role_activity = {
-            "kick": "kick_activity",
-            "snare": "snare_activity",
-            "hat": "high_activity",
-            "break": "event_activity",
+        section_orchestration = build_section_orchestration_plan(
+            composition_plan, phrase_directives, config, motif_plan
+        )
+        transition_plan = build_transition_plan(composition_plan, phrase_directives)
+        if motif_plan is not None:
+            for accent in build_motif_role_accents(
+                motif_plan, bpm=config.bpm, duration_seconds=config.duration
+            ):
+                percussion[accent.role].append(PercussionEvent(
+                    lane=accent.role,
+                    step=accent.step,
+                    time=accent.step * config.sixteenth_seconds,
+                    velocity=accent.velocity,
+                    pan=accent.pan,
+                    kind=accent.kind,
+                    pattern_style=accent.pattern_style,
+                    motif_id=accent.motif_id,
+                    motif_relation=accent.motif_relation,
+                ))
+        for role in percussion:
+            percussion[role] = sorted(
+                percussion[role], key=lambda event: (event.step, event.kind or "")
+            )
+
+        # Continuous role envelopes consume the same section/transition plan
+        # used by note and percussion events.
+        texture_envelope = render_role_envelope(
+            "texture", frame_count, sample_rate, composition_plan,
+            section_orchestration, transition_plan,
+        )
+        ambience_envelope = render_role_envelope(
+            "ambience", frame_count, sample_rate, composition_plan,
+            section_orchestration, transition_plan,
+        )
+
+        activity_defaults = {
+            "kick": 0.78, "snare": 0.66, "hat": 0.68, "break": 0.62,
         }
-        activity_defaults = {"kick": 0.72, "snare": 0.58, "hat": 0.50, "break": 0.46}
         phrase_shaped_percussion: dict[str, list[Any]] = {}
         for role, events in percussion.items():
-            activity_name = role_activity[role]
             adjusted = []
             for event in events:
-                directive = phrase_at_time(float(event.time))
-                activity = float(getattr(directive, activity_name))
+                activity = role_activity_at_time(
+                    role, float(event.time), composition_plan,
+                    section_orchestration, transition_plan,
+                )
                 velocity = (
-                    0.0 if directive.function == "silence" or activity <= 0.0
-                    else float(event.velocity) * min(1.0, activity / activity_defaults[role])
+                    float(event.velocity) * min(1.0, activity / activity_defaults[role])
+                    if activity > 0.0 else 0.0
                 )
                 if velocity > 1e-7:
-                    adjusted.append(replace(event, velocity=float(np.clip(velocity, 0.0, 1.0))))
+                    adjusted.append(replace(
+                        event, velocity=float(np.clip(velocity, 0.0, 1.0))
+                    ))
             phrase_shaped_percussion[role] = adjusted
+
         phrase_shaped_melody = []
         for event in melody_events:
-            directive = phrase_at_time(float(event.time))
-            activity = float(directive.melody_activity)
+            activity = role_activity_at_time(
+                "melody", float(event.time), composition_plan,
+                section_orchestration, transition_plan,
+            )
             velocity = (
-                0.0 if directive.function == "silence" or activity <= 0.0
-                else float(event.velocity) * min(1.0, activity / 0.55)
+                float(event.velocity) * min(1.0, activity / 0.72)
+                if activity > 0.0 else 0.0
             )
             if velocity > 1e-7:
                 phrase_shaped_melody.append(
@@ -586,7 +671,11 @@ class ReawarpEngine:
                     continue
                 if role == "snare" and section.density < 0.14 and event.velocity < 0.70:
                     continue
-                if role == "hat" and streams.get("section_ornaments").random() > section.percussion_density_scale:
+                if (
+                    role == "hat"
+                    and event.motif_relation != "shadow"
+                    and streams.get("section_ornaments").random() > section.percussion_density_scale
+                ):
                     continue
 
                 source_entry = (
@@ -761,13 +850,22 @@ class ReawarpEngine:
                 continue
             if event.kind != "kick" and section.density < 0.16:
                 continue
+            break_activity = role_activity_at_time(
+                "break", event.time, composition_plan,
+                section_orchestration, transition_plan,
+            )
+            if break_activity <= 1e-7:
+                continue
+            velocity = float(event.velocity * min(1.0, break_activity / 0.62))
+            if velocity <= 1e-7:
+                continue
             break_rng = streams.get("break_synthesis")
             if event.kind == "kick":
                 profile = break_profiles["kick"]
                 signal = render_kick(
                     sample_rate,
                     break_rng,
-                    event.velocity * 0.82,
+                    velocity * 0.82,
                     duration=0.31,
                     amp_decay=0.16,
                     profile=profile,
@@ -775,15 +873,16 @@ class ReawarpEngine:
             elif event.kind == "snare":
                 profile = break_profiles["snare"]
                 signal = render_snare(
-                    sample_rate, break_rng, event.velocity * 0.78, duration=0.22, profile=profile
+                    sample_rate, break_rng, velocity * 0.78, duration=0.22, profile=profile
                 )
             else:
                 profile = break_profiles["hat"]
                 signal = render_hat(
-                    sample_rate, break_rng, event.velocity * 0.9, duration=0.075, profile=profile
+                    sample_rate, break_rng, velocity * 0.9, duration=0.075, profile=profile
                 )
             place_mono(break_stem, signal, event.time, event.pan)
             record = event.to_dict()
+            record["velocity"] = velocity
             record["sound_profile"] = profile
             event_records.append(record)
 
@@ -808,20 +907,30 @@ class ReawarpEngine:
                 section = section_for_time(composition_plan, event.time)
                 if event.velocity <= 1e-7 or not section.melody:
                     continue
-                effective_frequency = event.frequency * (2.0 ** (section.motif_register_semitones / 12.0))
+                intent = role_intent_at_time(
+                    "melody", event.time, composition_plan, section_orchestration
+                )
+                effective_frequency = event.frequency * (
+                    2.0 ** (intent.register_semitones / 12.0)
+                )
+                melodic_instability = float(np.clip(
+                    0.62 * config.arrangement_instability
+                    + 0.38 * section.instability,
+                    0.0, 1.0,
+                ))
                 if config.synth_palette == "subtractive":
                     signal = render_subtractive_note(
                         effective_frequency, sample_rate, streams.get("melody_synthesis"),
                         duration=event.duration, velocity=event.velocity,
-                        profile=melody_profile, brightness=section.brightness,
-                        instability=section.instability,
+                        profile=melody_profile, brightness=intent.brightness,
+                        instability=melodic_instability,
                     )
                 else:
                     signal = render_extended_note(
                         effective_frequency, sample_rate, streams.get("melody_synthesis"),
                         duration=event.duration, velocity=event.velocity,
-                        palette=config.synth_palette, brightness=section.brightness,
-                        instability=section.instability,
+                        palette=config.synth_palette, brightness=intent.brightness,
+                        instability=melodic_instability,
                     )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
@@ -844,12 +953,7 @@ class ReawarpEngine:
                 np.concatenate((np.zeros(97, dtype=np.float32), texture[:-97]))
                 if len(texture) > 97 else texture
             )
-            texture_gain = np.zeros(frame_count, dtype=np.float32)
-            for section in composition_plan.sections:
-                start = max(0, int(round(section.start_seconds * sample_rate)))
-                end = min(frame_count, int(round(section.end_seconds * sample_rate)))
-                if end > start and section.texture:
-                    texture_gain[start:end] = 0.45 + 0.55 * section.density
+            texture_gain = texture_envelope
             texture_stem[:, 0] += texture * texture_gain * 0.72
             texture_stem[:, 1] += delayed * texture_gain * 0.72
             event_records.append({
@@ -873,13 +977,7 @@ class ReawarpEngine:
                 root_frequency=root_frequency,
                 amount=config.ambience_level,
             )
-            ambience_gain = np.zeros(frame_count, dtype=np.float32)
-            for section in composition_plan.sections:
-                start = max(0, int(round(section.start_seconds * sample_rate)))
-                end = min(frame_count, int(round(section.end_seconds * sample_rate)))
-                if end > start and section.ambience:
-                    ambience_gain[start:end] = section.space
-            ambience_stem *= ambience_gain[:, None]
+            ambience_stem *= ambience_envelope[:, None]
             event_records.append({
                 "lane": "ambience",
                 "time": 0.0,
@@ -1072,6 +1170,7 @@ class ReawarpEngine:
             "sample_trigger_seed_streams": {
                 "shared_drum_score": True,
                 "break_processing": sample_streams.seed_for("break_processing"),
+                "motif_anchor": motif_anchor_streams.seed_for("motif_anchor"),
             },
             "generator_families": {
                 "percussion": (
@@ -1086,10 +1185,17 @@ class ReawarpEngine:
                 "hybrid_architecture": config.percussion_hybrid_architecture,
                 "composition_director": f"seeded formal section plan ({config.structure}/{config.composition_flow})",
                 "synthetic_break": "stochastic event grammar with profile-based kick/snare/hat resynthesis",
-                "melody": f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette",
+                "melody": (
+                    f"persistent {motif_plan.anchor.motif_id} motif + section transformations + "
+                    f"{config.synth_palette} synthesis palette"
+                    if motif_plan is not None else
+                    f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette"
+                ),
                 "texture": "coloured noise with low-frequency amplitude modulation",
                 "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
-                "phrase_grammar": "shared phrase functions attenuate role activity; independent role streams remain separate",
+                "phrase_grammar": "shared phrase functions control section role intent and bar-aligned transitions",
+                "motif_system": "stable source identity with deterministic phrase transformations and cross-role rhythm shadows",
+                "orchestration": "seven independent role intents with separate activity, density, syncopation, register, brightness and space axes",
                 "break_processing": list(config.break_transforms),
             },
             "synthesis_profiles": {
@@ -1117,6 +1223,18 @@ class ReawarpEngine:
             },
             "composition_plan": composition_plan.to_dict(),
             "phrase_directives": [item.to_dict() for item in phrase_directives],
+            "motif_plan": motif_plan.to_dict() if motif_plan is not None else None,
+            "section_orchestration": [item.to_dict() for item in section_orchestration],
+            "transition_gestures": [item.to_dict() for item in transition_plan],
+            "composition_axes": {
+                "arrangement_density": config.arrangement_density,
+                "rhythmic_syncopation": config.rhythmic_syncopation,
+                "arrangement_instability": config.arrangement_instability,
+                "melodic_activity": config.melodic_activity,
+                "melody_register_semitones": config.melody_register_semitones,
+                "tonal_brightness": config.tonal_brightness,
+                "spatial_intent": config.spatial_intent,
+            },
             "drum_arrangement": [item.to_dict() for item in drum_plan],
             "drum_section_profiles": {
                 role: {

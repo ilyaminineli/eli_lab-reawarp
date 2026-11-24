@@ -23,8 +23,11 @@ class MelodyEvent:
     pan: float
     source_x: float
     source_y: float
+    motif_id: str | None = None
+    motif_transform: str | None = None
+    phrase_index: int | None = None
 
-    def to_dict(self) -> dict[str, int | float]:
+    def to_dict(self) -> dict[str, int | float | str | None]:
         return asdict(self)
 
 

@@ -328,6 +328,53 @@ class MainWindow(QMainWindow):
         form.addRow("Random seed", seed_widget)
         form_layout.addWidget(global_group)
 
+        axes_group = QGroupBox("COMPOSITION AXES")
+        axes_form = QFormLayout(axes_group)
+
+        def axis_control(value: float, tooltip: str) -> QDoubleSpinBox:
+            control = QDoubleSpinBox()
+            control.setRange(0.0, 1.0)
+            control.setSingleStep(0.05)
+            control.setValue(value)
+            control.setToolTip(tooltip)
+            return control
+
+        self.arrangement_density = axis_control(
+            0.55, "Controls the amount of activity in kick, snare and break roles."
+        )
+        self.rhythmic_syncopation = axis_control(
+            0.52, "Controls off-grid tension and the prominence of upper rhythmic shadows."
+        )
+        self.arrangement_instability = axis_control(
+            0.40, "Controls how far texture and section-level rhythmic details drift."
+        )
+        self.melodic_activity = axis_control(
+            0.62, "Controls melodic entrances and note activity independently of drum density."
+        )
+        self.melody_register_semitones = QSpinBox()
+        self.melody_register_semitones.setRange(-24, 24)
+        self.melody_register_semitones.setValue(0)
+        self.melody_register_semitones.setToolTip(
+            "Offsets the motif's register by semitones; section shifts remain phrase-aware."
+        )
+        self.tonal_brightness = axis_control(
+            0.55, "Sets the tonal brightness target independently of composition energy."
+        )
+        self.spatial_intent = axis_control(
+            0.52, "Controls the space/ambience intention independently of brightness and density."
+        )
+        for label, control in (
+            ("Arrangement density", self.arrangement_density),
+            ("Rhythmic syncopation", self.rhythmic_syncopation),
+            ("Instability", self.arrangement_instability),
+            ("Melodic activity", self.melodic_activity),
+            ("Melody register / st", self.melody_register_semitones),
+            ("Tonal brightness", self.tonal_brightness),
+            ("Spatial intent", self.spatial_intent),
+        ):
+            axes_form.addRow(label, control)
+        form_layout.addWidget(axes_group)
+
         modules = QGroupBox("GENERATOR MODULES")
         modules_layout = QVBoxLayout(modules)
         self.melody_enabled = QCheckBox("Geometric / FM melody")
@@ -606,8 +653,8 @@ class MainWindow(QMainWindow):
         self.generate_button.setMinimumHeight(54)
         self.generate_button.setMinimumWidth(230)
         self.generate_button.setToolTip(
-            "Build one connected composition: formal arrangement, evolving drum parts, "
-            "feature-guided sample selection, synthesis, textures and stems."
+            "Build one connected composition: persistent motif, section role orchestration, "
+            "phrase-aware transitions, hybrid sources and aligned stems."
         )
         self.generate_button.clicked.connect(self._generate)
         action_layout.addWidget(self.generate_button)
@@ -1155,6 +1202,13 @@ class MainWindow(QMainWindow):
             melody_root=int(self.melody_root.currentData()),
             composition_energy=self.composition_energy.value(),
             composition_variation=self.composition_variation.value(),
+            arrangement_density=self.arrangement_density.value(),
+            rhythmic_syncopation=self.rhythmic_syncopation.value(),
+            arrangement_instability=self.arrangement_instability.value(),
+            melodic_activity=self.melodic_activity.value(),
+            melody_register_semitones=self.melody_register_semitones.value(),
+            tonal_brightness=self.tonal_brightness.value(),
+            spatial_intent=self.spatial_intent.value(),
             sample_rate=48_000,
             seed=seed,
             complexity=self.complexity.value() / 100.0,
@@ -1317,6 +1371,26 @@ class MainWindow(QMainWindow):
             f"{result.config.percussion_source_mode.upper()} · "
             f"{result.config.percussion_hybrid_architecture.replace('_', ' ')}"
         )
+        motif_data = result.metadata.get("motif_plan") or {}
+        motif_anchor = motif_data.get("anchor", {})
+        motif_id = motif_anchor.get("motif_id")
+        motif_instances = motif_data.get("instances", [])
+        motif_line = " → ".join(
+            f"{item.get('section_name', '?')}:{item.get('operation', '?')}"
+            for item in motif_instances
+        )
+        transition_line = " · ".join(
+            f"{item.get('gesture', '?')} @ bar {int(item.get('boundary_bar', 0)) + 1}"
+            for item in result.metadata.get("transition_gestures", [])
+        )
+        role_line = " | ".join(
+            f"{item.get('section_name', '?')}:"
+            + "/".join(
+                str(role.get("role", "")) for role in item.get("roles", [])
+                if role.get("active")
+            )
+            for item in result.metadata.get("section_orchestration", [])
+        )
         self.render_summary.setText(
             f"{result.duration:.2f} s · {result.sample_rate:,} Hz · "
             f"{len(result.stems)} stems · {len(result.events)} events · "
@@ -1326,6 +1400,9 @@ class MainWindow(QMainWindow):
             + (f"\nDRUM EVOLUTION: {drum_line}" if drum_line else "\nDRUM EVOLUTION: static mode")
             + (f"\nDRUM TIMBRES: {profile_line}" if profile_line else "")
             + f"\nSOURCE ENGINE: {source_line}"
+            + (f"\nMOTIF: {motif_id} · {motif_line}" if motif_id else "")
+            + (f"\nROLE PLAN: {role_line}" if role_line else "")
+            + (f"\nTRANSITIONS: {transition_line}" if transition_line else "")
             + (f"\nSAMPLE BANKS: {bank_summary}" if bank_summary else "")
             + (f"\nSAMPLE SWITCHES: {switch_timeline}" if switch_timeline else "")
             + (f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}" if loaded_sources else "")

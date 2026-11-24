@@ -34,6 +34,14 @@ Reawarp is an offline-first Python audio engine. Its synthesis core is independe
 - Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
 - The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
 
+### Composition Director 2.0 (M15)
+- A persistent motif is extracted from a stable source phrase and keeps one identity across the arrangement.
+- Section instances apply deterministic repetition, displacement, fragmentation, augmentation/diminution, inversion, retrograde, rhythmic shadow and call/response transformations.
+- The same motif rhythm can appear as quiet hi-hat shadows or snare responses, while the melody remains its primary carrier.
+- A seven-role orchestration plan (kick, snare, hat, break, melody, texture and ambience) independently controls activity, density, syncopation, register, brightness and space.
+- Transition gestures are planned on the section/bar boundary and shape activity envelopes for pickups, fills, subtraction, collapse, silence gates, reverse-swell intentions, and echo handoffs.
+- The Generator exposes separate controls for the main composition axes; fixed seeds reproduce motif identity, transformations and role plans.
+
 ### Editable processing, role-aware routing, and musical automation (M11–M13)
 
 M11's serial chain editor supports add/remove/reorder operations, bounded stage parameters, per-stage wet/dry, global wet/tail, and portable versioned JSON.

@@ -28,6 +28,13 @@ class GenerationConfig:
     drum_part_cycle_bars: int = 2
     composition_energy: float = 0.62
     composition_variation: float = 0.45
+    arrangement_density: float = 0.55
+    rhythmic_syncopation: float = 0.52
+    arrangement_instability: float = 0.40
+    melodic_activity: float = 0.62
+    melody_register_semitones: int = 0
+    tonal_brightness: float = 0.55
+    spatial_intent: float = 0.52
     sample_rate: int = 48_000
     seed: int | str = 20261123
     complexity: float = 0.68
@@ -112,6 +119,15 @@ class GenerationConfig:
             raise ValueError("composition_energy must be between 0 and 1")
         if not 0.0 <= float(self.composition_variation) <= 1.0:
             raise ValueError("composition_variation must be between 0 and 1")
+        for name in (
+            "arrangement_density", "rhythmic_syncopation", "arrangement_instability",
+            "melodic_activity", "tonal_brightness", "spatial_intent",
+        ):
+            if not 0.0 <= float(getattr(self, name)) <= 1.0:
+                raise ValueError(f"{name} must be between 0 and 1")
+        if not -24 <= int(self.melody_register_semitones) <= 24:
+            raise ValueError("melody_register_semitones must be between -24 and 24")
+        object.__setattr__(self, "melody_register_semitones", int(self.melody_register_semitones))
         if not 0.0 <= float(self.complexity) <= 1.0:
             raise ValueError("complexity must be between 0.0 and 1.0")
         allowed_roles = {"kick", "snare", "hat", "break"}

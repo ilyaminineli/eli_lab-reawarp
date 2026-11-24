@@ -28,6 +28,8 @@ class PercussionEvent:
     pan: float = 0.0
     kind: str | None = None
     pattern_style: str | None = None
+    motif_id: str | None = None
+    motif_relation: str | None = None
 
     def to_dict(self) -> dict[str, int | float | str | None]:
         return asdict(self)
