@@ -9,6 +9,7 @@ from reawarp.synthesis.profiles import (
     HAT_PROFILES,
     KICK_PROFILES,
     MELODY_PROFILES,
+    EXTENDED_MELODY_PROFILES,
     SNARE_PROFILES,
     select_profile_name,
     EXTENDED_MELODY_PROFILES,
@@ -266,10 +267,10 @@ def render_extended_note(
         raise ValueError(f"unknown synthesis palette: {palette}")
 
     if palette in {"hybrid", "fm"}:
+        profile = "soft_keys" if palette == "hybrid" else "metallic_fm"
         return render_fm_note(
             frequency, sample_rate, rng, duration, velocity,
-            profile="metallic_fm" if palette == "fm" else "soft_keys",
-            brightness=brightness, instability=instability,
+            profile=profile, brightness=brightness, instability=instability,
         )
 
     length = max(64, int(round(sample_rate * (duration + 0.28))))
