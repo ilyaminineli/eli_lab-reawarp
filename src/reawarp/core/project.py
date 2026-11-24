@@ -21,7 +21,6 @@ class ReawarpProject:
     stems: dict[str, np.ndarray]
     events: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
-    fx_routing: dict[str, Any] = field(default_factory=dict)
 
     @property
     def frame_count(self) -> int:
@@ -70,7 +69,7 @@ class ReawarpProject:
         project_record = {
             "schema_version": 1,
             "application": "eli_lab-reawarp",
-            "application_version": "0.10.0",
+            "application_version": "0.11.0",
             "python_version": platform.python_version(),
             "sample_rate": self.sample_rate,
             "duration_seconds": self.duration,
