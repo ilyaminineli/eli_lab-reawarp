@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 
 from reawarp.export.wav import write_wav
+from reawarp.fx_automation import load_fx_automation, normalise_fx_automation, save_fx_automation
 from reawarp.fx_routing import (
     default_fx_routing, load_fx_routing,
     render_fx_routing, render_master_with_returns, save_fx_routing,
@@ -19,6 +20,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="reawarp-routing", description="Render role-aware stem FX routing offline.")
     parser.add_argument("project", type=Path, help="generated project directory containing project.json and stems/")
     parser.add_argument("--routing", type=Path, help="routing JSON; if omitted, a conservative starter file is created")
+    parser.add_argument("--automation", type=Path, help="optional beat-based FX automation JSON")
     parser.add_argument("--output", type=Path, default=Path("output/routed"), help="destination directory")
     parser.add_argument("--validate", action="store_true", help="validate routing JSON and exit")
     args = parser.parse_args()
@@ -37,10 +39,18 @@ def main() -> None:
         save_fx_routing(routing_path, default_fx_routing(names), names, sample_rate)
     try:
         routing = load_fx_routing(routing_path, names, sample_rate)
+        automation = (
+            load_fx_automation(args.automation, names)
+            if args.automation is not None else normalise_fx_automation(None, names)
+        )
     except Exception as exc:
-        raise SystemExit(f"Invalid routing: {exc}") from exc
+        raise SystemExit(f"Invalid routing or automation: {exc}") from exc
+    bpm = float(manifest.get("config", {}).get("bpm", 120.0))
     if args.validate:
-        print(f"Valid FX routing · {len(names)} stems · {len(routing['buses'])} buses")
+        print(
+            f"Valid FX routing · {len(names)} stems · {len(routing['buses'])} buses · "
+            f"{len(automation['lanes'])} automation lane(s) · {bpm:g} BPM"
+        )
         return
     try:
         import soundfile as sf
@@ -56,7 +66,9 @@ def main() -> None:
             raise SystemExit(f"Sample rate mismatch for {path.name}")
         stems[name] = np.ascontiguousarray(audio, dtype=np.float32)
     try:
-        processed, meta = render_fx_routing(stems, sample_rate, routing)
+        processed, meta = render_fx_routing(
+            stems, sample_rate, routing, bpm=bpm, automation=automation
+        )
     except Exception as exc:
         raise SystemExit(f"FX routing render failed: {exc}") from exc
     returns = meta.pop("bus_returns_audio")
@@ -66,6 +78,7 @@ def main() -> None:
         write_wav(output / "stems" / f"{name}.wav", audio, sample_rate, 24)
     for name, audio in returns.items():
         write_wav(output / "returns" / f"{name}.wav", audio, sample_rate, 24)
+    save_fx_automation(output / "fx_automation.json", automation, names)
     master = render_master_with_returns(processed, returns, master_wet=meta["master_wet"])
     write_wav(output / "master.wav", master, sample_rate, 24)
     (output / "routing.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
