@@ -64,6 +64,43 @@ jobs:
           print(f'Routing schema OK · {len(names)} stems · dry source preserved')
           PY
           reawarp-routing /tmp/reawarp-ci --routing /tmp/reawarp-routing.json --validate
+      - name: Validate beat-based FX automation without Pyo
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from reawarp.fx_automation import (
+              automation_envelope, load_fx_automation, normalise_fx_automation,
+              save_fx_automation,
+          )
+          project = json.loads(Path('/tmp/reawarp-ci/project.json').read_text(encoding='utf-8'))
+          stem = project['stems'][0]
+          payload = {
+              'schema_version': 1,
+              'lanes': {
+                  f'stem.{stem}.send.space': [
+                      {'beat': 0, 'value': 0.0, 'curve': 'smooth'},
+                      {'beat': 1, 'value': 0.5, 'curve': 'linear'},
+                      {'beat': 2, 'value': 0.0, 'curve': 'hold'},
+                  ]
+              },
+          }
+          automation = normalise_fx_automation(payload, project['stems'])
+          envelope = automation_envelope(
+              automation['lanes'][f'stem.{stem}.send.space'],
+              frames=2001, sample_rate=1000, bpm=120, default_value=0.0,
+          )
+          assert envelope[0] == 0.0
+          assert 0.20 < float(envelope[250]) < 0.30
+          assert abs(float(envelope[500]) - 0.5) < 1e-6
+          assert float(envelope[1000]) == 0.0
+          path = Path('/tmp/reawarp-automation.json')
+          save_fx_automation(path, automation, project['stems'])
+          loaded = load_fx_automation(path, project['stems'])
+          assert loaded == automation
+          print('Beat automation OK · deterministic smooth/linear/hold lanes')
+          PY
+          reawarp-routing /tmp/reawarp-ci --routing /tmp/reawarp-routing.json --automation /tmp/reawarp-automation.json --validate
       - name: Smoke-test local library CLI
         run: |
           reawarp-library --db /tmp/reawarp-library.sqlite3 index samples/13_cymbal1_606.wav
@@ -71,4 +108,4 @@ jobs:
       - name: Smoke-test desktop entry point
         env:
           QT_QPA_PLATFORM: offscreen
-        run: python -c "from PySide6.QtWidgets import QApplication; from reawarp.ui.main_window import MainWindow; app=QApplication([]); window=MainWindow(); assert window.tabs.count() == 5; assert window.fx_lab_page.stage_list.count() == 3; assert window.fx_routing_editor.stem.count() == 0; window.close(); app.processEvents(); print('Reawarp FX Lab and routing UI OK')"
+        run: python -c "from PySide6.QtWidgets import QApplication; from reawarp.ui.main_window import MainWindow; app=QApplication([]); window=MainWindow(); assert window.tabs.count() == 5; assert window.fx_lab_page.stage_list.count() == 3; assert window.fx_routing_editor.stem.count() == 0; assert window.fx_automation_editor.lane.count() == 0; assert window.fx_workspace_tabs.count() == 2; window.close(); app.processEvents(); print('Reawarp FX Lab, routing and automation UI OK')"
