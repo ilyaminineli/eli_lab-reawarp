@@ -152,6 +152,15 @@ def _build_break_events(
     # Pattern-family adaptation is deliberately opt-in through the global
     # structural-variation control. With zero variation, preserve the original
     # exact phrase template and density contract byte-for-byte.
+    if composition_plan is None:
+        composition_plan = build_composition_plan(
+            duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
+            structure=config.structure, energy=config.composition_energy,
+            variation=config.composition_variation, flow=config.composition_flow,
+            pattern_family=config.pattern_family,
+            pattern_relationship=config.pattern_relationship,
+        )
+
     step_seconds = config.sixteenth_seconds
     bar_count = (step_count + 15) // 16
     events: list[PercussionEvent] = []
