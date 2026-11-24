@@ -39,3 +39,12 @@ def test_generation_config_rejects_invalid_sample_bank_role_or_entry():
         GenerationConfig(sample_banks={"break": (_entry("x.wav", "break"),)})
     with pytest.raises(ValueError):
         GenerationConfig(sample_banks={"kick": ({"metadata": {}},)})
+
+
+def test_bundled_kick_role_includes_named_low_end_one_shots():
+    from reawarp.samples.catalog import discover_bundled_samples
+
+    names = {item.path.name for item in discover_bundled_samples(role="kick")}
+    assert "kick.wav" in names
+    assert "htr_c2_808_bass.wav" in names
+    assert "etp_c2_synth_bass_10.wav" in names
