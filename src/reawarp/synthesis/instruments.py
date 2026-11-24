@@ -296,6 +296,8 @@ def render_extended_note(
             (1.0, .58), (2.76, .24), (5.41, .13), (8.93, .07),
             (13.1, .035), (17.8, .018),
         )
+        if extended_profile is not None:
+            ratios = extended_profile.partials
         for index, (ratio, amp) in enumerate(ratios):
             detune = 1.0 + instability * (0.0007 * np.sin(2*np.pi*(.11+index*.017)*t))
             partial = frequency * ratio * detune
