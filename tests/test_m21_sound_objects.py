@@ -410,3 +410,77 @@ def test_renderer_enforces_declared_source_channel_count():
     )
     with pytest.raises(ValueError, match="declares 2 channels"):
         HybridVoiceRenderer().render(patch, {"stereo-source": source})
+
+
+
+def test_sound_object_score_adapter_renders_exact_event_span_and_controls():
+    from fractions import Fraction
+    from reawarp.score import (
+        AutomationLane, AutomationPoint, MusicalEvent, Score, ScoreRenderer,
+        TempoMap,
+    )
+    from reawarp.score.automation import (
+        AutomationTargetRegistry, DEFAULT_AUTOMATION_TARGETS,
+    )
+    from reawarp.synthesis.sound_object import (
+        build_score_sound_object_renderer, register_sound_object_automation_targets,
+    )
+
+    patch = _patch("score-voice")
+    register = AutomationTargetRegistry(DEFAULT_AUTOMATION_TARGETS.targets)
+    register_sound_object_automation_targets(register, patch)
+    target_id = "sound_object.score-voice.layer.body.gain"
+    event = MusicalEvent(
+        event_id="impact-01", voice_id="metal-impact",
+        onset_beats=Fraction(0), duration_beats=Fraction(128, 125),
+        kind="note", pitch=60, velocity=0.8,
+    )
+    score = Score(
+        title="Sound object Score voice",
+        tempo_map=TempoMap.constant(120.0),
+        events=(event,),
+        automation=(AutomationLane(
+            target_id,
+            (AutomationPoint(Fraction(0), 0.2),),
+            unit="normalized", minimum=0.0, maximum=4.0,
+        ),),
+        metadata={"sample_rate": SAMPLE_RATE, "frame_count": 4_096},
+    )
+    renderer = build_score_sound_object_renderer(patch, _sources())
+    result = ScoreRenderer().render(
+        score, SAMPLE_RATE, frame_count=4_096,
+        voice_renderers={"metal-impact": renderer},
+        automation_registry=register,
+    )
+    assert result.stems["metal-impact"].shape == (4_096, 2)
+    assert np.isfinite(result.stems["metal-impact"]).all()
+    assert np.max(np.abs(result.stems["metal-impact"])) > 0
+
+
+def test_sound_object_editor_model_exposes_units_ranges_and_role_choices():
+    from reawarp.synthesis.sound_object import sound_object_editor_model
+
+    model = sound_object_editor_model(_patch("editor-model"))
+    assert model["clock"] == {"sample_rate_hz": SAMPLE_RATE, "frame_unit": "frames"}
+    layer = next(item for item in model["layers"] if item["layer_id"] == "body")
+    assert layer["editable_fields"]["gain"]["unit"] == "linear"
+    assert layer["editable_fields"]["pan"]["minimum"] == -1.0
+    assert "transient" in layer["editable_fields"]["role"]
+    assert any(
+        item["target_id"] == "sound_object.editor-model.layer.body.gain"
+        for item in model["controls"]
+    )
+
+
+def test_sound_object_benchmark_harness_reports_time_and_memory():
+    from scripts.benchmark_sound_objects import benchmark
+
+    records = benchmark(12_000, 0.05, 1122)
+    assert {item["family"] for item in records} == {
+        "modal_resonator_bank", "additive_partial_voice",
+        "hybrid_transient_body_tail",
+    }
+    assert all(item["frames"] == 600 for item in records)
+    assert all(item["elapsed_seconds"] >= 0 for item in records)
+    assert all(item["tracemalloc_peak_bytes"] > 0 for item in records)
+    assert all(item["real_time_factor"] is not None for item in records)
