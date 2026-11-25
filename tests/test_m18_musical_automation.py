@@ -547,7 +547,15 @@ def test_scoped_modulation_base_value_does_not_leak_to_other_roles():
     assert bus.value_for_context(
         "synth.cutoff", 0, event_id="lead-note", default_value=0.0
     ) == pytest.approx(3_000.0)
-    assert bus.value_for_context(
+    value, active = bus.value_and_active_for_context(
         "synth.cutoff", 0, default_value=0.0,
         context={"role_id": "bass"},
-    ) == pytest.approx(20.0)
+    )
+    assert value == pytest.approx(0.0)
+    assert active is False
+    inactive = bus.sample(
+        "synth.cutoff", 0, 480, step_frames=48,
+        default_value=0.0, context={"role_id": "bass"},
+    )
+    assert inactive.active is not None
+    assert not bool(np.any(inactive.active)
