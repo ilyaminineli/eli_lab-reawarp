@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from reawarp.score.events import AutomationLane, MusicalEvent
+from reawarp.score.automation import AutomationModulation, AutomationSource
 from reawarp.score.time import MeterMap, TempoMap
 
 
@@ -19,6 +20,8 @@ class Score:
     meter_map: MeterMap = field(default_factory=MeterMap)
     events: tuple[MusicalEvent, ...] = ()
     automation: tuple[AutomationLane, ...] = ()
+    automation_sources: tuple[AutomationSource, ...] = ()
+    modulations: tuple[AutomationModulation, ...] = ()
     tuning_id: str = "12tet"
     tuning_reference_pitch: float = 69.0
     tuning_reference_frequency_hz: float = 440.0
@@ -47,7 +50,30 @@ class Score:
         object.__setattr__(self, "events", tuple(sorted(
             events, key=lambda item: (item.onset_beats, item.voice_id, item.event_id)
         )))
-        object.__setattr__(self, "automation", tuple(self.automation))
+        automation = tuple(self.automation)
+        lane_keys = [(lane.target_id, lane.scope, lane.scope_id) for lane in automation]
+        if len(lane_keys) != len(set(lane_keys)):
+            raise ValueError("automation target/scope combinations must be unique")
+        sources = tuple(self.automation_sources)
+        source_ids = [source.source_id for source in sources]
+        if len(source_ids) != len(set(source_ids)):
+            raise ValueError("automation source IDs must be unique")
+        modulations = tuple(self.modulations)
+        modulation_keys = [
+            (item.source_id, item.destination_target_id, item.retrigger)
+            for item in modulations
+        ]
+        if len(modulation_keys) != len(set(modulation_keys)):
+            raise ValueError("automation modulation relationships must be unique")
+        unknown_sources = {item.source_id for item in modulations} - set(source_ids)
+        if unknown_sources:
+            raise ValueError(
+                "automation modulation references unknown source(s): "
+                + ", ".join(sorted(unknown_sources))
+            )
+        object.__setattr__(self, "automation", automation)
+        object.__setattr__(self, "automation_sources", sources)
+        object.__setattr__(self, "modulations", modulations)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
@@ -63,7 +89,8 @@ class Score:
             ),
             default=0,
         )
-        return max(event_end, automation_end)
+        source_end = max((source.end for source in self.automation_sources), default=0)
+        return max(event_end, automation_end, source_end)
 
     def beat_to_seconds(self, beat) -> float:
         return self.tempo_map.beat_to_seconds(beat)
@@ -87,6 +114,8 @@ class Score:
             },
             "events": [event.to_dict() for event in self.events],
             "automation": [lane.to_dict() for lane in self.automation],
+            "automation_sources": [source.to_dict() for source in self.automation_sources],
+            "modulations": [item.to_dict() for item in self.modulations],
             "metadata": self.metadata,
         }
 
@@ -107,6 +136,14 @@ class Score:
             events=tuple(MusicalEvent.from_dict(item) for item in data.get("events", [])),
             automation=tuple(
                 AutomationLane.from_dict(item) for item in data.get("automation", [])
+            ),
+            automation_sources=tuple(
+                AutomationSource.from_dict(item)
+                for item in data.get("automation_sources", [])
+            ),
+            modulations=tuple(
+                AutomationModulation.from_dict(item)
+                for item in data.get("modulations", [])
             ),
             tuning_id=str(tuning.get("id", "12tet")),
             tuning_reference_pitch=float(tuning.get("reference_pitch", 69.0)),
