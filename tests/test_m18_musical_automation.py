@@ -162,6 +162,10 @@ def test_lfo_modulation_supports_explicit_event_retrigger_phase():
         amount=6.0,
         polarity="bipolar",
         retrigger="event",
+        scope="role",
+        scope_id="lead",
+        minimum=-12.0,
+        maximum=12.0,
     )
     bus = AutomationControlBus(
         (lane,),
@@ -229,6 +233,8 @@ def test_score_round_trip_preserves_scopes_sources_and_modulation():
             AutomationModulation(
                 "breathing", "synth.cutoff", amount=800.0,
                 retrigger="section", smoothing_seconds=0.03,
+                minimum=100.0, maximum=12_000.0,
+                scope="role", scope_id="melody",
             ),
         ),
     )
