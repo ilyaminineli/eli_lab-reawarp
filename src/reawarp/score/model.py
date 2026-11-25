@@ -22,6 +22,8 @@ class Score:
     automation: tuple[AutomationLane, ...] = ()
     automation_sources: tuple[AutomationSource, ...] = ()
     modulations: tuple[AutomationModulation, ...] = ()
+    harmonic_context: dict[str, Any] | None = None
+    sonorities: tuple[dict[str, Any], ...] = ()
     tuning_id: str = "12tet"
     tuning_reference_pitch: float = 69.0
     tuning_reference_frequency_hz: float = 440.0
@@ -58,6 +60,37 @@ class Score:
         source_ids = [source.source_id for source in sources]
         if len(source_ids) != len(set(source_ids)):
             raise ValueError("automation source IDs must be unique")
+        harmonic_context = self.harmonic_context
+        if harmonic_context is not None:
+            if not isinstance(harmonic_context, dict):
+                raise ValueError("harmonic_context must be an object or None")
+            harmonic_context = json.loads(json.dumps(
+                harmonic_context, ensure_ascii=False, allow_nan=False
+            ))
+            mode = str(harmonic_context.get("mode", "chromatic"))
+            if mode not in {"chromatic", "collection", "centred", "intervallic", "spectral", "microtonal", "ambiguous"}:
+                raise ValueError(f"unsupported harmonic context mode: {mode}")
+            for key in ("pitch_collection", "allowed_intervals"):
+                values = harmonic_context.get(key, [])
+                if not isinstance(values, list) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in values):
+                    raise ValueError(f"harmonic_context {key} must be a list of finite numbers")
+            for key in ("stability_weights", "tension_weights"):
+                values = harmonic_context.get(key, {})
+                if not isinstance(values, dict) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in values.values()):
+                    raise ValueError(f"harmonic_context {key} must map labels to finite numbers")
+        sonorities = tuple(json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False)) for item in self.sonorities)
+        sonority_ids = [str(item.get("sonority_id", "")) for item in sonorities]
+        if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
+            raise ValueError("sonorities require unique non-empty sonority_id values")
+        for item in sonorities:
+            from reawarp.score.time import as_fraction
+            start = as_fraction(item.get("onset_beats", 0))
+            duration = as_fraction(item.get("duration_beats", 1))
+            if start < 0 or duration <= 0:
+                raise ValueError("sonority onset must be non-negative and duration positive")
+            pitches = item.get("pitches", [])
+            if not isinstance(pitches, list) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in pitches):
+                raise ValueError("sonority pitches must be a list of finite pitch coordinates")
         modulations = tuple(self.modulations)
         modulation_keys = [
             (
@@ -77,6 +110,8 @@ class Score:
         object.__setattr__(self, "automation", automation)
         object.__setattr__(self, "automation_sources", sources)
         object.__setattr__(self, "modulations", modulations)
+        object.__setattr__(self, "harmonic_context", harmonic_context)
+        object.__setattr__(self, "sonorities", sonorities)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
@@ -119,6 +154,8 @@ class Score:
             "automation": [lane.to_dict() for lane in self.automation],
             "automation_sources": [source.to_dict() for source in self.automation_sources],
             "modulations": [item.to_dict() for item in self.modulations],
+            "harmonic_context": self.harmonic_context,
+            "sonorities": list(self.sonorities),
             "metadata": self.metadata,
         }
 
@@ -148,6 +185,8 @@ class Score:
                 AutomationModulation.from_dict(item)
                 for item in data.get("modulations", [])
             ),
+            harmonic_context=data.get("harmonic_context"),
+            sonorities=tuple(data.get("sonorities", ())),
             tuning_id=str(tuning.get("id", "12tet")),
             tuning_reference_pitch=float(tuning.get("reference_pitch", 69.0)),
             tuning_reference_frequency_hz=float(
