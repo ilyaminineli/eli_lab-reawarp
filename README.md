@@ -339,7 +339,7 @@ See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented b
 - [IRO integration contract](docs/IRO_INTEGRATION.md) — shared sample identity, provenance and the phrase grammar bridge to the IRO project.
 ## Current roadmap
 
-The current implementation baseline is **M18 complete; M19 in progress**. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs. M19.1–M19.5 now add optional harmonic context, tuning-aware sonority generation, sequence-level melodic voice-leading, six independent bass roles, explicit motif identity contracts, sonority-aware motif resolution and exact Reawarp pitch metadata in MIDI exports, without imposing functional tonality.
+The current implementation baseline is **M18 and M19 complete**. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M19.1–M19.5 add optional harmonic context, tuning-aware sonority generation, sequence-level melodic voice-leading, six independent bass roles, explicit motif identity contracts, sonority-aware motif resolution and exact Reawarp pitch metadata in MIDI exports, without imposing functional tonality. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs.
 
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
 - [Consolidated Roadmap](docs/ROADMAP.md) — post-M18 status and M19–M25 forward plan.

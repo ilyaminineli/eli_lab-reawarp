@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M18 is closed and M19.1–M19.4 are implemented on `main`. M19.4 supplies six independent bass-role grammars, shared phrase/form timing, real kick-event relationships, explicit density/register/movement/cadence controls, deterministic provenance and Score persistence. M19.5 motif/MIDI integration remains. M14 hardware profiling and matched-level/Pyo listening remain separate experimental sign-offs.
+**Current implementation baseline:** M18 is closed and M19.1–M19.5 are implemented on `main`. M19 includes optional pitch fields, tuning-aware sonorities, sequence-level voice-leading, six independent bass-role grammars, motif identity contracts, and exact Reawarp pitch metadata in MIDI. M14 hardware profiling and matched-level/Pyo listening remain separate experimental sign-offs.
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
