@@ -183,7 +183,7 @@ See [M20.md](M20.md).
 
 ## M21: Sound-object and hybrid instrument architecture
 
-**Status:** Planned. Existing synthesis palettes and hybrid percussion provide a foundation; a reusable source/envelope/spectrum/modulation/space model and broader hybrid voices remain future work.
+**Status:** Partially implemented on `feature/m21-sound-object-architecture-final`. The versioned sound-object patch schema, frame-exact hybrid transient/body/tail renderer, typed patch/layer controls, modal and additive native voices, non-destructive resampling provenance, and searchable SQLite patch/variant lineage are implemented with automated coverage. A graphical editor, direct ScoreRenderer object adapter, target-machine benchmarks and human matched-level listening remain.
 
 **Goal:** Treat instruments as designed sound behaviours with separately controllable transient/body/tail, spectral identity, modulation and spatial intent.
 
