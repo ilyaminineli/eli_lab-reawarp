@@ -73,7 +73,12 @@ def _control_curve(
         return None
     step = max(1, int(sample_rate) // 1000)
     sampled = controls.sample(
-        target_id, scheduled.start_frame, scheduled.end_frame, step_frames=step
+        target_id,
+        scheduled.start_frame,
+        scheduled.end_frame,
+        step_frames=step,
+        default_value=default,
+        event_id=scheduled.event.event_id,
     )
     if not len(sampled.frames):
         return np.full(scheduled.duration_frames, float(default), dtype=np.float32)
@@ -151,7 +156,15 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
             frequency = 440.0 * (2.0 ** ((float(event.pitch) - 69.0) / 12.0))
         if frequency is None or float(frequency) <= 0:
             raise ValueError(f'melody event {event.event_id!r} needs a positive frequency')
-        pitch_lane = controls.value_at_frame('synth.pitch', scheduled.start_frame) if 'synth.pitch' in controls.target_ids else 0.0
+        pitch_lane = (
+            controls.value_for_context(
+                'synth.pitch',
+                scheduled.start_frame,
+                event_id=event.event_id,
+                default_value=0.0,
+            )
+            if 'synth.pitch' in controls.target_ids else 0.0
+        )
         register = float(parameters.get('register_semitones', config.melody_register_semitones))
         frequency = float(frequency) * (2.0 ** ((register + pitch_lane) / 12.0))
         gate_value = parameters.get('gate_duration_beats')
