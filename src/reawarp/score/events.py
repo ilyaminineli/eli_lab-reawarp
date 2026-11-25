@@ -168,6 +168,10 @@ class AutomationLane:
     smoothing_seconds: float = 0.0
     minimum: float | None = None
     maximum: float | None = None
+    hysteresis: float = 0.0
+    scope: str = "global"
+    scope_id: str | None = None
+    value_mode: str = "absolute"
 
     def __post_init__(self) -> None:
         if not self.target_id.strip():
@@ -188,8 +192,18 @@ class AutomationLane:
             object.__setattr__(self, "loop_length", loop)
         if not math.isfinite(float(self.smoothing_seconds)) or self.smoothing_seconds < 0:
             raise ValueError("smoothing_seconds must be finite and non-negative")
+        if not math.isfinite(float(self.hysteresis)) or self.hysteresis < 0:
+            raise ValueError("hysteresis must be finite and non-negative")
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise ValueError("automation minimum cannot exceed maximum")
+        if self.scope not in {"global", "section", "role", "event"}:
+            raise ValueError("automation scope must be global, section, role, or event")
+        if self.scope == "global" and self.scope_id is not None:
+            raise ValueError("global automation lanes cannot have a scope_id")
+        if self.scope != "global" and not str(self.scope_id or "").strip():
+            raise ValueError(f"{self.scope} automation lanes require a scope_id")
+        if self.value_mode not in {"absolute", "relative"}:
+            raise ValueError("automation value_mode must be absolute or relative")
         object.__setattr__(self, "points", points)
 
     def evaluate(
@@ -274,6 +288,10 @@ class AutomationLane:
             "smoothing_seconds": self.smoothing_seconds,
             "minimum": self.minimum,
             "maximum": self.maximum,
+            "hysteresis": self.hysteresis,
+            "scope": self.scope,
+            "scope_id": self.scope_id,
+            "value_mode": self.value_mode,
         }
 
     @classmethod
@@ -298,4 +316,8 @@ class AutomationLane:
             smoothing_seconds=float(data.get("smoothing_seconds", 0.0)),
             minimum=None if data.get("minimum") is None else float(data["minimum"]),
             maximum=None if data.get("maximum") is None else float(data["maximum"]),
+            hysteresis=float(data.get("hysteresis", 0.0)),
+            scope=str(data.get("scope", "global")),
+            scope_id=None if data.get("scope_id") is None else str(data["scope_id"]),
+            value_mode=str(data.get("value_mode", "absolute")),
         )
