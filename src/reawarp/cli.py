@@ -37,6 +37,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--drum-change-intensity", type=float, default=0.68)
     parser.add_argument("--drum-part-cycle-bars", type=int, choices=(1, 2, 4), default=2)
+    parser.add_argument(
+        "--drum-sample-automation", choices=("fixed", "section", "cycle", "automatic"),
+        default="automatic", help="when percussion sample banks switch through the arrangement",
+    )
+    parser.add_argument("--arrangement-density", type=float, default=0.55)
+    parser.add_argument("--rhythmic-syncopation", type=float, default=0.52)
+    parser.add_argument("--arrangement-instability", type=float, default=0.40)
+    parser.add_argument("--melodic-activity", type=float, default=0.62)
+    parser.add_argument("--melody-register-semitones", type=int, choices=range(-24, 25), default=0)
+    parser.add_argument("--tonal-brightness", type=float, default=0.55)
+    parser.add_argument("--spatial-intent", type=float, default=0.52)
     parser.add_argument("--synth-palette", choices=SYNTH_PALETTES, default="subtractive", help="lead synthesis architecture palette")
     parser.add_argument("--percussion-synthesis", choices=("minimal", "extended", "samples"), default="minimal", help="synthetic drum architecture used when synthesis is active")
     parser.add_argument(
@@ -44,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="automatic", help="section-aware sample/synthesis source mode",
     )
     parser.add_argument(
-        "--percussion-hybrid-architecture", choices=("transient_body", "layered"),
+        "--percussion-hybrid-architecture", choices=("transient_body", "layered", "feature_guided"),
         default="transient_body", help="sample transient + synth body, or two full parallel layers",
     )
     parser.add_argument("--percussion-sample-mix", type=float, default=0.46)
@@ -154,6 +165,14 @@ def main() -> None:
         pattern_follow_structure=args.pattern_follow_structure,
         drum_change_intensity=args.drum_change_intensity,
         drum_part_cycle_bars=args.drum_part_cycle_bars,
+        drum_sample_automation=args.drum_sample_automation,
+        arrangement_density=args.arrangement_density,
+        rhythmic_syncopation=args.rhythmic_syncopation,
+        arrangement_instability=args.arrangement_instability,
+        melodic_activity=args.melodic_activity,
+        melody_register_semitones=args.melody_register_semitones,
+        tonal_brightness=args.tonal_brightness,
+        spatial_intent=args.spatial_intent,
         synth_palette=args.synth_palette,
         percussion_synthesis=args.percussion_synthesis,
         percussion_source_mode=args.percussion_source_mode,
