@@ -67,6 +67,39 @@ python -m pip install -e ".[pippi]"     # experimental pre-release integration
 
 Pyo, FluidSynth and selected research integrations may require platform-specific native runtimes. `requirements.txt` is an expanded developer/research inventory; prefer the curated extras in `pyproject.toml`. See [Dependency ecosystem](docs/DEPENDENCY_ECOSYSTEM.md).
 
+## Full-featured Windows CMD test
+
+Install the audio, desktop, MIDI and offline FX extras:
+
+```cmd
+python -m pip install -e ".[audio,m4,midi,pyo]"
+```
+
+This 90-second stress test deliberately exercises the complete generator surface:
+formal structure mutation, asymmetric rhythm and role relationships, independent
+composition axes, drum evolution and sample-bank switching, hybrid percussion,
+alternative synthesis and melody profiles, all break-transform families, and
+Score/MIDI output. BPM and duration are explicit and remain fixed.
+
+**Run from the repository root in Windows CMD (single line):**
+
+```cmd
+reawarp --bpm 137 --duration 90 --structure autechre_like --flow mutate --pattern-family asymmetric_7 --pattern-relationship shadow --pattern-follow-structure --drum-change-intensity 0.92 --drum-part-cycle-bars 1 --drum-sample-automation automatic --arrangement-density 0.76 --rhythmic-syncopation 0.86 --arrangement-instability 0.82 --melodic-activity 0.72 --melody-register-semitones 7 --tonal-brightness 0.67 --spatial-intent 0.88 --synth-palette granular --percussion-synthesis extended --percussion-source-mode hybrid --percussion-hybrid-architecture feature_guided --percussion-sample-mix 0.57 --hybrid-transient-ms 34 --melody-scale whole_tone --melody-root 6 --energy 0.78 --variation 0.88 --complexity 0.91 --seed 20261126 --melody-profile auto --kick-profile auto --snare-profile auto --hat-profile auto --break-style auto --break-density 0.72 --break-variation 0.82 --break-cycle-bars 1 --break-transforms slice_rearrange,stutter,dropout,reverse,gate,pitch_shift,time_stretch,granular,spectral_freeze --break-slice-count 32 --break-stutter-repeats 5 --break-dropout-probability 0.14 --break-pitch-semitones 3 --break-time-stretch 1.08 --break-gate-rate 11 --break-gate-duty 0.58 --break-grain-size-ms 65 --break-grain-density 1.8 --break-freeze-position 0.31 --ambience-level 0.23 --sample-rate 48000 --bit-depth 24 --midi-output output/reawarp-full-test/score.mid --output output/reawarp-full-test
+```
+
+The CLI generation step creates the source project, dry stems, Score and MIDI.
+FX routing is a distinct production render; run the next command to produce processed
+stems, SPACE/ECHO returns and the routed master:
+
+```cmd
+reawarp-routing output/reawarp-full-test --output output/reawarp-full-test-routed
+```
+
+The routing step uses the role-aware project defaults. Pyo and SoundFile must be
+installed for actual offline effect rendering. If that render fails, Reawarp retains
+the original dry stems and marks the audition state as a dry fallback instead of
+claiming that effects were applied.
+
 ## Generate a composition
 
 ```bash
