@@ -684,7 +684,7 @@ class AutomationControlBus:
             item for item in self._modulations.get(target_id, ())
             if self._modulation_matches_context(item, resolved_context)
         )
-        if not self._lanes.get(target_id):
+        if not active:
             explicit_base = next(
                 (
                     item.base_value for item in destination_modulations
