@@ -245,3 +245,18 @@ class Sonority:
             "tension": self.tension,
             "transform": self.transform,
         }
+
+def pitch_field_from_score(score) -> PitchField:
+    """Construct the optional pitch field carried by a Score."""
+    return PitchField.from_score_context(score.harmonic_context)
+
+
+def tuning_from_score(score, *, period_ratio: float = 2.0) -> EqualTemperamentTuning:
+    """Build the Score's equal-period tuning adapter from its persisted tuning data."""
+    return EqualTemperamentTuning(
+        divisions_per_period=score.tuning_divisions_per_period,
+        period_ratio=period_ratio,
+        reference_pitch=score.tuning_reference_pitch,
+        reference_frequency_hz=score.tuning_reference_frequency_hz,
+        identifier=score.tuning_id,
+    )
