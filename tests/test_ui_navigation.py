@@ -219,6 +219,7 @@ def test_m18_score_control_can_edit_existing_curves_and_undo_the_change():
     editor.source_values.setText("0.0, 0.4, 1.0")
     editor._add_control()
 
+    editor._begin_preview_edit()
     editor._preview_values_changed([0.0, 0.8, 0.2])
     updated = editor.updated_score(score)
     assert updated.automation_sources[0].parameters["values"] == [0.0, 0.8, 0.2]
