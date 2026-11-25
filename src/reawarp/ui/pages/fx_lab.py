@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import numpy as np
-from PySide6.QtCore import QThreadPool, Qt
+from PySide6.QtCore import QThreadPool, Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -49,7 +49,9 @@ def _playable(audio: np.ndarray) -> np.ndarray:
 
 
 class FxLabPage(QWidget):
-    """Load audio, build a serial chain, compare dry/wet, and export safely."""
+    """Load audio or project channels, design a chain, and apply it to a stem."""
+
+    applyChainRequested = Signal(str, object, float, float)
 
     def __init__(self, player: AudioPlayer, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -58,6 +60,8 @@ class FxLabPage(QWidget):
         self.processed_audio: np.ndarray | None = None
         self.sample_rate = 48_000
         self.source_path: Path | None = None
+        self._project_stems: dict[str, np.ndarray] = {}
+        self._project_stem: str | None = None
         self._worker: RenderWorker | None = None
         self._stages: list[dict[str, float | str]] = [
             dict(stage) for stage in FX_PRESETS["restrained_space"]
@@ -89,6 +93,28 @@ class FxLabPage(QWidget):
         self.source_button.clicked.connect(self._browse)
         source_layout.addWidget(self.source_button)
         layout.addWidget(source_group)
+
+        project_group = QGroupBox("ACTIVE COMPOSITION / STEM SOURCE")
+        project_layout = QHBoxLayout(project_group)
+        self.project_stem_combo = QComboBox()
+        self.project_stem_combo.setEnabled(False)
+        self.project_stem_combo.setToolTip(
+            "Load one of the active project's original dry channels into FX Lab."
+        )
+        project_layout.addWidget(self.project_stem_combo, 1)
+        self.load_project_stem_button = QPushButton("LOAD STEM")
+        self.load_project_stem_button.setEnabled(False)
+        self.load_project_stem_button.clicked.connect(self._load_project_stem)
+        project_layout.addWidget(self.load_project_stem_button)
+        self.apply_chain_button = QPushButton("APPLY CHAIN TO STEM MIXER")
+        self.apply_chain_button.setEnabled(False)
+        self.apply_chain_button.setToolTip(
+            "Attach this editable chain to the selected project stem. "
+            "The Stem Mixer then pre-renders it with the project's sends and returns."
+        )
+        self.apply_chain_button.clicked.connect(self._apply_chain_to_project_stem)
+        project_layout.addWidget(self.apply_chain_button)
+        layout.addWidget(project_group)
 
         self.controls_group = QGroupBox("SERIAL EFFECT CHAIN")
         controls_layout = QVBoxLayout(self.controls_group)
@@ -400,6 +426,8 @@ class FxLabPage(QWidget):
         self.source_audio = np.ascontiguousarray(audio, dtype=np.float32)
         self.sample_rate = int(sample_rate)
         self.source_path = Path(path)
+        self._project_stem = None
+        self.apply_chain_button.setEnabled(False)
         self.path_field.setText(str(self.source_path))
         self.source_preview.set_audio(self.source_audio, self.sample_rate)
         self.play_source_button.setEnabled(True)
@@ -408,6 +436,63 @@ class FxLabPage(QWidget):
         self.status.setText(
             f"Loaded {self.source_path.name} · {len(audio) / self.sample_rate:.2f}s · "
             f"{self.sample_rate:,} Hz · {audio.shape[1]} channel(s). Original file is untouched."
+        )
+
+    def set_project_sources(
+        self, stems: dict[str, np.ndarray], sample_rate: int
+    ) -> None:
+        """Expose a frozen copy of the current project's dry stems to FX Lab."""
+        self._project_stems = {
+            str(name): np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in stems.items()
+        }
+        self.sample_rate = int(sample_rate)
+        self.project_stem_combo.blockSignals(True)
+        self.project_stem_combo.clear()
+        for name in self._project_stems:
+            self.project_stem_combo.addItem(name.replace("_", " ").upper(), name)
+        self.project_stem_combo.blockSignals(False)
+        available = bool(self._project_stems)
+        self.project_stem_combo.setEnabled(available)
+        self.load_project_stem_button.setEnabled(available)
+        if not available:
+            self._project_stem = None
+            self.apply_chain_button.setEnabled(False)
+
+    def _load_project_stem(self) -> None:
+        name = self.project_stem_combo.currentData()
+        if not name or name not in self._project_stems:
+            return
+        self.source_audio = self._project_stems[name].copy()
+        self.sample_rate = int(self.sample_rate)
+        self.source_path = None
+        self._project_stem = str(name)
+        self.path_field.setText(f"ACTIVE PROJECT / {name}")
+        self.source_preview.set_audio(self.source_audio, self.sample_rate)
+        self.play_source_button.setEnabled(True)
+        self._invalidate_result()
+        self.status.setText(
+            f"Loaded dry project channel {name} · {len(self.source_audio) / self.sample_rate:.2f}s · "
+            "the project source remains unchanged."
+        )
+
+    def _apply_chain_to_project_stem(self) -> None:
+        if self._project_stem is None:
+            self.status.setText("Load a project stem before applying this chain.")
+            return
+        try:
+            stages = normalise_fx_stages(self._stages, sample_rate=self.sample_rate)
+        except Exception as exc:
+            self.status.setText(f"Invalid custom chain: {exc}")
+            return
+        self.applyChainRequested.emit(
+            self._project_stem,
+            [dict(stage) for stage in stages],
+            self.wet.value() / 100.0,
+            float(self.tail.value()),
+        )
+        self.status.setText(
+            f"Applied custom insert to {self._project_stem}. Open Stem Mixer to pre-render and audition the complete mix."
         )
 
     def _load_chain(self) -> None:
@@ -522,6 +607,9 @@ class FxLabPage(QWidget):
     def _set_result_available(self, available: bool) -> None:
         self.play_result_button.setEnabled(available)
         self.save_button.setEnabled(available)
+        self.apply_chain_button.setEnabled(
+            available and self._project_stem is not None
+        )
 
     def _play_source(self) -> None:
         if self.source_audio is None:
