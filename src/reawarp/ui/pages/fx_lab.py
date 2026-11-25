@@ -59,6 +59,7 @@ class FxLabPage(QWidget):
         self.source_audio: np.ndarray | None = None
         self.processed_audio: np.ndarray | None = None
         self.sample_rate = 48_000
+        self.project_sample_rate = 48_000
         self.source_path: Path | None = None
         self._project_stems: dict[str, np.ndarray] = {}
         self._project_stem: str | None = None
@@ -446,7 +447,7 @@ class FxLabPage(QWidget):
             str(name): np.asarray(audio, dtype=np.float32).copy()
             for name, audio in stems.items()
         }
-        self.sample_rate = int(sample_rate)
+        self.project_sample_rate = int(sample_rate)
         self.project_stem_combo.blockSignals(True)
         self.project_stem_combo.clear()
         for name in self._project_stems:
@@ -464,7 +465,7 @@ class FxLabPage(QWidget):
         if not name or name not in self._project_stems:
             return
         self.source_audio = self._project_stems[name].copy()
-        self.sample_rate = int(self.sample_rate)
+        self.sample_rate = int(self.project_sample_rate)
         self.source_path = None
         self._project_stem = str(name)
         self.path_field.setText(f"ACTIVE PROJECT / {name}")
