@@ -23,7 +23,7 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import (
-    measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,
+    match_audition_level, measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,
 )
 from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
@@ -1749,16 +1749,28 @@ class MainWindow(QMainWindow):
         if audio is None or not len(audio):
             self.statusBar().showMessage("This route has no rendered contribution to audition.", 5000)
             return
+        audition_audio = np.asarray(audio, dtype=np.float32)
+        match_report = None
+        if self.fx_routing_editor.match_audition_level():
+            audition_audio, match_report = match_audition_level(
+                audition_audio, target_rms_dbfs=-18.0, peak_ceiling=0.95
+            )
         try:
             self.player.stop()
             self.player.start(
-                np.asarray(audio, dtype=np.float32),
+                audition_audio,
                 self.project.sample_rate,
                 device=self.output_device.currentData(),
             )
             self.play_button.setText("PAUSE")
             self.preview_source.setCurrentIndex(0)
-            self.statusBar().showMessage(f"Auditioning {stage.upper()} · {stem}", 5000)
+            suffix = (
+                f" · matched {match_report['output_rms_dbfs']:.1f} dBFS RMS"
+                if match_report is not None else ""
+            )
+            self.statusBar().showMessage(
+                f"Auditioning {stage.upper()} · {stem}{suffix}", 5000
+            )
         except Exception as exc:
             self._show_error(f"FX audition failed: {exc}")
 
