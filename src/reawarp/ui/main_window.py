@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import secrets
 import shutil
 import tempfile
@@ -56,6 +57,8 @@ from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import CancellableRenderWorker
+logger = logging.getLogger("reawarp.ui")
+
 from reawarp.variations import (
     VariationBatch, VariationBatchService, VariationCandidate, VariationCandidateRecord, VariationRequest,
     build_listening_set, clone_project, matched_ab, project_audio,
@@ -717,6 +720,14 @@ class MainWindow(QMainWindow):
         )
         self.generate_button.clicked.connect(self._generate)
         action_layout.addWidget(self.generate_button)
+        self.randomise_button = QPushButton("FULL RANDOMISE")
+        self.randomise_button.setMinimumHeight(54)
+        self.randomise_button.setToolTip(
+            "Randomise every generator setting except BPM and duration. "
+            "The generated values are written into the visible controls."
+        )
+        self.randomise_button.clicked.connect(self._randomise_all_parameters)
+        action_layout.addWidget(self.randomise_button)
         layout.addWidget(action_bar)
         layout.addWidget(splitter, 1)
         return page
@@ -813,6 +824,15 @@ class MainWindow(QMainWindow):
         self.output_device = QComboBox()
         self.output_device.setMinimumWidth(180)
         layout.addWidget(self.output_device)
+        self.fx_render_state = QLabel("FX NOT RENDERED")
+        self.fx_render_state.setObjectName("muted")
+        layout.addWidget(self.fx_render_state)
+        self.retry_fx_button = QPushButton("PRE-RENDER FX")
+        self.retry_fx_button.setToolTip(
+            "Render all configured inserts and shared returns without modifying dry source stems."
+        )
+        self.retry_fx_button.clicked.connect(self._retry_fx_render)
+        layout.addWidget(self.retry_fx_button)
         self.play_button = QPushButton("PLAY")
         self.play_button.clicked.connect(self._toggle_playback)
         self.play_button.setEnabled(False)
@@ -1330,6 +1350,96 @@ class MainWindow(QMainWindow):
             break_grain_density=self.grain_density.value(),
             break_spectral_freeze_position=self.freeze_position.value(),
         )
+
+    def _randomise_all_parameters(self) -> None:
+        """Randomise every exposed generator setting while preserving tempo and length."""
+        from reawarp.randomization import random_generation_config
+
+        bpm = float(self.bpm.value())
+        duration = float(self.duration.value())
+        try:
+            base = self._read_config()
+            seed = secrets.randbelow(2 ** 31 - 1) + 1
+            config = random_generation_config(base, seed=seed)
+            config = replace(config, bpm=bpm, duration=duration)
+            self._apply_config_to_controls(config)
+        except Exception as exc:
+            self._show_error(f"Could not randomise generator settings: {exc}")
+            return
+        self.seed.setText(str(seed))
+        self.statusBar().showMessage(
+            f"Full generator randomisation prepared · {bpm:g} BPM · {duration:g}s · "
+            f"seed {seed}. Settings remain editable; press GENERATE TRACK to render.",
+            12000,
+        )
+
+    def _apply_config_to_controls(self, config: GenerationConfig) -> None:
+        """Reflect a randomised GenerationConfig in the visible Generator controls."""
+        self.structure.setCurrentText(config.structure)
+        self.composition_flow.setCurrentText(config.composition_flow)
+        self.pattern_family.setCurrentText(config.pattern_family)
+        self.pattern_relationship.setCurrentText(config.pattern_relationship)
+        self.pattern_follow_structure.setChecked(config.pattern_follow_structure)
+        self.drum_change_intensity.setValue(config.drum_change_intensity)
+        self.drum_part_cycle_bars.setCurrentIndex(
+            max(0, self.drum_part_cycle_bars.findData(config.drum_part_cycle_bars))
+        )
+        self.composition_energy.setValue(config.composition_energy)
+        self.composition_variation.setValue(config.composition_variation)
+        self.complexity.setValue(round(config.complexity * 100))
+        self.arrangement_density.setValue(config.arrangement_density)
+        self.rhythmic_syncopation.setValue(config.rhythmic_syncopation)
+        self.arrangement_instability.setValue(config.arrangement_instability)
+        self.melodic_activity.setValue(config.melodic_activity)
+        self.melody_register_semitones.setValue(config.melody_register_semitones)
+        self.tonal_brightness.setValue(config.tonal_brightness)
+        self.spatial_intent.setValue(config.spatial_intent)
+        self.melody_enabled.setChecked(config.include_melody)
+        self.texture_enabled.setChecked(config.include_texture)
+        self.ambience_enabled.setChecked(config.include_ambience)
+        self.ambience_level.setValue(config.ambience_level)
+        self.drum_sample_automation.setCurrentIndex(
+            max(0, self.drum_sample_automation.findData(config.drum_sample_automation))
+        )
+        self.auto_drum_sample_switching.setChecked(
+            config.drum_sample_automation != "fixed"
+        )
+        self.percussion_source_mode.setCurrentIndex(
+            max(0, self.percussion_source_mode.findData(config.percussion_source_mode))
+        )
+        self.percussion_hybrid_architecture.setCurrentIndex(
+            max(0, self.percussion_hybrid_architecture.findData(
+                config.percussion_hybrid_architecture
+            ))
+        )
+        self.percussion_sample_mix.setValue(config.percussion_sample_mix)
+        self.hybrid_transient_ms.setValue(config.hybrid_transient_ms)
+        self.kick_profile.setCurrentText(config.kick_profile)
+        self.snare_profile.setCurrentText(config.snare_profile)
+        self.hat_profile.setCurrentText(config.hat_profile)
+        self.melody_profile.setCurrentText(config.melody_profile)
+        self.synth_palette.setCurrentText(config.synth_palette)
+        self.percussion_synthesis.setCurrentText(config.percussion_synthesis)
+        self.melody_scale.setCurrentText(config.melody_scale)
+        self.melody_root.setCurrentIndex(config.melody_root)
+        self.break_style.setCurrentText(config.break_style)
+        self.break_density.setValue(config.break_density)
+        self.break_variation.setValue(config.break_variation)
+        self.break_cycle_bars.setCurrentIndex(
+            max(0, self.break_cycle_bars.findData(config.break_cycle_bars))
+        )
+        for name, checkbox in self.break_transform_checks.items():
+            checkbox.setChecked(name in config.break_transforms)
+        self.slice_count.setValue(config.break_slice_count)
+        self.stutter_repeats.setValue(config.break_stutter_repeats)
+        self.dropout_probability.setValue(config.break_dropout_probability)
+        self.pitch_semitones.setValue(config.break_pitch_semitones)
+        self.stretch_factor.setValue(config.break_time_stretch)
+        self.gate_rate.setValue(config.break_gate_rate_hz)
+        self.gate_duty.setValue(config.break_gate_duty)
+        self.grain_size.setValue(config.break_grain_size_ms)
+        self.grain_density.setValue(config.break_grain_density)
+        self.freeze_position.setValue(config.break_spectral_freeze_position)
 
     def _generate(self) -> None:
         try:
@@ -2356,7 +2466,10 @@ class MainWindow(QMainWindow):
         if str(message).startswith("CANCELLED:"):
             self.statusBar().showMessage("Background render cancelled.", 8000)
             return
-        self._show_error(message)
+        # Workers print the complete traceback; keep the dialog concise so the
+        # error can be copied from the terminal instead of a giant modal.
+        first_line = str(message).splitlines()[0] if str(message) else "Unknown render error"
+        self._show_error(first_line + "\n\nFull traceback was printed in the terminal.")
 
     def _show_error(self, message: str) -> None:
         self.statusBar().showMessage(message, 10000)
@@ -2436,6 +2549,20 @@ class MainWindow(QMainWindow):
             f"Custom FX Lab chain assigned to {stem_name}; pre-render the channel FX to audition the mix.",
             8000,
         )
+
+    def _retry_fx_render(self) -> None:
+        """Clear the failed routing cache and retry the current snapshot."""
+        if self.project is None or self._fx_worker is not None:
+            return
+        self._fx_routing_metadata = {}
+        self._fx_processed_stems = {}
+        self._fx_bus_returns = {}
+        self._fx_audition_audio = {}
+        self.fx_render_state.setText("FX RENDERING…")
+        self.fx_render_state.setToolTip("")
+        self.fx_render_state.setStyleSheet("")
+        self.retry_fx_button.setEnabled(False)
+        self._ensure_routing_render()
 
     def _pre_render_channel_fx(self) -> None:
         """Explicitly pre-render all current stem inserts and shared returns."""
@@ -2758,6 +2885,12 @@ class MainWindow(QMainWindow):
         worker = CancellableRenderWorker(operation)
         self._fx_worker = worker
         self._fx_pending_signature = signature
+        if hasattr(self, "fx_render_state"):
+            self.fx_render_state.setText("FX RENDERING…")
+            self.fx_render_state.setToolTip("")
+            self.fx_render_state.setStyleSheet("")
+        if hasattr(self, "retry_fx_button"):
+            self.retry_fx_button.setEnabled(False)
         self._fx_queued_signature = None
         worker.signals.finished.connect(self._fx_render_finished)
         worker.signals.error.connect(
@@ -2793,14 +2926,24 @@ class MainWindow(QMainWindow):
             }
             metadata["_routing_signature"] = signature
             self._fx_routing_metadata = metadata
+            if hasattr(self, "fx_render_state"):
+                self.fx_render_state.setText(
+                    f"FX READY · {len(metadata.get('rendered_returns', []))} RETURNS"
+                )
+                self.fx_render_state.setToolTip(
+                    "Configured stem inserts and active SPACE/ECHO returns are pre-rendered."
+                )
+                self.fx_render_state.setStyleSheet("")
+            if hasattr(self, "retry_fx_button"):
+                self.retry_fx_button.setEnabled(False)
+            logger.info(
+                "FX routing render complete: %d processed stems; rendered returns=%s",
+                len(self._fx_processed_stems), metadata.get("rendered_returns", []),
+            )
             self.statusBar().showMessage(
                 "Role-aware inserts and SPACE/ECHO returns are ready.", 5000
             )
-        queued = self._fx_queued_signature
         self._fx_queued_signature = None
-        if queued is not None or signature != self._routing_signature():
-            self._refresh_preview()
-            return
         self._refresh_preview()
 
     def _fx_render_failed(self, signature: str, message: str) -> None:
@@ -2823,17 +2966,18 @@ class MainWindow(QMainWindow):
                 "fallback": "dry_source_stems",
             }
             self.fx_routing_editor.set_meter_report({})
-            detail = str(message)
-            if "pyo" in detail.casefold() or "soundfile" in detail.casefold():
-                self.statusBar().showMessage(
-                    f"Pyo offline FX is unavailable; preview is currently dry. "
-                    f"Install with python -m pip install -e \".[pyo]\" and retry. {detail}",
-                    15000,
-                )
-            else:
-                self.statusBar().showMessage(
-                    f"FX render failed; dry sources retained: {detail}", 10000
-                )
+            logger.error("FX routing render failed; dry source stems retained:\n%s", message)
+            if hasattr(self, "fx_render_state"):
+                self.fx_render_state.setText("FX FAILED · DRY FALLBACK")
+                self.fx_render_state.setToolTip(str(message))
+                self.fx_render_state.setStyleSheet("color: #ff7777;")
+            if hasattr(self, "retry_fx_button"):
+                self.retry_fx_button.setEnabled(True)
+            self.statusBar().showMessage(
+                "FX render failed. Playback is using DRY stems, not processed audio. "
+                "Full traceback is printed in the terminal. Use PRE-RENDER FX to retry.",
+                20000,
+            )
         self._fx_queued_signature = None
         self._refresh_preview()
 
@@ -2911,6 +3055,12 @@ class MainWindow(QMainWindow):
     def _refresh_routing(self) -> None:
         """Invalidate all processed snapshots when routing controls change."""
         self._fx_routing_metadata = {}
+        if hasattr(self, "fx_render_state"):
+            self.fx_render_state.setText("FX NOT RENDERED")
+            self.fx_render_state.setToolTip("")
+            self.fx_render_state.setStyleSheet("")
+        if hasattr(self, "retry_fx_button"):
+            self.retry_fx_button.setEnabled(True)
         if self._fx_variation_worker is not None:
             self._fx_variation_worker.cancel()
             self._fx_variation_signature = None
@@ -2947,9 +3097,23 @@ class MainWindow(QMainWindow):
     def _current_preview_audio(self) -> np.ndarray | None:
         if self.project is None:
             return None
+        selection = self.preview_source.currentData()
+        # A failed FX pass intentionally leaves a labelled dry fallback. Keep
+        # that audio playable rather than making the transport appear broken.
+        if self._fx_routing_metadata.get("fallback") == "dry_source_stems":
+            if selection == "master":
+                dry = {
+                    name: self._processed_stem(name)
+                    for name in self.project.stems
+                }
+                return render_master_with_returns(
+                    dry, {}, master_wet=float(self.fx_routing_editor.routing()["master_wet"])
+                )
+            if selection in self.project.stems:
+                return self._processed_stem(selection)
+            return None
         if not self._ensure_routing_render():
             return None
-        selection = self.preview_source.currentData()
         if selection == "master":
             return self._render_mix()
         if selection in self.project.stems:

@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import logging
+import traceback
 
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
+
+logger = logging.getLogger(__name__)
 
 
 class WorkerSignals(QObject):
@@ -25,6 +29,8 @@ class RenderWorker(QRunnable):
         try:
             self.signals.finished.emit(self.operation())
         except Exception as exc:
+            detail = traceback.format_exc()
+            logger.error("Background render failed:\n%s", detail)
             self.signals.error.emit(f"{type(exc).__name__}: {exc}")
 
 
@@ -50,10 +56,13 @@ class CancellableRenderWorker(QRunnable):
         try:
             result = self.operation(self.cancel_event)
         except Exception as exc:
+            detail = traceback.format_exc()
             if self.cancel_event.is_set():
+                logger.info("Background render cancelled: %s", exc)
                 self.signals.error.emit("CANCELLED: " + str(exc))
             else:
-                self.signals.error.emit(f"{type(exc).__name__}: {exc}")
+                logger.error("Background render failed:\n%s", detail)
+                self.signals.error.emit(f"{type(exc).__name__}: {exc}\n\n{detail}")
         else:
             if self.cancel_event.is_set():
                 self.signals.error.emit("CANCELLED: FX render cancelled")
