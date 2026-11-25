@@ -256,7 +256,7 @@ The Score API can carry inspectable arrangement intent: asymmetric rational-beat
 
 ### Sound-object and hybrid instrument architecture (M21 foundation)
 
-The M21 API provides versioned sound-object patches with separate source/processing identity, transient/body/tail layers, envelopes, spectral and pitch metadata, coherent modulation, spatial intent and transformation lineage. A NumPy hybrid renderer returns exact-frame layer solos, a summed stereo render and phase/mono/headroom diagnostics. Opt-in modal-resonator and additive-partial voices are included; existing voice defaults are unchanged. Patch-scoped Score automation targets and SQLite searchable patch/rendered-variant lineage are available. See [M21](docs/M21.md) and run `python scripts/benchmark_sound_objects.py` to measure voice-family and hybrid render costs on the target machine.
+The M21 API provides versioned sound-object patches with separate source/processing identity, transient/body/tail layers, envelopes, spectral and pitch metadata, coherent modulation, spatial intent and transformation lineage. A NumPy hybrid renderer returns exact-frame layer solos, a summed stereo render and phase/mono/headroom diagnostics, and can be registered as a normal Score voice with typed automation. The editor-facing model publishes field units/ranges/choices. Opt-in modal-resonator and additive-partial voices are included; existing voice defaults are unchanged. Patch-scoped automation targets and SQLite searchable patch/rendered-variant lineage are available. See [M21](docs/M21.md) and run `python scripts/benchmark_sound_objects.py` to measure voice-family and hybrid render costs on the target machine.
 
 ## Determinism
 
