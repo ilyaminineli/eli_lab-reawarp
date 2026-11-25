@@ -531,7 +531,12 @@ class AutomationControlBus:
         for target_lanes in self._lanes.values():
             target_lanes.sort(key=lambda lane: self._SCOPE_ORDER[lane.scope])
         self._sources = {source.source_id: source for source in source_items}
-        self._modulations: dict[str, list[AutomationModulation]] = {}
+        # Materialise generated curves once. Regenerating an LFO or random walk
+        # for every control sample would turn a cheap lookup into O(samples × points).
+        self._source_lanes = {
+            source_id: source.to_lane() for source_id, source in self._sources.items()
+        }
+        self._modulations: dict[str, list[AutomationModulation]] = {};
         for modulation in modulations:
             if modulation.source_id not in self._sources:
                 raise ValueError(f"unknown modulation source: {modulation.source_id}")
@@ -619,8 +624,7 @@ class AutomationControlBus:
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
         for modulation in self._modulations.get(target_id, ()):
-            source = self._sources[modulation.source_id]
-            source_lane = source.to_lane()
+            source_lane = self._source_lanes[modulation.source_id]
             origin_key = {
                 "free": None,
                 "event": "event_onset_frame",
@@ -663,18 +667,19 @@ class AutomationControlBus:
         self,
         target_id: str,
         event_id: str | None,
+        context: Mapping[str, Any] | None = None,
     ) -> tuple[float, float, bool]:
         target = self._targets.get(target_id)
         smoothing = target.smoothing_seconds if target is not None else 0.0
         hysteresis = target.hysteresis if target is not None else 0.0
         continuous = target is None or target.value_type == "continuous"
-        context = self._context(event_id, None)
+        resolved_context = self._context(event_id, context)
         for lane in self._lanes.get(target_id, ()):
             applies = (
                 lane.scope == "global"
-                or (lane.scope == "role" and context.get("role_id") == lane.scope_id)
-                or (lane.scope == "section" and context.get("section_id") == lane.scope_id)
-                or (lane.scope == "event" and context.get("event_id") == lane.scope_id)
+                or (lane.scope == "role" and resolved_context.get("role_id") == lane.scope_id)
+                or (lane.scope == "section" and resolved_context.get("section_id") == lane.scope_id)
+                or (lane.scope == "event" and resolved_context.get("event_id") == lane.scope_id)
             )
             if applies:
                 smoothing = max(smoothing, lane.smoothing_seconds)
@@ -724,7 +729,9 @@ class AutomationControlBus:
             count=len(frames),
         )
         if len(values):
-            smoothing, hysteresis, continuous = self._smoothing_parameters(target_id, event_id)
+            smoothing, hysteresis, continuous = self._smoothing_parameters(
+                target_id, event_id, context
+            )
             if continuous and hysteresis > 0.0:
                 held = float(values[0])
                 for index in range(1, len(values)):
