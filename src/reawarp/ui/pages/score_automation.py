@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from fractions import Fraction
 from typing import Any
 
@@ -9,7 +10,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton, QSpinBox,
+    QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -43,6 +44,33 @@ _TARGETS = (
     ("fx.return.space.wet", "SPACE return wet"),
     ("fx.return.echo.wet", "ECHO return wet"),
 )
+
+_TARGET_AMOUNTS = {
+    "synth.cutoff": 1_200.0,
+    "synth.resonance": 0.2,
+    "synth.gain": 0.2,
+    "synth.pitch": 2.0,
+    "synth.modulation.depth": 0.2,
+    "synth.modulation.rate": 0.5,
+    "synth.wavetable.position": 0.2,
+    "synth.partial.balance": 0.2,
+    "synth.grain.size": 40.0,
+    "synth.grain.position": 0.2,
+    "synth.grain.density": 10.0,
+    "event.velocity_scale": 0.25,
+    "event.probability": 0.25,
+    "role.activity": 0.25,
+    "role.density": 2.0,
+    "role.syncopation": 0.2,
+    "sample.mix": 0.2,
+    "spatial.pan": 0.25,
+    "spatial.width": 0.25,
+    "fx.insert.wet": 0.25,
+    "fx.send.space": 0.25,
+    "fx.send.echo": 0.25,
+    "fx.return.space.wet": 0.25,
+    "fx.return.echo.wet": 0.25,
+}
 
 _TARGET_RANGES = {
     "synth.cutoff": (20.0, 18_000.0),
@@ -150,6 +178,7 @@ class ScoreAutomationEditor(QGroupBox):
         for target_id, label in _TARGETS:
             self.target.addItem(label, target_id)
         self.target.setCurrentIndex(0)
+        self.target.currentIndexChanged.connect(self._target_changed)
         form.addRow("Destination", self.target)
 
         self.source_kind = QComboBox()
@@ -190,7 +219,7 @@ class ScoreAutomationEditor(QGroupBox):
         form.addRow("End beat", self.end_beat)
         self.period = self._number(0.0625, 256.0, 4.0, 3)
         form.addRow("Period / step · beats", self.period)
-        self.amount = self._number(-20_000.0, 20_000.0, 800.0, 3)
+        self.amount = self._number(-20_000.0, 20_000.0, 1_200.0, 3)
         form.addRow("Modulation amount", self.amount)
         self.seed = QSpinBox()
         self.seed.setRange(0, 2_147_483_647)
@@ -245,6 +274,10 @@ class ScoreAutomationEditor(QGroupBox):
         control.setValue(value)
         return control
 
+    def _target_changed(self, *_args: Any) -> None:
+        target = str(self.target.currentData())
+        self.amount.setValue(_TARGET_AMOUNTS.get(target, 0.25))
+
     def _scope_changed(self, *_args: Any) -> None:
         is_global = self.scope.currentData() == "global"
         self.scope_id.setEnabled(not is_global)
@@ -278,15 +311,7 @@ class ScoreAutomationEditor(QGroupBox):
         if base is None:
             raise ValueError("generate a project before applying score automation")
         if self.bypass.isChecked():
-            return base.__class__(
-                **{
-                    **base.__dict__,
-                    "automation_sources": (),
-                    "modulations": (),
-                }
-            )
-        from dataclasses import replace
-
+            return replace(base, automation_sources=(), modulations=())
         return replace(
             base,
             automation_sources=tuple(self._sources),
