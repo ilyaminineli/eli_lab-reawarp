@@ -11,8 +11,15 @@ from reawarp.fx_automation import (
     score_to_fx_automation,
 )
 from reawarp.synthesis.score_voices import build_production_voice_renderers
+from reawarp.synthesis.sound_object import (
+    EnvelopeSpec, HybridRenderResult, HybridVoiceRenderer,
+    SoundObjectLayer, SoundObjectPatch, SoundObjectSource, TransformationRecord,
+    build_envelope_curve, derive_sound_object_seed,
+    register_sound_object_automation_targets, render_additive_partial_voice,
+    render_modal_resonator_bank, resample_audio_non_destructive,
+    sound_object_automation_targets,
+)
 from reawarp.score import (
-    AttentionSpan,CycleSpec,MutationPolicy,OrchestrationPlan,PhraseSpan,RoleRelationship,build_orchestration_plan,inspect_attention_conflicts,
     AttentionSpan, CycleSpec, MutationPolicy, OrchestrationPlan, PhraseSpan,
     RoleRelationship, TransitionSpan, build_orchestration_plan,
     inspect_attention_conflicts, inspect_event_onset_conflicts,
@@ -43,10 +50,15 @@ from reawarp.score import (
 )
 
 __all__ = [
-    "AttentionSpan","CycleSpec","MutationPolicy","OrchestrationPlan","PhraseSpan","RoleRelationship","build_orchestration_plan","inspect_attention_conflicts",
     "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
     "inspect_attention_conflicts", "inspect_event_onset_conflicts",
+    "EnvelopeSpec", "HybridRenderResult", "HybridVoiceRenderer",
+    "SoundObjectLayer", "SoundObjectPatch", "SoundObjectSource", "TransformationRecord",
+    "build_envelope_curve", "derive_sound_object_seed",
+    "register_sound_object_automation_targets", "render_additive_partial_voice",
+    "render_modal_resonator_bank", "resample_audio_non_destructive",
+    "sound_object_automation_targets",
     "AutomationControlBus",
     "AutomationLane",
     "AutomationModulation",
