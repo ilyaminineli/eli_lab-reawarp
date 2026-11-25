@@ -756,8 +756,8 @@ def _phrase_for_score(score: Score, phrase_id: str) -> PhraseSpan:
             phrase = replace(
                 phrase,
                 event_ids=tuple(event.event_id for event in events),
-                start_beats=as_fraction(freeze.get("phrase_start_beats", phrase.start_beats)),
-                end_beats=as_fraction(freeze.get("phrase_end_beats", phrase.end_beats)),
+                start_beats=_fraction(freeze.get("phrase_start_beats", phrase.start_beats), "frozen phrase start"),
+                end_beats=_fraction(freeze.get("phrase_end_beats", phrase.end_beats), "frozen phrase end"),
             )
     return phrase
 
@@ -899,6 +899,9 @@ def freeze_phrase_candidate(
     parent_candidate_id: str | None = None,
 ) -> tuple[Score, dict[str, Any]]:
     """Freeze candidate events in the Score and retain reversible source lineage."""
+    existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
+    if existing_freeze:
+        raise ValueError("phrase is already frozen; restore its base before replacing it")
     if _score_fingerprint(base_score) != candidate.base_score_fingerprint:
         raise ValueError("candidate base Score is stale; regenerate against the current Score")
     source_ids = set(candidate.source_event_ids)
