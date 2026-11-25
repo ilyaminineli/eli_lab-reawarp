@@ -861,8 +861,6 @@ def build_score_sound_object_renderer(
     the patch-scoped typed automation targets registered by
     `register_sound_object_automation_targets`.
     """
-    from reawarp.synthesis.sound_object import HybridVoiceRenderer as _Renderer
-
     if not isinstance(patch, SoundObjectPatch):
         patch = SoundObjectPatch.from_dict(patch)
     frozen_sources: dict[str, np.ndarray] = {}
@@ -884,7 +882,7 @@ def build_score_sound_object_renderer(
     target_ids = {
         target.target_id for target in sound_object_automation_targets(patch)
     }
-    renderer = _Renderer()
+    renderer = HybridVoiceRenderer()
 
     def render(scheduled, sample_rate: int, controls) -> np.ndarray:
         if int(sample_rate) != patch.sample_rate:
