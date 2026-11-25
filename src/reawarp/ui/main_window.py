@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import secrets
 from dataclasses import replace
@@ -47,11 +48,17 @@ from reawarp.ui.pages.fx_automation import FXAutomationEditor
 from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 from reawarp.ui.pages.library import LibraryPage
+from reawarp.ui.pages.variations import VariationBrowserPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import CancellableRenderWorker, RenderWorker
+from reawarp.variations import (
+    VariationBatch, VariationBatchService, VariationCandidate, VariationCandidateRecord, VariationRequest,
+    build_listening_set, clone_project, matched_ab, project_audio,
+    project_fingerprint, variation_session_metadata,
+)
 
 
 class MainWindow(QMainWindow):
@@ -69,6 +76,18 @@ class MainWindow(QMainWindow):
         self._break_audio: np.ndarray | None = None
         self._worker: RenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
+        self._variation_origin_project: ReawarpProject | None = None
+        self._variation_base_project: ReawarpProject | None = None
+        self._variation_parent_candidate_id: str | None = None
+        self._variation_active_candidate_id: str | None = None
+        self._variation_candidates: dict[str, VariationCandidate] = {}
+        self._variation_branch_base: ReawarpProject | None = None
+        self._variation_batch_worker: CancellableRenderWorker | None = None
+        self._variation_compare_worker: CancellableRenderWorker | None = None
+        self._variation_compare_signature: tuple[str, str] | None = None
+        self._variation_ab_buffers: dict[str, np.ndarray] = {}
+        self._variation_listening_buffers: dict[str, np.ndarray] = {}
+        self._variation_session_epoch = 0
         self._mix_rows: dict[str, StemRow] = {}
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
@@ -132,13 +151,25 @@ class MainWindow(QMainWindow):
         self.fx_lab_page = FxLabPage(self.player, self)
         self.library_page = LibraryPage(self)
         self.library_page.sampleSelected.connect(self._accept_library_sample)
+        self.variation_page = VariationBrowserPage(self)
+        self.variation_page.batchRequested.connect(self._start_variation_batch)
+        self.variation_page.cancelRequested.connect(self._cancel_variation_batch)
+        self.variation_page.candidateSelected.connect(self._variation_candidate_selected)
+        self.variation_page.candidateAction.connect(self._variation_candidate_action)
+        self.variation_page.notesChanged.connect(self._variation_notes_changed)
+        self.variation_page.compareRequested.connect(self._variation_compare)
+        self.variation_page.listeningSetRequested.connect(self._variation_listening_set)
+        self.variation_page.auditionRequested.connect(self._variation_audition)
+        self.variation_page.loadProjectRequested.connect(self._load_variation_project)
+        self.variation_page.listeningItemRequested.connect(self._variation_listening_item)
 
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
         # code/tests that query the number of workspace pages.
         self.tabs = self.workspace_stack
         for workspace in (
-            generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page
+            generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
+            self.variation_page,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -148,12 +179,14 @@ class MainWindow(QMainWindow):
             ("STEM MIXER", "Shape the relationships between generated musical roles."),
             ("FX LAB", "Build reusable non-destructive processing chains and compare results."),
             ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
+            ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
         ]
         self.navigator = WorkspaceNavigator(
             [
                 ("COMPOSE", [
                     ("Generator", "Create the composition plan and its coordinated sound sources.", 0),
                     ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
+                    ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
                 ]),
                 ("PRODUCE", [
                     ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
@@ -211,7 +244,7 @@ class MainWindow(QMainWindow):
         title, description = self._workspace_info[index]
         self.workspace_title.setText(title)
         self.workspace_description.setText(description)
-        self.transport_bar.setVisible(index in (0, 2))
+        self.transport_bar.setVisible(index in (0, 2, 5))
 
     def _update_project_context(self) -> None:
         if self.project is None:
@@ -1274,6 +1307,7 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self._show_error(str(exc))
             return
+        self._clear_variation_session()
         self._run_render(lambda: ReawarpEngine().generate(config), "Generating full loop…")
 
     def _apply_score_automation(self) -> None:
@@ -1352,6 +1386,714 @@ class MainWindow(QMainWindow):
             score=controlled_score,
         )
 
+    def _clear_variation_session(self) -> None:
+        self._variation_session_epoch += 1
+        if hasattr(self, "variation_page"):
+            self.variation_page.set_batch_busy(False)
+        if self._variation_batch_worker is not None:
+            self._variation_batch_worker.cancel()
+            self._variation_batch_worker = None
+        self._variation_origin_project = None
+        self._variation_base_project = None
+        self._variation_parent_candidate_id = None
+        self._variation_active_candidate_id = None
+        self._variation_candidates.clear()
+        self._variation_branch_base = None
+        self._variation_ab_buffers.clear()
+        self._variation_listening_buffers.clear()
+        if self._variation_compare_worker is not None:
+            self._variation_compare_worker.cancel()
+            self._variation_compare_worker = None
+        if hasattr(self, "variation_page"):
+            self.variation_page.set_candidates([])
+
+    def _load_variation_project(self) -> None:
+        directory = QFileDialog.getExistingDirectory(
+            self, "Load Reawarp project or variation session", str(Path.cwd())
+        )
+        if not directory:
+            return
+        self._clear_variation_session()
+        self._run_render(
+            lambda: ReawarpProject.load(directory),
+            "Loading project, candidates and listening history…",
+        )
+
+    def _restore_variation_session(self, project: ReawarpProject) -> None:
+        saved = getattr(project, "variation_candidates", {})
+        if not saved or "base" not in saved:
+            return
+        origin = clone_project(saved["base"], readonly=True)
+        self._variation_origin_project = origin
+        self._variation_base_project = origin
+        if "branch_base" in saved:
+            self._variation_branch_base = clone_project(saved["branch_base"], readonly=True)
+        session = project.metadata.get("m23_variations", {})
+        self._variation_active_candidate_id = session.get("active_candidate_id")
+        for key, candidate_project in saved.items():
+            if key in {"base", "branch_base"}:
+                continue
+            record_data = candidate_project.metadata.get("m23_candidate")
+            if not isinstance(record_data, dict):
+                continue
+            record = VariationCandidateRecord.from_dict(record_data)
+            self._variation_candidates[record.candidate_id] = VariationCandidate(
+                record, candidate_project
+            )
+        if (
+            self._variation_branch_base is not None
+            and self._variation_active_candidate_id in self._variation_candidates
+        ):
+            active = self._variation_candidates[self._variation_active_candidate_id]
+            self._variation_parent_candidate_id = active.record.candidate_id
+        self.variation_page.set_stems(list(project.stems))
+        self.variation_page.set_candidates(
+            [item.record for item in self._variation_candidates.values()],
+            selected_id=self._variation_active_candidate_id,
+        )
+
+    def _refresh_sound_object_targets(self) -> None:
+        try:
+            from reawarp.library.store import SampleLibrary
+            with SampleLibrary() as library:
+                patches = library.search_sound_objects(limit=256)
+            self.variation_page.set_sound_objects([
+                (patch.patch_id, patch.name) for patch in patches
+            ])
+        except Exception as exc:
+            self.statusBar().showMessage(f"Sound-object catalogue unavailable: {exc}", 6000)
+
+    def _render_sound_object_candidate(
+        self, base: ReawarpProject, index: int, variation_seed: int,
+        request: VariationRequest, cancel_event: object,
+    ) -> ReawarpProject:
+        """Render deterministic M21 patch variations as non-destructive project stems."""
+        from pathlib import Path
+        import hashlib
+        import re
+        from reawarp.library.store import SampleLibrary
+        from reawarp.samples.io import read_sample
+        from reawarp.synthesis.sound_object import (
+            HybridVoiceRenderer, SoundObjectPatch, TransformationRecord,
+            derive_sound_object_seed, resample_audio_non_destructive,
+        )
+
+        if not request.targets:
+            raise ValueError("select at least one sound-object patch from the local library")
+        stems = {
+            name: np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in base.stems.items()
+        }
+        variants = copy.deepcopy(base.metadata.get("sound_object_variants", []))
+        with SampleLibrary() as library:
+            for patch_id in request.targets:
+                if cancel_event.is_set():
+                    raise RuntimeError("sound-object batch cancelled")
+                patch = library.get_sound_object(str(patch_id))
+                if patch is None:
+                    raise KeyError(f"sound-object patch not found: {patch_id}")
+                source_audio: dict[str, np.ndarray] = {}
+                for source in patch.sources:
+                    required_frames = max(
+                        (
+                            layer.source_start_frame + layer.frame_count
+                            for layer in patch.layers if layer.source_id == source.source_id
+                        ),
+                        default=patch.duration_frames,
+                    )
+                    if source.source_kind == "asset":
+                        if source.asset_id:
+                            asset = library.get_asset(source.asset_id)
+                            if asset is None:
+                                raise KeyError(
+                                    f"sound-object source asset not indexed: {source.asset_id}"
+                                )
+                            if asset.sha256.casefold() != str(source.asset_sha256).casefold():
+                                raise ValueError(
+                                    f"source hash changed for sound-object asset {source.asset_id}"
+                                )
+                            source_path = Path(asset.path)
+                        else:
+                            source_path = Path(str(source.uri))
+                            digest = hashlib.sha256()
+                            with source_path.open("rb") as handle:
+                                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                                    digest.update(block)
+                            if digest.hexdigest().casefold() != str(source.asset_sha256).casefold():
+                                raise ValueError(
+                                    f"source hash changed for sound-object URI {source.uri}"
+                                )
+                        audio = read_sample(source_path, patch.sample_rate)
+                    else:
+                        source_seed = derive_sound_object_seed(
+                            patch.seed, patch.patch_id, source.source_id
+                        )
+                        rng = np.random.default_rng(source_seed)
+                        frames = required_frames
+                        time = np.arange(frames, dtype=np.float64) / patch.sample_rate
+                        model = str(source.source_model or "").casefold()
+                        frequency = float(
+                            patch.pitch_model.get("frequency_hz", 220.0)
+                        )
+                        noise = rng.normal(0.0, 1.0, frames)
+                        if "impulse" in model or "noise" in model:
+                            decay = 18.0 if "impulse" in model else 5.0
+                            audio = noise * np.exp(-time * decay)
+                        elif "modal" in model or "reson" in model or "sine" in model:
+                            ratios = [
+                                float(item.get("ratio", 1.0))
+                                for item in patch.spectrum.get("partials", [])
+                            ] or [1.0, 1.414, 2.17]
+                            partials = [
+                                np.sin(2.0 * np.pi * frequency * ratio * time)
+                                / (1.0 + partial_index)
+                                for partial_index, ratio in enumerate(ratios)
+                            ]
+                            audio = np.sum(partials, axis=0)
+                            if "tail" in model:
+                                audio *= np.exp(-time * 3.5)
+                        else:
+                            audio = noise * np.exp(-time * 1.5)
+                        audio = np.asarray(audio, dtype=np.float32)
+                    if len(audio) < required_frames:
+                        audio = np.pad(audio, (0, required_frames - len(audio)))
+                    source_audio[source.source_id] = np.asarray(
+                        audio[:required_frames], dtype=np.float32
+                    )
+
+                rng = np.random.default_rng(
+                    derive_sound_object_seed(variation_seed, patch.patch_id, "m23-variation")
+                )
+                updated_layers = []
+                for layer in patch.layers:
+                    gain_scale = float(rng.uniform(0.84, 1.16))
+                    decay_scale = float(rng.uniform(0.82, 1.18))
+                    release_scale = float(rng.uniform(0.86, 1.14))
+                    envelope = replace(
+                        layer.envelope,
+                        decay_seconds=float(np.clip(
+                            layer.envelope.decay_seconds * decay_scale, 0.0, 30.0
+                        )),
+                        release_seconds=float(np.clip(
+                            layer.envelope.release_seconds * release_scale, 0.0, 30.0
+                        )),
+                    )
+                    updated_layers.append(replace(
+                        layer,
+                        gain=float(np.clip(layer.gain * gain_scale, 0.0, 4.0)),
+                        envelope=envelope,
+                    ))
+                spectrum = copy.deepcopy(patch.spectrum)
+                for partial in spectrum.get("partials", []):
+                    partial["gain"] = float(np.clip(
+                        float(partial.get("gain", 1.0)) * rng.uniform(0.84, 1.16),
+                        0.0, 4.0,
+                    ))
+                modulation = copy.deepcopy(patch.modulation)
+                if modulation and "depth" in modulation:
+                    modulation["depth"] = float(np.clip(
+                        float(modulation["depth"]) * rng.uniform(0.8, 1.2),
+                        0.0, 1.0,
+                    ))
+                processing_id = f"{patch.processing_identity_id}:m23:{variation_seed}"
+                transform = TransformationRecord(
+                    operation="m23_seeded_hybrid_variation",
+                    seed=int(variation_seed),
+                    parameters={
+                        "candidate_index": int(index),
+                        "layer_gain_range": [0.84, 1.16],
+                        "envelope_decay_range": [0.82, 1.18],
+                        "envelope_release_range": [0.86, 1.14],
+                    },
+                    preserved_dimensions=(
+                        "source_identity", "source_hashes", "layer_roles",
+                        "phase_groups", "pitch_model",
+                    ),
+                    changed_dimensions=(
+                        "processing_identity", "layer_gain", "envelope",
+                        "spectral_partial_gain", "modulation_depth",
+                    ),
+                )
+                variant_patch = replace(
+                    patch,
+                    seed=int(variation_seed),
+                    processing_identity_id=processing_id,
+                    layers=tuple(updated_layers),
+                    spectrum=spectrum,
+                    modulation=modulation,
+                    transformations=patch.transformations + (transform,),
+                )
+                rendered = HybridVoiceRenderer().render(
+                    variant_patch, source_audio,
+                    frame_count=variant_patch.duration_frames,
+                )
+                rendered_audio = rendered.audio
+                if patch.sample_rate != base.sample_rate:
+                    rendered_audio, resample_record = resample_audio_non_destructive(
+                        rendered_audio, patch.sample_rate, base.sample_rate,
+                        seed=int(variation_seed),
+                    )
+                    variant_patch = replace(
+                        variant_patch,
+                        transformations=variant_patch.transformations + (resample_record,),
+                    )
+                if len(rendered_audio) > base.frame_count:
+                    raise ValueError(
+                        f"sound-object patch {patch.name!r} exceeds project duration"
+                    )
+                safe_patch_id = re.sub(r"[^A-Za-z0-9_-]+", "_", patch.patch_id).strip("_")
+                stem_name = f"sound_object_{safe_patch_id or 'patch'}"
+                if stem_name in stems and stem_name not in request.targets:
+                    stem_name = f"{stem_name}_{index:02d}"
+                audio = np.zeros((base.frame_count, 2), dtype=np.float32)
+                audio[:len(rendered_audio)] = rendered_audio
+                stems[stem_name] = audio
+                variants.append({
+                    "patch_id": patch.patch_id,
+                    "name": patch.name,
+                    "source_identity_id": patch.source_identity_id,
+                    "source_hashes": list(patch.source_hashes),
+                    "original_processing_identity_id": patch.processing_identity_id,
+                    "processing_identity_id": variant_patch.processing_identity_id,
+                    "seed": variation_seed,
+                    "stem": stem_name,
+                    "patch": variant_patch.to_dict(),
+                    "diagnostics": rendered.diagnostics,
+                })
+
+        score = base.to_score()
+        score_metadata = copy.deepcopy(score.metadata)
+        score_metadata["render_stems"] = list(stems)
+        score_metadata["m23_sound_object_variants"] = variants
+        project_metadata = copy.deepcopy(base.metadata)
+        project_metadata["sound_object_variants"] = variants
+        project_metadata["m23_sound_object_variation_seed"] = variation_seed
+        return ReawarpProject(
+            config=base.config,
+            sample_rate=base.sample_rate,
+            stems=stems,
+            events=copy.deepcopy(base.events),
+            metadata=project_metadata,
+            score=replace(score, metadata=score_metadata),
+        )
+
+    def _start_variation_batch(self, payload: dict[str, Any]) -> None:
+        if self.project is None:
+            self.statusBar().showMessage("Generate or load a project before creating variations.")
+            return
+        if self._worker is not None or self._variation_batch_worker is not None:
+            return
+        try:
+            request = VariationRequest.from_dict(payload)
+        except Exception as exc:
+            self._show_error(f"Invalid variation request: {exc}")
+            return
+        if self._variation_origin_project is None:
+            self._variation_origin_project = clone_project(self.project, readonly=True)
+            self._variation_base_project = self._variation_origin_project
+        base = self._variation_branch_base or self._variation_base_project
+        if base is None:
+            self.statusBar().showMessage("The frozen source project is unavailable.")
+            return
+        self.variation_page.set_batch_busy(True)
+        epoch = self._variation_session_epoch
+        parent_candidate_id = self._variation_parent_candidate_id
+
+        def operation(cancel_event):
+            batch = VariationBatchService().generate_batch(
+                base, request, parent_candidate_id=parent_candidate_id,
+                cancel_event=cancel_event,
+                sound_object_renderer=(
+                    self._render_sound_object_candidate
+                    if request.mode == "sound_object" else None
+                ),
+            )
+            return epoch, batch
+
+        worker = CancellableRenderWorker(operation)
+        self._variation_batch_worker = worker
+        worker.signals.finished.connect(self._variation_batch_finished)
+        worker.signals.error.connect(
+            lambda message, epoch=epoch: self._variation_batch_failed((epoch, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+        self.statusBar().showMessage(
+            f"Generating {request.count} comparable candidates · {request.mode.replace('_', ' ')}…"
+        )
+
+    def _cancel_variation_batch(self) -> None:
+        if self._variation_batch_worker is not None:
+            self._variation_batch_worker.cancel()
+            self.statusBar().showMessage("Cancellation requested · the active render will stop at a safe boundary.")
+
+    def _variation_batch_finished(self, result: object) -> None:
+        if (
+            not isinstance(result, tuple) or len(result) != 2
+            or result[0] != self._variation_session_epoch
+            or not isinstance(result[1], VariationBatch)
+        ):
+            return
+        self._variation_batch_worker = None
+        self.variation_page.set_batch_busy(False)
+        result = result[1]
+        for candidate in result.candidates:
+            self._variation_candidates[candidate.record.candidate_id] = candidate
+        records = [item.record for item in self._variation_candidates.values()]
+        selected = result.candidates[-1].record.candidate_id if result.candidates else None
+        self.variation_page.set_candidates(records, selected_id=selected)
+        self.statusBar().showMessage(
+            f"Variation batch complete · {len(result.candidates)} candidate(s) · source project remains frozen.",
+            8000,
+        )
+    def _variation_batch_failed(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        epoch, message = payload
+        if epoch != self._variation_session_epoch:
+            return
+        self._variation_batch_worker = None
+        self.variation_page.set_batch_busy(False)
+        if str(message).startswith("CANCELLED:"):
+            self.statusBar().showMessage(
+                "Variation batch cancelled · frozen source and previously completed batches are intact.",
+                8000,
+            )
+        else:
+            self._show_error(f"Variation batch failed: {message}")
+
+    def _variation_candidate_selected(self, candidate_id: str) -> None:
+        if candidate_id in self._variation_candidates:
+            self._variation_compare(candidate_id)
+
+    def _variation_sync_candidate(self, candidate: VariationCandidate) -> None:
+        record = candidate.record.to_dict()
+        metadata = copy.deepcopy(candidate.project.metadata)
+        metadata["m23_candidate"] = record
+        candidate.project.metadata = metadata
+        score = candidate.project.to_score()
+        score_metadata = dict(score.metadata)
+        score_metadata["m23_candidate"] = record
+        candidate.project.score = replace(score, metadata=score_metadata)
+
+    def _variation_candidate_action(self, action: str, candidate_id: str) -> None:
+        if action == "restore":
+            if self._variation_origin_project is None:
+                return
+            self._variation_active_candidate_id = None
+            self._variation_base_project = self._variation_origin_project
+            self._variation_branch_base = None
+            self._variation_parent_candidate_id = None
+            self._render_finished(clone_project(self._variation_origin_project))
+            return
+        candidate = self._variation_candidates.get(candidate_id)
+        if candidate is None:
+            return
+        candidate.record.selection_state = action
+        self._variation_sync_candidate(candidate)
+        if action in {"promoted", "branched"}:
+            self._variation_active_candidate_id = candidate_id
+            self._render_finished(clone_project(candidate.project))
+        if action == "branched":
+            self._variation_branch_base = clone_project(candidate.project, readonly=True)
+            self._variation_parent_candidate_id = candidate_id
+        self.variation_page.set_candidates(
+            [item.record for item in self._variation_candidates.values()],
+            selected_id=candidate_id,
+        )
+        self.statusBar().showMessage(
+            f"{candidate.record.label} · {candidate.record.selection_state.upper()}", 6000
+        )
+
+    def _variation_notes_changed(self, candidate_id: str, notes: str) -> None:
+        candidate = self._variation_candidates.get(candidate_id)
+        if candidate is None:
+            return
+        candidate.record.notes = str(notes)
+        self._variation_sync_candidate(candidate)
+
+    def _variation_candidate_stem(self, candidate: VariationCandidate) -> str | None:
+        variants = candidate.project.metadata.get("sound_object_variants", [])
+        targets = set(candidate.record.targets)
+        for item in variants:
+            if isinstance(item, dict) and item.get("patch_id") in targets:
+                stem = str(item.get("stem", ""))
+                if stem in candidate.project.stems:
+                    return stem
+        for target in candidate.record.targets:
+            if target in candidate.project.stems:
+                return target
+        return next(iter(candidate.project.stems), None)
+
+    def _variation_compare(self, candidate_id: str) -> None:
+        candidate = self._variation_candidates.get(candidate_id)
+        if candidate is None:
+            return
+        reference_project = (
+            self._variation_candidates[candidate.record.parent_candidate_id].project
+            if candidate.record.parent_candidate_id in self._variation_candidates
+            else self._variation_origin_project
+        )
+        if reference_project is None:
+            reference_project = self._variation_branch_base or self._variation_base_project
+        if reference_project is None:
+            return
+        stage = str(self.variation_page.compare_stage.currentData() or "dry_master")
+        stem = self._variation_candidate_stem(candidate)
+        if stage == "dry_master":
+            left, right = project_audio(reference_project), project_audio(candidate.project)
+            try:
+                self._show_variation_comparison(
+                    matched_ab(left, right, sample_rate=reference_project.sample_rate)
+                )
+            except Exception as exc:
+                self.statusBar().showMessage(f"Could not compare candidates: {exc}", 8000)
+            return
+        if stage == "dry_stem":
+            if stem is None:
+                return
+            right = project_audio(candidate.project, stem=stem)
+            left = (
+                np.zeros_like(right) if stem not in reference_project.stems
+                else project_audio(reference_project, stem=stem)
+            )
+            try:
+                self._show_variation_comparison(
+                    matched_ab(left, right, sample_rate=reference_project.sample_rate)
+                )
+            except Exception as exc:
+                self.statusBar().showMessage(f"Could not compare candidates: {exc}", 8000)
+            return
+
+        if self._variation_compare_worker is not None:
+            self._variation_compare_worker.cancel()
+        signature = (candidate_id, stage)
+        self._variation_compare_signature = signature
+        self._routing_signature()  # synchronise portable fader state before snapshotting
+        routing = self.fx_routing_editor.routing()
+        legacy_automation = self.fx_automation_editor.automation()
+        mix_controls = {
+            name: {
+                "gain": row.gain.value() / 100.0,
+                "pan": row.pan.value() / 100.0,
+                "mute": row.mute.isChecked(),
+                "solo": row.solo.isChecked(),
+            }
+            for name, row in self._mix_rows.items()
+        }
+        reference_compare_project = reference_project
+        if stem is not None and stem not in reference_project.stems:
+            reference_stems = dict(reference_project.stems)
+            reference_stems[stem] = np.zeros_like(candidate.project.stems[stem])
+            reference_score = reference_project.to_score()
+            reference_score_metadata = dict(reference_score.metadata)
+            reference_score_metadata["render_stems"] = list(reference_stems)
+            reference_compare_project = replace(
+                reference_project,
+                stems=reference_stems,
+                score=replace(reference_score, metadata=reference_score_metadata),
+            )
+        projects = (reference_compare_project, candidate.project)
+
+        def operation(cancel_event):
+            rendered = []
+            for project in projects:
+                if cancel_event.is_set():
+                    raise RuntimeError("variation comparison cancelled")
+                score = project.to_score()
+                controls = None
+                if score.automation or score.automation_sources or score.modulations:
+                    if legacy_automation:
+                        score = attach_fx_automation_to_score(
+                            score, legacy_automation, tuple(project.stems)
+                        )
+                    controls = build_score_control_bus(
+                        score, project.sample_rate,
+                        automation_registry=fx_automation_registry(tuple(project.stems)),
+                    )
+                dry_stems = {
+                    name: np.asarray(audio, dtype=np.float32).copy()
+                    for name, audio in project.stems.items()
+                }
+                processed, metadata = render_fx_routing(
+                    dry_stems, project.sample_rate, routing,
+                    bpm=project.config.bpm,
+                    automation=legacy_automation if controls is None else None,
+                    controls=controls,
+                    mix_controls=mix_controls,
+                    include_audition_audio=True,
+                    cancel_event=cancel_event,
+                )
+                rendered.append((processed, metadata))
+            return {"signature": signature, "rendered": rendered}
+
+        worker = CancellableRenderWorker(operation)
+        self._variation_compare_worker = worker
+        worker.signals.finished.connect(self._variation_compare_finished)
+        worker.signals.error.connect(
+            lambda message, requested=signature: self._variation_compare_failed((requested, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+        self.statusBar().showMessage(f"Rendering matched comparison · {stage.replace('.', ' ').upper()}…")
+
+    def _show_variation_comparison(self, result: dict[str, Any]) -> None:
+        self._variation_ab_buffers = {
+            "reference": result["reference"],
+            "candidate": result["candidate"],
+            "difference": result["difference"],
+        }
+        self.variation_page.set_comparison(
+            result["reference"], result["candidate"], result["difference"],
+            int(result["sample_rate"]),
+        )
+        report = result["difference_meter"]
+        self.statusBar().showMessage(
+            "Matched A/B · -18 dBFS RMS target where peak headroom permits · "
+            f"difference peak {report['peak_dbfs']:.1f} dBFS",
+            6000,
+        )
+
+    def _variation_compare_finished(self, result: object) -> None:
+        if not isinstance(result, dict) or result.get("signature") != self._variation_compare_signature:
+            return
+        self._variation_compare_worker = None
+        candidate_id, stage = result["signature"]
+        candidate = self._variation_candidates.get(candidate_id)
+        if candidate is None:
+            return
+        reference_project = (
+            self._variation_candidates[candidate.record.parent_candidate_id].project
+            if candidate.record.parent_candidate_id in self._variation_candidates
+            else self._variation_origin_project
+        )
+        if reference_project is None:
+            reference_project = self._variation_branch_base or self._variation_base_project
+        if reference_project is None:
+            return
+        stem = self._variation_candidate_stem(candidate)
+
+        def extract(item):
+            processed, metadata = item
+            audition = metadata.get("audition_audio", {})
+            if stage == "direct":
+                return audition["direct"][stem]
+            if stage == "processed":
+                return processed[stem]
+            if stage == "insert":
+                return audition["insert"][stem]
+            if stage.startswith("send."):
+                return audition["sends"][stem][stage.split(".", 1)[1]]
+            if stage.startswith("return."):
+                return audition["returns"][stage.split(".", 1)[1]]
+            if stage == "master":
+                return render_master_with_returns(
+                    processed, metadata.get("bus_returns_audio", {}),
+                    master_wet=float(metadata.get("master_wet", 1.0)),
+                )
+            raise ValueError(f"unsupported comparison stage: {stage}")
+
+        try:
+            left, right = extract(result["rendered"][0]), extract(result["rendered"][1])
+            self._show_variation_comparison(
+                matched_ab(left, right, sample_rate=reference_project.sample_rate)
+            )
+        except Exception as exc:
+            self.statusBar().showMessage(f"Could not compare routing stages: {exc}", 8000)
+
+    def _variation_compare_failed(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        signature, message = payload
+        if signature != self._variation_compare_signature:
+            return
+        self._variation_compare_worker = None
+        if str(message).startswith("CANCELLED:"):
+            return
+        self.statusBar().showMessage(f"Variation comparison failed: {message}", 10000)
+
+
+    def _variation_listening_set(self, preset: str) -> None:
+        candidate_id = self.variation_page.selected_candidate_id
+        selected = self._variation_candidates.get(candidate_id or "")
+        project = selected.project if selected is not None else (
+            self._variation_branch_base or self._variation_base_project
+        )
+        if project is None:
+            return
+        try:
+            buffers = build_listening_set(project, preset)
+        except Exception as exc:
+            self.statusBar().showMessage(f"Listening set failed: {exc}", 8000)
+            return
+        self._variation_listening_buffers = {
+            str(label): np.asarray(audio, dtype=np.float32).copy()
+            for label, audio in buffers.items()
+        }
+        self.variation_page.set_listening_items(self._variation_listening_buffers)
+        if buffers:
+            self.statusBar().showMessage(
+                f"Listening set · {preset.replace('_', ' ').upper()} · {len(buffers)} excerpt(s)",
+                5000,
+            )
+
+    def _variation_listening_item(self, label: str) -> None:
+        audio = self._variation_listening_buffers.get(label)
+        if audio is None:
+            return
+        self._variation_ab_buffers["listening"] = audio
+        sample_rate = (
+            self._variation_candidates.get(self.variation_page.selected_candidate_id or "").project.sample_rate
+            if self.variation_page.selected_candidate_id in self._variation_candidates
+            else (self._variation_base_project.sample_rate if self._variation_base_project else 48_000)
+        )
+        self.variation_page.set_listening_audio(audio, sample_rate)
+
+    def _variation_audition(self, source: str) -> None:
+        audio = self._variation_ab_buffers.get(source)
+        if audio is None:
+            self.statusBar().showMessage("Run a matched comparison or choose a listening set first.")
+            return
+        project = self._variation_branch_base or self._variation_base_project or self.project
+        if project is None:
+            return
+        if source == "listening":
+            audio, _report = match_audition_level(audio)
+        try:
+            self.player.start(audio, project.sample_rate, device=self.output_device.currentData())
+        except Exception as exc:
+            self.statusBar().showMessage(f"Could not audition comparison: {exc}", 8000)
+
+    def _project_with_variation_session(self) -> ReawarpProject:
+        if self.project is None:
+            raise RuntimeError("no active project")
+        if self._variation_origin_project is None or not self._variation_candidates:
+            return self.project
+        origin = clone_project(self._variation_origin_project)
+        origin_fingerprint = project_fingerprint(origin)
+        origin.metadata.pop("m23_candidate", None)
+        origin.metadata["m23_project_fingerprint"] = origin_fingerprint
+        variation_projects: dict[str, ReawarpProject] = {"base": origin}
+        branch_fingerprint = None
+        if self._variation_branch_base is not None:
+            branch = clone_project(self._variation_branch_base)
+            branch_fingerprint = project_fingerprint(branch)
+            branch.metadata.pop("m23_candidate", None)
+            branch.metadata["m23_project_fingerprint"] = origin_fingerprint
+            variation_projects["branch_base"] = branch
+        for candidate_id, candidate in self._variation_candidates.items():
+            self._variation_sync_candidate(candidate)
+            variation_projects[candidate_id] = candidate.project
+        session = variation_session_metadata(
+            origin, self._variation_candidates,
+            active_candidate_id=self._variation_active_candidate_id,
+        )
+        session["active_branch_fingerprint"] = branch_fingerprint
+        metadata = copy.deepcopy(self.project.metadata)
+        metadata.pop("m23_candidate", None)
+        metadata["m23_active_candidate_id"] = self._variation_active_candidate_id
+        metadata["m23_project_fingerprint"] = origin_fingerprint
+        metadata["m23_variations"] = session
+        return replace(self.project, metadata=metadata, variation_candidates=variation_projects)
+
     def _regenerate_stem(self, name: str) -> None:
         if self.project is None:
             return
@@ -1410,6 +2152,9 @@ class MainWindow(QMainWindow):
         self._fx_audition_audio = {}
         self.fx_routing_editor.set_meter_report({})
         self._rebuild_mixer()
+        self.variation_page.set_stems(list(result.stems))
+        self._refresh_sound_object_targets()
+        self._restore_variation_session(result)
         self.mixer_stack.setCurrentIndex(1)
         self._update_project_context()
         self.preview_source.setEnabled(True)
@@ -1960,7 +2705,8 @@ class MainWindow(QMainWindow):
             )
             return
         try:
-            output = self.project.export(
+            export_project = self._project_with_variation_session()
+            output = export_project.export(
                 directory, bit_depth=24, include_stems=True, include_master=True
             )
             master = self._render_mix()

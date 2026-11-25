@@ -192,6 +192,29 @@ class SampleLibrary:
             CREATE INDEX IF NOT EXISTS idx_projects_family
                 ON projects(family_id);
 
+            CREATE TABLE IF NOT EXISTS project_candidates (
+                candidate_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+                batch_id TEXT NOT NULL,
+                parent_candidate_id TEXT,
+                selection_state TEXT NOT NULL,
+                label TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                targets_json TEXT NOT NULL,
+                root_seed TEXT,
+                variation_seed INTEGER NOT NULL,
+                seed_lineage_json TEXT NOT NULL,
+                changed_parameters_json TEXT NOT NULL,
+                technical_flags_json TEXT NOT NULL,
+                technical_metrics_json TEXT NOT NULL,
+                notes TEXT NOT NULL,
+                indexed_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_project_candidates_batch
+                ON project_candidates(batch_id);
+            CREATE INDEX IF NOT EXISTS idx_project_candidates_parent
+                ON project_candidates(parent_candidate_id);
+
             CREATE TABLE IF NOT EXISTS sound_objects (
                 patch_id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -364,7 +387,19 @@ class SampleLibrary:
         metadata = dict(record.get("metadata") or {})
         variation = metadata.get("variation")
         variation = variation if isinstance(variation, dict) else None
-        family_id = hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()[:24]
+        candidate = metadata.get("m23_candidate")
+        candidate = candidate if isinstance(candidate, dict) else None
+        session = metadata.get("m23_variations")
+        session = session if isinstance(session, dict) else None
+        family_source = (
+            (session or {}).get("base_project_fingerprint")
+            or (candidate or {}).get("base_project_fingerprint")
+            or metadata.get("m23_project_fingerprint")
+        )
+        family_id = (
+            str(family_source)[:24] if family_source
+            else hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()[:24]
+        )
         project_id = hashlib.sha256(
             (str(project_file.parent).casefold() + "\0" +
              _sha256_file(project_file)).encode("utf-8")
@@ -372,6 +407,10 @@ class SampleLibrary:
         root_seed = str(config.get("seed")) if config.get("seed") is not None else None
         variation_stem = str(variation.get("stem")) if variation and variation.get("stem") else None
         variation_index = int(variation.get("index", 0)) if variation else None
+        if candidate:
+            targets = candidate.get("targets", [])
+            variation_stem = "+".join(str(item) for item in targets) if targets else str(candidate.get("mode", "full_project"))
+            variation_index = int(candidate.get("index", 0))
         parent = self._connection.execute(
             """
             SELECT project_id FROM projects
@@ -414,6 +453,47 @@ class SampleLibrary:
                 """,
                 (project_id, family_id),
             )
+        if candidate:
+            self._connection.execute(
+                """
+                INSERT INTO project_candidates (
+                    candidate_id, project_id, batch_id, parent_candidate_id,
+                    selection_state, label, mode, targets_json, root_seed,
+                    variation_seed, seed_lineage_json, changed_parameters_json,
+                    technical_flags_json, technical_metrics_json, notes, indexed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(candidate_id) DO UPDATE SET
+                    project_id=excluded.project_id,
+                    batch_id=excluded.batch_id,
+                    parent_candidate_id=excluded.parent_candidate_id,
+                    selection_state=excluded.selection_state,
+                    label=excluded.label,
+                    mode=excluded.mode,
+                    targets_json=excluded.targets_json,
+                    root_seed=excluded.root_seed,
+                    variation_seed=excluded.variation_seed,
+                    seed_lineage_json=excluded.seed_lineage_json,
+                    changed_parameters_json=excluded.changed_parameters_json,
+                    technical_flags_json=excluded.technical_flags_json,
+                    technical_metrics_json=excluded.technical_metrics_json,
+                    notes=excluded.notes,
+                    indexed_at=excluded.indexed_at
+                """,
+                (
+                    str(candidate.get("candidate_id", "")), project_id,
+                    str(candidate.get("batch_id", "")), candidate.get("parent_candidate_id"),
+                    str(candidate.get("selection_state", "unreviewed")),
+                    str(candidate.get("label", "Candidate")), str(candidate.get("mode", "stems")),
+                    _canonical_json(candidate.get("targets", [])),
+                    None if candidate.get("root_seed") is None else str(candidate.get("root_seed")),
+                    int(candidate.get("variation_seed", 1)),
+                    _canonical_json(candidate.get("seed_lineage", {})),
+                    _canonical_json(candidate.get("changed_parameters", {})),
+                    _canonical_json(candidate.get("technical_flags", [])),
+                    _canonical_json(candidate.get("technical_metrics", {})),
+                    str(candidate.get("notes", "")), indexed_at,
+                ),
+            )
         self._connection.commit()
 
         indexed_assets: list[str] = []
@@ -431,6 +511,8 @@ class SampleLibrary:
                         "family_id": family_id,
                         "root_seed": root_seed,
                         "variation": variation,
+                        "m23_candidate": candidate,
+                        "sound_object_variants": metadata.get("sound_object_variants", []),
                     },
                 )
                 indexed_assets.append(asset.asset_id)
@@ -467,6 +549,9 @@ class SampleLibrary:
             "parent_project_id": parent_id,
             "variation_stem": variation_stem,
             "variation_index": variation_index,
+            "candidate_id": (candidate or {}).get("candidate_id"),
+            "candidate_batch_id": (candidate or {}).get("batch_id"),
+            "selection_state": (candidate or {}).get("selection_state"),
             "assets_indexed": len(indexed_assets),
             "asset_ids": indexed_assets,
         }
@@ -665,16 +750,36 @@ class SampleLibrary:
     def genealogy(self, family_id: str) -> list[dict[str, Any]]:
         rows = self._connection.execute(
             """
-            SELECT project_id, family_id, path, root_seed, variation_stem,
-                   variation_index, parent_project_id, indexed_at
-            FROM projects
-            WHERE family_id = ?
-            ORDER BY CASE WHEN variation_stem IS NULL THEN 0 ELSE 1 END,
-                     variation_stem, variation_index, path
+            SELECT p.project_id, p.family_id, p.path, p.root_seed,
+                   p.variation_stem, p.variation_index, p.parent_project_id,
+                   p.indexed_at, c.candidate_id, c.batch_id,
+                   c.parent_candidate_id, c.selection_state, c.label,
+                   c.mode, c.targets_json, c.variation_seed,
+                   c.seed_lineage_json, c.changed_parameters_json,
+                   c.technical_flags_json, c.technical_metrics_json, c.notes
+            FROM projects p
+            LEFT JOIN project_candidates c ON c.project_id = p.project_id
+            WHERE p.family_id = ?
+            ORDER BY CASE WHEN c.candidate_id IS NULL THEN 0 ELSE 1 END,
+                     c.batch_id, c.variation_seed, p.path
             """,
             (str(family_id),),
         ).fetchall()
-        return [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            item = dict(row)
+            for field, source in (
+                ("targets", "targets_json"),
+                ("seed_lineage", "seed_lineage_json"),
+                ("changed_parameters", "changed_parameters_json"),
+                ("technical_flags", "technical_flags_json"),
+                ("technical_metrics", "technical_metrics_json"),
+            ):
+                encoded = item.pop(source, None)
+                if encoded is not None:
+                    item[field] = json.loads(encoded)
+            result.append(item)
+        return result
 
     def project_family_id(self, directory: str | Path) -> str:
         root = Path(directory).expanduser().resolve()

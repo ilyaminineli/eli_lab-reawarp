@@ -26,6 +26,7 @@ class ReawarpProject:
     events: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     score: Score | None = None
+    variation_candidates: dict[str, ReawarpProject] = field(default_factory=dict, repr=False, compare=False)
 
     @property
     def frame_count(self) -> int:
@@ -62,6 +63,7 @@ class ReawarpProject:
             bit_depth: int = 24,
             include_stems: bool = True,
             include_master: bool = True,
+            _include_variations: bool = True,
     ) -> Path:
         output = Path(directory).expanduser()
         output.mkdir(parents=True, exist_ok=True)
@@ -102,6 +104,24 @@ class ReawarpProject:
             },
             "export": {"bit_depth": bit_depth, "master": include_master, "stems": include_stems},
         }
+        if _include_variations and self.variation_candidates:
+            candidate_ids = []
+            for candidate_id, candidate in sorted(self.variation_candidates.items()):
+                safe_id = str(candidate_id)
+                if (
+                    not safe_id or safe_id in {".", ".."}
+                    or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in safe_id)
+                ):
+                    raise ValueError(f"invalid variation candidate ID: {candidate_id!r}")
+                candidate.export(
+                    output / "candidates" / safe_id,
+                    bit_depth=bit_depth,
+                    include_stems=True,
+                    include_master=True,
+                    _include_variations=False,
+                )
+                candidate_ids.append(safe_id)
+            project_record["variation_candidates"] = candidate_ids
         (output / "project.json").write_text(
             json.dumps(project_record, indent=2, ensure_ascii=False), encoding="utf-8"
         )
@@ -109,6 +129,34 @@ class ReawarpProject:
             json.dumps({"schema_version": 1, "events": self.events}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        session = self.metadata.get("m23_variations")
+        if isinstance(session, dict):
+            report = {
+                "schema_version": 1,
+                "policy": "human_selection_only_no_artistic_auto_score",
+                "base_project_fingerprint": session.get("base_project_fingerprint"),
+                "active_candidate_id": session.get("active_candidate_id"),
+                "candidates": [
+                    {
+                        "candidate_id": item.get("candidate_id"),
+                        "label": item.get("label"),
+                        "selection_state": item.get("selection_state"),
+                        "parent_candidate_id": item.get("parent_candidate_id"),
+                        "mode": item.get("mode"),
+                        "targets": item.get("targets", []),
+                        "variation_seed": item.get("variation_seed"),
+                        "technical_flags": item.get("technical_flags", []),
+                        "technical_metrics": item.get("technical_metrics", {}),
+                        "notes": item.get("notes", ""),
+                    }
+                    for item in session.get("candidate_records", [])
+                    if isinstance(item, dict)
+                ],
+            }
+            (output / "listening_report.json").write_text(
+                json.dumps(report, indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
         self.to_score().save(output / "score.json")
         return output
 
@@ -184,7 +232,7 @@ class ReawarpProject:
         if list(score.metadata.get("render_stems", [])) != list(stem_names):
             raise ValueError("project score stem list does not match project.json")
 
-        return cls(
+        project = cls(
             config=config,
             sample_rate=sample_rate,
             stems=stems,
@@ -192,3 +240,18 @@ class ReawarpProject:
             metadata=metadata,
             score=score,
         )
+        candidate_ids = record.get("variation_candidates", [])
+        if not isinstance(candidate_ids, list):
+            raise ValueError("variation_candidates must be a list")
+        for candidate_id in candidate_ids:
+            safe_id = str(candidate_id)
+            if (
+                not safe_id or safe_id in {".", ".."}
+                or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in safe_id)
+            ):
+                raise ValueError(f"invalid variation candidate ID: {candidate_id!r}")
+            candidate_directory = root / "candidates" / safe_id
+            if not candidate_directory.is_dir():
+                raise ValueError(f"variation candidate export is missing: {safe_id}")
+            project.variation_candidates[safe_id] = cls.load(candidate_directory)
+        return project

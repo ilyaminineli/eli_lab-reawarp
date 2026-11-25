@@ -199,7 +199,7 @@ See [M22.md](M22.md).
 
 ## M23: Variation browser and critical-listening workflow
 
-**Status:** Planned. Deterministic stem regeneration and project genealogy exist; candidate batching, matched-level comparison, listening sets and guided notes remain future work.
+**Status:** Implemented. Deterministic candidate batches, blind matched-level A/B, waveform/spectrogram difference inspection, dry/insert/send/return/master stages, listening-set presets, human-authored notes, selection/branch/restore actions, nested project persistence and SQLite candidate ancestry are integrated. The M21 hybrid renderer supplies sound-object variations while retaining source identity. Target-machine performance and human listening remain experimental sign-offs.
 
 **Goal:** Make generation a reproducible candidate-selection process while keeping the original project immutable.
 
@@ -285,4 +285,6 @@ M21 is closed: versioned sound-object patches, hybrid transient/body/tail render
 
 M22 is closed: the Stem Mixer and core render API apply effects automatically from musical stem roles; no per-stem effect marking is required. Inserts live on each source path before the master, while wet-only SPACE/ECHO returns create shared relationships. Routing schema v3 includes inspectable roles and migrates v1/v2 authored routes without losing values. The existing cancellable worker/cache, stage audition, signal meters and matched-level audition remain in place.
 
-Outstanding Pyo-enabled listening and target-machine performance are experimental sign-offs; they are not claims of verified sound quality or timing. The following active milestone is M23.
+M23 is closed: frozen-base candidate batches, deterministic seed lineage, matched A/B and difference inspection, critical-listening sets, review actions, notes, project export/reload and SQLite project genealogy are integrated. Sound-object candidates use M21 source-preserving hybrid rendering.
+
+Outstanding Pyo-enabled listening, target-machine performance and human artistic selection are experimental sign-offs; they are not claims of verified sound quality or timing. The following active milestone is M24.
