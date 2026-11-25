@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import time
 import tracemalloc
 from pathlib import Path
@@ -21,7 +20,7 @@ from reawarp.synthesis.sound_object import (
 )
 
 
-def _measure(label, callback):
+def _measure(label, callback, sample_rate: int):
     tracemalloc.start()
     started = time.perf_counter()
     audio = callback()
@@ -35,10 +34,7 @@ def _measure(label, callback):
     return {
         "family": label,
         "elapsed_seconds": elapsed,
-        "real_time_factor": (
-            elapsed / (len(arrays) / callback.sample_rate)
-            if hasattr(callback, "sample_rate") and len(arrays) else None
-        ),
+        "real_time_factor": elapsed / (len(arrays) / sample_rate) if len(arrays) else None,
         "frames": int(len(arrays)),
         "output_bytes": int(np.asarray(arrays).nbytes),
         "tracemalloc_peak_bytes": int(traced_peak),
@@ -120,11 +116,7 @@ def benchmark(sample_rate: int, duration: float, seed: int) -> list[dict]:
     ]
 
     def measured(label, callback):
-        class TimedCallback:
-            sample_rate = sample_rate
-            def __call__(self):
-                return callback()
-        return _measure(label, TimedCallback())
+        return _measure(label, callback, sample_rate)
 
     modal = measured("modal_resonator_bank", lambda: render_modal_resonator_bank(
         modal_frequencies, modal_gains, frames=frames, sample_rate=sample_rate,
