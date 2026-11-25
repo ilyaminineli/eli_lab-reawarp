@@ -652,7 +652,20 @@ def render_fx_routing(
         if len(insert_tail):
             post_insert = np.concatenate((post_insert, insert_tail), axis=0)
         inserts[name] = post_insert.copy()
-        outputs[name] = post_insert.copy()
+        direct_output = post_insert.copy()
+        # CLI/portable routing has no separate GUI fader, so its v2 route
+        # record owns direct mute/solo/gain/pan. The desktop passes explicit
+        # mix_controls and applies those same controls after this cached pass.
+        if mix_controls is None:
+            if name not in audible:
+                direct_output.fill(0.0)
+            else:
+                direct_output *= float(effective[name]["gain"])
+                if channels == 2:
+                    direct_output = _apply_pan(
+                        direct_output, float(effective[name]["pan"])
+                    )
+        outputs[name] = np.ascontiguousarray(direct_output, dtype=np.float32)
         tails[name] = {
             "insert_tail_frames": max(0, len(post_insert) - frames),
             "insert_tail_seconds": max(0, len(post_insert) - frames) / float(sample_rate),
