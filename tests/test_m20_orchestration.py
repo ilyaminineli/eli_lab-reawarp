@@ -75,8 +75,8 @@ def test_score_generation_compiles_complete_m20_director_intent():
     from reawarp.core.score_generation import build_score_generation_plan
 
     config = GenerationConfig(
-        duration=24.0, bpm=120.0, seed="m20-director-bridge",
-        structure="autechre_like", complexity=0.38,
+        duration=60.0, bpm=120.0, seed="m20-director-bridge",
+        structure="uplift_drop_return", complexity=0.38,
         break_cycle_bars=2,
     )
     generated = build_score_generation_plan(config)
