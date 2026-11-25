@@ -10,6 +10,8 @@ class PhraseSpan:
  def __post_init__(self):
   object.__setattr__(self,'start_beats',as_fraction(self.start_beats));object.__setattr__(self,'end_beats',as_fraction(self.end_beats))
   if not self.phrase_id or self.end_beats<=self.start_beats: raise ValueError('invalid phrase span')
+ @property
+ def duration_beats(self):return self.end_beats-self.start_beats
  def to_dict(self):return {'phrase_id':self.phrase_id,'start_beats':str(self.start_beats),'end_beats':str(self.end_beats),'function':self.function,'section_id':self.section_id,'overlap_group':self.overlap_group,'allow_overlap':self.allow_overlap}
  @classmethod
  def from_dict(cls,d):return cls(**d)
@@ -69,7 +71,7 @@ class MutationPolicy:
  phrase_id:str;stable_anchors:tuple=();preserve_pattern:tuple=();preserve_motif:tuple=();preserve_sound:tuple=();allow_pattern:tuple=();allow_motif:tuple=();allow_sound:tuple=();principal_developments:int=1;deliberate_rupture:bool=False;rupture_reason:str|None=None
  def __post_init__(self):
   if self.principal_developments>1 and (not self.deliberate_rupture or not self.rupture_reason):raise ValueError('multiple principal developments require deliberate rupture and rupture_reason')
- def to_dict(self):return {k:(list(v) if isinstance(v,tuple) else v) for k,v in self.__dict__.items()}
+ def to_dict(self):return {'phrase_id':self.phrase_id,'stable_anchors':list(self.stable_anchors),'preserve_pattern':list(self.preserve_pattern),'preserve_motif':list(self.preserve_motif),'preserve_sound':list(self.preserve_sound),'allow_pattern':list(self.allow_pattern),'allow_motif':list(self.allow_motif),'allow_sound':list(self.allow_sound),'principal_developments':self.principal_developments,'deliberate_rupture':self.deliberate_rupture,'rupture_reason':self.rupture_reason}
  @classmethod
  def from_dict(cls,d):return cls(**{k:tuple(v) if isinstance(v,list) else v for k,v in d.items()})
 @dataclass(frozen=True,slots=True)
