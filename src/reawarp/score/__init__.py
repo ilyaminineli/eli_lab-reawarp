@@ -10,13 +10,6 @@ from reawarp.score.render import (
 )
 from reawarp.score.timeline import RenderTimeline
 from reawarp.score.model import Score
-from reawarp.composition.phrases import (
-    PhraseBoundary, PhraseSpan as CompositionPhraseSpan, PhrasePlan,
-    MotifIdentity, MotifFamily, MotifTransformation, PhraseCandidate,
-    PhraseCandidateBatch, build_phrase_candidate_batch, freeze_phrase_candidate,
-    restore_phrase_base, branch_phrase_candidate, continue_evolving,
-    phrase_context_events,
-)
 from reawarp.score.orchestration_intent import (
     AttentionSpan, CycleSpec, MutationPolicy, OrchestrationPlan, PhraseSpan,
     RoleRelationship, TransitionSpan, build_orchestration_plan,
@@ -65,12 +58,6 @@ from reawarp.score.time import (
 )
 
 __all__ = [
-    "PhraseBoundary", "CompositionPhraseSpan", "PhrasePlan",
-    "MotifIdentity", "MotifFamily", "MotifTransformation",
-    "PhraseCandidate", "PhraseCandidateBatch",
-    "build_phrase_candidate_batch", "freeze_phrase_candidate",
-    "restore_phrase_base", "branch_phrase_candidate", "continue_evolving",
-    "phrase_context_events",
     "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
     "inspect_attention_conflicts", "inspect_event_onset_conflicts",
