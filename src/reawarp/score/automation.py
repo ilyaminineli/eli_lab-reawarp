@@ -175,26 +175,26 @@ DEFAULT_AUTOMATION_TARGETS = AutomationTargetRegistry((
     AutomationTarget("synth.cutoff", "synthesis", "Hz", minimum=20.0, maximum=18_000.0),
     AutomationTarget("synth.resonance", "synthesis", "normalized", minimum=0.0, maximum=1.0),
     AutomationTarget("synth.gain", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.pitch", "synthesis", "semitones", minimum=-48.0, maximum=48.0),
+    AutomationTarget("synth.pitch", "synthesis", "semitones", minimum=-48.0, maximum=48.0, update_clock="event"),
     AutomationTarget("synth.attack", "synthesis", "seconds", minimum=0.001, maximum=2.0, update_clock="event"),
     AutomationTarget("synth.decay", "synthesis", "seconds", minimum=0.01, maximum=4.0, update_clock="event"),
     AutomationTarget("synth.release", "synthesis", "seconds", minimum=0.02, maximum=0.65, update_clock="event"),
     AutomationTarget("synth.modulation.depth", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
     AutomationTarget("synth.modulation.rate", "synthesis", "Hz", minimum=0.0, maximum=40.0, update_clock="event"),
-    AutomationTarget("synth.wavetable.position", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.partial.balance", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.grain.size", "synthesis", "milliseconds", minimum=1.0, maximum=500.0),
-    AutomationTarget("synth.grain.position", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.grain.density", "synthesis", "Hz", minimum=0.0, maximum=200.0),
-    AutomationTarget("event.velocity_scale", "composition", "ratio", minimum=0.0, maximum=2.0),
-    AutomationTarget("event.probability", "composition", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("role.activity", "composition", "normalized", minimum=0.0, maximum=1.0),
+    AutomationTarget("synth.wavetable.position", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("synth.partial.balance", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("synth.grain.size", "synthesis", "milliseconds", minimum=1.0, maximum=500.0, update_clock="event"),
+    AutomationTarget("synth.grain.position", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("synth.grain.density", "synthesis", "Hz", minimum=0.0, maximum=200.0, update_clock="event"),
+    AutomationTarget("event.velocity_scale", "composition", "ratio", minimum=0.0, maximum=2.0, update_clock="event"),
+    AutomationTarget("event.probability", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("role.activity", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
     AutomationTarget("role.density", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
     AutomationTarget("role.syncopation", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
     AutomationTarget("role.articulation", "composition", "articulation_index", value_type="discrete", minimum=0, maximum=4, update_clock="event"),
-    AutomationTarget("sample.mix", "composition", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("spatial.pan", "spatial", "normalized", minimum=-1.0, maximum=1.0),
-    AutomationTarget("spatial.width", "spatial", "ratio", minimum=0.0, maximum=2.0),
+    AutomationTarget("sample.mix", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("spatial.pan", "spatial", "normalized", minimum=-1.0, maximum=1.0, update_clock="event"),
+    AutomationTarget("spatial.width", "spatial", "ratio", minimum=0.0, maximum=2.0, update_clock="event"),
     AutomationTarget("fx.insert.wet", "fx", "normalized", minimum=0.0, maximum=1.0),
     AutomationTarget("fx.send.space", "fx", "normalized", minimum=0.0, maximum=1.0),
     AutomationTarget("fx.send.echo", "fx", "normalized", minimum=0.0, maximum=1.0),
@@ -592,6 +592,20 @@ class AutomationControlBus:
         if target_id not in self._lanes and target_id not in self._modulations:
             raise KeyError(f"automation target not found: {target_id}")
         return self._targets.get(target_id)
+
+    def recommended_step_frames(self, target_id: str) -> int | None:
+        """Return the frame step for a continuous target, or None for event-clock controls."""
+        target = self.target(target_id)
+        if target is None:
+            return max(1, int(round(self.timeline.sample_rate / 1_000.0)))
+        if target.update_clock == "event":
+            return None
+        if target.update_clock == "sample":
+            return 1
+        return max(
+            1,
+            int(round(self.timeline.sample_rate / float(target.control_rate_hz))),
+        )
 
     def _lane_position(self, lane: AutomationLane, frame: int) -> Fraction:
         frame = max(0, int(frame))

@@ -276,12 +276,16 @@ def _control_bus_envelope(
     sample_rate: int,
     default: float,
 ) -> np.ndarray:
-    """Evaluate a score control lane at 1 kHz, then interpolate per audio frame."""
+    """Evaluate a score control lane at its declared control rate, then interpolate."""
     if target not in controls.target_ids:
         return np.full(frames, float(default), dtype=np.float32)
     if frames <= 0:
         return np.zeros(max(0, frames), dtype=np.float32)
-    step = max(1, int(sample_rate) // 1000)
+    step = controls.recommended_step_frames(target)
+    if step is None:
+        raise ValueError(
+            f"event-clock target {target!r} cannot drive a continuous FX routing lane"
+        )
     sampled = controls.sample(
         target, 0, frames, step_frames=step, default_value=float(default)
     )

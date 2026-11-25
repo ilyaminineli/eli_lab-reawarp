@@ -68,10 +68,14 @@ def _control_curve(
     sample_rate: int,
     default: float,
 ) -> tuple[np.ndarray, np.ndarray] | None:
-    """Interpolate a control-bus lane and its active mask at 1 kHz."""
+    """Interpolate a control lane and its active mask at its declared control rate."""
     if target_id not in controls.target_ids or scheduled.duration_frames <= 0:
         return None
-    step = max(1, int(sample_rate) // 1000)
+    step = controls.recommended_step_frames(target_id)
+    if step is None:
+        raise ValueError(
+            f"event-clock target {target_id!r} cannot be sampled as a continuous voice curve"
+        )
     sampled = controls.sample(
         target_id,
         scheduled.start_frame,

@@ -845,3 +845,14 @@ def test_shared_score_control_bus_preserves_context_for_downstream_fx_consumers(
         "stem.kick.insert_wet", bus.timeline.beat_to_frame(Fraction(0)),
         default_value=0.0,
     ) == pytest.approx(0.5)
+
+
+def test_control_clock_recommendations_match_each_destination_contract():
+    bus = AutomationControlBus((), _timeline(sample_rate=48_000))
+
+    assert bus.recommended_step_frames("synth.cutoff") == 48
+    assert bus.recommended_step_frames("synth.gain") == 48
+    assert bus.recommended_step_frames("synth.pitch") is None
+    assert bus.recommended_step_frames("synth.attack") is None
+    assert bus.recommended_step_frames("role.density") is None
+    assert bus.recommended_step_frames("spatial.pan") is None
