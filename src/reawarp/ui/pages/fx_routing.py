@@ -6,7 +6,7 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QLabel, QMessageBox, QPushButton, QSlider, QVBoxLayout, QWidget,
 )
 
@@ -146,7 +146,13 @@ class FXRoutingEditor(QGroupBox):
             self.audition_stage.addItem(label, stage)
         self.audition_button = QPushButton("AUDITION SELECTED")
         self.audition_button.clicked.connect(self._request_audition)
+        self.match_level_checkbox = QCheckBox("MATCH LEVEL")
+        self.match_level_checkbox.setChecked(True)
+        self.match_level_checkbox.setToolTip(
+            "Create a peak-safe -18 dBFS RMS audition copy. Exported masters are not changed."
+        )
         audition_row.addWidget(self.audition_stage, 1)
+        audition_row.addWidget(self.match_level_checkbox)
         audition_row.addWidget(self.audition_button)
         root.addLayout(audition_row)
 
@@ -299,6 +305,9 @@ class FXRoutingEditor(QGroupBox):
 
     def _apply_dry_routing(self) -> None:
         self.set_routing(default_fx_routing(self._stem_names))
+
+    def match_audition_level(self) -> bool:
+        return bool(self.match_level_checkbox.isChecked())
 
     def _request_audition(self) -> None:
         stem = str(self.stem.currentData() or "")
