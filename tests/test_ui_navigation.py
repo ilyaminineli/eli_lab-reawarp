@@ -267,6 +267,10 @@ def test_m22_fx_editor_starts_with_role_auto_routing_and_exposes_send_taps():
     assert route["stems"]["kick"]["insert"]["kind"] == "bypass"
     assert route["stems"]["kick"]["sends"] == {"space": 0.0, "echo": 0.0}
     assert route["stems"]["melody"]["sends"]["space"] > 0.0
+    assert editor.match_audition_level() is True
+    editor.match_level_checkbox.setChecked(False)
+    assert editor.match_audition_level() is False
+    editor.match_level_checkbox.setChecked(True)
 
     taps = []
     editor.auditionRequested.connect(lambda stage, stem: taps.append((stage, stem)))
