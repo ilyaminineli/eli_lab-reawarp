@@ -273,7 +273,7 @@ class AutomationSource:
             if waveform not in {"sine", "triangle", "square", "saw"}:
                 raise ValueError("LFO waveform must be sine, triangle, square, or saw")
             positions = self._positions(count)
-            for position in positions:
+            for index, position in enumerate(positions):
                 cycles = float((position - self.start) / Fraction(str(period))) + phase
                 phase_value = cycles % 1.0
                 if waveform == "triangle":
@@ -284,7 +284,13 @@ class AutomationSource:
                     wave = 2.0 * phase_value - 1.0
                 else:
                     wave = math.sin(2.0 * math.pi * cycles)
-                points.append(AutomationPoint(position, center + depth * wave))
+                segment_curve = (
+                    "step" if waveform == "square" and index < len(positions) - 1
+                    else None
+                )
+                points.append(AutomationPoint(
+                    position, center + depth * wave, segment_curve
+                ))
 
         elif self.kind in {"envelope", "phrase_curve"}:
             if self.kind == "envelope":
@@ -512,7 +518,10 @@ class AutomationControlBus:
             str(key): dict(value) for key, value in (event_contexts or {}).items()
         }
         source_items = tuple(sources)
-        lane_items = tuple(lanes) + tuple(source.to_lane() for source in source_items)
+        source_lanes = {
+            source.source_id: source.to_lane() for source in source_items
+        }
+        lane_items = tuple(lanes) + tuple(source_lanes.values())
         lane_keys: set[tuple[str, str, str | None]] = set()
         for lane in lane_items:
             key = (lane.target_id, lane.scope, lane.scope_id)
@@ -531,12 +540,10 @@ class AutomationControlBus:
         for target_lanes in self._lanes.values():
             target_lanes.sort(key=lambda lane: self._SCOPE_ORDER[lane.scope])
         self._sources = {source.source_id: source for source in source_items}
-        # Materialise generated curves once. Regenerating an LFO or random walk
-        # for every control sample would turn a cheap lookup into O(samples × points).
-        self._source_lanes = {
-            source_id: source.to_lane() for source_id, source in self._sources.items()
-        }
-        self._modulations: dict[str, list[AutomationModulation]] = {};
+        # Materialise generated curves once; control sampling should be O(1) in
+        # source generation cost, not regenerate an entire random walk per sample.
+        self._source_lanes = source_lanes
+        self._modulations: dict[str, list[AutomationModulation]] = {}
         for modulation in modulations:
             if modulation.source_id not in self._sources:
                 raise ValueError(f"unknown modulation source: {modulation.source_id}")
@@ -674,6 +681,7 @@ class AutomationControlBus:
         hysteresis = target.hysteresis if target is not None else 0.0
         continuous = target is None or target.value_type == "continuous"
         resolved_context = self._context(event_id, context)
+        resolved_context["event_id"] = event_id or resolved_context.get("event_id")
         for lane in self._lanes.get(target_id, ()):
             applies = (
                 lane.scope == "global"
