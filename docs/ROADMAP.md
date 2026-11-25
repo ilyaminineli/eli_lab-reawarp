@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
-**Updated:** 2026-11-24  
-**Current implementation baseline:** M15 motif/orchestration implementation and cross-platform regression coverage landed on `main`; subjective listening validation remains pending; M14 target-machine profiling/listening also remains pending  
+**Updated:** 2026-11-25  
+**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; the last accepted M17.5 CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18's typed automation/source model, ScoreRenderer consumers and first Score Control editor are now partially implemented; M18 CI and listening sign-off remain open. M14 target-machine profiling/Pyo listening also remain pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -12,7 +12,7 @@ The canonical target workflow is:
 
 `Configuration → Form/Role Plan → Score → Dry Stem Render → FX Routing/Automation → Export + Provenance`
 
-The current application has strong components at most of these stages, but score-driven rendering is not yet complete. That is the main architectural bridge to build after reliability and profiling.
+M17.5 completed the canonical Score-first cutover for event-backed roles: `generate()` now plans a rational-beat Score before rendering, ScoreRenderer owns event scheduling, and the legacy project-event dictionaries are derived afterwards. Noise texture and ambience remain specialised whole-field passes represented by Score markers. M18 now extends the shared control bus into reusable deterministic score sources and scoped modulation; the remaining work is musical authoring coverage, listening and target-machine validation.
 
 ## Implemented baseline
 
@@ -25,13 +25,13 @@ The current application has strong components at most of these stages, but score
 | Melodic synthesis | Implemented | Distinct subtractive and alternative synthesis paths |
 | Ambience/texture stems | Implemented | Separate generated roles |
 | Project stems and provenance | Implemented | Dry stems, events and generation metadata |
-| Score and MIDI interchange | Partially implemented | Rich score schema and conversion/export exist; score is not yet the renderer's authoritative input |
+| Score and MIDI interchange | Implemented | M17.5 makes rational-beat Score authoritative for event-backed rendering; project events remain a compatibility projection; MIDI 1.0 limitations are documented |
 | Local sample/stem library | Implemented | SQLite indexing, descriptors, search, collections and genealogy |
 | FX Lab and editable serial chains | Implemented | Optional Pyo offline backend and portable JSON |
 | Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
 | GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
-| Regression testing | Implemented | M14 suite covers deterministic streams, transform edge cases, score/MIDI and project round trips, FX contracts, stem isolation and offscreen UI navigation; M15 motif/orchestration fixtures are being added |
+| Regression testing | Implemented baseline; M18 verification pending | M17.5 CI passed 107 tests per Linux/Windows matrix job; M18 adds control-source, scope, modulation, render and offscreen UI fixtures, awaiting its CI result |
 | Target-machine DSP listening validation | Pending | Requires Pyo-enabled Windows render and critical audition |
 | Performance benchmark baseline | Partially implemented | Reproducible benchmark harness and phase timings are present; target-Windows 30/180-second results are pending |
 
@@ -89,7 +89,7 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 
 ## M16: Score-driven render core
 
-**Status:** Partially implemented on main. A score-native offline renderer, shared beat/frame timeline, typed automation control bus and score provenance are landed. Full migration of the existing M8–M15 Generator planners and production synthesis loops remains open.
+**Status:** Foundation implemented; completed by the M17.5 canonical Score-first generation cutover. A score-native offline renderer, shared beat/frame timeline, typed automation control bus, production voices, sample triggers, break slicing, FX compatibility and Score provenance are now in the active generation path.
 
 **Goal:** Make the universal score the canonical symbolic event representation consumed by the audio renderer.
 
@@ -103,13 +103,14 @@ Compare the same seed in a full render and in isolated kick/snare/hat/melody/tex
 - Project-derived scores retain score-renderer version, source generator version, root seed, sample rate, frame count, duration, named seed streams and generator-family provenance.
 - Existing project and score schema version 1 remain readable; MIDI 1.0 precision and metadata limitations are documented in docs/M16.md.
 
-### Remaining integration work
+### Current state and remaining boundaries
 
-1. Convert the existing percussion, motif and melody planners to emit MusicalEvent records directly instead of legacy seconds-based event classes.
-2. Adapt production instrument, sample-trigger and break-slice renderers to consume ScheduledScoreEvent from the canonical score.
-3. Replace remaining constant-4/4 section and bar timing in the legacy Generator with MeterMap queries where musical form is expressed in bars.
-4. Route the existing M13 FX automation representation into the typed score control bus.
-5. Complete target-Windows performance profiling and critical listening after the production renderer adapters land.
+- M17.5 completed the canonical generation cutover: `ReawarpEngine.generate()` plans Score first, all event-backed voices use ScoreRenderer, and compatibility event dictionaries are derived from that Score.
+- Texture and ambience remain specialist whole-field renderers; their marker events document the passes without pretending that they are event-scheduled instruments.
+- Some high-level pattern and arrangement planners still use fixed sixteenth-grid and constant-BPM assumptions. Score's tempo/meter maps are richer than every planner currently consuming them.
+- M13 wet automation is bridged into the typed Score control bus by M17.4. M18 extends the bus with source generators and scoped relationships.
+
+Target-Windows performance profiling and critical listening remain cross-cutting sign-off work, rather than a missing Score scheduling feature.
 
 ### Acceptance criteria
 
@@ -158,7 +159,7 @@ See [M16 — Score-driven render core](M16.md) for the timing/render foundation 
 
 ## M18: Musical automation and control performance
 
-**Status:** Planned. M16/M17 provide the Score control bus and typed target registry; user-facing composition-level automation and reusable modulation sources remain future work.
+**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers and a first Score Control editor are landed. Planner authoring, broader instrument/FX destinations, CI acceptance and critical listening remain open.
 
 **Goal:** Turn the typed control bus into a compositional instrument. Add inspectable and editable score trajectories for synthesis, role behaviour, spatial motion and selected FX parameters.
 
