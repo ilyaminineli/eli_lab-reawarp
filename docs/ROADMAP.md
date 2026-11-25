@@ -159,7 +159,7 @@ See [M16 — Score-driven render core](M16.md) for the timing/render foundation 
 
 ## M18: Musical automation and control performance
 
-**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers, per-note ADSR/vibrato across five melodic palettes, Score-aware scope suggestions, selectable LFO waveforms and editable normalized source points are landed. Cross-platform CI passes (129 tests per job). Planner authoring, remaining synthesis/FX destinations and critical listening remain open.
+**Status:** Implementation complete on the M18 development branch. Typed/scoped control model, deterministic sources/modulation, render-time composition controls, five-palette ADSR/vibrato, instrument-specific wavetable/partial/granular controls, spatial pan/width, stem-aware fixed FX routing and the Score Control editor are integrated. Existing cross-platform CI evidence records 129 tests passing per job. Target-Windows performance profiling and matched-level Pyo listening remain experimentally unverified M14/M22 sign-offs, not software implementation blockers.
 
 **Goal:** Turn the typed control bus into a compositional instrument. Add inspectable and editable score trajectories for synthesis, role behaviour, spatial motion and selected FX parameters.
 
@@ -167,7 +167,7 @@ See [M18.md](M18.md).
 
 ## M19: Harmonic context and voice-leading
 
-**Status:** Planned. Score tuning hooks and frequency-aware notes exist, but harmonic context, sonority planning, optional pitch hierarchy and voice-leading are not yet composition-first.
+**Status:** In progress. Optional Score harmonic-context/sonority persistence, equal-period tuning conversion, pitch-field candidate evaluation and deterministic voice-leading matching with inspectable cost components are implemented as M19.1 foundations. Sonority planning, bass-role grammar, full planner integration, motif preservation and UI remain.
 
 **Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 
