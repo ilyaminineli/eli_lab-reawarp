@@ -1,13 +1,14 @@
-"""Portable role-aware inserts and two shared send/return buses.
+"""Versioned role-aware mixer: per-stem inserts, tap-point sends and fixed returns.
 
-The generator remains the dry, deterministic source of truth. This module
-applies an optional offline FX pass after generation and never mutates input
-stem buffers or their random streams.
+The render contract keeps dry stems immutable. Inserts operate per stem before
+the master, and SPACE/ECHO are fixed auxiliary returns. Schema v1 projects are
+migrated in memory to v2. No arbitrary routing graph or feedback bus is implied.
 """
 from __future__ import annotations
 
 import json
 import math
+import threading
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -17,19 +18,29 @@ from reawarp.fx import FX_PRESETS, normalise_fx_stages, render_pyo_fx
 from reawarp.fx_automation import automation_envelope, normalise_fx_automation
 from reawarp.score.automation import AutomationControlBus
 
-FX_ROUTING_SCHEMA_VERSION = 1
+FX_ROUTING_SCHEMA_VERSION = 2
+LEGACY_FX_ROUTING_SCHEMA_VERSION = 1
 FX_BUSES = ("space", "echo")
+SEND_TAP_POINTS = (
+    "pre_insert_pre_fader",
+    "pre_insert_post_fader",
+    "post_insert_pre_fader",
+    "post_insert_post_fader",
+)
 FX_DELAY_DIVISIONS: dict[str, float] = {
-    "off": 0.0,
-    "1/2": 2.0,
-    "1/4": 1.0,
-    "dotted_1/8": 0.75,
-    "1/8": 0.5,
-    "1/8_triplet": 1.0 / 3.0,
-    "1/16": 0.25,
-    "1/16_triplet": 1.0 / 6.0,
-    "1/32": 0.125,
+    "off": 0.0, "1/2": 2.0, "1/4": 1.0, "dotted_1/8": 0.75,
+    "1/8": 0.5, "1/8_triplet": 1.0 / 3.0, "1/16": 0.25,
+    "1/16_triplet": 1.0 / 6.0, "1/32": 0.125,
 }
+
+
+class FXRenderCancelledError(RuntimeError):
+    """Raised at safe boundaries when a background FX render is cancelled."""
+
+
+def _check_cancel(cancel_event: Any | None) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise FXRenderCancelledError("FX render cancelled")
 
 
 def _finite(value: Any, name: str, low: float, high: float) -> float:
@@ -40,6 +51,30 @@ def _finite(value: Any, name: str, low: float, high: float) -> float:
     if not math.isfinite(number) or not low <= number <= high:
         raise ValueError(f"{name} must be between {low:g} and {high:g}")
     return number
+
+
+def classify_fx_role(stem_name: str) -> str:
+    """Infer a conservative musical role from a generated stem identifier."""
+    token = str(stem_name).casefold().replace("-", "_")
+    if any(part in token for part in ("kick", "sub", "bass", "low_end")):
+        return "kick"
+    if any(part in token for part in ("snare", "clap", "rim")):
+        return "snare"
+    if any(part in token for part in ("hat", "cymbal", "ride", "shaker", "tamb")):
+        return "hats"
+    if any(part in token for part in ("break", "loop", "sample_break", "synthetic_break")):
+        return "break"
+    if any(part in token for part in ("melody", "lead", "arp", "keys", "voice")):
+        return "melody"
+    if any(part in token for part in ("texture", "noise", "granular", "drone")):
+        return "texture"
+    if any(part in token for part in ("ambience", "ambient", "pad", "atmosphere")):
+        return "ambience"
+    return "other"
+
+
+def _bypass_insert() -> dict[str, Any]:
+    return {"kind": "bypass", "wet": 0.0, "tail_seconds": 0.0}
 
 
 def _chain_record(record: Mapping[str, Any], sample_rate: int) -> dict[str, Any]:
@@ -56,94 +91,162 @@ def _chain_record(record: Mapping[str, Any], sample_rate: int) -> dict[str, Any]
         stages = normalise_fx_stages(record.get("stages", []), sample_rate=sample_rate)
         return {"kind": "stages", "stages": stages, "wet": wet, "tail_seconds": tail}
     if kind == "bypass":
-        return {"kind": "bypass", "wet": 0.0, "tail_seconds": 0.0, "stages": ()}
+        return _bypass_insert()
     raise ValueError(f"Unknown route kind: {kind}")
 
 
-def default_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
-    """Build a conservative route map: every stem dry, every send closed."""
+def _base_routing(stem_names: Sequence[str], *, routing_mode: str) -> dict[str, Any]:
     return {
         "schema_version": FX_ROUTING_SCHEMA_VERSION,
+        "routing_mode": routing_mode,
         "master_wet": 1.0,
         "stems": {
             str(name): {
-                "insert": {"kind": "bypass", "wet": 0.0, "tail_seconds": 0.0},
+                "insert": _bypass_insert(),
                 "sends": {"space": 0.0, "echo": 0.0},
+                "send_taps": {
+                    "space": "post_insert_post_fader",
+                    "echo": "post_insert_post_fader",
+                },
+                "gain_db": 0.0,
+                "pan": 0.0,
+                "mute": False,
+                "solo": False,
             }
             for name in stem_names
         },
         "buses": {
-            "space": {"chain": "restrained_space", "wet": 0.18, "tail_seconds": 2.0, "delay_sync": "off"},
-            "echo": {"chain": "tape_echo", "wet": 0.0, "tail_seconds": 1.5, "delay_sync": "off"},
+            "space": {
+                "chain": "restrained_space", "wet": 0.18,
+                "tail_seconds": 2.0, "delay_sync": "off",
+                "alignment_policy": "start_aligned",
+            },
+            "echo": {
+                "chain": "tape_echo", "wet": 0.0,
+                "tail_seconds": 1.5, "delay_sync": "off",
+                "alignment_policy": "start_aligned",
+            },
         },
     }
+
+
+def default_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
+    """Manual, fully dry routing. Kept as the reference A/B baseline."""
+    return _base_routing(stem_names, routing_mode="manual")
+
+
+def role_aware_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
+    """Assign inserts and shared sends from role identity; unknown stems stay dry.
+
+    This is the desktop's normal new-project starting point. It removes the need
+    to hand-enable effect sends for each stem while protecting kick/sub energy.
+    """
+    routing = _base_routing(stem_names, routing_mode="role_auto")
+    role_defaults = {
+        "kick": {"insert": _bypass_insert(), "sends": (0.0, 0.0)},
+        "snare": {
+            "insert": {"kind": "preset", "preset": "restrained_space", "wet": 0.08, "tail_seconds": 0.8},
+            "sends": (0.05, 0.015),
+        },
+        "hats": {
+            "insert": {"kind": "preset", "preset": "digital_fracture", "wet": 0.07, "tail_seconds": 0.5},
+            "sends": (0.055, 0.02),
+        },
+        "break": {
+            "insert": {"kind": "preset", "preset": "digital_fracture", "wet": 0.10, "tail_seconds": 0.65},
+            "sends": (0.04, 0.02),
+        },
+        "melody": {
+            "insert": {"kind": "preset", "preset": "metallic_machine", "wet": 0.07, "tail_seconds": 1.0},
+            "sends": (0.075, 0.035),
+        },
+        "texture": {
+            "insert": {"kind": "preset", "preset": "restrained_space", "wet": 0.10, "tail_seconds": 1.6},
+            "sends": (0.10, 0.01),
+        },
+        "ambience": {
+            "insert": _bypass_insert(),
+            "sends": (0.035, 0.0),
+        },
+    }
+    for name in stem_names:
+        role = classify_fx_role(name)
+        spec = role_defaults.get(role)
+        if spec is None:
+            continue
+        route = routing["stems"][str(name)]
+        route["insert"] = dict(spec["insert"])
+        route["sends"] = {
+            "space": float(spec["sends"][0]),
+            "echo": float(spec["sends"][1]),
+        }
+    routing["buses"]["space"]["wet"] = 0.16
+    routing["buses"]["echo"]["wet"] = 0.07
+    return routing
 
 
 def build_role_audition_matrix(stem_names: Sequence[str]) -> dict[str, dict[str, Any]]:
-    """Create four restrained, comparable role-routing starting points.
-
-    Names are classified conservatively. Unknown stem names remain completely
-    dry rather than receiving an assumed effect assignment.
-    """
-    def role_of(name: str) -> str:
-        token = str(name).lower()
-        if "kick" in token or "sub" in token or "bass" in token:
-            return "kick"
-        if "snare" in token or "clap" in token:
-            return "snare"
-        if any(part in token for part in ("hat", "cymbal", "ride", "shaker", "tamb")):
-            return "hats"
-        if "break" in token or "loop" in token:
-            return "break"
-        if any(part in token for part in ("melody", "lead", "arp")):
-            return "melody"
-        if any(part in token for part in ("ambience", "texture", "noise", "pad")):
-            return "ambience"
-        return "other"
-
-    roles = {name: role_of(name) for name in stem_names}
-    definitions = {
+    """Create four restrained comparison routes without hand-editing stem names."""
+    role_sends = {
         "percussion_focus": {
-            "sends": {"snare": (0.02, 0.00), "hats": (0.06, 0.02), "break": (0.04, 0.01)},
-            "space_wet": 0.12, "echo_wet": 0.05,
+            "snare": (0.04, 0.01), "hats": (0.06, 0.02), "break": (0.04, 0.01),
+            "space_wet": 0.13, "echo_wet": 0.05,
         },
         "melody_foreground": {
-            "sends": {"melody": (0.08, 0.04), "hats": (0.02, 0.00), "break": (0.02, 0.00)},
+            "melody": (0.08, 0.04), "hats": (0.02, 0.0), "break": (0.02, 0.0),
             "space_wet": 0.14, "echo_wet": 0.08,
         },
         "ambience_background": {
-            "sends": {"ambience": (0.16, 0.00), "melody": (0.02, 0.00)},
-            "space_wet": 0.16, "echo_wet": 0.00,
+            "ambience": (0.12, 0.0), "texture": (0.10, 0.0), "melody": (0.02, 0.0),
+            "space_wet": 0.16, "echo_wet": 0.0,
         },
         "combined_roles": {
-            "sends": {
-                "snare": (0.02, 0.00), "hats": (0.04, 0.01), "break": (0.04, 0.01),
-                "melody": (0.07, 0.03), "ambience": (0.12, 0.00),
-            },
-            "space_wet": 0.14, "echo_wet": 0.06,
+            "snare": (0.04, 0.01), "hats": (0.045, 0.015), "break": (0.04, 0.015),
+            "melody": (0.07, 0.03), "ambience": (0.08, 0.0), "texture": (0.08, 0.0),
+            "space_wet": 0.15, "echo_wet": 0.06,
         },
     }
-    matrix: dict[str, dict[str, Any]] = {}
-    for profile, spec in definitions.items():
-        routing = default_fx_routing(stem_names)
-        for stem, role in roles.items():
-            send = spec["sends"].get(role)
+    result = {}
+    for name, spec in role_sends.items():
+        route = role_aware_fx_routing(stem_names)
+        route["routing_mode"] = name
+        for stem in stem_names:
+            send = spec.get(classify_fx_role(stem))
             if send is None:
-                continue
-            routing["stems"][stem]["sends"] = {"space": send[0], "echo": send[1]}
-        routing["buses"]["space"]["wet"] = spec["space_wet"]
-        routing["buses"]["echo"]["wet"] = spec["echo_wet"]
-        matrix[profile] = routing
-    return matrix
+                route["stems"][stem]["sends"] = {"space": 0.0, "echo": 0.0}
+            else:
+                route["stems"][stem]["sends"] = {"space": send[0], "echo": send[1]}
+        route["buses"]["space"]["wet"] = spec["space_wet"]
+        route["buses"]["echo"]["wet"] = spec["echo_wet"]
+        result[name] = route
+    return result
 
 
 def normalise_fx_routing(
     payload: Mapping[str, Any], stem_names: Sequence[str], sample_rate: int
 ) -> dict[str, Any]:
-    """Validate routing JSON and fill omitted stems/buses with dry defaults."""
-    if not isinstance(payload, Mapping) or payload.get("schema_version") != FX_ROUTING_SCHEMA_VERSION:
-        raise ValueError(f"FX routing schema_version must be {FX_ROUTING_SCHEMA_VERSION}")
-    defaults = default_fx_routing(stem_names)
+    """Validate v1/v2 JSON and return the canonical v2 representation."""
+    if not isinstance(payload, Mapping):
+        raise ValueError("FX routing must be a JSON object")
+    version = payload.get("schema_version")
+    if version not in {LEGACY_FX_ROUTING_SCHEMA_VERSION, FX_ROUTING_SCHEMA_VERSION}:
+        raise ValueError(
+            f"FX routing schema_version must be {LEGACY_FX_ROUTING_SCHEMA_VERSION} or {FX_ROUTING_SCHEMA_VERSION}"
+        )
+    mode = str(payload.get("routing_mode", "manual"))
+    if mode not in {"manual", "role_auto", "percussion_focus", "melody_foreground",
+                    "ambience_background", "combined_roles"}:
+        raise ValueError(f"unsupported routing_mode: {mode}")
+    if version == LEGACY_FX_ROUTING_SCHEMA_VERSION:
+        defaults = default_fx_routing(stem_names)
+        mode = "manual"
+    elif mode in {"percussion_focus", "melody_foreground", "ambience_background", "combined_roles"}:
+        defaults = build_role_audition_matrix(stem_names)[mode]
+    elif mode == "role_auto":
+        defaults = role_aware_fx_routing(stem_names)
+    else:
+        defaults = default_fx_routing(stem_names)
+
     source_stems = payload.get("stems", {})
     source_buses = payload.get("buses", {})
     if not isinstance(source_stems, Mapping) or not isinstance(source_buses, Mapping):
@@ -159,17 +262,35 @@ def normalise_fx_routing(
             raise ValueError(f"routing for stem {name!r} must be an object")
         insert = raw.get("insert", {"kind": "bypass"})
         sends = raw.get("sends", {})
-        if not isinstance(insert, Mapping) or not isinstance(sends, Mapping):
-            raise ValueError(f"insert and sends for stem {name!r} must be JSON objects")
+        send_taps = raw.get("send_taps", {})
+        if not isinstance(insert, Mapping) or not isinstance(sends, Mapping) or not isinstance(send_taps, Mapping):
+            raise ValueError(f"insert, sends and send_taps for stem {name!r} must be JSON objects")
         unknown_buses = set(sends) - set(FX_BUSES)
-        if unknown_buses:
-            raise ValueError(f"stem {name!r} references unknown bus(es): {', '.join(map(str, unknown_buses))}")
+        unknown_taps = set(send_taps) - set(FX_BUSES)
+        if unknown_buses or unknown_taps:
+            raise ValueError(f"stem {name!r} references an unknown send bus")
+        normalized_taps = {}
+        for bus in FX_BUSES:
+            tap = str(send_taps.get(bus, "post_insert_post_fader"))
+            if tap not in SEND_TAP_POINTS:
+                raise ValueError(
+                    f"{name}.{bus} send tap must be one of {', '.join(SEND_TAP_POINTS)}"
+                )
+            normalized_taps[bus] = tap
+        for boolean_name in ("mute", "solo"):
+            if boolean_name in raw and not isinstance(raw[boolean_name], bool):
+                raise ValueError(f"{name}.{boolean_name} must be a boolean")
         stems[name] = {
             "insert": _chain_record(insert, sample_rate),
             "sends": {
                 bus: _finite(sends.get(bus, 0.0), f"{name}.{bus} send", 0.0, 1.0)
                 for bus in FX_BUSES
             },
+            "send_taps": normalized_taps,
+            "gain_db": _finite(raw.get("gain_db", 0.0), f"{name}.gain_db", -60.0, 12.0),
+            "pan": _finite(raw.get("pan", 0.0), f"{name}.pan", -1.0, 1.0),
+            "mute": bool(raw.get("mute", False)),
+            "solo": bool(raw.get("solo", False)),
         }
 
     unknown_bus_names = set(source_buses) - set(FX_BUSES)
@@ -185,6 +306,9 @@ def normalise_fx_routing(
         tail = _finite(raw.get("tail_seconds", defaults["buses"][bus]["tail_seconds"]),
                        f"{bus}.tail_seconds", 0.0, 12.0)
         division = str(raw.get("delay_sync", "off"))
+        alignment = str(raw.get("alignment_policy", "start_aligned"))
+        if alignment != "start_aligned":
+            raise ValueError(f"{bus}.alignment_policy must be start_aligned")
         if preset not in FX_PRESETS:
             raise ValueError(f"Unknown bus preset for {bus}: {preset}")
         if division not in FX_DELAY_DIVISIONS:
@@ -196,16 +320,14 @@ def normalise_fx_routing(
         ):
             raise ValueError(f"Bus preset {preset!r} has no delay stage to synchronise")
         buses[bus] = {
-            "chain": preset,
-            "wet": wet,
-            "tail_seconds": tail,
-            "delay_sync": division,
+            "chain": preset, "wet": wet, "tail_seconds": tail,
+            "delay_sync": division, "alignment_policy": alignment,
         }
     return {
         "schema_version": FX_ROUTING_SCHEMA_VERSION,
+        "routing_mode": mode,
         "master_wet": _finite(payload.get("master_wet", 1.0), "master_wet", 0.0, 1.0),
-        "stems": stems,
-        "buses": buses,
+        "stems": stems, "buses": buses,
     }
 
 
@@ -256,7 +378,7 @@ def _pad_to(audio: np.ndarray, frames: int) -> np.ndarray:
     return np.pad(audio, ((0, frames - len(audio)), (0, 0)))
 
 
-def _automation_lane(
+def automation_envelope_wrapper(
     automation: Mapping[str, Any], target: str, *, frames: int, sample_rate: int,
     bpm: float, default: float,
 ) -> np.ndarray:
@@ -266,17 +388,10 @@ def _automation_lane(
     )
 
 
-
-
 def _control_bus_envelope(
-    controls: AutomationControlBus,
-    target: str,
-    *,
-    frames: int,
-    sample_rate: int,
-    default: float,
+    controls: AutomationControlBus, target: str, *, frames: int,
+    sample_rate: int, default: float,
 ) -> np.ndarray:
-    """Evaluate a score control lane at its declared control rate, then interpolate."""
     if target not in controls.target_ids:
         return np.full(frames, float(default), dtype=np.float32)
     if frames <= 0:
@@ -298,21 +413,57 @@ def _control_bus_envelope(
     ).astype(np.float32)
 
 
-def _tempo_stages(bus_record: Mapping[str, Any], sample_rate: int, bpm: float) -> tuple[dict[str, Any], ...]:
+def _tempo_stages(
+    bus_record: Mapping[str, Any], sample_rate: int, bpm: float
+) -> tuple[dict[str, Any], ...]:
     preset = str(bus_record["chain"])
     stages = [dict(stage) for stage in FX_PRESETS[preset]]
     division = str(bus_record.get("delay_sync", "off"))
-    if division == "off":
-        return normalise_fx_stages(stages, sample_rate=sample_rate)
-    beat_count = FX_DELAY_DIVISIONS[division]
-    delay_seconds = (60.0 / bpm) * beat_count
-    delay_stage = next((stage for stage in stages if stage.get("type") == "delay"), None)
-    if delay_stage is None:
-        raise ValueError(
-            f"Bus preset {preset!r} has no delay stage; choose a delay preset or turn sync off"
-        )
-    delay_stage["delay_seconds"] = delay_seconds
+    if division != "off":
+        delay_seconds = (60.0 / bpm) * FX_DELAY_DIVISIONS[division]
+        delay_stage = next((stage for stage in stages if stage.get("type") == "delay"), None)
+        if delay_stage is None:
+            raise ValueError(f"Bus preset {preset!r} has no delay stage to synchronise")
+        delay_stage["delay_seconds"] = delay_seconds
     return normalise_fx_stages(stages, sample_rate=sample_rate)
+
+
+def _apply_pan(audio: np.ndarray, pan: float) -> np.ndarray:
+    result = np.asarray(audio, dtype=np.float32).copy()
+    angle = (float(pan) + 1.0) * math.pi / 4.0
+    left = math.cos(angle)
+    right = math.sin(angle)
+    mid = (result[:, 0] + result[:, 1]) * 0.5
+    side = (result[:, 0] - result[:, 1]) * 0.5
+    result[:, 0] = (mid + side) * left * math.sqrt(2.0)
+    result[:, 1] = (mid - side) * right * math.sqrt(2.0)
+    return result
+
+
+def measure_signal(audio: np.ndarray, *, sample_rate: int) -> dict[str, Any]:
+    """Peak/RMS/crest/headroom at a named signal boundary; silence is finite."""
+    value = np.asarray(audio, dtype=np.float64)
+    if value.ndim == 1:
+        value = value[:, None]
+    if value.ndim != 2 or not np.isfinite(value).all():
+        raise ValueError("meter input must be a finite mono or multichannel array")
+    peak = float(np.max(np.abs(value))) if value.size else 0.0
+    rms = float(np.sqrt(np.mean(np.square(value)))) if value.size else 0.0
+    floor = 1e-12
+    peak_dbfs = max(-240.0, 20.0 * math.log10(max(peak, floor)))
+    rms_dbfs = max(-240.0, 20.0 * math.log10(max(rms, floor)))
+    crest_db = max(0.0, peak_dbfs - rms_dbfs) if rms > 0 else 0.0
+    return {
+        "frames": int(len(value)),
+        "duration_seconds": len(value) / float(sample_rate),
+        "channels": int(value.shape[1]),
+        "peak": peak,
+        "peak_dbfs": peak_dbfs,
+        "rms": rms,
+        "rms_dbfs": rms_dbfs,
+        "crest_factor_db": crest_db,
+        "headroom_db": max(0.0, -peak_dbfs),
+    }
 
 
 def render_fx_routing(
@@ -323,186 +474,282 @@ def render_fx_routing(
     bpm: float = 120.0,
     automation: Mapping[str, Any] | None = None,
     controls: AutomationControlBus | None = None,
+    mix_controls: Mapping[str, Mapping[str, Any]] | None = None,
+    include_audition_audio: bool = False,
+    cancel_event: Any | None = None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
-    """Render per-stem inserts and shared returns with optional beat automation.
+    """Render stem inserts and fixed SPACE/ECHO returns without mutating sources.
 
-    Direct stem outputs stay frame-aligned. Insert tails remain available to
-    shared sends, and shared return tails extend the final master. Inputs are
-    never modified.
+    Insert law is a linear dry/wet crossfade. Each send selects one of four
+    pre/post-insert and pre/post-fader taps. Sends are gain contributions into
+    an auxiliary bus; bus returns are wet-only and never re-add their dry input.
+    Stem event buffers are immutable; direct inserts and return tails may extend
+    the mix frame count. Built-in FX are start-aligned (zero declared latency).
     """
+    _check_cancel(cancel_event)
     if not dry_stems:
-        return {}, {"schema_version": 1, "buses": {}, "master_wet": 1.0,
-                    "rendered_returns": [], "active_send_stems_by_bus": {}}
+        return {}, {
+            "schema_version": FX_ROUTING_SCHEMA_VERSION, "buses": {},
+            "master_wet": 1.0, "rendered_returns": [],
+            "active_send_stems_by_bus": {}, "meters": {},
+        }
     tempo = _finite(bpm, "bpm", 1.0, 1000.0)
     if controls is not None and automation is not None:
         raise ValueError("pass either legacy automation JSON or score controls, not both")
     if controls is not None and controls.timeline.sample_rate != int(sample_rate):
         raise ValueError("score automation control bus sample rate must match FX render rate")
+    if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
+        raise ValueError("sample_rate must be positive")
     names = tuple(dry_stems)
-    first = _stereo(np.asarray(dry_stems[names[0]]), 2)
-    frames, channels = first.shape
-    config = normalise_fx_routing(routing, names, sample_rate)
+    first = np.asarray(dry_stems[names[0]], dtype=np.float32)
+    if first.ndim == 1:
+        channels = 1
+        first_stereo = _stereo(first, 1)
+    elif first.ndim == 2 and first.shape[1] in {1, 2}:
+        channels = int(first.shape[1])
+        first_stereo = _stereo(first, channels)
+    else:
+        raise ValueError("dry stems must be mono or stereo")
+    frames = len(first_stereo)
+    config = normalise_fx_routing(routing, names, int(sample_rate))
     lanes = (
         normalise_fx_automation(automation, names)
         if controls is None else {"schema_version": 1, "lanes": {}}
     )
+    mix = mix_controls or {}
+    effective: dict[str, dict[str, Any]] = {}
+    solo_active = False
+    for name in names:
+        route = config["stems"][name]
+        controls_for_stem = mix.get(name, {})
+        gain = _finite(
+            controls_for_stem.get("gain", 10.0 ** (float(route["gain_db"]) / 20.0)),
+            f"{name} mixer gain", 0.0, 4.0,
+        )
+        pan = _finite(controls_for_stem.get("pan", route["pan"]), f"{name} mixer pan", -1.0, 1.0)
+        muted = bool(controls_for_stem.get("mute", route["mute"]))
+        solo = bool(controls_for_stem.get("solo", route["solo"]))
+        solo_active = solo_active or solo
+        effective[name] = {"gain": gain, "pan": pan, "mute": muted, "solo": solo}
+    audible = {
+        name for name, values in effective.items()
+        if not values["mute"] and (not solo_active or values["solo"])
+    }
+
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
     active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     outputs: dict[str, np.ndarray] = {}
+    inserts: dict[str, np.ndarray] = {}
+    sends_audio: dict[str, dict[str, np.ndarray]] = {name: {} for name in names}
+    direct_audio: dict[str, np.ndarray] = {}
+    tails: dict[str, dict[str, Any]] = {}
+    meter_direct: dict[str, Any] = {}
+    meter_insert: dict[str, Any] = {}
+    meter_sends: dict[str, dict[str, Any]] = {name: {} for name in names}
 
     for name, source in dry_stems.items():
-        dry = _stereo(np.asarray(source), channels)
+        _check_cancel(cancel_event)
+        dry_value = np.asarray(source, dtype=np.float32)
+        dry = _stereo(dry_value, channels)
         if dry.shape != (frames, channels):
-            raise ValueError("all stems must share the same frame and channel dimensions")
-        record = config["stems"][name]
-        insert = record["insert"]
+            raise ValueError("all dry stems must share the same frame and channel dimensions")
+        if not np.isfinite(dry).all():
+            raise ValueError(f"dry stem {name!r} contains non-finite samples")
+        dry = dry.copy()
+        direct_audio[name] = dry.copy()
+        route = config["stems"][name]
+        insert = route["insert"]
         insert_target = f"stem.{name}.insert_wet"
         insert_points = lanes["lanes"].get(insert_target)
         insert_controlled = controls is not None and insert_target in controls.target_ids
         insert_can_open = (
-            float(insert["wet"]) > 0.0
-            or any(float(point["value"]) > 0.0 for point in (insert_points or ()))
-            or insert_controlled
-        )
-        if insert["kind"] == "bypass" or not insert_can_open:
-            processed_full = dry.copy()
-            insert_level = np.zeros(frames, dtype=np.float32)
-        else:
-            # Render the full wet path once; automation then crossfades it against dry.
-            processed_full = _stereo(
-                _render_chain(dry, sample_rate, insert, wet=1.0), channels
+            insert["kind"] != "bypass" and (
+                float(insert["wet"]) > 0.0
+                or any(float(point["value"]) > 0.0 for point in (insert_points or ()))
+                or insert_controlled
             )
+        )
+        if insert_can_open:
+            processed_full = _stereo(
+                _render_chain(dry, int(sample_rate), insert, wet=1.0), channels
+            )
+            _check_cancel(cancel_event)
             if insert_controlled:
                 insert_level = _control_bus_envelope(
                     controls, insert_target, frames=frames,
-                    sample_rate=sample_rate, default=float(insert["wet"]),
+                    sample_rate=int(sample_rate), default=float(insert["wet"]),
                 )
             elif insert_points:
-                insert_level = _automation_lane(
-                    lanes, insert_target, frames=frames, sample_rate=sample_rate,
-                    bpm=tempo, default=float(insert["wet"]),
+                insert_level = automation_envelope_wrapper(
+                    lanes, insert_target, frames=frames,
+                    sample_rate=int(sample_rate), bpm=tempo, default=float(insert["wet"]),
                 )
             else:
                 insert_level = np.full(frames, float(insert["wet"]), dtype=np.float32)
+        else:
+            processed_full = dry.copy()
+            insert_level = np.zeros(frames, dtype=np.float32)
 
-        direct_processed = _pad_to(processed_full, frames)
-        direct = dry * (1.0 - insert_level[:, None]) + direct_processed * insert_level[:, None]
-        outputs[name] = np.ascontiguousarray(direct, dtype=np.float32)
+        processed_to_source = _pad_to(processed_full, frames)
+        post_insert = (
+            dry * (1.0 - insert_level[:, None])
+            + processed_to_source * insert_level[:, None]
+        ).astype(np.float32)
+        # Any additional insert tail follows the last insert automation value.
+        insert_tail = (
+            processed_full[frames:] * float(insert_level[-1])
+            if len(processed_full) > frames and frames else
+            processed_full[frames:] if len(processed_full) > frames else
+            np.empty((0, channels), dtype=np.float32)
+        )
+        if len(insert_tail):
+            post_insert = np.concatenate((post_insert, insert_tail), axis=0)
+        inserts[name] = post_insert.copy()
+        outputs[name] = post_insert.copy()
+        tails[name] = {
+            "insert_tail_frames": max(0, len(post_insert) - frames),
+            "insert_tail_seconds": max(0, len(post_insert) - frames) / float(sample_rate),
+        }
+        meter_direct[name] = measure_signal(dry, sample_rate=int(sample_rate))
+        meter_insert[name] = measure_signal(post_insert, sample_rate=int(sample_rate))
 
-        # Preserve insert tails on send paths. The last automation value is held
-        # through the tail so no abrupt truncation is introduced at the source end.
-        send_frames = max(frames, len(processed_full))
-        send_source = _pad_to(processed_full, send_frames).copy()
-        send_source[:frames] = direct
-        if send_frames > frames:
-            send_source[frames:] *= float(insert_level[-1]) if frames else 0.0
-
-        for bus, static_amount in record["sends"].items():
+        for bus, static_amount in route["sends"].items():
+            _check_cancel(cancel_event)
             target = f"stem.{name}.send.{bus}"
             points = lanes["lanes"].get(target)
+            send_frames = max(frames, len(dry), len(post_insert))
             if controls is not None and target in controls.target_ids:
-                envelope = _control_bus_envelope(
+                send_level = _control_bus_envelope(
                     controls, target, frames=send_frames,
-                    sample_rate=sample_rate, default=float(static_amount),
+                    sample_rate=int(sample_rate), default=float(static_amount),
                 )
             elif points:
-                envelope = _automation_lane(
-                    lanes, target, frames=send_frames, sample_rate=sample_rate,
-                    bpm=tempo, default=float(static_amount),
+                send_level = automation_envelope_wrapper(
+                    lanes, target, frames=send_frames,
+                    sample_rate=int(sample_rate), bpm=tempo, default=float(static_amount),
                 )
             else:
-                envelope = np.full(send_frames, float(static_amount), dtype=np.float32)
-            if not np.any(envelope):
-                continue
-            contribution = send_source * envelope[:, None]
-            target_buffer = bus_inputs[bus]
-            if len(contribution) > len(target_buffer):
-                target_buffer = _pad_to(target_buffer, len(contribution))
-            target_buffer[:len(contribution)] += contribution
-            bus_inputs[bus] = target_buffer
-            if name not in active_stems_by_bus[bus]:
-                active_stems_by_bus[bus].append(name)
+                send_level = np.full(send_frames, float(static_amount), dtype=np.float32)
+
+            tap = route["send_taps"][bus]
+            pre_insert, pre_fader = tap.startswith("pre_insert"), tap.endswith("pre_fader")
+            selected = dry if pre_insert else post_insert
+            selected = _pad_to(selected, send_frames).copy()
+            fader = effective[name]
+            if name not in audible:
+                send_level = np.zeros_like(send_level)
+            elif not pre_fader:
+                selected *= float(fader["gain"])
+                selected = _apply_pan(selected, float(fader["pan"])) if channels == 2 else selected
+            contribution = np.ascontiguousarray(selected * send_level[:, None], dtype=np.float32)
+            sends_audio[name][bus] = contribution.copy()
+            meter_sends[name][bus] = measure_signal(contribution, sample_rate=int(sample_rate))
+            if np.any(contribution):
+                target_buffer = bus_inputs[bus]
+                if len(contribution) > len(target_buffer):
+                    target_buffer = _pad_to(target_buffer, len(contribution))
+                target_buffer[:len(contribution)] += contribution
+                bus_inputs[bus] = target_buffer
+                if name not in active_stems_by_bus[bus]:
+                    active_stems_by_bus[bus].append(name)
 
     returns: dict[str, np.ndarray] = {}
+    meter_returns: dict[str, Any] = {}
     for bus, source in bus_inputs.items():
+        _check_cancel(cancel_event)
         record = config["buses"][bus]
         target = f"bus.{bus}.wet"
         points = lanes["lanes"].get(target)
         if controls is not None and target in controls.target_ids:
             requested_wet = _control_bus_envelope(
                 controls, target, frames=max(len(source), 1),
-                sample_rate=sample_rate, default=float(record["wet"]),
+                sample_rate=int(sample_rate), default=float(record["wet"]),
             )
         elif points:
-            requested_wet = _automation_lane(
-                lanes, target, frames=max(len(source), 1), sample_rate=sample_rate,
-                bpm=tempo, default=float(record["wet"]),
+            requested_wet = automation_envelope_wrapper(
+                lanes, target, frames=max(len(source), 1),
+                sample_rate=int(sample_rate), bpm=tempo, default=float(record["wet"]),
             )
         else:
             requested_wet = np.full(
                 max(len(source), 1), float(record["wet"]), dtype=np.float32
             )
         if not np.any(source) or not np.any(requested_wet):
+            meter_returns[bus] = measure_signal(
+                np.zeros((0, channels), dtype=np.float32), sample_rate=int(sample_rate)
+            )
             continue
-
-        stages = _tempo_stages(record, sample_rate, tempo)
+        stages = _tempo_stages(record, int(sample_rate), tempo)
         processed = _stereo(
             render_pyo_fx(
-                source, sample_rate, preset=None, stages=stages,
+                source, int(sample_rate), preset=None, stages=stages,
                 wet=1.0, tail_seconds=float(record["tail_seconds"]),
-            ),
-            channels,
+            ), channels,
         )
-        desired_frames = max(len(source), len(processed))
-        base_signal = _pad_to(source, desired_frames)
-        processed = _pad_to(processed, desired_frames)
-        if controls is not None and target in controls.target_ids:
-            wet_envelope = _control_bus_envelope(
-                controls, target, frames=desired_frames,
-                sample_rate=sample_rate, default=float(record["wet"]),
-            )
-        elif points:
-            wet_envelope = _automation_lane(
-                lanes, target, frames=desired_frames, sample_rate=sample_rate,
+        _check_cancel(cancel_event)
+        wet_envelope = _control_bus_envelope(
+            controls, target, frames=len(processed),
+            sample_rate=int(sample_rate), default=float(record["wet"]),
+        ) if controls is not None and target in controls.target_ids else (
+            automation_envelope_wrapper(
+                lanes, target, frames=len(processed), sample_rate=int(sample_rate),
                 bpm=tempo, default=float(record["wet"]),
-            )
-        else:
-            wet_envelope = np.full(
-                desired_frames, float(record["wet"]), dtype=np.float32
-            )
-        returns[bus] = np.ascontiguousarray(
-            base_signal * (1.0 - wet_envelope[:, None]) + processed * wet_envelope[:, None],
-            dtype=np.float32,
+            ) if points else np.full(len(processed), float(record["wet"]), dtype=np.float32)
         )
+        returns[bus] = np.ascontiguousarray(processed * wet_envelope[:, None], dtype=np.float32)
+        meter_returns[bus] = measure_signal(returns[bus], sample_rate=int(sample_rate))
 
+    meter_master_input = {}
+    for name in names:
+        meter_master_input[name] = measure_signal(outputs[name], sample_rate=int(sample_rate))
+    tail_report = {
+        bus: {
+            "input_frames": int(len(bus_inputs[bus])),
+            "return_frames": int(len(returns.get(bus, ()))),
+            "tail_frames": max(0, len(returns.get(bus, ())) - len(bus_inputs[bus])),
+            "tail_seconds": max(0, len(returns.get(bus, ())) - len(bus_inputs[bus])) / float(sample_rate),
+            "latency_frames": 0,
+            "alignment_policy": config["buses"][bus]["alignment_policy"],
+        }
+        for bus in FX_BUSES
+    }
     metadata = {
         "schema_version": FX_ROUTING_SCHEMA_VERSION,
+        "routing_mode": config["routing_mode"],
         "master_wet": config["master_wet"],
         "bpm": tempo,
-        "stems": {
-            name: {
-                "insert": {
-                    "kind": record["insert"]["kind"],
-                    "preset": record["insert"].get("preset"),
-                    "wet": record["insert"]["wet"],
-                    "tail_seconds": record["insert"]["tail_seconds"],
-                },
-                "sends": dict(record["sends"]),
-            }
-            for name, record in config["stems"].items()
-        },
+        "stems": config["stems"],
         "buses": config["buses"],
         "rendered_returns": list(returns),
         "active_send_stems_by_bus": active_stems_by_bus,
-        "automation_lanes": (
-            list(controls.target_ids) if controls is not None
-            else list(lanes["lanes"])
-        ),
-        "automation_source": (
-            "score-control-bus" if controls is not None else "legacy-json"
-        ),
+        "automation_lanes": list(controls.target_ids) if controls is not None else list(lanes["lanes"]),
+        "automation_source": "score-control-bus" if controls is not None else "legacy-json",
+        "send_semantics": {
+            "tap_points": list(SEND_TAP_POINTS),
+            "pre_fader": "send is unaffected by fader gain/pan; explicit mute and non-solo exclusion still gate it",
+            "post_fader": "send receives the current fader gain and pan",
+            "pre_insert": "send taps the immutable dry stem",
+            "post_insert": "send taps the dry/wet insert output including its tail",
+            "return": "wet-only auxiliary output; dry send signal remains on the direct path",
+        },
+        "tails": tail_report,
+        "latency": {bus: {"frames": 0, "policy": "start_aligned"} for bus in FX_BUSES},
+        "meters": {
+            "direct": meter_direct,
+            "insert": meter_insert,
+            "sends": meter_sends,
+            "returns": meter_returns,
+            "post_insert_stems": meter_master_input,
+        },
     }
     metadata["bus_returns_audio"] = returns
+    if include_audition_audio:
+        metadata["audition_audio"] = {
+            "direct": direct_audio,
+            "insert": inserts,
+            "sends": sends_audio,
+            "returns": {bus: audio.copy() for bus, audio in returns.items()},
+        }
     return outputs, metadata
 
 
@@ -513,7 +760,7 @@ def render_master_with_returns(
     frames: int | None = None,
     master_wet: float = 1.0,
 ) -> np.ndarray:
-    """Sum aligned processed stems and shared returns without mutating inputs."""
+    """Sum aligned post-insert stems and wet-only auxiliary returns."""
     wet = _finite(master_wet, "master_wet", 0.0, 1.0)
     all_buffers = [*processed_stems.values(), *bus_returns.values()]
     if frames is None:
