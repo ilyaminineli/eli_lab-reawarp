@@ -23,26 +23,12 @@ _TARGETS = (
     ("synth.resonance", "Filter resonance"),
     ("synth.gain", "Voice gain"),
     ("synth.pitch", "Pitch offset · semitones"),
-    ("synth.modulation.depth", "Modulation depth"),
-    ("synth.modulation.rate", "Modulation rate · Hz"),
-    ("synth.wavetable.position", "Wavetable position"),
-    ("synth.partial.balance", "Partial balance"),
-    ("synth.grain.size", "Grain size · ms"),
-    ("synth.grain.position", "Grain position"),
-    ("synth.grain.density", "Grain density · Hz"),
     ("event.velocity_scale", "Event velocity scale"),
     ("event.probability", "Event probability"),
     ("role.activity", "Role activity"),
-    ("role.density", "Role density · events/beat"),
-    ("role.syncopation", "Role syncopation"),
     ("sample.mix", "Sample contribution"),
     ("spatial.pan", "Stereo pan"),
     ("spatial.width", "Stereo width"),
-    ("fx.insert.wet", "FX insert wet"),
-    ("fx.send.space", "SPACE send"),
-    ("fx.send.echo", "ECHO send"),
-    ("fx.return.space.wet", "SPACE return wet"),
-    ("fx.return.echo.wet", "ECHO return wet"),
 )
 
 _TARGET_AMOUNTS = {
@@ -50,26 +36,12 @@ _TARGET_AMOUNTS = {
     "synth.resonance": 0.2,
     "synth.gain": 0.2,
     "synth.pitch": 2.0,
-    "synth.modulation.depth": 0.2,
-    "synth.modulation.rate": 0.5,
-    "synth.wavetable.position": 0.2,
-    "synth.partial.balance": 0.2,
-    "synth.grain.size": 40.0,
-    "synth.grain.position": 0.2,
-    "synth.grain.density": 10.0,
     "event.velocity_scale": 0.25,
     "event.probability": 0.25,
     "role.activity": 0.25,
-    "role.density": 2.0,
-    "role.syncopation": 0.2,
     "sample.mix": 0.2,
     "spatial.pan": 0.25,
     "spatial.width": 0.25,
-    "fx.insert.wet": 0.25,
-    "fx.send.space": 0.25,
-    "fx.send.echo": 0.25,
-    "fx.return.space.wet": 0.25,
-    "fx.return.echo.wet": 0.25,
 }
 
 _TARGET_RANGES = {
@@ -77,26 +49,12 @@ _TARGET_RANGES = {
     "synth.resonance": (0.0, 1.0),
     "synth.gain": (0.0, 1.0),
     "synth.pitch": (-48.0, 48.0),
-    "synth.modulation.depth": (0.0, 1.0),
-    "synth.modulation.rate": (0.0, 40.0),
-    "synth.wavetable.position": (0.0, 1.0),
-    "synth.partial.balance": (0.0, 1.0),
-    "synth.grain.size": (1.0, 500.0),
-    "synth.grain.position": (0.0, 1.0),
-    "synth.grain.density": (0.0, 200.0),
     "event.velocity_scale": (0.0, 2.0),
     "event.probability": (0.0, 1.0),
     "role.activity": (0.0, 1.0),
-    "role.density": (0.0, 64.0),
-    "role.syncopation": (0.0, 1.0),
     "sample.mix": (0.0, 1.0),
     "spatial.pan": (-1.0, 1.0),
     "spatial.width": (0.0, 2.0),
-    "fx.insert.wet": (0.0, 1.0),
-    "fx.send.space": (0.0, 1.0),
-    "fx.send.echo": (0.0, 1.0),
-    "fx.return.space.wet": (0.0, 1.0),
-    "fx.return.echo.wet": (0.0, 1.0),
 }
 
 
@@ -246,10 +204,6 @@ class ScoreAutomationEditor(QGroupBox):
         root.addWidget(self.controls)
 
         footer = QHBoxLayout()
-        self.bypass = QCheckBox("BYPASS SCORE SOURCES")
-        self.bypass.setToolTip("Temporarily remove generated M18 sources and modulation links from the next render.")
-        self.bypass.toggled.connect(self.changed.emit)
-        footer.addWidget(self.bypass)
         footer.addStretch(1)
         self.apply_button = QPushButton("APPLY & RE-RENDER")
         self.apply_button.setObjectName("primaryAction")
@@ -310,8 +264,6 @@ class ScoreAutomationEditor(QGroupBox):
         base = score or self._score
         if base is None:
             raise ValueError("generate a project before applying score automation")
-        if self.bypass.isChecked():
-            return replace(base, automation_sources=(), modulations=())
         return replace(
             base,
             automation_sources=tuple(self._sources),
