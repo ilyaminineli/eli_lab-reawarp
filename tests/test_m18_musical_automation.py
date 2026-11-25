@@ -311,3 +311,91 @@ def test_source_time_stays_beat_addressed_through_tempo_ramps():
     end = timeline.beat_to_frame(Fraction(8))
     assert bus.value_at_frame("source.ramp-pulse", middle) == pytest.approx(0.5, abs=0.002)
     assert bus.value_at_frame("source.ramp-pulse", end) == pytest.approx(1.0)
+
+
+
+def test_score_renderer_applies_role_activity_and_velocity_scale_only_to_target_voice():
+    events = (
+        MusicalEvent(
+            event_id="lead-a",
+            voice_id="lead",
+            onset_beats=Fraction(0),
+            duration_beats=Fraction(1),
+            kind="note",
+            frequency_hz=440.0,
+            velocity=0.8,
+        ),
+        MusicalEvent(
+            event_id="bass-a",
+            voice_id="bass",
+            onset_beats=Fraction(0),
+            duration_beats=Fraction(1),
+            kind="note",
+            frequency_hz=110.0,
+            velocity=0.8,
+        ),
+    )
+
+    def constant_voice(scheduled, sample_rate, controls):
+        del sample_rate, controls
+        return np.ones(scheduled.duration_frames, dtype=np.float32)
+
+    base = ScoreRenderer().render(
+        Score(events=events),
+        48_000,
+        voice_renderers={"lead": constant_voice, "bass": constant_voice},
+    )
+    controlled = ScoreRenderer().render(
+        Score(
+            events=events,
+            automation=(
+                AutomationLane(
+                    "event.velocity_scale",
+                    (AutomationPoint(Fraction(0), 0.5),),
+                    unit="ratio",
+                    scope="role",
+                    scope_id="lead",
+                ),
+                AutomationLane(
+                    "role.activity",
+                    (AutomationPoint(Fraction(0), 0.25),),
+                    unit="normalized",
+                    scope="role",
+                    scope_id="lead",
+                ),
+            ),
+        ),
+        48_000,
+        voice_renderers={"lead": constant_voice, "bass": constant_voice},
+    )
+
+    np.testing.assert_allclose(
+        controlled.stems["lead"], base.stems["lead"] * 0.125, atol=1e-7
+    )
+    np.testing.assert_array_equal(controlled.stems["bass"], base.stems["bass"])
+
+
+def test_event_probability_is_a_stable_score_render_gate():
+    event = MusicalEvent(
+        event_id="probability-gate",
+        voice_id="hats",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(1, 4),
+        kind="hit",
+        velocity=1.0,
+    )
+    score = Score(
+        events=(event,),
+        automation=(
+            AutomationLane(
+                "event.probability",
+                (AutomationPoint(Fraction(0), 0.0),),
+                unit="normalized",
+            ),
+        ),
+    )
+    first = ScoreRenderer().render(score, 48_000)
+    second = ScoreRenderer().render(score, 48_000)
+    assert first.schedule[0].event.event_id == "probability-gate"
+    assert "hats" not in first.stems
+    assert first.stems.keys() == second.stems.keys()
