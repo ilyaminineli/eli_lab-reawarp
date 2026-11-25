@@ -12,6 +12,7 @@ class TuningSystem(Protocol):
     """Adapter interface for equal, just, regular-temperament, or custom tunings."""
 
     identifier: str
+    divisions_per_period: int
 
     def frequency_for_pitch(self, pitch: float) -> float: ...
     def pitch_for_frequency(self, frequency_hz: float) -> float: ...
@@ -28,7 +29,7 @@ class EqualTemperamentTuning:
     identifier: str = "12tet"
 
     def __post_init__(self) -> None:
-        if isinstance(self.divisions_per_period, bool) or self.divisions_per_period < 1:
+        if isinstance(self.divisions_per_period, bool) or not isinstance(self.divisions_per_period, int) or self.divisions_per_period < 1:
             raise ValueError("divisions_per_period must be a positive integer")
         if not math.isfinite(self.period_ratio) or self.period_ratio <= 1.0:
             raise ValueError("period_ratio must be finite and greater than one")
