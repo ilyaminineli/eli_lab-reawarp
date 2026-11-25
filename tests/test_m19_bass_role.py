@@ -334,12 +334,12 @@ def test_reattaching_plan_replaces_old_bass_events_without_touching_other_events
     score = Score(events=(other,))
     first = plan_bass_role(
         _boundaries(), EqualTemperamentTuning(),
-        config=BassRoleConfig(mode="pedal", seed=1),
+        config=BassRoleConfig(mode="pedal", density=1, seed=1),
     )
     attached = first.attach_to_score(score)
     second = plan_bass_role(
         _boundaries(), EqualTemperamentTuning(),
-        config=BassRoleConfig(mode="pedal", seed=2),
+        config=BassRoleConfig(mode="pedal", density=1, seed=2),
     )
     replaced = second.attach_to_score(attached)
     assert [item.event_id for item in replaced.events if item.voice_id == "melody"] == ["melody-a"]
