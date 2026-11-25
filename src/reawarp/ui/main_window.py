@@ -22,7 +22,9 @@ from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
-from reawarp.fx_routing import (\n    measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,\n)
+from reawarp.fx_routing import (
+    measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,
+)
 from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
 )
