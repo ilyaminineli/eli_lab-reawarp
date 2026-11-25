@@ -607,6 +607,22 @@ class AutomationControlBus:
             result.update(context)
         return result
 
+    @staticmethod
+    def _modulation_matches_context(
+        modulation: AutomationModulation,
+        context: Mapping[str, Any],
+    ) -> bool:
+        scope_key = {
+            "global": None,
+            "section": "section_id",
+            "role": "role_id",
+            "event": "event_id",
+        }[modulation.scope]
+        return (
+            scope_key is None
+            or str(context.get(scope_key)) == modulation.scope_id
+        )
+
     def _value_before_modulation(
         self,
         target_id: str,
@@ -659,7 +675,10 @@ class AutomationControlBus:
         value = self._value_before_modulation(
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
-        destination_modulations = self._modulations.get(target_id, ())
+        destination_modulations = tuple(
+            item for item in self._modulations.get(target_id, ())
+            if self._modulation_matches_context(item, resolved_context)
+        )
         if not self._lanes.get(target_id):
             explicit_base = next(
                 (
@@ -671,14 +690,6 @@ class AutomationControlBus:
             if explicit_base is not None:
                 value = float(explicit_base)
         for modulation in destination_modulations:
-            scope_key = {
-                "global": None,
-                "section": "section_id",
-                "role": "role_id",
-                "event": "event_id",
-            }[modulation.scope]
-            if scope_key is not None and str(resolved_context.get(scope_key)) != modulation.scope_id:
-                continue
             source_lane = self._source_lanes[modulation.source_id]
             origin_key = {
                 "free": None,
@@ -691,6 +702,9 @@ class AutomationControlBus:
             source_position = self._lane_position(source_lane, source_frame)
             if origin is not None:
                 source_position += self._sources[modulation.source_id].start
+            source_definition = self._sources[modulation.source_id]
+            if not source_definition.start <= source_position <= source_definition.end:
+                continue
             source_value = source_lane.evaluate(source_position)
             signal = (
                 2.0 * source_value - 1.0
@@ -748,13 +762,7 @@ class AutomationControlBus:
                 smoothing = max(smoothing, lane.smoothing_seconds)
                 hysteresis = max(hysteresis, lane.hysteresis)
         for modulation in self._modulations.get(target_id, ()):
-            scope_key = {
-                "global": None,
-                "section": "section_id",
-                "role": "role_id",
-                "event": "event_id",
-            }[modulation.scope]
-            if scope_key is not None and str(resolved_context.get(scope_key)) != modulation.scope_id:
+            if not self._modulation_matches_context(modulation, resolved_context):
                 continue
             smoothing = max(smoothing, modulation.smoothing_seconds)
             hysteresis = max(hysteresis, modulation.hysteresis)
