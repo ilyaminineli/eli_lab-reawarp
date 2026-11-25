@@ -175,7 +175,7 @@ See [M19.md](M19.md).
 
 ## M20: Perceptual orchestration and multi-scale phrase grammar
 
-**Status:** Planned. M15 supplies motifs, role axes and transitions; explicit foreground/midground/background intent, role-pair grammars, asymmetric phrase hierarchy and attention allocation remain future work.
+**Status:** Partially implemented on `feature/m20-perceptual-orchestration`; Score-native phrase/cycle/relationship/attention intent is in place, while director integration and listening validation remain. M15 supplies motifs, role axes and transitions; explicit foreground/midground/background intent, role-pair grammars, asymmetric phrase hierarchy and attention allocation remain future work.
 
 **Goal:** Compose relationships between layers and nested time scales, with identity, expectation, negative space and perceptual hierarchy.
 

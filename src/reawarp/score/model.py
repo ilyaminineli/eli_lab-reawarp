@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ class Score:
     schema_version: int = 1
     sonority_plan: dict[str, Any] | None = None
     bass_plan: dict[str, Any] | None = None
+    orchestration_plan: dict[str, Any] | None = None
     tuning_period_ratio: float = 2.0
 
     def __post_init__(self) -> None:
@@ -121,6 +123,16 @@ class Score:
             score_ids = [str(item.get("sonority_id", "")) for item in sonorities]
             if planned_ids and planned_ids != score_ids:
                 raise ValueError("sonority_plan boundary IDs must match Score.sonorities order")
+        orchestration_plan = self.orchestration_plan
+        if orchestration_plan is not None:
+            from reawarp.score.orchestration_intent import OrchestrationPlan
+            if not isinstance(orchestration_plan, dict):
+                raise ValueError("orchestration_plan must be an object or None")
+            try:
+                payload = json.loads(json.dumps(orchestration_plan, ensure_ascii=False, allow_nan=False))
+                orchestration_plan = OrchestrationPlan.from_dict(payload).to_dict()
+            except (TypeError, ValueError, KeyError, OverflowError) as exc:
+                raise ValueError(f"invalid orchestration_plan: {exc}") from exc
         bass_plan = self.bass_plan
         if bass_plan is not None:
             if not isinstance(bass_plan, dict):
@@ -244,6 +256,7 @@ class Score:
         object.__setattr__(self, "sonorities", sonorities)
         object.__setattr__(self, "sonority_plan", sonority_plan)
         object.__setattr__(self, "bass_plan", bass_plan)
+        object.__setattr__(self, "orchestration_plan", orchestration_plan)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
@@ -268,7 +281,11 @@ class Score:
             ),
             default=0,
         )
-        return max(event_end, automation_end, source_end, sonority_end)
+        orchestration_end = Fraction(0)
+        if self.orchestration_plan is not None:
+            from reawarp.score.orchestration_intent import OrchestrationPlan
+            orchestration_end = OrchestrationPlan.from_dict(self.orchestration_plan).duration_beats
+        return max(event_end, automation_end, source_end, sonority_end, orchestration_end)
 
     def beat_to_seconds(self, beat) -> float:
         return self.tempo_map.beat_to_seconds(beat)
@@ -299,6 +316,7 @@ class Score:
             "sonorities": list(self.sonorities),
             "sonority_plan": self.sonority_plan,
             "bass_plan": self.bass_plan,
+            "orchestration_plan": self.orchestration_plan,
             "metadata": self.metadata,
         }
 
@@ -332,6 +350,7 @@ class Score:
             sonorities=tuple(data.get("sonorities", ())),
             sonority_plan=data.get("sonority_plan"),
             bass_plan=data.get("bass_plan"),
+            orchestration_plan=data.get("orchestration_plan"),
             tuning_id=str(tuning.get("id", "12tet")),
             tuning_reference_pitch=float(tuning.get("reference_pitch", 69.0)),
             tuning_reference_frequency_hz=float(

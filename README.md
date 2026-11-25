@@ -250,6 +250,10 @@ MIDI 1.0 note numbers are integer semitones. Reawarp rounds fractional pitches t
 
 M16 adds the score-native offline renderer, tempo-map-aware frame scheduling, meter queries, and typed frame-addressed automation. M17.5 completes the Score-first cutover: the default `ReawarpEngine.generate()` plans a canonical rational-beat Score before rendering event-backed voices, and project event dictionaries are derived compatibility/export views. Specialised whole-field texture and ambience passes remain outside event-level scheduling; `generate_legacy()` is retained for comparison. See [M16/M17 implementation details](docs/M16.md) and the [post-M17 roadmap](docs/ROADMAP.md).
 
+### Perceptual orchestration intent (M20 foundation)
+
+The Score API can carry inspectable arrangement intent: asymmetric rational-beat phrases, independently phased cycles, pairwise role grammars, foreground/midground/background/absence spans, explicit hand-offs and per-domain mutation permissions. Plans round-trip through Score JSON and Reawarp MIDI metadata without changing playback scheduling. Register/spectral overlap inspection emits heuristic warnings only, never a quality score. See [M20](docs/M20.md).
+
 ## Determinism
 
 The root seed is split into named NumPy random streams using a stable hash. Pattern, synthesis, profile-selection, and break-processing streams are independent. Regenerating one lane therefore does not change unrelated generated lanes. Repeated renders with the same application version, configuration, seed, and dependency environment produce identical floating-point stems.
