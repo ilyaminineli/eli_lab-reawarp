@@ -442,9 +442,9 @@ class FxLabPage(QWidget):
     def set_project_sources(
         self, stems: dict[str, np.ndarray], sample_rate: int
     ) -> None:
-        """Expose a frozen copy of the current project's dry stems to FX Lab."""
+        """Expose the immutable source arrays from the active project to FX Lab."""
         self._project_stems = {
-            str(name): np.asarray(audio, dtype=np.float32).copy()
+            str(name): np.asarray(audio, dtype=np.float32)
             for name, audio in stems.items()
         }
         self.project_sample_rate = int(sample_rate)
