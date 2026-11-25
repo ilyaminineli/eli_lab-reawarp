@@ -80,8 +80,10 @@ class Score:
             harmonic_context = json.loads(json.dumps(
                 harmonic_context, ensure_ascii=False, allow_nan=False
             ))
+            from reawarp.score.pitch import PitchField
+
             mode = str(harmonic_context.get("mode", "chromatic"))
-            if mode not in {"chromatic", "collection", "centred", "intervallic", "spectral", "microtonal", "ambiguous"}:
+            if mode not in PitchField.MODES:
                 raise ValueError(f"unsupported harmonic context mode: {mode}")
             for key in ("pitch_collection", "allowed_intervals"):
                 values = harmonic_context.get(key, [])
@@ -91,6 +93,10 @@ class Score:
                 values = harmonic_context.get(key, {})
                 if not isinstance(values, dict) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in values.values()):
                     raise ValueError(f"harmonic_context {key} must map labels to finite numbers")
+            try:
+                PitchField.from_score_context(harmonic_context)
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ValueError(f"invalid harmonic_context: {exc}") from exc
         raw_sonorities = tuple(self.sonorities)
         if any(not isinstance(item, dict) for item in raw_sonorities):
             raise ValueError("each sonority must be an object")

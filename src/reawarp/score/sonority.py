@@ -112,8 +112,14 @@ def generate_sonority(
     field = pitch_field or PitchField()
     if not isinstance(field, PitchField):
         raise ValueError("pitch_field must be a PitchField or None")
+    if (
+        bass_pitch is not None
+        and field.hard_constraint
+        and not field.evaluate(bass_pitch, tuning).allowed
+    ):
+        raise ValueError("bass_pitch violates hard pitch-field constraints")
 
-    candidate_count = int(math.floor((high - low) / step + 1e-9)) + 1
+    candidate_count = int(math.floor((high - low) / step + 1e-9))
     if candidate_count > 512:
         raise ValueError("pitch range creates more than 512 candidate steps")
     candidates = []

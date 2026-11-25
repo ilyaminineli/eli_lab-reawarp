@@ -121,23 +121,30 @@ def assign_voice_leading(
     best_crossings: tuple[tuple[int, int], ...] = ()
     best_assignment: tuple[int, ...] | None = None
 
-    candidates = (
-        (tuple(range(len(source))),)
-        if not allow_crossing
-        else itertools.permutations(range(len(target)))
-    )
-    for assignment in candidates:
-        deltas = tuple(target[assignment[index]] - source[index] for index in range(len(source)))
+    for assignment in itertools.permutations(range(len(target))):
+        assigned_targets = tuple(target[target_index] for target_index in assignment)
+        deltas = tuple(
+            assigned_targets[index] - source[index]
+            for index in range(len(source))
+        )
         distances = tuple(abs(delta) for delta in deltas)
         if maximum_leap is not None and any(distance > maximum_leap for distance in distances):
             continue
 
         crossed = tuple(
             (left, right)
-            for left in range(len(assignment))
-            for right in range(left + 1, len(assignment))
-            if assignment[left] > assignment[right]
+            for left in range(len(source))
+            for right in range(left + 1, len(source))
+            if (
+                (source[left] - source[right] > 1e-9
+                 and assigned_targets[left] - assigned_targets[right] < -1e-9)
+                or
+                (source[left] - source[right] < -1e-9
+                 and assigned_targets[left] - assigned_targets[right] > 1e-9)
+            )
         )
+        if not allow_crossing and crossed:
+            continue
         motion_cost = weights.motion * sum(distances)
         leap_cost = weights.leap * sum(
             max(0.0, distance - weights.leap_threshold) ** 2

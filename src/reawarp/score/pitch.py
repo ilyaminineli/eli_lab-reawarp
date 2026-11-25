@@ -132,7 +132,7 @@ class PitchField:
     maximum_pitch: float | None = None
 
     MODES = frozenset({
-        "chromatic", "collection", "centred", "intervallic",
+        "chromatic", "collection", "modal", "centred", "intervallic",
         "spectral", "microtonal", "ambiguous",
     })
 
@@ -151,8 +151,16 @@ class PitchField:
         ):
             if any(not math.isfinite(float(value)) for value in values):
                 raise ValueError(f"{name} values must be finite")
-        if self.mode == "collection" and not self.pitch_collection:
-            raise ValueError("collection mode requires pitch_collection values")
+        if self.mode in {"collection", "modal"} and not self.pitch_collection:
+            raise ValueError(f"{self.mode} mode requires pitch_collection values")
+        if self.mode == "intervallic" and (
+            self.centre_pitch is None or not self.allowed_intervals
+        ):
+            raise ValueError(
+                "intervallic mode requires centre_pitch and allowed_intervals"
+            )
+        if self.allowed_intervals and self.centre_pitch is None:
+            raise ValueError("allowed_intervals require centre_pitch")
         if self.minimum_pitch is not None and not math.isfinite(float(self.minimum_pitch)):
             raise ValueError("minimum_pitch must be finite")
         if self.maximum_pitch is not None and not math.isfinite(float(self.maximum_pitch)):

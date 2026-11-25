@@ -546,6 +546,19 @@ def _build_sonority(
         "phrase_id": boundary.phrase_id,
     }
     if boundary.pitches:
+        if pitch_field is not None and pitch_field.hard_constraint:
+            checked_pitches = boundary.pitches + (
+                () if boundary.bass_pitch is None else (boundary.bass_pitch,)
+            )
+            rejected = tuple(
+                pitch for pitch in checked_pitches
+                if not pitch_field.evaluate(pitch, tuning).allowed
+            )
+            if rejected:
+                raise ValueError(
+                    f"explicit sonority {boundary.sonority_id} violates hard "
+                    f"pitch-field constraints: {rejected}"
+                )
         return Sonority(
             sonority_id=boundary.sonority_id,
             onset_beats=boundary.onset_beats,
@@ -648,7 +661,10 @@ def _crossed_voice_pairs(
         for right in range(left + 1, len(source)):
             before = source[left] - source[right]
             after = target[left] - target[right]
-            if before * after < -1e-9:
+            if (
+                (before > 1e-9 and after < -1e-9)
+                or (before < -1e-9 and after > 1e-9)
+            ):
                 pairs.append((voice_ids[left], voice_ids[right]))
     return tuple(pairs)
 

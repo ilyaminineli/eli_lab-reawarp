@@ -412,43 +412,58 @@ def _make_sonorities(
             item.sonority_id for item in boundaries
         ):
             raise ValueError("supplied sonority IDs must match boundary order")
-        return sonorities
+    else:
+        generated = []
+        for boundary in boundaries:
+            if boundary.pitches:
+                generated.append(Sonority(
+                    sonority_id=boundary.sonority_id,
+                    onset_beats=boundary.onset_beats,
+                    duration_beats=boundary.duration_beats,
+                    pitches=boundary.pitches,
+                    bass_pitch=boundary.bass_pitch,
+                    tension=boundary.tension,
+                    transform="boundary",
+                    transform_parameters={
+                        "section_id": boundary.section_id,
+                        "phrase_id": boundary.phrase_id,
+                    },
+                ))
+            else:
+                seed = _derived_seed(config.seed, boundary.sonority_id)
+                generated_sonority = generate_sonority(
+                    pitch_field, tuning,
+                    sonority_id=boundary.sonority_id,
+                    onset_beats=boundary.onset_beats,
+                    duration_beats=boundary.duration_beats,
+                    voice_count=boundary.voice_count,
+                    minimum_pitch=boundary.minimum_pitch,
+                    maximum_pitch=boundary.maximum_pitch,
+                    pitch_step=boundary.pitch_step,
+                    minimum_spacing=boundary.minimum_spacing,
+                    maximum_spacing=boundary.maximum_spacing,
+                    bass_pitch=boundary.bass_pitch,
+                    seed=seed,
+                    temperature=boundary.temperature,
+                )
+                generated.append(generated_sonority)
+        sonorities = tuple(generated)
 
-    generated = []
-    for boundary in boundaries:
-        if boundary.pitches:
-            generated.append(Sonority(
-                sonority_id=boundary.sonority_id,
-                onset_beats=boundary.onset_beats,
-                duration_beats=boundary.duration_beats,
-                pitches=boundary.pitches,
-                bass_pitch=boundary.bass_pitch,
-                tension=boundary.tension,
-                transform="boundary",
-                transform_parameters={
-                    "section_id": boundary.section_id,
-                    "phrase_id": boundary.phrase_id,
-                },
-            ))
-        else:
-            seed = _derived_seed(config.seed, boundary.sonority_id)
-            generated_sonority = generate_sonority(
-                pitch_field, tuning,
-                sonority_id=boundary.sonority_id,
-                onset_beats=boundary.onset_beats,
-                duration_beats=boundary.duration_beats,
-                voice_count=boundary.voice_count,
-                minimum_pitch=boundary.minimum_pitch,
-                maximum_pitch=boundary.maximum_pitch,
-                pitch_step=boundary.pitch_step,
-                minimum_spacing=boundary.minimum_spacing,
-                maximum_spacing=boundary.maximum_spacing,
-                bass_pitch=boundary.bass_pitch,
-                seed=seed,
-                temperature=boundary.temperature,
+    if pitch_field is not None and pitch_field.hard_constraint:
+        for sonority in sonorities:
+            checked_pitches = sonority.pitches + (
+                () if sonority.bass_pitch is None else (sonority.bass_pitch,)
             )
-            generated.append(generated_sonority)
-    return tuple(generated)
+            rejected = tuple(
+                pitch for pitch in checked_pitches
+                if not pitch_field.evaluate(pitch, tuning).allowed
+            )
+            if rejected:
+                raise ValueError(
+                    f"sonority {sonority.sonority_id} violates hard pitch-field "
+                    f"constraints: {rejected}"
+                )
+    return sonorities
 
 
 def _candidates_for_boundary(
@@ -773,6 +788,14 @@ def plan_bass_role(
                 max(anchor - config.movement_range, pitch),
             )
             pitch = min(config.register_max, max(config.register_min, pitch))
+            if (
+                pitch_field is not None
+                and pitch_field.hard_constraint
+                and not pitch_field.evaluate(pitch, tuning).allowed
+            ):
+                raise ValueError(
+                    f"bass pitch {pitch:g} violates hard pitch-field constraints"
+                )
             if candidate.duration <= 0:
                 continue
             event_id = _event_id(
