@@ -515,14 +515,32 @@ class HybridVoiceRenderer:
             controls.get(f"sound_object.{patch.patch_id}.gain", 1.0),
             "sound-object gain", 0.0, 4.0,
         )
-        global_pan = _number(patch.spatial.get("pan", 0.0), "spatial.pan", -1.0, 1.0)
-        width = _number(patch.spatial.get("width", 1.0), "spatial.width", 0.0, 2.0)
+        prefix = f"sound_object.{patch.patch_id}"
+        global_pan = _number(
+            controls.get(f"{prefix}.spatial.pan", patch.spatial.get("pan", 0.0)),
+            "spatial.pan", -1.0, 1.0,
+        )
+        width = _number(
+            controls.get(f"{prefix}.spatial.width", patch.spatial.get("width", 1.0)),
+            "spatial.width", 0.0, 2.0,
+        )
+        pitch_semitones = _number(
+            controls.get(f"{prefix}.pitch", 0.0), "sound-object pitch", -48.0, 48.0
+        )
+        attack_override = controls.get(f"{prefix}.attack")
+        decay_override = controls.get(f"{prefix}.decay")
+        release_override = controls.get(f"{prefix}.release")
         spatial_stems: dict[str, np.ndarray] = {}
         source_map = {item.source_id: item for item in patch.sources}
-        layer_by_id = {item.layer_id: item for item in patch.layers}
 
-        modulation_depth = _number(patch.modulation.get("depth", 0.0), "modulation.depth", 0.0, 1.0)
-        modulation_rate = _number(patch.modulation.get("rate_hz", 0.0), "modulation.rate_hz", 0.0, 40.0)
+        modulation_depth = _number(
+            controls.get(f"{prefix}.modulation.depth", patch.modulation.get("depth", 0.0)),
+            "modulation.depth", 0.0, 1.0,
+        )
+        modulation_rate = _number(
+            controls.get(f"{prefix}.modulation.rate", patch.modulation.get("rate_hz", 0.0)),
+            "modulation.rate_hz", 0.0, 40.0,
+        )
         if modulation_depth > 0.0 and modulation_rate > 0.0:
             phase_seed = derive_sound_object_seed(patch.seed, patch.patch_id, "coherent-modulation")
             phase = 2.0 * math.pi * (phase_seed / float(1 << 64))
@@ -556,14 +574,62 @@ class HybridVoiceRenderer:
                 raise ValueError("source audio must contain only finite samples")
             length = layer.frame_count
             source_begin = layer.source_start_frame
-            source_end = min(len(source), source_begin + length)
+            pitch_ratio = 2.0 ** (pitch_semitones / 12.0)
+            required_source_frames = max(
+                1, int(math.ceil(max(0, length - 1) * pitch_ratio)) + 1
+            )
+            source_end = min(len(source), source_begin + required_source_frames)
             segment = source[source_begin:source_end]
-            if len(segment) < length:
-                shape = (length - len(segment),) if source.ndim == 1 else (length - len(segment), 2)
-                segment = np.concatenate((segment, np.zeros(shape, dtype=np.float32)), axis=0)
-            envelope = build_envelope_curve(length, patch.sample_rate, layer.envelope)
+            if len(segment) < required_source_frames:
+                shape = (
+                    (required_source_frames - len(segment),)
+                    if source.ndim == 1
+                    else (required_source_frames - len(segment), 2)
+                )
+                segment = np.concatenate(
+                    (segment, np.zeros(shape, dtype=np.float32)), axis=0
+                )
+            if abs(pitch_semitones) > 1e-9:
+                source_positions = np.arange(length, dtype=np.float64) * pitch_ratio
+                source_axis = np.arange(len(segment), dtype=np.float64)
+                if segment.ndim == 1:
+                    segment = np.interp(
+                        source_positions, source_axis, segment,
+                        left=0.0, right=0.0,
+                    ).astype(np.float32)
+                else:
+                    segment = np.column_stack([
+                        np.interp(
+                            source_positions, source_axis, segment[:, channel],
+                            left=0.0, right=0.0,
+                        )
+                        for channel in range(2)
+                    ]).astype(np.float32)
+            envelope_spec = layer.envelope
+            if any(value is not None for value in (
+                attack_override, decay_override, release_override
+            )):
+                envelope_spec = EnvelopeSpec(
+                    attack_seconds=(
+                        envelope_spec.attack_seconds if attack_override is None
+                        else _number(attack_override, "attack override", 0.0, 30.0)
+                    ),
+                    decay_seconds=(
+                        envelope_spec.decay_seconds if decay_override is None
+                        else _number(decay_override, "decay override", 0.0, 30.0)
+                    ),
+                    sustain_level=envelope_spec.sustain_level,
+                    release_seconds=(
+                        envelope_spec.release_seconds if release_override is None
+                        else _number(release_override, "release override", 0.0, 30.0)
+                    ),
+                    attack_curve=envelope_spec.attack_curve,
+                    decay_curve=envelope_spec.decay_curve,
+                    release_curve=envelope_spec.release_curve,
+                )
+            envelope = build_envelope_curve(length, patch.sample_rate, envelope_spec)
             layer_gain = _number(
-                controls.get(f"sound_object.{patch.patch_id}.layer.{layer.layer_id}.gain", layer.gain),
+                controls.get(f"{prefix}.layer.{layer.layer_id}.gain", layer.gain),
                 "layer gain", 0.0, 4.0,
             )
             segment = segment * envelope.reshape((-1,) if segment.ndim == 1 else (-1, 1))
@@ -618,6 +684,9 @@ class HybridVoiceRenderer:
                 "mono_fold_loss_db": mono_loss_db,
                 "warnings": warnings,
                 "rendered_layer_count": len(spatial_stems),
+                "pitch_semitones": pitch_semitones,
+                "modulation_rate_hz": modulation_rate,
+                "modulation_depth": modulation_depth,
                 "audio_bytes": int(final.nbytes + sum(item.nbytes for item in spatial_stems.values())),
             },
         )
