@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Sequence
 
 
@@ -17,9 +17,25 @@ class MotifNote:
     pan: float
     source_x: float = 0.0
     source_y: float = 0.0
+    articulation: str = "default"
+    timbre: str = "default"
 
-    def to_dict(self) -> dict[str, int | float]:
+    def to_dict(self) -> dict[str, int | float | str]:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MotifNote":
+        return cls(
+            step=int(data["step"]),
+            midi_note=int(data["midi_note"]),
+            duration_steps=float(data["duration_steps"]),
+            velocity=float(data.get("velocity", 0.8)),
+            pan=float(data.get("pan", 0.0)),
+            source_x=float(data.get("source_x", 0.0)),
+            source_y=float(data.get("source_y", 0.0)),
+            articulation=str(data.get("articulation", "default")),
+            timbre=str(data.get("timbre", "default")),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +61,18 @@ class Motif:
             "notes": [note.to_dict() for note in self.notes],
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "Motif":
+        return cls(
+            motif_id=str(data["motif_id"]),
+            role=str(data.get("role", "melody")),
+            source_section=str(data.get("source_section", "SOURCE_PHRASE")),
+            source_start_bar=int(data.get("source_start_bar", 0)),
+            phrase_bars=int(data.get("phrase_bars", 1)),
+            pitch_center=int(data.get("pitch_center", 60)),
+            notes=tuple(MotifNote.from_dict(item) for item in data.get("notes", ())),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class MotifInstance:
@@ -58,6 +86,8 @@ class MotifInstance:
     operations: tuple[str, ...]
     phrase_steps: int
     notes: tuple[MotifNote, ...]
+    preserved_dimensions: tuple[str, ...] = ()
+    changed_dimensions: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,7 +97,30 @@ class MotifInstance:
             "operation": self.operation, "operations": list(self.operations),
             "phrase_steps": self.phrase_steps,
             "notes": [note.to_dict() for note in self.notes],
+            "preserved_dimensions": list(self.preserved_dimensions),
+            "changed_dimensions": list(self.changed_dimensions),
         }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MotifInstance":
+        return cls(
+            motif_id=str(data["motif_id"]),
+            section_index=int(data.get("section_index", 0)),
+            section_name=str(data.get("section_name", "")),
+            function=str(data.get("function", "continuation")),
+            start_bar=int(data.get("start_bar", 0)),
+            end_bar=int(data.get("end_bar", 0)),
+            operation=str(data.get("operation", "repeat")),
+            operations=tuple(str(item) for item in data.get("operations", ())),
+            phrase_steps=int(data.get("phrase_steps", 16)),
+            notes=tuple(MotifNote.from_dict(item) for item in data.get("notes", ())),
+            preserved_dimensions=tuple(
+                str(item) for item in data.get("preserved_dimensions", ())
+            ),
+            changed_dimensions=tuple(
+                str(item) for item in data.get("changed_dimensions", ())
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +134,20 @@ class MotifPlan:
             "instances": [instance.to_dict() for instance in self.instances],
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "MotifPlan":
+        if int(data.get("schema_version", 1)) != 1:
+            raise ValueError("unsupported motif plan schema version")
+        anchor = data.get("anchor")
+        if not isinstance(anchor, dict):
+            raise ValueError("motif plan requires an anchor object")
+        return cls(
+            anchor=Motif.from_dict(anchor),
+            instances=tuple(
+                MotifInstance.from_dict(item) for item in data.get("instances", ())
+            ),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class MotifAccent:
@@ -92,6 +159,47 @@ class MotifAccent:
     pattern_style: str
     motif_id: str
     motif_relation: str
+
+
+MOTIF_IDENTITY_DIMENSIONS = (
+    "contour",
+    "interval_profile",
+    "rhythm",
+    "register",
+    "articulation",
+    "timbre",
+)
+
+_MOTIF_IDENTITY_BY_OPERATION = {
+    "repeat": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "return": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "displacement": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "fragmentation": ("articulation", "timbre"),
+    "augmentation": ("contour", "interval_profile", "register", "articulation", "timbre"),
+    "diminution": ("contour", "interval_profile", "register", "articulation", "timbre"),
+    "inversion": ("rhythm", "articulation", "timbre"),
+    "retrograde": ("register", "articulation", "timbre"),
+    "rhythmic_shadow": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "call_response": ("articulation", "timbre"),
+    "dissolve": ("articulation", "timbre"),
+}
+
+
+def motif_identity_contract(operation: str) -> dict[str, tuple[str, ...]]:
+    """Declare exactly which named motif dimensions survive an operation.
+
+    A retained dimension is a structural contract, not a claim that the
+    transformation is perceptually successful in every context.
+    """
+    try:
+        preserved = _MOTIF_IDENTITY_BY_OPERATION[operation]
+    except KeyError as exc:
+        raise ValueError(f"unknown motif transformation: {operation}") from exc
+    changed = tuple(
+        dimension for dimension in MOTIF_IDENTITY_DIMENSIONS
+        if dimension not in preserved
+    )
+    return {"preserved": preserved, "changed": changed}
 
 
 def _clip(value: float, low: float, high: float) -> float:
@@ -165,6 +273,8 @@ def _extract_anchor_motif(
             pan=_clip(float(event.pan), -1.0, 1.0),
             source_x=float(getattr(event, "source_x", 0.0)),
             source_y=float(getattr(event, "source_y", 0.0)),
+            articulation=str(getattr(event, "articulation", "default")),
+            timbre=str(getattr(event, "timbre", getattr(event, "synthesis_profile", "default"))),
         )
         for event in selected
         if 0 <= int(event.step) - start_bar * 16 < phrase_steps
@@ -196,89 +306,96 @@ def _extract_anchor_motif(
     )
 
 
-def transform_motif(motif: Motif, operation: str) -> tuple[tuple[MotifNote, ...], int]:
-    """Apply one bounded transformation, preserving the source motif identity."""
-    allowed = {
-        "repeat", "return", "displacement", "fragmentation", "augmentation",
-        "diminution", "inversion", "retrograde", "rhythmic_shadow",
-        "call_response", "dissolve",
-    }
-    if operation not in allowed:
-        raise ValueError(f"unknown motif transformation: {operation}")
+def transform_motif_with_identity(
+    motif: Motif,
+    operation: str,
+) -> tuple[tuple[MotifNote, ...], int, dict[str, tuple[str, ...]]]:
+    """Transform motif material and return its explicit identity contract."""
+    contract = motif_identity_contract(operation)
     phrase_steps = motif.phrase_steps
     source = list(motif.notes)
     if operation in {"repeat", "return"}:
         notes = source
     elif operation == "displacement":
-        notes = [
-            MotifNote((n.step + 1) % phrase_steps, n.midi_note, n.duration_steps,
-                      n.velocity, n.pan, n.source_x, n.source_y) for n in source
-        ]
+        notes = [replace(n, step=(n.step + 1) % phrase_steps) for n in source]
     elif operation == "fragmentation":
         notes = [n for index, n in enumerate(source) if index == 0 or index % 2 == 0]
     elif operation == "augmentation":
         phrase_steps *= 2
         notes = [
-            MotifNote(n.step * 2, n.midi_note, min(24.0, n.duration_steps * 2),
-                      n.velocity, n.pan, n.source_x, n.source_y) for n in source
+            replace(n, step=n.step * 2, duration_steps=min(24.0, n.duration_steps * 2))
+            for n in source
         ]
     elif operation == "diminution":
         phrase_steps = max(8, phrase_steps // 2)
         notes = [
-            MotifNote(min(phrase_steps - 1, int(round(n.step * 0.5))), n.midi_note,
-                      max(0.5, n.duration_steps * 0.5), n.velocity, n.pan,
-                      n.source_x, n.source_y) for n in source
+            replace(
+                n,
+                step=min(phrase_steps - 1, int(round(n.step * 0.5))),
+                duration_steps=max(0.5, n.duration_steps * 0.5),
+            )
+            for n in source
         ]
     elif operation == "inversion":
         notes = [
-            MotifNote(n.step, 2 * motif.pitch_center - n.midi_note, n.duration_steps,
-                      n.velocity, n.pan, n.source_x, n.source_y) for n in source
+            replace(n, midi_note=2 * motif.pitch_center - n.midi_note)
+            for n in source
         ]
     elif operation == "retrograde":
         notes = [
-            MotifNote(phrase_steps - 1 - n.step, n.midi_note, n.duration_steps,
-                      n.velocity, -n.pan, n.source_x, n.source_y) for n in reversed(source)
+            replace(n, step=phrase_steps - 1 - n.step, pan=-n.pan)
+            for n in reversed(source)
         ]
     elif operation == "rhythmic_shadow":
         notes = [
-            MotifNote((n.step + 2) % phrase_steps, n.midi_note, n.duration_steps,
-                      n.velocity * 0.82, n.pan, n.source_x, n.source_y) for n in source
+            replace(n, step=(n.step + 2) % phrase_steps, velocity=n.velocity * 0.82)
+            for n in source
         ]
     elif operation == "call_response":
         half = max(4, phrase_steps // 2)
         notes = []
-        for n in source:
-            local = n.step % half
-            notes.append(MotifNote(
-                local, n.midi_note, n.duration_steps, n.velocity, n.pan,
-                n.source_x, n.source_y,
-            ))
+        for note in source:
+            local = note.step % half
+            notes.append(replace(note, step=local))
             if local + half < phrase_steps:
-                notes.append(MotifNote(
-                    local + half, 2 * motif.pitch_center - n.midi_note,
-                    n.duration_steps, n.velocity * 0.78, -n.pan,
-                    n.source_x, n.source_y,
+                notes.append(replace(
+                    note,
+                    step=local + half,
+                    midi_note=2 * motif.pitch_center - note.midi_note,
+                    velocity=note.velocity * 0.78,
+                    pan=-note.pan,
                 ))
     else:  # dissolve
         notes = [
-            MotifNote(n.step, n.midi_note, n.duration_steps,
-                      n.velocity * (0.86 if index == 0 else 0.62),
-                      n.pan, n.source_x, n.source_y)
-            for index, n in enumerate(source)
+            replace(
+                note,
+                velocity=note.velocity * (0.86 if index == 0 else 0.62),
+            )
+            for index, note in enumerate(source)
             if index == 0 or index % 3 == 0
         ]
 
     notes = [
-        MotifNote(
-            int(n.step) % phrase_steps, int(n.midi_note),
-            _clip(n.duration_steps, 0.35, 24.0),
-            _clip(n.velocity, 0.0, 1.0), _clip(n.pan, -1.0, 1.0),
-            float(n.source_x), float(n.source_y),
+        replace(
+            note,
+            step=int(note.step) % phrase_steps,
+            midi_note=int(note.midi_note),
+            duration_steps=_clip(note.duration_steps, 0.35, 24.0),
+            velocity=_clip(note.velocity, 0.0, 1.0),
+            pan=_clip(note.pan, -1.0, 1.0),
+            source_x=float(note.source_x),
+            source_y=float(note.source_y),
         )
-        for n in notes
+        for note in notes
     ]
-    notes.sort(key=lambda n: (n.step, n.midi_note))
-    return tuple(notes), phrase_steps
+    notes.sort(key=lambda note: (note.step, note.midi_note))
+    return tuple(notes), phrase_steps, contract
+
+
+def transform_motif(motif: Motif, operation: str) -> tuple[tuple[MotifNote, ...], int]:
+    """Backwards-compatible motif transform; identity detail is available separately."""
+    notes, phrase_steps, _contract = transform_motif_with_identity(motif, operation)
+    return notes, phrase_steps
 
 
 def _operation_for_section(section: Any, directive: Any, seed: int | str) -> str:
@@ -325,7 +442,7 @@ def build_motif_plan(
     for section in composition_plan.sections:
         directive = directives.get(int(section.index))
         operation = _operation_for_section(section, directive, seed)
-        notes, phrase_steps = transform_motif(anchor, operation)
+        notes, phrase_steps, contract = transform_motif_with_identity(anchor, operation)
         instances.append(MotifInstance(
             motif_id=anchor.motif_id,
             section_index=int(section.index),
@@ -334,6 +451,8 @@ def build_motif_plan(
             start_bar=int(section.start_bar), end_bar=int(section.end_bar),
             operation=operation, operations=(operation,),
             phrase_steps=phrase_steps, notes=notes,
+            preserved_dimensions=contract["preserved"],
+            changed_dimensions=contract["changed"],
         ))
     return MotifPlan(anchor=anchor, instances=tuple(instances))
 

@@ -167,7 +167,7 @@ See [M18.md](M18.md).
 
 ## M19: Harmonic context and voice-leading
 
-**Status:** M19.1–M19.4 implemented on main. Optional Score harmonic-context and sonority persistence, tuning-aware pitch fields, seeded sonority generation, provenance-preserving transformations, boundary-driven whole-sequence melodic voice-leading, and six independent bass-role grammars with kick relationships/cadence controls are integrated. M19.5 motif/MIDI integration remains.
+**Status:** M19.1–M19.5 implemented on main. Optional harmonic context, tuning-aware sonority generation/transformation, sequence-level melodic voice-leading, six independent bass roles, explicit motif identity contracts, Score-tuning-aware sonority binding and loss-aware MIDI 1.0 interchange with exact Reawarp text metadata are integrated.
 
 **Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 

@@ -345,11 +345,19 @@ def pitch_field_from_score(score) -> PitchField:
     return PitchField.from_score_context(score.harmonic_context)
 
 
-def tuning_from_score(score, *, period_ratio: float = 2.0) -> EqualTemperamentTuning:
-    """Build the Score's equal-period tuning adapter from its persisted tuning data."""
+def tuning_from_score(
+    score,
+    *,
+    period_ratio: float | None = None,
+) -> EqualTemperamentTuning:
+    """Build the Score tuning adapter, including its persisted period ratio."""
+    resolved_period_ratio = (
+        float(getattr(score, "tuning_period_ratio", 2.0))
+        if period_ratio is None else float(period_ratio)
+    )
     return EqualTemperamentTuning(
         divisions_per_period=score.tuning_divisions_per_period,
-        period_ratio=period_ratio,
+        period_ratio=resolved_period_ratio,
         reference_pitch=score.tuning_reference_pitch,
         reference_frequency_hz=score.tuning_reference_frequency_hz,
         identifier=score.tuning_id,

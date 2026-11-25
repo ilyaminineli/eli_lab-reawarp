@@ -33,6 +33,7 @@ class Score:
     schema_version: int = 1
     sonority_plan: dict[str, Any] | None = None
     bass_plan: dict[str, Any] | None = None
+    tuning_period_ratio: float = 2.0
 
     def __post_init__(self) -> None:
         if not self.title.strip():
@@ -49,6 +50,13 @@ class Score:
             raise ValueError("tuning reference frequency must be positive")
         if isinstance(self.tuning_divisions_per_period, bool) or not isinstance(self.tuning_divisions_per_period, int) or self.tuning_divisions_per_period < 1:
             raise ValueError("tuning divisions per period must be positive")
+        try:
+            tuning_period_ratio = float(self.tuning_period_ratio)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("tuning period ratio must be finite and greater than one") from exc
+        if not math.isfinite(tuning_period_ratio) or tuning_period_ratio <= 1.0:
+            raise ValueError("tuning period ratio must be finite and greater than one")
+        object.__setattr__(self, "tuning_period_ratio", tuning_period_ratio)
         events = tuple(self.events)
         ids = [event.event_id for event in events]
         if len(ids) != len(set(ids)):
@@ -275,6 +283,7 @@ class Score:
                 "reference_pitch": self.tuning_reference_pitch,
                 "reference_frequency_hz": self.tuning_reference_frequency_hz,
                 "divisions_per_period": self.tuning_divisions_per_period,
+                "period_ratio": self.tuning_period_ratio,
             },
             "events": [event.to_dict() for event in self.events],
             "automation": [lane.to_dict() for lane in self.automation],
@@ -323,6 +332,7 @@ class Score:
                 tuning.get("reference_frequency_hz", 440.0)
             ),
             tuning_divisions_per_period=int(tuning.get("divisions_per_period", 12)),
+            tuning_period_ratio=float(tuning.get("period_ratio", 2.0)),
             metadata=dict(data.get("metadata", {})),
             schema_version=int(data.get("schema_version", 1)),
         )

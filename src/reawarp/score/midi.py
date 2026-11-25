@@ -12,7 +12,7 @@ from typing import Any
 
 from reawarp.score.events import AutomationLane, AutomationPoint, MusicalEvent
 from reawarp.score.model import Score
-from reawarp.score.pitch import EqualTemperamentTuning
+from reawarp.score.pitch import EqualTemperamentTuning, tuning_from_score
 from reawarp.score.time import (
     MeterMap, MeterPoint, TempoMap, TempoPoint, as_fraction,
 )
@@ -78,20 +78,35 @@ def _drum_note(event: MusicalEvent) -> int | None:
     return None
 
 
-def _event_note(event: MusicalEvent, score: Score) -> int | None:
+def _midi_semitone_frequency(note: int) -> float:
+    """Frequency of a standard MIDI 1.0 note number."""
+    if isinstance(note, bool) or not 0 <= int(note) <= 127:
+        raise ValueError("MIDI note number must be between 0 and 127")
+    return 440.0 * (2.0 ** ((int(note) - 69) / 12.0))
+
+
+def _event_frequency(event: MusicalEvent, score: Score) -> float | None:
     if event.pitch is not None:
-        value = event.pitch
-    elif event.frequency_hz is not None:
-        tuning = EqualTemperamentTuning(
-            divisions_per_period=score.tuning_divisions_per_period,
-            reference_pitch=score.tuning_reference_pitch,
-            reference_frequency_hz=score.tuning_reference_frequency_hz,
-            identifier=score.tuning_id,
-        )
-        value = tuning.pitch_for_frequency(event.frequency_hz)
-    else:
+        return tuning_from_score(score).frequency_for_pitch(event.pitch)
+    if event.frequency_hz is not None:
+        return float(event.frequency_hz)
+    return None
+
+
+def _midi_note_from_frequency(frequency_hz: float) -> int:
+    """Resolve Hz to the nearest standard MIDI semitone (A4 = 440 Hz)."""
+    frequency = float(frequency_hz)
+    if not math.isfinite(frequency) or frequency <= 0:
+        raise ValueError("MIDI note frequency must be positive and finite")
+    semitone = 69.0 + 12.0 * math.log2(frequency / 440.0)
+    return int(min(127, max(0, math.floor(semitone + 0.5))))
+
+
+def _event_note(event: MusicalEvent, score: Score) -> int | None:
+    frequency = _event_frequency(event, score)
+    if frequency is None:
         return _drum_note(event)
-    return int(min(127, max(0, math.floor(float(value) + 0.5))))
+    return _midi_note_from_frequency(frequency)
 
 
 def _default_channel(event: MusicalEvent, voice_order: dict[str, int]) -> int:
@@ -136,7 +151,11 @@ def score_to_midi(
             "reference_pitch": score.tuning_reference_pitch,
             "reference_frequency_hz": score.tuning_reference_frequency_hz,
             "divisions_per_period": score.tuning_divisions_per_period,
+            "period_ratio": score.tuning_period_ratio,
         },
+        "sonorities": list(score.sonorities),
+        "sonority_plan": score.sonority_plan,
+        "bass_plan": score.bass_plan,
         "metadata": score.metadata,
     }
     conductor_items.append((
@@ -198,7 +217,15 @@ def score_to_midi(
         end_tick = start_tick + length_tick
         velocity = max(1, min(127, int(round(event.velocity * 127.0))))
         payload = event.to_dict()
-        payload.update({"midi_channel": channel, "midi_note": note})
+        resolved_frequency = _event_frequency(event, score)
+        payload.update({
+            "midi_channel": channel,
+            "midi_note": note,
+            "reawarp_pitch_coordinate": event.pitch,
+            "reawarp_resolved_frequency_hz": resolved_frequency,
+            "reawarp_tuning_id": score.tuning_id,
+            "reawarp_tuning_period_ratio": score.tuning_period_ratio,
+        })
         sequence += 1
         voice_items[event.voice_id].append((
             start_tick, 1, sequence,
@@ -391,8 +418,10 @@ def score_from_midi(path: str | Path) -> Score:
     reference_pitch = float(tuning_data.get("reference_pitch", 69.0))
     reference_hz = float(tuning_data.get("reference_frequency_hz", 440.0))
     divisions = int(tuning_data.get("divisions_per_period", 12))
+    period_ratio = float(tuning_data.get("period_ratio", 2.0))
     tuning = EqualTemperamentTuning(
         divisions_per_period=divisions,
+        period_ratio=period_ratio,
         reference_pitch=reference_pitch,
         reference_frequency_hz=reference_hz,
         identifier=tuning_id,
@@ -436,14 +465,15 @@ def score_from_midi(path: str | Path) -> Score:
                 tuning_id=str(original.get("tuning_id", tuning_id)),
             ))
         else:
+            midi_frequency = _midi_semitone_frequency(note)
             events.append(MusicalEvent(
                 event_id=f"midi-event-{record_index:06d}",
                 voice_id=track_name,
                 onset_beats=Fraction(start_tick, ppq),
                 duration_beats=Fraction(end_tick - start_tick, ppq),
                 kind="note",
-                pitch=float(note),
-                frequency_hz=tuning.frequency_for_pitch(float(note)),
+                pitch=tuning.pitch_for_frequency(midi_frequency),
+                frequency_hz=midi_frequency,
                 velocity=float(velocity) / 127.0,
                 channel=channel,
                 tuning_id=tuning_id,
@@ -484,5 +514,9 @@ def score_from_midi(path: str | Path) -> Score:
         tuning_reference_pitch=reference_pitch,
         tuning_reference_frequency_hz=reference_hz,
         tuning_divisions_per_period=divisions,
+        tuning_period_ratio=period_ratio,
+        sonorities=tuple(custom_score.get("sonorities", ())),
+        sonority_plan=custom_score.get("sonority_plan"),
+        bass_plan=custom_score.get("bass_plan"),
         metadata=metadata,
     )
