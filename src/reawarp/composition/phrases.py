@@ -619,13 +619,13 @@ def _transform_events(
         "no_change": (),
         "transposition": ("pitch", "register"),
         "inversion": ("pitch", "register"),
-        "retrograde": ("rhythm", "spatial"),
+        "retrograde": ("rhythm",),
         "augmentation": ("rhythm", "envelope"),
         "diminution": ("rhythm", "envelope"),
         "fragmentation": ("rhythm", "silence"),
         "extension": ("rhythm", "silence"),
         "truncation": ("rhythm", "silence"),
-        "displacement": ("rhythm", "spatial"),
+        "displacement": ("rhythm",),
     }
     if operation not in changed_by_operation:
         raise ValueError(f"operation {operation!r} requires an unavailable M31 sound-object service")
@@ -661,10 +661,11 @@ def _transform_events(
             + span - (event.onset_beats - phrase.start_beats) - event.duration_beats,
         ) for event in reversed(source)]
     elif operation == "augmentation":
+        # Stretch each phrase event around the phrase start at a half-rate.
         output = [replace(
             event,
-            onset_beats=phrase.start_beats + 2 * (event.onset_beats - phrase.start_beats),
-            duration_beats=2 * event.duration_beats,
+            onset_beats=phrase.start_beats + (event.onset_beats - phrase.start_beats) / 2,
+            duration_beats=event.duration_beats / 2,
         ) for event in source]
     elif operation == "diminution":
         output = [replace(
@@ -698,15 +699,6 @@ def _transform_events(
             + (event.onset_beats - phrase.start_beats + shift) % span,
         ) for event in source]
 
-    if operation == "augmentation":
-        # The phrase occupies its complete semantic span: doubling material's
-        # internal timescale is constrained to half-span offsets, not a longer
-        # phrase. Keep the phrase clock fixed and report the rhythmic change.
-        output = [replace(
-            event,
-            onset_beats=phrase.start_beats + (event.onset_beats - phrase.start_beats) / 2,
-            duration_beats=event.duration_beats * 2,
-        ) for event in source]
     output.sort(key=lambda item: (item.onset_beats, item.voice_id, item.event_id))
     for event in output:
         if event.onset_beats < phrase.start_beats or event.end_beats > phrase.end_beats:
