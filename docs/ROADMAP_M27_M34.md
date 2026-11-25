@@ -8,6 +8,15 @@
 **Roadmap assessment:** 26 November 2026  
 **Basis:** the four companion guides in `docs/guides/`: the IDM Field Guide, Composition Atlas, Sound Design/Synthesis/Hybrid Sound Architecture, and Advanced Composition and Generative Systems.
 
+**Source guides (read as the governing references):**
+
+- [IDM Field Guide for Composers, Producers and Programmers](guides/IDM_Field_Guide_for_Composers_Producers_and_Programmers.md)
+- [IDM Composition Atlas: Patterns, Phrases and Track Structures](guides/IDM_Composition_Atlas_Patterns_Phrases_and_Track_Structures.md)
+- [IDM Sound Design, Synthesis and Hybrid Sound Architecture](guides/IDM_Sound_Design_Synthesis_and_Hybrid_Sound_Architecture.md)
+- [IDM Advanced Composition and Generative Systems](guides/IDM_Advanced_Composition_and_Generation_Appendix.md)
+
+Use these guides for the musical reasoning and terminology. Use the current code, tests and MILESTONES.md for implementation facts and compatibility; where the roadmap suggests an interface or path, treat it as a proposal to validate against the actual repository before creating new code.
+
 This roadmap deliberately does not treat “more algorithms”, “more parameters”, or “more complexity” as progress by themselves. It follows the guides' central distinction between producing events and composing relationships: the system should establish recognisable material, develop it at several time-scales, preserve intentional invariants, orchestrate it for listener attention, and help a human composer audition, subtract, freeze, arrange and finish.
 
 ## Guide-derived design principles
