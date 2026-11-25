@@ -17,6 +17,13 @@ from reawarp.composition.motifs import (
     render_motif_events,
     transform_motif,
 )
+from reawarp.composition.phrases import (
+    PhraseBoundary, PhraseSpan, PhrasePlan, MotifIdentity, MotifFamily,
+    MotifTransformation, PhraseCandidate, PhraseCandidateBatch,
+    build_phrase_candidate_batch, freeze_phrase_candidate,
+    restore_phrase_base, branch_phrase_candidate, continue_evolving,
+    phrase_context_events,
+)
 from reawarp.composition.perceptual import build_perceptual_orchestration_plan
 from reawarp.composition.orchestration import (
     ROLE_NAMES,
@@ -32,6 +39,20 @@ from reawarp.composition.orchestration import (
 )
 
 __all__ = [
+    "PhraseBoundary",
+    "PhraseSpan",
+    "PhrasePlan",
+    "MotifIdentity",
+    "MotifFamily",
+    "MotifTransformation",
+    "PhraseCandidate",
+    "PhraseCandidateBatch",
+    "build_phrase_candidate_batch",
+    "freeze_phrase_candidate",
+    "restore_phrase_base",
+    "branch_phrase_candidate",
+    "continue_evolving",
+    "phrase_context_events",
     "STRUCTURES",
     "CompositionPlan",
     "SectionPlan",
