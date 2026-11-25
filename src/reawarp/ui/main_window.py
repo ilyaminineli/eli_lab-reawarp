@@ -3094,9 +3094,23 @@ class MainWindow(QMainWindow):
     def _current_preview_audio(self) -> np.ndarray | None:
         if self.project is None:
             return None
+        selection = self.preview_source.currentData()
+        # A failed FX pass intentionally leaves a labelled dry fallback. Keep
+        # that audio playable rather than making the transport appear broken.
+        if self._fx_routing_metadata.get("fallback") == "dry_source_stems":
+            if selection == "master":
+                dry = {
+                    name: self._processed_stem(name)
+                    for name in self.project.stems
+                }
+                return render_master_with_returns(
+                    dry, {}, master_wet=float(self.fx_routing_editor.routing()["master_wet"])
+                )
+            if selection in self.project.stems:
+                return self._processed_stem(selection)
+            return None
         if not self._ensure_routing_render():
             return None
-        selection = self.preview_source.currentData()
         if selection == "master":
             return self._render_mix()
         if selection in self.project.stems:
