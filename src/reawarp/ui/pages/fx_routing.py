@@ -177,8 +177,13 @@ class FXRoutingEditor(QGroupBox):
             ) if self.variation_choice.currentData() else None
         )
         self.variation_choice.currentIndexChanged.connect(
-            lambda: self.play_variation_button.setEnabled(
-                self.variation_choice.currentData() is not None
+            lambda: (
+                self.play_variation_button.setEnabled(
+                    self.variation_choice.currentData() is not None
+                ),
+                self.apply_variation_button.setEnabled(
+                    self.variation_choice.currentData() is not None
+                ),
             )
         )
         prerender_row.addWidget(self.play_variation_button)
@@ -491,7 +496,11 @@ class FXRoutingEditor(QGroupBox):
         for candidate_id, label in choices:
             self.variation_choice.addItem(str(label), str(candidate_id))
         self.variation_choice.blockSignals(False)
-        self.play_variation_button.setEnabled(False)
+        if choices:
+            self.variation_choice.setCurrentIndex(1)
+        else:
+            self.play_variation_button.setEnabled(False)
+            self.apply_variation_button.setEnabled(False)
 
 
     def routing(self) -> dict[str, Any]:
