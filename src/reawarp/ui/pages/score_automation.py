@@ -244,6 +244,9 @@ class ScoreAutomationEditor(QGroupBox):
         self._score: Score | None = None
         self._sources: list[AutomationSource] = []
         self._modulations: list[AutomationModulation] = []
+        self._undo_stack: list[
+            tuple[list[AutomationSource], list[AutomationModulation]]
+        ] = []
         self._counter = 0
 
         root = QVBoxLayout(self)
@@ -264,6 +267,24 @@ class ScoreAutomationEditor(QGroupBox):
         self.target.setCurrentIndex(0)
         self.target.currentIndexChanged.connect(self._target_changed)
         form.addRow("Destination", self.target)
+
+        template_row = QWidget()
+        template_layout = QHBoxLayout(template_row)
+        template_layout.setContentsMargins(0, 0, 0, 0)
+        self.template = QComboBox()
+        for label in (
+            "Slow filter sweep",
+            "Phrase gain envelope",
+            "Rhythmic role thinning",
+            "Granular density motion",
+            "Stereo drift",
+        ):
+            self.template.addItem(label, label)
+        self.load_template_button = QPushButton("LOAD")
+        self.load_template_button.clicked.connect(self._apply_template)
+        template_layout.addWidget(self.template, 1)
+        template_layout.addWidget(self.load_template_button)
+        form.addRow("Quick template", template_row)
 
         self.source_kind = QComboBox()
         self.source_kind.addItem("SINE LFO", "lfo")
@@ -337,20 +358,23 @@ class ScoreAutomationEditor(QGroupBox):
         root.addLayout(form)
 
         self.preview = AutomationCurvePreview()
-        self.preview.valuesChanged.connect(
-            lambda values: self.source_values.setText(
-                ", ".join(f"{float(value):.4f}" for value in values)
-            )
-        )
+        self.preview.valuesChanged.connect(self._preview_values_changed)
+        self.preview.editStarted.connect(self._begin_preview_edit)
         root.addWidget(self.preview)
 
         action_row = QHBoxLayout()
         self.add_button = QPushButton("ADD CONTROL")
         self.remove_button = QPushButton("REMOVE")
+        self.undo_button = QPushButton("UNDO")
+        self.clear_button = QPushButton("CLEAR ALL")
         self.add_button.clicked.connect(self._add_control)
         self.remove_button.clicked.connect(self._remove_control)
+        self.undo_button.clicked.connect(self._undo)
+        self.clear_button.clicked.connect(self._clear_controls)
         action_row.addWidget(self.add_button)
         action_row.addWidget(self.remove_button)
+        action_row.addWidget(self.undo_button)
+        action_row.addWidget(self.clear_button)
         action_row.addStretch(1)
         root.addLayout(action_row)
 
@@ -373,6 +397,8 @@ class ScoreAutomationEditor(QGroupBox):
         self.status.setObjectName("muted")
         root.addWidget(self.status)
         self.remove_button.setEnabled(False)
+        self.undo_button.setEnabled(False)
+        self.clear_button.setEnabled(False)
         self._scope_changed()
         self._source_kind_changed()
         self._target_changed()
@@ -523,17 +549,7 @@ class ScoreAutomationEditor(QGroupBox):
         self._refresh_scope_ids()
         self._sources = list(score.automation_sources) if score is not None else []
         self._modulations = list(score.modulations) if score is not None else []
-        self.controls.clear()
-        for source in self._sources:
-            connections = [
-                item for item in self._modulations if item.source_id == source.source_id
-            ]
-            if connections:
-                destinations = ", ".join(item.destination_target_id for item in connections)
-            else:
-                destinations = "unconnected"
-            self.controls.addItem(f"{source.source_id}  →  {destinations}")
-        self.apply_button.setEnabled(score is not None)
+        self._undo_stack.clear()
         existing_indices = [
             int(source.source_id.rsplit("-", 1)[-1])
             for source in self._sources
@@ -541,10 +557,160 @@ class ScoreAutomationEditor(QGroupBox):
             and source.source_id.rsplit("-", 1)[-1].isdigit()
         ]
         self._counter = max([self._counter, *existing_indices], default=self._counter)
-        self._select_control(self.controls.currentRow())
+        self._refresh_control_list()
+        self.apply_button.setEnabled(score is not None)
         self.status.setText(
             f"{len(self._sources)} source(s) · {len(self._modulations)} connection(s). "
             "Changes are staged until APPLY & RE-RENDER."
+        )
+
+    def _record_undo(self) -> None:
+        self._undo_stack.append((list(self._sources), list(self._modulations)))
+        self.undo_button.setEnabled(True)
+
+    @staticmethod
+    def _source_label(
+        source: AutomationSource,
+        modulations: list[AutomationModulation],
+    ) -> str:
+        destinations = ", ".join(
+            item.destination_target_id
+            for item in modulations if item.source_id == source.source_id
+        ) or "unconnected"
+        return f"{source.source_id}  →  {destinations}"
+
+    def _refresh_control_list(self, selected_row: int | None = None) -> None:
+        previous = self.controls.currentRow() if selected_row is None else selected_row
+        self.controls.blockSignals(True)
+        self.controls.clear()
+        for source in self._sources:
+            self.controls.addItem(self._source_label(source, self._modulations))
+        if self._sources:
+            self.controls.setCurrentRow(max(0, min(previous, len(self._sources) - 1)))
+        self.controls.blockSignals(False)
+        self._select_control(self.controls.currentRow())
+        self.undo_button.setEnabled(bool(self._undo_stack))
+        self.clear_button.setEnabled(bool(self._sources))
+        self.remove_button.setEnabled(bool(self._sources))
+
+    def _undo(self) -> None:
+        if not self._undo_stack:
+            return
+        self._sources, self._modulations = self._undo_stack.pop()
+        self._refresh_control_list()
+        self.changed.emit()
+        self.status.setText("Reverted the last staged Score Control edit.")
+
+    def _clear_controls(self) -> None:
+        if not self._sources and not self._modulations:
+            return
+        self._record_undo()
+        self._sources = []
+        self._modulations = []
+        self._refresh_control_list(-1)
+        self.changed.emit()
+        self.status.setText("Cleared staged controls. UNDO restores them.")
+
+    def _begin_preview_edit(self) -> None:
+        row = self.controls.currentRow()
+        if 0 <= row < len(self._sources):
+            source = self._sources[row]
+            if source.kind in {"envelope", "phrase_curve", "stepped"}:
+                self._record_undo()
+
+    def _preview_values_changed(self, values: list[float]) -> None:
+        text = ", ".join(f"{float(value):.4f}" for value in values)
+        self.source_values.blockSignals(True)
+        self.source_values.setText(text)
+        self.source_values.blockSignals(False)
+        row = self.controls.currentRow()
+        if not 0 <= row < len(self._sources):
+            return
+        source = self._sources[row]
+        if source.kind not in {"envelope", "phrase_curve", "stepped"}:
+            return
+        parameters = dict(source.parameters)
+        if source.kind == "envelope":
+            denominator = max(1, len(values) - 1)
+            parameters["shape"] = [
+                [index / denominator, float(value)]
+                for index, value in enumerate(values)
+            ]
+        else:
+            parameters["values"] = [float(value) for value in values]
+        updated = replace(source, parameters=parameters)
+        try:
+            updated.to_lane()
+        except Exception as exc:
+            self.status.setText(f"Curve edit rejected: {exc}")
+            return
+        self._sources[row] = updated
+        item = self.controls.item(row)
+        if item is not None:
+            item.setText(self._source_label(updated, self._modulations))
+        self.changed.emit()
+        self.status.setText(
+            f"Updated {updated.source_id}. APPLY & RE-RENDER commits this staged curve."
+        )
+
+    def _apply_template(self) -> None:
+        templates = {
+            "Slow filter sweep": {
+                "target": "synth.cutoff", "kind": "lfo", "waveform": "triangle",
+                "scope": "global", "scope_id": "", "retrigger": "free",
+                "period": 16.0, "amount": 1_200.0, "start": 0.0,
+                "end": 64.0, "values": "0.0, 1.0, 0.0",
+            },
+            "Phrase gain envelope": {
+                "target": "synth.gain", "kind": "envelope", "waveform": "sine",
+                "scope": "role", "scope_id": "melody", "retrigger": "event",
+                "period": 4.0, "amount": 0.25, "start": 0.0,
+                "end": 16.0, "values": "0.0, 1.0, 0.7, 0.0",
+            },
+            "Rhythmic role thinning": {
+                "target": "role.density", "kind": "stepped", "waveform": "sine",
+                "scope": "role", "scope_id": "hat", "retrigger": "role",
+                "period": 2.0, "amount": 0.5, "start": 0.0,
+                "end": 64.0, "values": "1.0, 0.75, 0.45, 0.9",
+            },
+            "Granular density motion": {
+                "target": "synth.grain.density", "kind": "lfo", "waveform": "triangle",
+                "scope": "role", "scope_id": "melody", "retrigger": "section",
+                "period": 8.0, "amount": 25.0, "start": 0.0,
+                "end": 64.0, "values": "0.0, 1.0, 0.0",
+            },
+            "Stereo drift": {
+                "target": "spatial.pan", "kind": "lfo", "waveform": "sine",
+                "scope": "role", "scope_id": "ambience", "retrigger": "section",
+                "period": 8.0, "amount": 0.35, "start": 0.0,
+                "end": 64.0, "values": "0.0, 1.0, 0.0",
+            },
+        }
+        specification = templates[str(self.template.currentData())]
+        target_index = self.target.findData(specification["target"])
+        if target_index < 0:
+            self.status.setText(
+                f"Template target {specification['target']} is unavailable for this Score."
+            )
+            return
+        self.target.setCurrentIndex(target_index)
+        self.source_kind.setCurrentIndex(self.source_kind.findData(specification["kind"]))
+        self.lfo_waveform.setCurrentIndex(
+            self.lfo_waveform.findData(specification["waveform"])
+        )
+        self.scope.setEnabled(True)
+        self.scope.setCurrentIndex(self.scope.findData(specification["scope"]))
+        self.scope_id.setCurrentText(specification["scope_id"])
+        self.retrigger.setCurrentIndex(
+            self.retrigger.findData(specification["retrigger"])
+        )
+        self.period.setValue(specification["period"])
+        self.amount.setValue(specification["amount"])
+        self.start_beat.setValue(specification["start"])
+        self.end_beat.setValue(specification["end"])
+        self.source_values.setText(specification["values"])
+        self.status.setText(
+            f"Loaded {self.template.currentText()}. Review its scope and destination before adding."
         )
 
     def updated_score(self, score: Score | None = None) -> Score:
@@ -642,26 +808,10 @@ class ScoreAutomationEditor(QGroupBox):
         except Exception as exc:
             self.status.setText(f"Could not create control: {exc}")
             return
+        self._record_undo()
         self._sources.append(source)
         self._modulations.append(modulation)
-        self.controls.addItem(f"{source_id}  →  {target}  ·  {scope.upper()}")
-        self.controls.setCurrentRow(self.controls.count() - 1)
-        editable_values: list[float] = []
-        if source.kind == "envelope":
-            editable_values = [
-                float(point[1])
-                for point in source.parameters.get(
-                    "shape", [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]]
-                )
-            ]
-        elif source.kind in {"phrase_curve", "stepped"}:
-            editable_values = [
-                float(value) for value in source.parameters.get("values", [0.0, 1.0])
-            ]
-        self.preview.set_values(
-            editable_values if editable_values else [point.value for point in lane.points],
-            editable=source.kind in {"envelope", "phrase_curve", "stepped"},
-        )
+        self._refresh_control_list(len(self._sources) - 1)
         self.changed.emit()
         self.status.setText(
             f"Added {source.kind} → {target}. Control motion is bounded by {low:g}…{high:g}."
@@ -671,12 +821,13 @@ class ScoreAutomationEditor(QGroupBox):
         row = self.controls.currentRow()
         if row < 0 or row >= len(self._sources):
             return
-        source = self._sources.pop(row)
+        source = self._sources[row]
+        self._record_undo()
+        self._sources.pop(row)
         self._modulations = [
             item for item in self._modulations if item.source_id != source.source_id
         ]
-        self.controls.takeItem(row)
-        self._select_control(self.controls.currentRow())
+        self._refresh_control_list(max(0, row - 1))
         self.changed.emit()
 
     def _select_control(self, row: int) -> None:
@@ -685,25 +836,65 @@ class ScoreAutomationEditor(QGroupBox):
             self.preview.set_values(())
             return
         source = self._sources[row]
+        kind_index = self.source_kind.findData(source.kind)
+        if kind_index >= 0:
+            self.source_kind.setCurrentIndex(kind_index)
+        self.start_beat.setValue(float(source.start))
+        self.end_beat.setValue(float(source.end))
+        self.seed.setValue(int(source.seed))
+        parameters = source.parameters or {}
+        self.period.setValue(float(
+            parameters.get("period_beats", parameters.get("step_beats", 4.0))
+        ))
+        waveform_index = self.lfo_waveform.findData(
+            str(parameters.get("waveform", "sine"))
+        )
+        if waveform_index >= 0:
+            self.lfo_waveform.setCurrentIndex(waveform_index)
+        self.random_step_size.setValue(float(parameters.get("step_size", 0.12)))
+        self.random_initial.setValue(float(parameters.get("initial", 0.5)))
+        if source.kind == "envelope":
+            values = [
+                float(point[1])
+                for point in parameters.get(
+                    "shape", [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]]
+                )
+            ]
+        else:
+            values = [
+                float(value) for value in parameters.get("values", [0.0, 1.0])
+            ]
+        self.source_values.blockSignals(True)
+        self.source_values.setText(", ".join(f"{value:.4f}" for value in values))
+        self.source_values.blockSignals(False)
+        self._source_kind_changed()
+        modulation = next(
+            (item for item in self._modulations if item.source_id == source.source_id),
+            None,
+        )
+        if modulation is not None:
+            target_index = self.target.findData(modulation.destination_target_id)
+            if target_index >= 0:
+                self.target.setCurrentIndex(target_index)
+            scope_index = self.scope.findData(modulation.scope)
+            if scope_index >= 0:
+                self.scope.setEnabled(
+                    not modulation.destination_target_id.startswith(("stem.", "bus."))
+                )
+                self.scope.setCurrentIndex(scope_index)
+            self.scope_id.setCurrentText(modulation.scope_id or "")
+            retrigger_index = self.retrigger.findData(modulation.retrigger)
+            if retrigger_index >= 0:
+                self.retrigger.setCurrentIndex(retrigger_index)
+            self.amount.setValue(float(modulation.amount))
         try:
             lane = source.to_lane()
         except Exception:
             self.preview.set_values(())
             return
-        editable_values: list[float] = []
-        if source.kind == "envelope":
-            editable_values = [
-                float(point[1])
-                for point in source.parameters.get(
-                    "shape", [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]]
-                )
-            ]
-        elif source.kind in {"phrase_curve", "stepped"}:
-            editable_values = [
-                float(value) for value in source.parameters.get("values", [0.0, 1.0])
-            ]
+        editable = source.kind in {"envelope", "phrase_curve", "stepped"}
         self.preview.set_values(
-            editable_values if editable_values else [point.value for point in lane.points],
-            editable=source.kind in {"envelope", "phrase_curve", "stepped"},
+            values if editable else [point.value for point in lane.points],
+            editable=editable,
         )
 

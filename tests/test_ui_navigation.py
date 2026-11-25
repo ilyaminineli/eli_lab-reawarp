@@ -189,6 +189,7 @@ def test_m18_score_control_exposes_live_planner_synth_and_fx_destinations():
     assert editor.scope.currentData() == "global"
     assert not editor.scope.isEnabled()
     editor._add_control()
+    assert not editor.scope.isEnabled()
     modulation = editor.updated_score(score).modulations[0]
     assert modulation.destination_target_id == "stem.melody.insert_wet"
     assert modulation.scope == "global"
@@ -206,4 +207,44 @@ def test_m18_curve_preview_points_are_editable_only_for_curve_sources():
     assert editor.preview._values == (0.0, 0.5, 1.0)
     editor.source_kind.setCurrentIndex(editor.source_kind.findData("lfo"))
     assert editor.preview._editable is False
+    editor.close()
+
+
+def test_m18_score_control_can_edit_existing_curves_and_undo_the_change():
+    _application()
+    editor = ScoreAutomationEditor()
+    score = Score(title="Curve editing fixture")
+    editor.set_score(score)
+    editor.source_kind.setCurrentIndex(editor.source_kind.findData("phrase_curve"))
+    editor.source_values.setText("0.0, 0.4, 1.0")
+    editor._add_control()
+
+    editor._preview_values_changed([0.0, 0.8, 0.2])
+    updated = editor.updated_score(score)
+    assert updated.automation_sources[0].parameters["values"] == [0.0, 0.8, 0.2]
+    assert editor.undo_button.isEnabled()
+
+    editor._undo()
+    reverted = editor.updated_score(score)
+    assert reverted.automation_sources[0].parameters["values"] == [0.0, 0.4, 1.0]
+    editor._clear_controls()
+    assert editor.updated_score(score).automation_sources == ()
+    editor._undo()
+    assert len(editor.updated_score(score).automation_sources) == 1
+    editor.close()
+
+
+def test_m18_score_control_templates_populate_reviewable_source_drafts():
+    _application()
+    editor = ScoreAutomationEditor()
+    editor.set_score(Score(title="Template fixture"))
+    editor.template.setCurrentIndex(editor.template.findData("Slow filter sweep"))
+    editor._apply_template()
+
+    assert editor.target.currentData() == "synth.cutoff"
+    assert editor.source_kind.currentData() == "lfo"
+    assert editor.lfo_waveform.currentData() == "triangle"
+    assert editor.scope.currentData() == "global"
+    assert editor.period.value() == pytest.approx(16.0)
+    assert editor.end_beat.value() == pytest.approx(64.0)
     editor.close()
