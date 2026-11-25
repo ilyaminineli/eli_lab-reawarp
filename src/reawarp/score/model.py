@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,9 @@ class Score:
             raise ValueError(f"unsupported score schema version: {self.schema_version}")
         if not self.tuning_id.strip():
             raise ValueError("tuning_id cannot be empty")
-        if self.tuning_reference_frequency_hz <= 0:
+        if not math.isfinite(float(self.tuning_reference_pitch)):
+            raise ValueError("tuning reference pitch must be finite")
+        if not math.isfinite(float(self.tuning_reference_frequency_hz)) or self.tuning_reference_frequency_hz <= 0:
             raise ValueError("tuning reference frequency must be positive")
         if self.tuning_divisions_per_period < 1:
             raise ValueError("tuning divisions per period must be positive")
@@ -72,7 +75,7 @@ class Score:
                 raise ValueError(f"unsupported harmonic context mode: {mode}")
             for key in ("pitch_collection", "allowed_intervals"):
                 values = harmonic_context.get(key, [])
-                if not isinstance(values, list) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in values):
+                if not isinstance(values, list) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in values):
                     raise ValueError(f"harmonic_context {key} must be a list of finite numbers")
             for key in ("stability_weights", "tension_weights"):
                 values = harmonic_context.get(key, {})
@@ -83,6 +86,8 @@ class Score:
         if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
             raise ValueError("sonorities require unique non-empty sonority_id values")
         for item in sonorities:
+            if not isinstance(item, dict):
+                raise ValueError("each sonority must be an object")
             from reawarp.score.time import as_fraction
             start = as_fraction(item.get("onset_beats", 0))
             duration = as_fraction(item.get("duration_beats", 1))
