@@ -65,6 +65,8 @@ jobs:
         run: python scripts/benchmark_m24_4_nonlinear.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-4-benchmark.json
       - name: Render M24.4 nonlinear listening example
         run: python scripts/render_m24_4_listening_example.py --output /tmp/reawarp-m24-4-listening --sample-rate 22050
+      - name: Smoke-test M25 manifest, asset portability and archive reopen
+        run: python scripts/benchmark_m25.py --durations 5 --sample-rate 48000 --output /tmp/reawarp-m25-smoke.json
       - name: Smoke-test CLI
         run: reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-ci
       - name: Smoke-test FX preset and stage registries
@@ -242,6 +244,8 @@ jobs:
         run: python -m compileall -q src/reawarp
       - name: Run regression suite
         run: python -m pytest -q
+      - name: Smoke-test M25 archive manifest and 48 kHz export/reopen
+        run: python scripts/benchmark_m25.py --durations 5 --sample-rate 48000 --output reawarp-m25-windows-smoke.json
       - name: Smoke-test Windows CLI and benchmark
         run: |
           reawarp --duration 5 --sample-rate 22050 --seed 211 --output reawarp-windows-ci

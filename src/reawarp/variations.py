@@ -100,8 +100,11 @@ class VariationCandidateRecord:
     notes: str = ""
     technical_flags: list[str] = field(default_factory=list)
     technical_metrics: dict[str, Any] = field(default_factory=dict)
+    schema_version: int = 1
 
     def __post_init__(self):
+        if self.schema_version != 1:
+            raise ValueError(f"unsupported variation candidate schema version: {self.schema_version}")
         if not self.candidate_id or not self.batch_id or self.index < 1 or self.variation_seed < 1:
             raise ValueError("candidate identity, index and seed must be valid")
         if self.selection_state not in _STATES:
@@ -132,6 +135,7 @@ class VariationCandidateRecord:
             selection_state=str(value.get("selection_state", "unreviewed")),
             notes=str(value.get("notes", "")), technical_flags=list(value.get("technical_flags", [])),
             technical_metrics=dict(value.get("technical_metrics", {})),
+            schema_version=int(value.get("schema_version", 1)),
         )
 
 @dataclass(slots=True)

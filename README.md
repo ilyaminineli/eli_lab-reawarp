@@ -134,6 +134,16 @@ Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`
 
 Choose a lead synthesis architecture with `--synth-palette`: `subtractive` (default), `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. `subtractive` is a separate renderer, not another FM preset. Choose drum construction separately with `--percussion-synthesis minimal|extended|samples`; `minimal` (default) uses sparse, dry transient/body/tail kick/snare/hat voices, while `samples` selects the legacy profiled drum renderers. The M10 FX Lab adds a separate non-destructive Pyo processing path; the core generator and NumPy reference renderer remain independent. M24.1 convolution, M24.2 spectral delay, M24.3 cross-synthesis/frequency transformation and M24.4 oversampled nonlinear processors are available as separate experimental NumPy reference APIs with tests, benchmarks and audition generators; they are not automatically inserted into the M22/M12 role map. Feedback delay networks and later M24 research modules remain separately planned.
 
+## Portable project archives and M25 durability
+
+New project exports include `manifest.json`: application/renderer and schema versions, configuration/Score/seed/tuning provenance, selected sample dependencies, candidate ancestry, routing/automation sidecars, render environment and a SHA-256 inventory of the archived files. Sample dependencies are embedded into `assets/` by default; use `ReawarpProject.export(..., asset_policy="reference")` to preserve external paths while recording their hashes. Missing or changed files are reported on reopen and are never silently substituted.
+
+Run the target-machine 30-second/180-second 48 kHz generation → export → reopen benchmark on Windows:
+
+    python scripts/benchmark_m25.py --durations 30 180 --sample-rate 48000 --output output/m25-target-windows.json
+
+For a budget-gated sign-off, add explicit `--max-rss-gb` and `--max-wall-seconds` limits. Optional Pyo integration is enabled with `--pyo` after installing the `pyo` extra. The normal CI workflow runs a short 5-second 48 kHz archive smoke test; it does not claim target-machine performance acceptance. See [M25 — Performance, portability and project durability](docs/M25.md).
+
 ## Generate a loop
 
     reawarp --bpm 137 --duration 12 --seed 20261123 --complexity 0.68 --output output/demo --midi-output output/demo.mid

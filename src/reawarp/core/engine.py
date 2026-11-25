@@ -75,6 +75,7 @@ class ReawarpEngine:
             voice_renderers: dict[str, Any] | None = None,
             config: GenerationConfig | None = None,
             fx_automation: Mapping[str, Any] | None = None,
+            cancel_event: Any | None = None,
     ) -> ScoreRenderResult:
         """Render a canonical score using the shared frame-accurate score core."""
         if config is not None and voice_renderers is not None:
@@ -98,6 +99,9 @@ class ReawarpEngine:
         from reawarp.fx_automation import fx_automation_registry
 
         automation_registry = fx_automation_registry(fx_stem_names)
+        sample_preparation_seconds = 0.0
+        voice_renderer_setup_seconds = 0.0
+        render_pipeline_started = perf_counter()
         if config is not None:
             from reawarp.synthesis.score_samples import prepare_score_sample_renderers
 
@@ -105,8 +109,13 @@ class ReawarpEngine:
                 replace(config, sample_rate=rate)
                 if int(config.sample_rate) != rate else config
             )
+            sample_started = perf_counter()
             prepared_samples = prepare_score_sample_renderers(score, render_config)
+            sample_preparation_seconds = perf_counter() - sample_started
             score = prepared_samples.score
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("score render cancelled")
+            renderer_setup_started = perf_counter()
             production_renderers = build_production_voice_renderers(render_config)
             for role, sample_renderer in prepared_samples.voice_renderers.items():
                 base_renderer = production_renderers.get(role)
@@ -124,15 +133,25 @@ class ReawarpEngine:
 
                 production_renderers[role] = render_combined
             voice_renderers = production_renderers
+            voice_renderer_setup_seconds = perf_counter() - renderer_setup_started
             if frame_count is None:
                 frame_count = render_config.frame_count
-        return ScoreRenderer().render(
+        if cancel_event is not None and cancel_event.is_set():
+            raise RuntimeError("score render cancelled")
+        rendered_score = ScoreRenderer().render(
             score,
             rate,
             frame_count=frame_count,
             voice_renderers=voice_renderers,
             automation_registry=automation_registry,
+            cancel_event=cancel_event,
         )
+        rendered_score.performance.update({
+            "sample_preparation_seconds": sample_preparation_seconds,
+            "voice_renderer_setup_seconds": voice_renderer_setup_seconds,
+            "render_score_pipeline_seconds": perf_counter() - render_pipeline_started,
+        })
+        return rendered_score
 
     def plan_score(
             self,
@@ -159,6 +178,7 @@ class ReawarpEngine:
             *,
             regenerate: str | None = None,
             variation: int = 1,
+            cancel_event: Any | None = None,
             **overrides: Any,
     ) -> ReawarpProject:
         """Generate from a canonical Score, then render its scheduled events."""
@@ -174,12 +194,18 @@ class ReawarpEngine:
             score_to_legacy_project_events,
         )
 
+        def check_cancelled() -> None:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("generation cancelled")
+
+        check_cancelled()
         total_started = perf_counter()
         planning_started = perf_counter()
         plan = build_score_generation_plan(
             config, regenerate=regenerate, variation=variation
         )
         planning_seconds = perf_counter() - planning_started
+        check_cancelled()
         composition_plan_seconds = float(
             plan.timings.get("composition_plan_seconds", 0.0)
         )
@@ -188,7 +214,8 @@ class ReawarpEngine:
         )
 
         score_render_started = perf_counter()
-        rendered = self.render_score(plan.score, config=config)
+        rendered = self.render_score(plan.score, config=config, cancel_event=cancel_event)
+        check_cancelled()
         score_render_seconds = perf_counter() - score_render_started
         canonical_score = rendered.score or plan.score
 
@@ -218,6 +245,7 @@ class ReawarpEngine:
 
         field_render_started = perf_counter()
         if config.include_texture:
+            check_cancelled()
             texture_envelope = render_role_envelope(
                 "texture", frame_count, sample_rate,
                 plan.composition_plan, plan.section_orchestration,
@@ -237,6 +265,7 @@ class ReawarpEngine:
             stems["noise_texture"][:, 1] += delayed * texture_envelope * 0.72
 
         if config.include_ambience:
+            check_cancelled()
             ambience_envelope = render_role_envelope(
                 "ambience", frame_count, sample_rate,
                 plan.composition_plan, plan.section_orchestration,
@@ -254,6 +283,7 @@ class ReawarpEngine:
             )
             stems["ambience"] *= ambience_envelope[:, None]
         field_render_seconds = perf_counter() - field_render_started
+        check_cancelled()
 
         headroom_started = perf_counter()
         peak_ceiling = 10.0 ** (-1.0 / 20.0)
@@ -296,11 +326,26 @@ class ReawarpEngine:
         project_events = score_to_legacy_project_events(project_score)
 
         synthesis_and_buffer_seconds = score_render_seconds + field_render_seconds
+        render_performance = dict(rendered.performance)
         performance = {
             "planning_seconds": planning_seconds,
             "composition_plan_seconds": composition_plan_seconds,
             "event_generation_seconds": event_generation_seconds,
             "score_render_seconds": score_render_seconds,
+            "sample_preparation_seconds": render_performance.get("sample_preparation_seconds", 0.0),
+            "voice_renderer_setup_seconds": render_performance.get("voice_renderer_setup_seconds", 0.0),
+            "control_bus_seconds": render_performance.get("control_bus_seconds", 0.0),
+            "event_scheduling_seconds": render_performance.get("event_scheduling_seconds", 0.0),
+            "voice_callback_seconds": render_performance.get("voice_callback_seconds", 0.0),
+            "sample_trigger_callback_seconds": render_performance.get("sample_trigger_callback_seconds", 0.0),
+            "event_accumulation_seconds": render_performance.get("event_accumulation_seconds", 0.0),
+            "callback_seconds_by_voice": render_performance.get("callback_seconds_by_voice", {}),
+            "callback_counts_by_voice": render_performance.get("callback_counts_by_voice", {}),
+            "callback_seconds_by_kind": render_performance.get("callback_seconds_by_kind", {}),
+            "callback_counts_by_kind": render_performance.get("callback_counts_by_kind", {}),
+            "scheduled_event_count": render_performance.get("scheduled_event_count", 0),
+            "rendered_event_count": render_performance.get("rendered_event_count", 0),
+            "rendered_sample_trigger_count": render_performance.get("rendered_sample_trigger_count", 0),
             "field_render_seconds": field_render_seconds,
             "synthesis_and_buffer_seconds": synthesis_and_buffer_seconds,
             "headroom_seconds": headroom_seconds,
@@ -383,9 +428,12 @@ class ReawarpEngine:
             variation: int = 1,
             *,
             base_project: ReawarpProject | None = None,
+            cancel_event: Any | None = None,
     ) -> ReawarpProject:
         """Regenerate one canonical score voice and merge it into a frozen project."""
-        variant = self.generate(config, regenerate=stem, variation=variation)
+        variant = self.generate(
+            config, regenerate=stem, variation=variation, cancel_event=cancel_event
+        )
         if base_project is None:
             return variant
         if base_project.config != config:

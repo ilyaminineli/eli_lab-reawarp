@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import math
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
-from typing import Callable, Mapping
+from time import perf_counter
+from typing import Any, Callable, Mapping
 
 import numpy as np
 
@@ -111,6 +112,7 @@ class ScoreRenderResult:
     sample_rate: int
     frame_count: int
     score: Score | None = None
+    performance: dict[str, Any] = field(default_factory=dict)
 
     def render_master(self) -> np.ndarray:
         if not self.stems:
@@ -324,18 +326,22 @@ class ScoreRenderer:
         voice_renderers: Mapping[str, ScoreVoiceRenderer] | None = None,
         automation_registry: AutomationTargetRegistry | None = None,
         allow_custom_automation_targets: bool = True,
+        cancel_event: Any | None = None,
     ) -> ScoreRenderResult:
         if not isinstance(score, Score):
             raise TypeError("score must be a reawarp Score")
         if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
             raise ValueError("sample_rate must be a positive integer")
         sample_rate = int(sample_rate)
+        renderer_started = perf_counter()
+        control_started = perf_counter()
         controls = build_score_control_bus(
             score,
             sample_rate,
             automation_registry=automation_registry,
             allow_custom_automation_targets=allow_custom_automation_targets,
         )
+        control_bus_seconds = perf_counter() - control_started
         timeline = controls.timeline
         source_sample_rate = int(score.metadata.get("sample_rate", sample_rate) or sample_rate)
 
@@ -374,8 +380,11 @@ class ScoreRenderer:
             raise ValueError("frame_count must be a positive integer")
         frame_count = int(frame_count)
 
+        scheduling_started = perf_counter()
         schedule: list[ScheduledScoreEvent] = []
         for source_event in score.events:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("score render cancelled")
             source_start = timeline.beat_to_frame(source_event.onset_beats)
             if source_start >= frame_count:
                 continue
@@ -399,9 +408,21 @@ class ScoreRenderer:
                 beat_in_bar=beat_in_bar,
             ))
 
+        scheduling_seconds = perf_counter() - scheduling_started
         renderers = dict(voice_renderers or {})
         stems: dict[str, np.ndarray] = {}
+        voice_callback_seconds = 0.0
+        sample_trigger_callback_seconds = 0.0
+        event_accumulation_seconds = 0.0
+        callback_seconds_by_voice: dict[str, float] = {}
+        callback_counts_by_voice: dict[str, int] = {}
+        callback_seconds_by_kind: dict[str, float] = {}
+        callback_counts_by_kind: dict[str, int] = {}
+        rendered_event_count = 0
+        rendered_sample_trigger_count = 0
         for scheduled in schedule:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("score render cancelled")
             event = scheduled.event
             if event.kind in {"control", "marker"} or event.velocity <= 0.0:
                 continue
@@ -429,7 +450,21 @@ class ScoreRenderer:
             renderer = renderers.get(event.voice_id, renderers.get(event.kind))
             if renderer is None:
                 renderer = _default_voice_renderer
+            callback_started = perf_counter()
             rendered = np.asarray(renderer(scheduled, sample_rate, controls), dtype=np.float32)
+            callback_elapsed = perf_counter() - callback_started
+            voice_id = str(event.voice_id)
+            event_kind = str(event.kind)
+            voice_callback_seconds += callback_elapsed
+            callback_seconds_by_voice[voice_id] = callback_seconds_by_voice.get(voice_id, 0.0) + callback_elapsed
+            callback_counts_by_voice[voice_id] = callback_counts_by_voice.get(voice_id, 0) + 1
+            callback_seconds_by_kind[event_kind] = callback_seconds_by_kind.get(event_kind, 0.0) + callback_elapsed
+            callback_counts_by_kind[event_kind] = callback_counts_by_kind.get(event_kind, 0) + 1
+            rendered_event_count += 1
+            if event_kind == "trigger":
+                sample_trigger_callback_seconds += callback_elapsed
+                rendered_sample_trigger_count += 1
+            accumulation_started = perf_counter()
             if rendered.ndim == 2 and rendered.shape[1] == 1:
                 rendered = rendered[:, 0]
             if rendered.ndim not in (1, 2) or (
@@ -478,7 +513,23 @@ class ScoreRenderer:
             )
             start = scheduled.start_frame
             target[start:scheduled.end_frame] += rendered_stereo * event_gain
+            event_accumulation_seconds += perf_counter() - accumulation_started
 
+        performance = {
+            "control_bus_seconds": control_bus_seconds,
+            "event_scheduling_seconds": scheduling_seconds,
+            "voice_callback_seconds": voice_callback_seconds,
+            "sample_trigger_callback_seconds": sample_trigger_callback_seconds,
+            "event_accumulation_seconds": event_accumulation_seconds,
+            "scheduled_event_count": len(schedule),
+            "rendered_event_count": rendered_event_count,
+            "rendered_sample_trigger_count": rendered_sample_trigger_count,
+            "callback_seconds_by_voice": callback_seconds_by_voice,
+            "callback_counts_by_voice": callback_counts_by_voice,
+            "callback_seconds_by_kind": callback_seconds_by_kind,
+            "callback_counts_by_kind": callback_counts_by_kind,
+            "score_renderer_wall_seconds": perf_counter() - renderer_started,
+        }
         return ScoreRenderResult(
             stems=stems,
             schedule=tuple(schedule),
@@ -487,4 +538,5 @@ class ScoreRenderer:
             sample_rate=sample_rate,
             frame_count=frame_count,
             score=score,
+            performance=performance,
         )

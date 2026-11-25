@@ -22,13 +22,13 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
-from reawarp.export.wav import write_wav
+from reawarp.export.project_archive import export_project_archive
 from reawarp.fx_routing import (
     match_audition_level, measure_signal, render_fx_routing,
-    render_master_with_returns, save_fx_routing,
+    render_master_with_returns,
 )
 from reawarp.fx_automation import (
-    attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
+    attach_fx_automation_to_score, fx_automation_registry,
 )
 from reawarp.score.render import build_score_control_bus
 from reawarp.samples.io import read_sample
@@ -53,7 +53,7 @@ from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
-from reawarp.ui.workers import CancellableRenderWorker, RenderWorker
+from reawarp.ui.workers import CancellableRenderWorker
 from reawarp.variations import (
     VariationBatch, VariationBatchService, VariationCandidate, VariationCandidateRecord, VariationRequest,
     build_listening_set, clone_project, matched_ab, project_audio,
@@ -74,7 +74,8 @@ class MainWindow(QMainWindow):
         self.project: ReawarpProject | None = None
         self._break_path: str | None = None
         self._break_audio: np.ndarray | None = None
-        self._worker: RenderWorker | None = None
+        self._worker: CancellableRenderWorker | None = None
+        self._export_worker: CancellableRenderWorker | None = None
         self._variation_counts: dict[str, int] = {}
         self._variation_origin_project: ReawarpProject | None = None
         self._variation_base_project: ReawarpProject | None = None
@@ -694,6 +695,11 @@ class MainWindow(QMainWindow):
         self.progress.setMaximumWidth(90)
         self.progress.setVisible(False)
         action_layout.addWidget(self.progress)
+        self.cancel_background_button = QPushButton("CANCEL")
+        self.cancel_background_button.setEnabled(False)
+        self.cancel_background_button.setVisible(False)
+        self.cancel_background_button.clicked.connect(self._cancel_background_job)
+        action_layout.addWidget(self.cancel_background_button)
         self.generate_button = QPushButton("GENERATE TRACK  →")
         self.generate_button.setObjectName("primaryAction")
         self.generate_button.setMinimumHeight(54)
@@ -749,10 +755,21 @@ class MainWindow(QMainWindow):
         self.player.stop()
         if self._tray_icon is not None:
             self._tray_icon.hide()
+        workers = (
+            self._worker, self._export_worker, self._variation_batch_worker,
+            self._variation_compare_worker, self._fx_worker,
+        )
+        for worker in workers:
+            if worker is not None:
+                worker.cancel()
         pool = QThreadPool.globalInstance()
         pool.clear()
         pool.waitForDone(-1)
         self._worker = None
+        self._export_worker = None
+        self._variation_batch_worker = None
+        self._variation_compare_worker = None
+        self._fx_worker = None
 
     def _quit_from_tray(self) -> None:
         self._shutdown()
@@ -1308,7 +1325,10 @@ class MainWindow(QMainWindow):
             self._show_error(str(exc))
             return
         self._clear_variation_session()
-        self._run_render(lambda: ReawarpEngine().generate(config), "Generating full loop…")
+        self._run_render(
+            lambda cancel_event: ReawarpEngine().generate(config, cancel_event=cancel_event),
+            "Generating full loop…",
+        )
 
     def _apply_score_automation(self) -> None:
         """Apply the staged M18 score controls without mutating the source project."""
@@ -1323,7 +1343,9 @@ class MainWindow(QMainWindow):
             return
         base_project = self.project
         self._run_render(
-            lambda: self._render_score_automation_project(base_project, edited_score),
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, edited_score, cancel_event=cancel_event
+            ),
             "Applying score automation and re-rendering event-backed voices…",
         )
 
@@ -1331,9 +1353,13 @@ class MainWindow(QMainWindow):
     def _render_score_automation_project(
         project: ReawarpProject,
         score,
+        *,
+        cancel_event: object | None = None,
     ) -> ReawarpProject:
         """Render a controlled Score and retain the specialist whole-field layers."""
-        rendered = ReawarpEngine().render_score(score, config=project.config)
+        rendered = ReawarpEngine().render_score(
+            score, config=project.config, cancel_event=cancel_event
+        )
         canonical_score = rendered.score or score
         stems = {
             name: np.asarray(audio, dtype=np.float32).copy()
@@ -1415,7 +1441,7 @@ class MainWindow(QMainWindow):
             return
         self._clear_variation_session()
         self._run_render(
-            lambda: ReawarpProject.load(directory),
+            lambda cancel_event: ReawarpProject.load(directory, cancel_event=cancel_event),
             "Loading project, candidates and listening history…",
         )
 
@@ -2102,17 +2128,31 @@ class MainWindow(QMainWindow):
         config = self.project.config
         base_project = self.project
         self._run_render(
-            lambda: ReawarpEngine().generate_variant(
-                config, name, variation, base_project=base_project
+            lambda cancel_event: ReawarpEngine().generate_variant(
+                config, name, variation, base_project=base_project,
+                cancel_event=cancel_event,
             ),
             f"Regenerating {name} · variation {variation}…",
         )
+
+    def _cancel_background_job(self) -> None:
+        cancelled = False
+        for worker in (self._worker, self._export_worker):
+            if worker is not None:
+                worker.cancel()
+                cancelled = True
+        if cancelled:
+            self.cancel_background_button.setEnabled(False)
+            self.statusBar().showMessage(
+                "Cancellation requested · the worker will stop at its next safe checkpoint.",
+                8000,
+            )
 
     def _run_render(self, operation: Any, message: str) -> None:
         if self._worker is not None:
             return
         self._set_busy(True, message)
-        worker = RenderWorker(operation)
+        worker = CancellableRenderWorker(operation)
         self._worker = worker
         worker.signals.finished.connect(self._render_finished)
         worker.signals.error.connect(self._render_failed)
@@ -2121,6 +2161,8 @@ class MainWindow(QMainWindow):
     def _set_busy(self, busy: bool, message: str = "") -> None:
         self.generate_button.setEnabled(not busy)
         self.progress.setVisible(busy)
+        self.cancel_background_button.setVisible(busy or self._export_worker is not None)
+        self.cancel_background_button.setEnabled(busy or self._export_worker is not None)
         for row in self._mix_rows.values():
             row.regen.setEnabled(not busy and row.can_regenerate)
         self.header_state.setText("RENDERING…" if busy else "OFFLINE RENDER ENGINE")
@@ -2136,9 +2178,26 @@ class MainWindow(QMainWindow):
         previous_names = tuple(self.project.stems) if self.project is not None else ()
         previous_routing = self.fx_routing_editor.routing() if previous_names else None
         previous_automation = self.fx_automation_editor.automation() if previous_names else None
+        project_routing = result.metadata.get("project_fx_routing")
+        project_automation = result.metadata.get("project_fx_automation")
         self.player.stop()
         self._playback_stopped()
         self.project = result
+        asset_audit = result.metadata.get("project_asset_validation")
+        file_audit = result.metadata.get("project_file_validation")
+        audit_warnings = []
+        if isinstance(asset_audit, dict):
+            audit_warnings.extend(asset_audit.get("missing", []))
+            audit_warnings.extend(asset_audit.get("changed", []))
+        if isinstance(file_audit, dict):
+            audit_warnings.extend(file_audit.get("missing", []))
+            audit_warnings.extend(file_audit.get("changed", []))
+        if audit_warnings:
+            self.statusBar().showMessage(
+                f"Project opened with {len(audit_warnings)} missing/changed asset or archive file(s). "
+                "No replacement samples were selected; inspect project manifest and asset validation.",
+                15000,
+            )
         self._fx_project_revision += 1
         self.score_automation_editor.set_score(result.to_score())
         if self._fx_worker is not None:
@@ -2162,9 +2221,13 @@ class MainWindow(QMainWindow):
         self.stop_button.setEnabled(True)
         self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate, result.config.bpm)
         self.fx_automation_editor.set_project(list(result.stems), result.config.bpm)
-        if previous_routing is not None and previous_names == tuple(result.stems):
+        if isinstance(project_routing, dict):
+            self.fx_routing_editor.set_routing(project_routing)
+        elif previous_routing is not None and previous_names == tuple(result.stems):
             self.fx_routing_editor.set_routing(previous_routing)
-        if previous_automation is not None and previous_names == tuple(result.stems):
+        if isinstance(project_automation, dict):
+            self.fx_automation_editor.set_automation(project_automation)
+        elif previous_automation is not None and previous_names == tuple(result.stems):
             self.fx_automation_editor.set_automation(previous_automation)
         self.preview_source.blockSignals(True)
         self.preview_source.clear()
@@ -2270,6 +2333,9 @@ class MainWindow(QMainWindow):
     def _render_failed(self, message: str) -> None:
         self._worker = None
         self._set_busy(False)
+        if str(message).startswith("CANCELLED:"):
+            self.statusBar().showMessage("Background render cancelled.", 8000)
+            return
         self._show_error(message)
 
     def _show_error(self, message: str) -> None:
@@ -2691,7 +2757,7 @@ class MainWindow(QMainWindow):
         )
 
     def _export_project(self) -> None:
-        if self.project is None:
+        if self.project is None or self._export_worker is not None:
             return
         directory = QFileDialog.getExistingDirectory(
             self, "Export Reawarp project", str(Path.cwd())
@@ -2704,48 +2770,77 @@ class MainWindow(QMainWindow):
                 8000,
             )
             return
-        try:
-            export_project = self._project_with_variation_session()
-            output = export_project.export(
-                directory, bit_depth=24, include_stems=True, include_master=True
-            )
-            master = self._render_mix()
-            if master is None:
-                self.statusBar().showMessage("FX master is not ready; export cancelled.", 8000)
-                return
-            if master is not None:
-                write_wav(output / "master.wav", master, self.project.sample_rate, 24)
-            self._ensure_routing_render()
-            routing_path = save_fx_routing(
-                output / "fx_routing.json", self.fx_routing_editor.routing(),
-                list(self.project.stems), self.project.sample_rate,
-            )
-            automation_path = save_fx_automation(
-                output / "fx_automation.json", self.fx_automation_editor.automation(),
-                list(self.project.stems),
-            )
-            for bus, audio in self._fx_bus_returns.items():
-                write_wav(output / "returns" / f"{bus}.wav", audio, self.project.sample_rate, 24)
-            mix_data = {
-                "schema_version": 1,
-                "description": (
-                    "Mixer settings are applied to master.wav; stem WAVs remain the original aligned render buffers."
-                ),
-                "stems": {name: row.state() for name, row in self._mix_rows.items()},
-                "master_peak": (
-                    float(np.max(np.abs(master))) if master is not None and master.size else 0.0
-                ),
-                "fx_routing": routing_path.name,
-                "fx_automation": automation_path.name,
-                "fx_returns": list(self._fx_bus_returns),
-                "routing_render": self._fx_routing_metadata,
-            }
-            (output / "mix.json").write_text(
-                json.dumps(mix_data, indent=2, ensure_ascii=False), encoding="utf-8"
-            )
-        except Exception as exc:
-            self._show_error(f"Export failed: {exc}")
+        master = self._render_mix()
+        if master is None:
+            self.statusBar().showMessage("FX master is not ready; export cancelled.", 8000)
             return
+
+        export_project = self._project_with_variation_session()
+        sample_rate = self.project.sample_rate
+        master_snapshot = np.asarray(master, dtype=np.float32).copy()
+        routing = copy.deepcopy(self.fx_routing_editor.routing())
+        automation = copy.deepcopy(self.fx_automation_editor.automation())
+        returns = {
+            name: np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in self._fx_bus_returns.items()
+        }
+        mix_data = {
+            "schema_version": 1,
+            "description": (
+                "Mixer settings are applied to master.wav; stem WAVs remain the original aligned render buffers."
+            ),
+            "stems": {name: row.state() for name, row in self._mix_rows.items()},
+            "master_peak": (
+                float(np.max(np.abs(master_snapshot))) if master_snapshot.size else 0.0
+            ),
+            "fx_routing": "fx_routing.json",
+            "fx_automation": "fx_automation.json",
+            "fx_returns": list(returns),
+            "routing_render": copy.deepcopy(self._fx_routing_metadata),
+        }
+
+        def operation(cancel_event):
+            output = export_project_archive(
+                export_project,
+                directory,
+                master_audio=master_snapshot,
+                fx_routing=routing,
+                fx_automation=automation,
+                returns=returns,
+                mix_data=mix_data,
+                bit_depth=24,
+                asset_policy="copy",
+                cancel_event=cancel_event,
+            )
+            return str(output)
+
+        self.export_button.setEnabled(False)
+        self.cancel_background_button.setVisible(True)
+        self.cancel_background_button.setEnabled(True)
         self.statusBar().showMessage(
-            f"Exported stems, master, and metadata to {output}", 10000
+            "Exporting project, assets and integrity manifest in the background…", 10000
         )
+        worker = CancellableRenderWorker(operation)
+        self._export_worker = worker
+        worker.signals.finished.connect(self._export_finished)
+        worker.signals.error.connect(self._export_failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _export_finished(self, result: object) -> None:
+        self._export_worker = None
+        self.export_button.setEnabled(self.project is not None)
+        if self._worker is None:
+            self.cancel_background_button.setEnabled(False)
+            self.cancel_background_button.setVisible(False)
+        self.statusBar().showMessage(f"Exported portable project to {result}", 10000)
+
+    def _export_failed(self, message: str) -> None:
+        self._export_worker = None
+        self.export_button.setEnabled(self.project is not None)
+        if self._worker is None:
+            self.cancel_background_button.setEnabled(False)
+            self.cancel_background_button.setVisible(False)
+        if str(message).startswith("CANCELLED:"):
+            self.statusBar().showMessage("Project export cancelled.", 8000)
+            return
+        self._show_error(f"Export failed: {message}")

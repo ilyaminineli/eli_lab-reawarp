@@ -215,9 +215,9 @@ See [M24.md](M24.md), [M24.1.md](M24.1.md), [M24.2.md](M24.2.md), [M24.3.md](M24
 
 ## M25: Performance, portability and project durability
 
-**Status:** Planned. M14's portable tests and benchmark harness are implemented; target-Windows long-render measurements and Pyo listening remain experimentally unverified.
+**Status:** Portable archive/manifest, source-asset embedding/reference policy, missing/changed-asset audit, compatibility fixtures, detailed Score/voice timing, background archive service and cooperative generation/export cancellation are implemented. A 5-second 48 kHz archive/reopen smoke case is in CI. Target-Windows 30/180-second profiling, declared resource budgets, Pyo-enabled routing and human listening remain open acceptance gates.
 
-**Goal:** Establish measured performance budgets, explicit asset portability and durable project/schema migration guarantees.
+**Goal:** Make long-form work measurable, portable, recoverable and archivable without silently replacing source assets or mutating older projects.
 
 See [M25.md](M25.md).
 
