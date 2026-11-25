@@ -60,7 +60,10 @@ class Score:
             raise ValueError("automation source IDs must be unique")
         modulations = tuple(self.modulations)
         modulation_keys = [
-            (item.source_id, item.destination_target_id, item.retrigger)
+            (
+                item.source_id, item.destination_target_id, item.retrigger,
+                item.scope, item.scope_id,
+            )
             for item in modulations
         ]
         if len(modulation_keys) != len(set(modulation_keys)):
