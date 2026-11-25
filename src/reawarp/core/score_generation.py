@@ -15,6 +15,7 @@ from time import perf_counter
 import numpy as np
 
 from reawarp.composition.director import build_composition_plan
+from reawarp.composition.perceptual import build_perceptual_orchestration_plan
 from reawarp.composition.motifs import (
     build_motif_plan,
     build_motif_role_accents,
@@ -38,6 +39,9 @@ from reawarp.generators.percussion import (
 )
 from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
+from reawarp.score.orchestration_intent import (
+    inspect_attention_conflicts, inspect_event_onset_conflicts,
+)
 from reawarp.score.planner import melody_to_score_events, percussion_to_score_events
 from reawarp.score.time import MeterMap, TempoMap
 from reawarp.synthesis.profiles import (
@@ -63,6 +67,7 @@ class ScoreGenerationPlan:
     phrase_directives: tuple[Any, ...]
     section_orchestration: tuple[Any, ...]
     transition_plan: tuple[Any, ...]
+    perceptual_orchestration: Any
     streams: RandomStreams
     motif_plan: Any
     selected_profiles: dict[str, dict[int, str]]
@@ -287,6 +292,10 @@ def build_score_generation_plan(
     transition_plan = tuple(build_transition_plan(
         composition_plan, phrase_directives
     ))
+    perceptual_orchestration = build_perceptual_orchestration_plan(
+        composition_plan, phrase_directives, section_orchestration,
+        transition_plan, config=config, motif_plan=motif_plan,
+    )
     if motif_plan is not None:
         for accent in build_motif_role_accents(
             motif_plan, bpm=config.bpm, duration_seconds=config.duration
@@ -548,6 +557,11 @@ def build_score_generation_plan(
             "function": function,
         })
     metadata = {
+        "perceptual_orchestration": perceptual_orchestration.to_dict(),
+        "perceptual_attention_warnings": list(
+            inspect_attention_conflicts(perceptual_orchestration)
+        ),
+        "perceptual_onset_warnings": list(inspect_event_onset_conflicts(events)[:128]),
         "score_origin": "score_first_generation",
         "planner_event_timebase": "rational_quarter_note_beats_from_sixteenth_grid",
         "algorithm_version": "0.8.0",
@@ -633,6 +647,7 @@ def build_score_generation_plan(
         tempo_map=TempoMap.constant(float(config.bpm)),
         meter_map=MeterMap(),
         events=tuple(events),
+        orchestration_plan=perceptual_orchestration.to_dict(),
         metadata=metadata,
     )
     timings = {
@@ -645,6 +660,7 @@ def build_score_generation_plan(
         phrase_directives=phrase_directives,
         section_orchestration=section_orchestration,
         transition_plan=transition_plan,
+        perceptual_orchestration=perceptual_orchestration,
         streams=streams,
         motif_plan=motif_plan,
         selected_profiles=selected_profiles,
