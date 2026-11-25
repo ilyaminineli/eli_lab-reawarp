@@ -947,6 +947,7 @@ class MainWindow(QMainWindow):
         self.fx_routing_editor = FXRoutingEditor()
         self.fx_routing_editor.changed.connect(self._refresh_routing)
         self.fx_routing_editor.auditionRequested.connect(self._audition_fx_component)
+        self.fx_routing_editor.mixerStateRequested.connect(self._apply_routing_mixer_state)
         routing_scroll = QScrollArea()
         routing_scroll.setWidgetResizable(True)
         routing_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1561,6 +1562,19 @@ class MainWindow(QMainWindow):
             self.preview_source.setCurrentIndex(index)
         self._set_workspace(0)
 
+    def _apply_routing_mixer_state(self, states: dict[str, dict[str, Any]]) -> None:
+        """Restore portable routing-file faders into the visible mixer rows."""
+        for name, values in states.items():
+            row = self._mix_rows.get(name)
+            if row is None:
+                continue
+            gain = 10.0 ** (float(values.get("gain_db", 0.0)) / 20.0)
+            row.gain.setValue(int(round(np.clip(gain, 0.0, 4.0) * 100)))
+            row.pan.setValue(int(round(float(values.get("pan", 0.0)) * 100)))
+            row.mute.setChecked(bool(values.get("mute", False)))
+            row.solo.setChecked(bool(values.get("solo", False)))
+        self._refresh_preview()
+
     def _routing_signature(self) -> str:
         import hashlib
 
@@ -1568,12 +1582,14 @@ class MainWindow(QMainWindow):
         mixer_state = {
             name: {
                 "gain": row.gain.value() / 100.0,
+                "gain_db": 20.0 * float(np.log10(max(row.gain.value() / 100.0, 0.001))),
                 "pan": row.pan.value() / 100.0,
                 "mute": row.mute.isChecked(),
                 "solo": row.solo.isChecked(),
             }
             for name, row in self._mix_rows.items()
         }
+        self.fx_routing_editor.set_mixer_state(mixer_state)
         payload = {
             "project_revision": self._fx_project_revision,
             "routing": self.fx_routing_editor.routing(),
