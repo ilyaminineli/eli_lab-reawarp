@@ -354,3 +354,59 @@ def test_typed_score_control_ids_change_rendered_object_parameters():
     assert automated.diagnostics["modulation_depth"] == 0.4
     assert automated.audio.shape == baseline.audio.shape
     assert np.isfinite(automated.audio).all()
+
+
+def test_library_verifies_asset_backed_source_hash(tmp_path):
+    from dataclasses import replace
+    from reawarp.library.store import SampleLibrary
+
+    wav_path = tmp_path / "source-asset.wav"
+    sample_rate = 48_000
+    sample = np.sin(
+        2.0 * np.pi * 440.0 * np.arange(2_048, dtype=np.float64) / sample_rate
+    )
+    pcm = np.clip(sample * 32767, -32768, 32767).astype("<i2")
+    with wave.open(str(wav_path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(sample_rate)
+        handle.writeframes(pcm.tobytes())
+
+    library = SampleLibrary(":memory:")
+    try:
+        asset = library.index_file(wav_path, asset_type="source", role="body")
+        source = SoundObjectSource(
+            "indexed-bronze-source", source_kind="asset",
+            asset_id=asset.asset_id, asset_sha256=asset.sha256,
+            sample_rate=sample_rate, channels=1,
+        )
+        patch = SoundObjectPatch(
+            patch_id="asset-backed-patch", name="Asset-backed bronze",
+            sample_rate=sample_rate, seed=12,
+            source_identity_id="source:bronze", processing_identity_id="process:modal",
+            sources=(source,),
+            layers=(SoundObjectLayer("body", "body", source.source_id, 0, 1_024),),
+        )
+        assert len(library.save_sound_object(patch)) == 64
+        invalid_source = replace(source, asset_sha256="0" * 64)
+        invalid_patch = replace(patch, sources=(invalid_source,))
+        with pytest.raises(ValueError, match="does not match"):
+            library.save_sound_object(invalid_patch)
+    finally:
+        library.close()
+
+
+def test_renderer_enforces_declared_source_channel_count():
+    source = np.zeros(128, dtype=np.float32)
+    patch = SoundObjectPatch(
+        patch_id="stereo-contract", name="Stereo contract",
+        sample_rate=SAMPLE_RATE, seed=3,
+        source_identity_id="source:stereo", processing_identity_id="process:width",
+        sources=(SoundObjectSource(
+            "stereo-source", source_kind="procedural", sample_rate=SAMPLE_RATE,
+            channels=2, source_model="stereo-field",
+        ),),
+        layers=(SoundObjectLayer("body", "body", "stereo-source", 0, 128),),
+    )
+    with pytest.raises(ValueError, match="declares 2 channels"):
+        HybridVoiceRenderer().render(patch, {"stereo-source": source})
