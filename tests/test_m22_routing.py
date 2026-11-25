@@ -265,3 +265,24 @@ def test_portable_route_mixer_state_controls_direct_output_without_gui():
     processed, _ = render_fx_routing(stems, 8_000, route)
     assert np.count_nonzero(processed["texture"]) == 0
     assert processed["melody"][0, 1] == pytest.approx(0.05, abs=1e-6)
+
+
+def test_editor_exports_visible_mixer_values_in_portable_routing_state():
+    from reawarp.ui.pages.fx_routing import FXRoutingEditor
+    from PySide6.QtWidgets import QApplication
+    import os
+
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+    editor = FXRoutingEditor()
+    editor.set_stems(("melody", "kick"), 48_000)
+    editor.set_mixer_state({
+        "melody": {"gain_db": 6.0, "pan": -0.25, "mute": True, "solo": False},
+        "kick": {"gain_db": -3.0, "pan": 0.5, "mute": False, "solo": True},
+    })
+    state = editor.routing()["stems"]
+    assert state["melody"]["gain_db"] == pytest.approx(6.0)
+    assert state["melody"]["pan"] == pytest.approx(-0.25)
+    assert state["melody"]["mute"] is True
+    assert state["kick"]["solo"] is True
+    editor.close()
