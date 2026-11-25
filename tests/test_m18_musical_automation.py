@@ -180,6 +180,10 @@ def test_lfo_modulation_supports_explicit_event_retrigger_phase():
         },
     )
 
+    assert bus._context("note-a", None)["role_id"] == "lead"
+    assert bus._sources["slow-pulse"].to_lane().evaluate(Fraction(0)) == pytest.approx(1.0)
+    assert bus._source_lanes["slow-pulse"].evaluate(Fraction(0)) == pytest.approx(1.0)
+    assert bus._modulations["synth.pitch"][0].scope_id == "lead"
     assert bus.value_for_context(
         "synth.pitch", 48_000, event_id="note-a"
     ) == pytest.approx(6.0)
