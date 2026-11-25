@@ -324,3 +324,33 @@ def test_sound_object_schema_rejects_invalid_units_and_ranges():
             layers=(SoundObjectLayer("layer", "body", "source", 0, 128),),
             spatial={"width": 3.0},
         )
+
+
+def test_typed_score_control_ids_change_rendered_object_parameters():
+    patch = _patch("automation-consumer")
+    source_audio = _sources()
+    renderer = HybridVoiceRenderer()
+    baseline = renderer.render(patch, source_audio)
+    prefix = f"sound_object.{patch.patch_id}"
+    automated = renderer.render(
+        patch,
+        source_audio,
+        control_values={
+            f"{prefix}.gain": 0.35,
+            f"{prefix}.pitch": 7.0,
+            f"{prefix}.attack": 0.008,
+            f"{prefix}.decay": 0.15,
+            f"{prefix}.release": 0.04,
+            f"{prefix}.modulation.rate": 3.0,
+            f"{prefix}.modulation.depth": 0.4,
+            f"{prefix}.spatial.pan": 0.25,
+            f"{prefix}.spatial.width": 1.4,
+            f"{prefix}.layer.body.gain": 0.2,
+        },
+    )
+    assert not np.array_equal(baseline.audio, automated.audio)
+    assert automated.diagnostics["pitch_semitones"] == 7.0
+    assert automated.diagnostics["modulation_rate_hz"] == 3.0
+    assert automated.diagnostics["modulation_depth"] == 0.4
+    assert automated.audio.shape == baseline.audio.shape
+    assert np.isfinite(automated.audio).all()
