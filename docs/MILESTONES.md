@@ -25,7 +25,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | Variation browser and candidate genealogy | Implemented | Candidate selection remains human-authored |
 | M24.1–M24.4 DSP research | NumPy reference APIs and CI coverage | Not default production inserts; listening and target profiling remain open |
 | M25 portability and project durability | Implementation complete; prior short CI acceptance passed | Target-Windows long benchmark and declared resource budgets remain open |
-| M26 production FX variations and delivery export | Implemented; this change simplifies the delivery handoff | Linux smoke jobs passed on the current PR head; Windows regression is in progress; target-Windows/Pyo listening and human listening remain separate gates |
+| M26 production FX variations and delivery export | Implemented; this change simplifies the delivery handoff | Linux Python 3.10–3.12 smoke and Windows regression jobs passed on the implementation commit; local Pyo/audio listening and human musical acceptance remain separate gates |
 | M24.5–M24.7 | Planned / research gate | No implementation claim |
 
 **Previous M25 validation baseline:** [CI run 45701978735](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45701978735) passed Linux Python 3.10–3.12 and Windows. The 5-second 48 kHz export/reopen smoke passed in all four jobs and Windows reported 307 passing tests. This is a short portability/integrity check, not a 30/180-second target-machine performance sign-off. M26 adds further regression coverage; see the latest [Actions runs](https://github.com/ilyaminineli/eli_lab-reawarp/actions).
