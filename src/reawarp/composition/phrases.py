@@ -792,6 +792,14 @@ def build_phrase_candidate_batch(
             + ", ".join(sorted(unavailable))
         )
     source_ids = set(phrase.event_ids)
+    existing_freeze = score.metadata.get("m28_phrase_freezes", {}).get(phrase_id)
+    if existing_freeze:
+        source_ids = set(existing_freeze.get("frozen_event_ids", ()))
+        phrase = replace(
+            phrase, event_ids=tuple(
+                event.event_id for event in score.events if event.event_id in source_ids
+            ),
+        )
     source_events = tuple(item for item in score.events if item.event_id in source_ids)
     source_provenance = score.metadata.get("m28_phrase_freezes", {}).get(phrase_id)
     if source_provenance:
