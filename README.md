@@ -50,6 +50,12 @@ M12 brings those chains into the generated-project Stem Mixer. Each stem can hav
 
 M13 adds deterministic beat-addressed automation for insert wet, stem sends, and bus return wet, along with tempo-synchronised delay divisions. Automation JSON is portable and independent from routing JSON. Pyo remains optional and is needed only when an active insert or send is rendered.
 
+### Score-level control performance (M18 · in progress)
+
+The canonical Score now supports global, section, role and event automation scopes, with absolute/relative lane precedence and serialised smoothing/hysteresis. Reusable deterministic sources include LFO, envelope, stepped, bounded random-walk and phrase-curve generators; explicit modulation links define destination, amount, polarity, bounds, scope and retrigger phase. ScoreRenderer consumes the first synthesis, event, sample and spatial controls on the shared tempo-aware frame clock.
+
+The Stem Mixer adds a separate **SCORE CONTROL** editor with source preview and offline Apply & Re-render. Applying score controls preserves specialist texture and ambience field stems. This is an active implementation slice: planner density/syncopation authoring, expanded continuous synthesis/FX targets and critical listening remain open. See [M18 — Musical automation and control performance](docs/M18.md).
+
 ### Integrated composition and source engine
 
 Reawarp uses the audio already shipped in `samples/` as a selectable percussion library. The IRO repositories provide a related mathematical-sound and performance vocabulary; their manifests are kept separate from the actual bundled audio paths. See [IRO integration](docs/IRO_INTEGRATION.md).
