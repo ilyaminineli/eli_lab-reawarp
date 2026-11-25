@@ -1,7 +1,9 @@
 # Reawarp dependency inventory
 # Generated from:
-# - pyproject.toml and the M3 Dependency Ecosystem matrix
-# - docs/guides/ (composition, generative systems, synthesis and DSP guides)
+# - pyproject.toml (supported core and optional install extras)
+# - docs/DEPENDENCY_ECOSYSTEM.md (dependency/platform/licensing review)
+# - docs/MILESTONES.md (implemented feature boundaries)
+# - docs/guides/ (composition, generative systems, synthesis and DSP guidance)
 # - selected audio libraries from https://github.com/andreimatveyeu/awesome-python-audio
 #
 # IMPORTANT:
@@ -13,6 +15,7 @@
 # For the minimal renderer, install only the CORE section.
 # For implemented desktop features, use the extras documented in README.md.
 # Experimental or platform-sensitive packages should remain commented until reviewed.
+
 
 
 # -----------------------------------------------------------------------------

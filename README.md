@@ -1,386 +1,182 @@
 # eli_lab-reawarp / 再変形
 
-A deterministic mathematical audio laboratory for IDM percussion, synthetic breaks, eccentric melodic sequences, and stem generation.
+**A deterministic mathematical audio laboratory for IDM composition, broken rhythms, hybrid synthesis and offline sound design.**
 
-Reawarp is an offline-first Python audio engine. Its synthesis core is independent of the desktop layer and optional third-party analysis or playback backends. It renders compositions up to three minutes, synchronized stems, and machine-readable event provenance.
+Reawarp turns musical constraints and generative systems into structured compositions, independently editable stems and portable project archives. It is an offline-first instrument and production laboratory, not a general-purpose DAW.
 
-## Current implementation
+## What it does
 
-### Synthesis and composition (M9)
-- Long-form composition planning up to 180 seconds with classical-arc, transformed-sonata, free-jazz, episodic, minimal-variation, and Autechre-inspired process-form presets.
-- Structure flow controls: preserve a preset, cross-mix its movements with another formal grammar, or mutate the order of inner movements deterministically.
-- A pattern grammar library with asymmetric, interlocking, ghost-break, omission, rotating-cycle, ratchet, cross-accent, and broken-regularity families, selected per form and section.
-- Pattern relationship controls for unison, interlock, shadow/phase offset, call-and-response, and counter-accent; motif transformation utilities include retrograde, inversion, augmentation, diminution, fragmentation, reordering, and displacement. Formal-section pattern auto-switching is opt-in in the desktop UI or via `--pattern-follow-structure`, preserving legacy break phrases by default.
-- Role-driven lead synthesis defaults to a genuinely subtractive voice (harmonic source, moving low-pass filter, restrained resonance and envelope); additive, FM, modal, inharmonic, granular and scanned/pulsar voices remain selectable alternatives.
-- Drum synthesis is independent of the melody renderer: minimal dry transient/body/tail kick, snare and hat voices are the default; extended resonant voices and the legacy profiled sample-style renderer remain selectable.
-- Legacy profile catalogues remain available when `percussion_synthesis=samples` is selected.
-- Subtractive lead voices use independent oscillator/filter/envelope code paths rather than routing every named palette through FM.
-- A separate harmonic ambience stem with filtered noise, slow stereo movement, and restrained early reflections.
-- A structured 16-step break grammar (broken funk, half-time, straight, sparse) with density, phrase-cycle, and bounded variation controls.
-- Imported break recordings are transient-sliced and triggered on the groove grid; complete clips are no longer stacked at every trigger.
-- Euclidean, modular-prime, Fibonacci-accent, and logistic-map rhythm material in the other percussion lanes.
-- Lissajous-derived melodic contours with profiled synthesis.
-- Independent random streams per generator and synthesis/profile lane.
-- Stem-only regeneration while preserving unrelated stems bit-identically.
-- A local SQLite sample/stem library with timbral and rhythmic descriptors, similarity ranking, named collections, and variation genealogy.
+- **Compose:** deterministic structures up to 180 seconds, section and phrase planning, persistent motifs, role relationships, asymmetry, transitions and negative space.
+- **Generate sound:** subtractive and alternative melodic voices, dedicated percussion synthesis, sample-driven and hybrid drum architectures, ambience and transformed break material.
+- **Transform breaks:** transient detection, slicing, rearrangement, stutter, dropout, reverse, gate, pitch/time operations, granular resynthesis and spectral freeze. Source recordings are not overwritten.
+- **Manage samples:** local SQLite sample/stem library, descriptors, similarity search, collections, sample banks and project genealogy.
+- **Work with a musical Score:** rational-beat events, tempo/meter maps, tuning-aware pitch, typed automation, Score-first event rendering and optional MIDI 1.0 interchange.
+- **Produce non-destructively:** role-aware per-stem inserts, shared SPACE/ECHO returns, beat automation, routing meters, tail handling, matched-level audition and project-aware FX variations.
+- **Review variations:** deterministic candidate batches, blind A/B, difference inspection, listening sets, review notes and candidate ancestry.
+- **Export complete projects:** routed master, dry stems, returns, Score/events, MIDI, routing/automation, source assets and integrity manifest in a ZIP handoff.
 
-### Offline sound design (M10–M13)
-- A separate FX Lab loads external mono/stereo audio without changing the source file.
-- Optional Pyo offline processing with high/low/band-pass filters, saturation, delay, frequency shift, and Freeverb stages.
-- Four starting chains: restrained space, tape echo, metallic machine, and digital fracture.
-- M11 adds a serial-chain editor: add/remove stages, reorder processing, edit each stage’s parameters and mix, and save/load portable versioned JSON chains.
-- M12 adds per-stem inserts and shared SPACE/ECHO sends/returns in the Stem Mixer, with a separate offline routing render and non-destructive export.
-- M13 adds beat-based deterministic automation for insert wet, per-stem sends, and shared return wet, plus tempo-synchronised delay divisions on the ECHO bus.
-- Global wet/dry blend, explicit tail allowance, dry/processed waveform and spectrogram comparison, audition, and 24-bit WAV export.
-- The `reawarp-fx` command renders starter presets or user-authored chain JSON; Pyo is not required by the base generator.
+## Architecture
 
-### Composition Director 2.0 (M15)
-- A persistent motif is extracted from a stable source phrase and keeps one identity across the arrangement.
-- Section instances apply deterministic repetition, displacement, fragmentation, augmentation/diminution, inversion, retrograde, rhythmic shadow and call/response transformations.
-- The same motif rhythm can appear as quiet hi-hat shadows or snare responses, while the melody remains its primary carrier.
-- A seven-role orchestration plan (kick, snare, hat, break, melody, texture and ambience) independently controls activity, density, syncopation, register, brightness and space.
-- Transition gestures are planned on the section/bar boundary and shape activity envelopes for pickups, fills, subtraction, collapse, silence gates, reverse-swell intentions, and echo handoffs.
-- The Generator exposes separate controls for the main composition axes; fixed seeds reproduce motif identity, transformations and role plans.
+`GenerationConfig → Composition / Role Plan → Score → Dry Stems → FX Routing + Automation → Project Archive`
 
-### Editable processing, role-aware routing, and musical automation (M11–M13)
+The Score is canonical for event-backed generation: `ReawarpEngine.generate()` plans rational-beat events before rendering, and ScoreRenderer resolves them to sample frames. Whole-field texture and ambience remain specialist render passes represented by Score markers. Dry stems and original sample assets are not overwritten by downstream processing.
 
-M11's serial chain editor supports add/remove/reorder operations, bounded stage parameters, per-stage wet/dry, global wet/tail, and portable versioned JSON.
-
-M12 brings those chains into the generated-project Stem Mixer. Each stem can have its own insert and post-insert sends to the two shared returns, SPACE and ECHO. The design is intentionally small and dry by default. Original stem exports remain untouched; insert tails can feed shared sends and returns can extend the routed master.
-
-M13 adds deterministic beat-addressed automation for insert wet, stem sends, and bus return wet, along with tempo-synchronised delay divisions. Automation JSON is portable and independent from routing JSON. Pyo remains optional and is needed only when an active insert or send is rendered.
-
-### Score-level control performance (M18 · implemented)
-
-The canonical Score now supports global, section, role and event automation scopes, with absolute/relative lane precedence and serialised smoothing/hysteresis. Reusable deterministic sources include LFO, envelope, stepped, bounded random-walk and phrase-curve generators; explicit modulation links define destination, amount, polarity, bounds, scope and retrigger phase. ScoreRenderer consumes the first synthesis, event, sample and spatial controls on the shared tempo-aware frame clock.
-
-The Stem Mixer adds a separate **SCORE CONTROL** editor with source preview, scope-aware deterministic sources/modulation and offline Apply & Re-render. Event/role density, syncopation, articulation, synthesis, spatial and stem-aware fixed-FX controls are integrated into the Score render pipeline. Hardware profiling and matched-level listening remain separate M14/M22 sign-offs. See [M18 — Musical automation and control performance](docs/M18.md).
-
-### Integrated composition and source engine
-
-Reawarp uses the audio already shipped in `samples/` as a selectable percussion library. The IRO repositories provide a related mathematical-sound and performance vocabulary; their manifests are kept separate from the actual bundled audio paths. See [IRO integration](docs/IRO_INTEGRATION.md).
-
-The Generator now builds one shared kick/snare/hat score for both synthesis and samples. Section-aware drum grammars change the parts through the track, while preserving anchors and role relationships. Sample-only, synthesis-only, automatic and hybrid source modes render into the same role stems. Hybrid architectures can combine a short sample transient with a synthesized body/tail, or use a controlled parallel blend.
-
-The phrase director remains responsible for the larger arc—introduction, establishment, development, uplift, arrival, drop, silence, contrast, return and residue—while the drum arranger and source engine translate those functions into actual patterns, timbres and source contributions.
-
-See [M15 — Integrated composition-to-production workflow](docs/M15.md) for the shared drum-score, hybrid source and Generator architecture.
-
-### Connected sample, drum and synthesis workflow
-
-The Generator builds role-specific sample banks from the selected anchor, bundled samples and indexed Library material. Drum parts can switch automatically at section or phrase-cycle boundaries; true returns recall the selected anchor and false returns can use a related variant. The same drum-event stream drives both samples and synthesis.
-
-Hybrid percussion now offers transient/body, parallel-layer and feature-guided architectures. The feature-guided mode uses indexed spectral, level, flatness and onset descriptors to steer the synthesized voice. The Generator presents FORM, VOICES and RHYTHM as one scrollable workflow with a persistent **GENERATE TRACK** action bar.
-
-See [Sample banks, drum automation and hybrid composition](docs/SAMPLE_BANKS_HYBRID_COMPOSITION.md).
-
-### Break transformation (M3)
-- Transient detection from positive short-time energy flux.
-- Automatic frame-accurate slicing with configurable slice limits.
-- Slice/phrase rearrangement, stutter, and probabilistic dropout.
-- Reverse and periodic gating with short edge fades.
-- Pitch shifting and phase-vocoder time stretching.
-- Jittered granular resynthesis and spectral freezing.
-- Ordered transform chains applied in memory to imported break samples; source files are never overwritten.
-- Transform and source provenance recorded in `project.json` and `events.json`.
-
-### Audio and export
-- Optional WAV sample overlays for kick, snare, hi-hat, and break lanes.
-- Offline stereo rendering using float32 buffers.
-- Synchronized individual stems and master WAV.
-- 16-bit and 24-bit PCM WAV export.
-- JSON project metadata and event provenance.
-
-The core requires Python 3.10+ and NumPy. `requirements.txt` is an expanded environment inventory: every uncommented line is installed, including experimental integrations that may need native runtimes or platform-specific setup. `pyproject.toml` extras remain the curated install groups for supported features.
+The mixer intentionally uses a bounded role-aware model: per-stem serial inserts and two shared wet-only returns (SPACE and ECHO). It is not an arbitrary routing graph or a live plug-in host.
 
 ## Install
 
-Create a virtual environment, then run:
+Python 3.10 or newer is required. Create a virtual environment:
 
-    python -m pip install --upgrade pip
-    python -m pip install -e ".[audio,m4,midi]"
+```bash
+python -m venv .venv
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# macOS / Linux:
+source .venv/bin/activate
+python -m pip install --upgrade pip
+```
 
-For the minimal core:
+Minimal NumPy core:
 
-    python -m pip install -e .
+```bash
+python -m pip install -e .
+```
 
-Optional analysis and music integrations:
+Desktop, audio I/O and MIDI:
 
-    python -m pip install -e ".[analysis]"   # librosa analysis adapters
-    python -m pip install -e ".[midi]"       # Mido MIDI import/export
-    python -m pip install -e ".[theory]"     # music21 symbolic music theory
-    python -m pip install -e ".[soundfont]"  # FluidSynth / SF2 source synthesis
-    python -m pip install -e ".[pyo]"       # Pyo offline FX Lab backend
-    python -m pip install -e ".[pippi]"     # experimental Pippi beta (platform caveat)
+```bash
+python -m pip install -e ".[audio,m4,midi]"
+```
 
-Install extras only when the corresponding feature is needed. A full M4/M5 development environment can also include analysis and symbolic-theory tools:
+Development and tests:
 
-    python -m pip install -e ".[audio,m4,analysis,midi,theory,soundfont,synthesis]"
+```bash
+python -m pip install -e ".[dev,audio,m4,midi]"
+python -m pytest -q
+```
 
-If upgrading an environment that previously had PySide6 6.12.0, remove the two optional 6.12-only Qt extension wheels left behind by the downgrade before running pip check:
+Install optional capabilities only when needed:
 
-    python -m pip uninstall -y PySide6-Pdf PySide6-WebEngine
-    python -m pip check
+```bash
+python -m pip install -e ".[pyo]"       # Pyo offline FX rendering
+python -m pip install -e ".[analysis]"  # librosa analysis adapters
+python -m pip install -e ".[theory]"    # music21 symbolic theory
+python -m pip install -e ".[soundfont]" # FluidSynth / SF2 synthesis
+python -m pip install -e ".[pippi]"     # experimental pre-release integration
+```
 
-Csound, SuperCollider, and FluidSynth also require their native runtimes when those adapters are used.
+Pyo, FluidSynth and selected research integrations may require platform-specific native runtimes. `requirements.txt` is an expanded developer/research inventory; prefer the curated extras in `pyproject.toml`. See [Dependency ecosystem](docs/DEPENDENCY_ECOSYSTEM.md).
 
-## Generate a composition (M8)
+## Generate a composition
 
-The composition duration can be up to three minutes. Example:
+```bash
+reawarp --duration 12 --bpm 137 --complexity 0.68 --seed 211 --output output/demo
+```
 
-    reawarp --duration 180 --structure autechre_like --flow mix --pattern-family asymmetric_7 --pattern-relationship shadow --pattern-follow-structure --synth-palette subtractive --percussion-synthesis minimal --complexity 0.42 --seed 20261124 --output output/three-minute-study
+A long-form 180-second study:
 
-Useful structure presets include `classical_arc`, `sonata_mutation`, `free_jazz`, `free_jazz_episodic`, `autechre_like`, `minimal_variation`, and `hybrid`. The `preset` flow preserves the chosen movement sequence, `mix` imports middle movements from a deterministic alternate structure, and `mutate` reorders the inner movements while retaining the opening and ending.
+```bash
+reawarp --duration 180 --structure autechre_like --flow mix \
+  --pattern-family asymmetric_7 --pattern-relationship shadow \
+  --pattern-follow-structure --synth-palette subtractive \
+  --percussion-synthesis minimal --complexity 0.42 --seed 20261124 \
+  --output output/three-minute-study
+```
 
-Choose a lead synthesis architecture with `--synth-palette`: `subtractive` (default), `hybrid`, `fm`, `additive`, `modal`, `inharmonic`, `granular`, or `physical`. `subtractive` is a separate renderer, not another FM preset. Choose drum construction separately with `--percussion-synthesis minimal|extended|samples`; `minimal` (default) uses sparse, dry transient/body/tail kick/snare/hat voices, while `samples` selects the legacy profiled drum renderers. The M10 FX Lab adds a separate non-destructive Pyo processing path; the core generator and NumPy reference renderer remain independent. M24.1 convolution, M24.2 spectral delay, M24.3 cross-synthesis/frequency transformation and M24.4 oversampled nonlinear processors are available as separate experimental NumPy reference APIs with tests, benchmarks and audition generators; they are not automatically inserted into the M22/M12 role map. Feedback delay networks and later M24 research modules remain separately planned.
+Use the same seed and configuration to reproduce a composition within the documented application/environment contract. Generated output includes master audio, aligned stems, project/event metadata and canonical `score.json`.
 
-## Portable project archives and M25 durability
+## Desktop production workflow
 
-New project exports include `manifest.json`: application/renderer and schema versions, configuration/Score/seed/tuning provenance, selected sample dependencies, candidate ancestry, routing/automation sidecars, render environment and a SHA-256 inventory of the archived files. Sample dependencies are embedded into `assets/` by default; use `ReawarpProject.export(..., asset_policy="reference")` to preserve external paths while recording their hashes. Missing or changed files are reported on reopen and are never silently substituted.
+Install the `m4` extra and launch:
 
-Run the target-machine 30-second/180-second 48 kHz generation → export → reopen benchmark on Windows:
+```bash
+reawarp-gui
+# or
+python -m reawarp.ui
+```
 
-    python scripts/benchmark_m25.py --durations 30 180 --sample-rate 48000 --output output/m25-target-windows.json
+The workspace groups composition, production and assets. The Stem Mixer renders role-aware inserts and shared returns in a cancellable background job; its processed channel/master previews and export use the same routing snapshot. Install Pyo to render actual effects:
 
-For a budget-gated sign-off, add explicit `--max-rss-gb` and `--max-wall-seconds` limits. Optional Pyo integration is enabled with `--pyo` after installing the `pyo` extra. The normal CI workflow runs a short 5-second 48 kHz archive smoke test; it does not claim target-machine performance acceptance. See [M25 — Performance, portability and project durability](docs/M25.md).
+```bash
+python -m pip install -e ".[pyo]"
+```
 
-## Generate a loop
+FX Lab can load an active project's dry channel, audition an editable chain, and assign it as that channel's insert in Stem Mixer. Stem Mixer can pre-render the complete routing and generate deterministic effect alternatives from project context and a variation seed; audition a candidate and apply its routing to the current project. When Pyo is unavailable, the app reports that the preview is dry rather than claiming an effect render succeeded.
 
-    reawarp --bpm 137 --duration 12 --seed 20261123 --complexity 0.68 --output output/demo --midi-output output/demo.mid
+Standalone FX commands:
 
-Shape the break grammar and sound palette:
+```bash
+reawarp-fx input.wav output_fx.wav --preset tape_echo --wet 0.70 --tail 2.0
+reawarp-fx input.wav output_custom.wav --chain-json my_chain.json
+reawarp-routing output/demo --output output/routed
+```
 
-    reawarp --break-style broken_funk --break-density 0.50 --break-variation 0.25 --break-cycle-bars 2
-    reawarp --melody-profile soft_keys --ambience-level 0.16
+## Score and MIDI
 
-Use a fixed or automatically selected percussion profile:
+```python
+from reawarp import GenerationConfig, ReawarpEngine
 
-    reawarp --kick-profile deep_sub --snare-profile acoustic --hat-profile dark
+project = ReawarpEngine().generate(
+    GenerationConfig(bpm=137, duration=12.0, seed=211, complexity=0.68)
+)
+score = project.to_score()
+score.save("output/demo/score.json")
+score.export_midi("output/demo.mid")  # requires the midi extra
+```
 
-Process an imported break sample without modifying the original file:
+MIDI import/export:
 
-    reawarp --break-sample samples/Breaks/my_break.wav --break-transforms slice_rearrange,stutter,dropout,reverse,gate --break-slice-count 16 --output output/processed
+```bash
+reawarp-midi-import input.mid --output imported-score.json
+reawarp-midi-export imported-score.json --output exported.mid --ppq 960
+```
 
-### Offline FX Lab (M10)
+MIDI 1.0 uses integer semitone notes and finite tick resolution. Reawarp preserves exact pitch/event context in its Score and escaped text metadata for Reawarp-to-Reawarp interchange. Other MIDI software may ignore that metadata.
 
-Install its optional backend and launch the desktop app:
+## Complete project package
 
-    python -m pip install -e ".[pyo]"
-    reawarp-gui
+The desktop **EXPORT STEMS + MASTER…** action now writes a ZIP handoff. It includes:
 
-The FX LAB workspace loads a mono/stereo audio file, lets you build an ordered processing chain, and renders a separate result for dry/processed audition and export. The source is untouched. Start from a preset or edit its stages; each stage has its own mix and bounded controls. Save your chain as JSON to reuse it in the GUI or CLI:
+- routed `master.wav`, original aligned dry `stems/` and rendered `returns/`;
+- canonical `score.json`, compatibility `events.json`, combined `midi/score.mid` and separate `midi/voices/*.mid`;
+- `project.json`, `fx_routing.json`, `fx_automation.json`, `mix.json` and package instructions;
+- copied source samples under `assets/` by default, plus manifest and SHA-256 file inventory;
+- variation candidates and listening report when they are part of the project session.
 
-    reawarp-fx input.wav output_fx.wav --preset tape_echo --wet 0.70 --tail 2.0
-    reawarp-fx input.wav output_custom.wav --chain-json my_chain.json
-    reawarp-fx --list-presets
-    reawarp-fx --list-stages
-    reawarp-fx --validate-chain-json my_chain.json
+The extracted project folder can be reopened with Reawarp. MIDI 1.0 playback is a lossy pitch/timing projection; the Score remains authoritative. The Python packaging service is `reawarp.export.project_archive.export_project_package`.
 
-Available starting chains: `restrained_space`, `tape_echo`, `metallic_machine`, and `digital_fracture`. Pyo uses its offline server; it does not open the audio device to process the file. See [M10 FX Lab](docs/M10.md) and [M11 Editable FX Chains](docs/M11.md).
+New project exports embed referenced samples by default. The explicit `asset_policy="reference"` mode records external paths and hashes instead. Missing/changed assets are reported rather than silently substituted.
 
-Pitch/time/granular operations accept their own controls:
+## Performance and validation
 
-    reawarp --break-sample samples/Breaks/my_break.wav --break-transforms pitch_shift,time_stretch,granular --break-pitch-semitones 5 --break-time-stretch 1.25 --break-grain-size-ms 75 --break-grain-density 1.6 --output output/warped
+Run the target-Windows 30/180-second 48 kHz benchmark:
 
-The output contains master.wav, a stems/ directory, project.json, events.json, and the synthesizer-independent score.json.
+```powershell
+python scripts/benchmark_m25.py --durations 30 180 --sample-rate 48000 --output output/m25-target-windows.json
+```
 
-## Role-aware per-stem FX routing (M12)
-
-After exporting a generated project, create a starter routing document:
-
-    reawarp-routing output/my-composition --output output/routed
-
-Validate or render a routing file without overwriting the source project:
-
-    reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --validate
-    reawarp-routing output/my-composition --routing my-routing.json --automation my-automation.json --output output/routed
-
-Generate four starter listening variants from the same dry stems:
-
-    reawarp-routing output/my-composition --audition-matrix --output output/role-auditions
-
-The audition matrix exports percussion, melody, ambience, and combined-role renders plus an RMS/peak report. The report is a signal-level aid, not a substitute for listening. The Stem Mixer exposes per-stem inserts, shared SPACE/ECHO sends, beat-based automation, and tempo-synchronised ECHO divisions. The routed export contains dry source stems, processed return WAVs, the routed master, fx_routing.json, fx_automation.json, and render metadata. See [M12 role-aware FX routing](docs/M12.md) and [M13 musical FX automation](docs/M13.md).
-
-## Python API
-
-    from reawarp import GenerationConfig, ReawarpEngine
-
-    engine = ReawarpEngine()
-    project = engine.generate(
-        GenerationConfig(
-            bpm=137,
-            duration=12.0,
-            seed=20261123,
-            complexity=0.68,
-            kick_profile="deep_sub",
-            sample_paths={"break": "samples/Breaks/my_break.wav"},
-            break_transforms=("slice_rearrange", "granular", "reverse"),
-        )
-    )
-    project.export("output/my_loop", bit_depth=24)
-
-    # Build the universal score from the render and export standard MIDI 1.0.
-    score = project.to_score(title="My IDM sketch")
-    score.save("output/my_loop/score.json")
-    score.export_midi("output/my_loop.mid")
-
-    # Regenerate only the kick; every unrelated stem remains identical.
-    variation = engine.generate_variant(project.config, stem="kick", variation=2)
-    variation.export("output/my_loop_kick_variation")
-
-Supported custom sample roles: kick, snare, hat, and break. Break transformations are applied only to the imported break sample and run in memory. The original source file is read-only from Reawarp's perspective.
-
-## Musical score and MIDI (M5)
-
-Every rendered project can be converted to a synthesizer-independent score:
-
-    from reawarp import Score
-
-    score = project.to_score(title="Break study")
-    score.save("output/score.json")
-    score.export_midi("output/score.mid")
-
-The score model includes:
-- Rational beat positions and durations using fractions.Fraction.
-- Piecewise step/linear tempo maps with beat/second conversion.
-- Independent meter maps and bar/beat queries.
-- Universal note, hit, grain, trigger, control, and marker events.
-- Automation lanes with step, linear, cubic, and exponential interpolation.
-- Exact frequency in Hz, fractional pitch coordinates, and a pluggable tuning-system interface.
-- Event provenance, stable IDs, source references, tags, and seed information.
-
-MIDI import/export is provided by the optional Mido adapter:
-
-    reawarp-midi-import input.mid --output imported-score.json
-    reawarp-midi-export imported-score.json --output exported.mid --ppq 960
-
-The main reawarp command can also export MIDI for a freshly generated render with --midi-output.
-
-MIDI 1.0 note numbers are integer semitones. Reawarp rounds fractional pitches to the nearest MIDI note for ordinary playback, while embedding exact pitch, frequency, event identity, and Reawarp metadata in text meta events for a Reawarp-to-Reawarp round trip. Linear tempo ramps are sampled into discrete MIDI tempo events. The score model remains the authoritative representation.
-
-M16 adds the score-native offline renderer, tempo-map-aware frame scheduling, meter queries, and typed frame-addressed automation. M17.5 completes the Score-first cutover: the default `ReawarpEngine.generate()` plans a canonical rational-beat Score before rendering event-backed voices, and project event dictionaries are derived compatibility/export views. Specialised whole-field texture and ambience passes remain outside event-level scheduling; `generate_legacy()` is retained for comparison. See [M16/M17 implementation details](docs/M16.md) and the [post-M17 roadmap](docs/ROADMAP.md).
-
-### Perceptual orchestration intent (M20 foundation)
-
-The Score API can carry inspectable arrangement intent: asymmetric rational-beat phrases, independently phased cycles, pairwise role grammars, foreground/midground/background/absence spans, explicit hand-offs and per-domain mutation permissions. Plans round-trip through Score JSON and Reawarp MIDI metadata without changing playback scheduling. Register/spectral overlap inspection emits heuristic warnings only, never a quality score. See [M20](docs/M20.md).
-
-### Sound-object and hybrid instrument architecture (M21 foundation)
-
-The M21 API provides versioned sound-object patches with separate source/processing identity, transient/body/tail layers, envelopes, spectral and pitch metadata, coherent modulation, spatial intent and transformation lineage. A NumPy hybrid renderer returns exact-frame layer solos, a summed stereo render and phase/mono/headroom diagnostics, and can be registered as a normal Score voice with typed automation. The editor-facing model publishes field units/ranges/choices. Opt-in modal-resonator and additive-partial voices are included; existing voice defaults are unchanged. Patch-scoped automation targets and SQLite searchable patch/rendered-variant lineage are available. See [M21](docs/M21.md) and run `python scripts/benchmark_sound_objects.py` to measure voice-family and hybrid render costs on the target machine.
-
-
-### Variation browser and critical listening (M23)
-
-The Variations workspace keeps a frozen source project and batch-generates deterministic stem/role-pair, full-project, sample-bank, Score automation and M21 sound-object candidates. Blind labels, matched-level A/B, difference waveform/spectrogram views and dry/processed/insert/send/return/master comparisons support listening before parameter inspection. Keep, discard, promote, branch and restore preserve source stems; listening sets cover full mix, isolated roles, role pairs, transitions, thirds and subtraction. Candidate ancestry, seeds, changed parameters, technical flags and human-authored notes survive nested project export/reload and SQLite library indexing. Technical metrics are diagnostic only and never grade artistic quality. See [M23](docs/M23.md).
-
-### Mixer and routing quality (M22)
-
-The Stem Mixer and core routing API apply restrained role-aware inserts and SPACE/ECHO sends automatically instead of requiring per-stem effect marking. Effects are part of each sound-role path before the master, not a post-master stage. Kick/sub remains dry; snare, hats, breaks, melody and texture receive conservative role assignments. Each send can tap pre/post insert and pre/post fader; shared returns are wet-only and extend the master with reported tail/latency policy. Routing JSON v3 migrates v1/v2 files, and the same cancellable background cache feeds preview and export. Direct/insert/send/return/master audition, peak/RMS/crest/headroom meters and peak-safe -18 dBFS matched audition copies are available. Dry source stems remain immutable. See [M22](docs/M22.md). Pyo-enabled target-Windows listening remains experimentally unverified.
-
-## Determinism
-
-The root seed is split into named NumPy random streams using a stable hash. Pattern, synthesis, profile-selection, and break-processing streams are independent. Regenerating one lane therefore does not change unrelated generated lanes. Repeated renders with the same application version, configuration, seed, and dependency environment produce identical floating-point stems.
-
-## Audio model
-
-- Internal format: NumPy float32, stereo.
-- Default sample rate: 48 kHz.
-- Duration: 5–180 seconds (up to three minutes).
-- BPM: 60–220.
-- Timing: event positions are derived from a sixteenth-note grid with controlled variation.
-- Export: 16-bit or 24-bit PCM WAV.
-
-The M4 PySide6 desktop instrument provides generation controls, break analysis, waveform/spectrogram preview, SoundDevice audition, stem mixing, and per-generator regeneration. The M9 interface uses the AVTranslator-inspired near-black monochrome theme; closing its window now performs a full application shutdown. The M5.1 sound pass adds controlled break grammar, transient-sliced break playback, profiled melody voices, and a dedicated ambience stem. M6 adds the searchable local sample/stem library, similarity descriptors, collections, and project-variation genealogy. Reawarp remains an offline mathematical sound laboratory, not a live event sequencer or full DAW.
-
-## Desktop application (M4)
-
-Install the UI and playback dependencies with `python -m pip install -e ".[m4]"` (or use the complete development command above). Launch with:
-
-    reawarp-gui
-
-or:
-
-    python -m reawarp.ui
-
-The main workspaces are Generator, Break Lab, Stem Mixer, FX Lab, and Library. The Generator exposes break style, density, phrase variation, cycle length, melody voice, and ambience controls. Rendering runs in a background worker; the audio callback only copies pre-rendered samples. Mixer faders affect audition and the exported master, while individual stem files remain unchanged. The Library provides local indexing, search, similarity, collections, and audition, with matching `reawarp-library` CLI commands. See [M4 design and implementation](docs/M4.md) and [M5.1 sound/rhythm refinement](docs/M5.1.md).
-
-## Local sample and stem library (M6)
-
-Create or update the default local library database:
-
-    reawarp-library index samples/
-    reawarp-library index output/
-
-Index one exported project directly (including its stems, master, and referenced source samples):
-
-    reawarp-library index output/my_idm_project/
-
-Search by role, text, or tags:
-
-    reawarp-library search --role kick
-    reawarp-library search --query granular --type sample
-    reawarp-library search --tag percussion --tag idm
-
-Find sounds similar to an indexed asset (the command prints asset IDs for reuse):
-
-    reawarp-library search --similar-to ASSET_ID --limit 12
-
-Create a collection and add selected assets:
-
-    reawarp-library collections create "Metallic Breaks" --description "Bright, inharmonic and percussive sources"
-    reawarp-library collections add "Metallic Breaks" ASSET_ID_1 ASSET_ID_2
-    reawarp-library collections show "Metallic Breaks"
-
-Inspect generated variants from a project family using the `family_id` returned by project indexing:
-
-    reawarp-library genealogy FAMILY_ID
-
-The default SQLite database is stored at `~/.reawarp/library.sqlite3`; pass `--db path/to/library.sqlite3` before the subcommand to use another database. WAV indexing works with the core install. FLAC/AIFF/OGG support uses the optional `soundfile` package from the `audio` extra. Descriptors are calculated locally and source files are never modified.
+For budget-gated acceptance, add agreed `--max-rss-gb` and `--max-wall-seconds` limits. CI runs the full regression suite on Linux/Python 3.10–3.12 and Windows/Python 3.11, plus CLI, routing, M24 and M25 smoke checks. A short smoke run is not a substitute for target-machine performance or human listening.
 
 ## Development
 
-    python -m pip install -e ".[dev]"
-    python -m compileall -q src/reawarp
-    reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-smoke
-    python -m pytest -q
-    python scripts/benchmark_generation.py --durations 5 30 180 --palettes subtractive fm --output benchmark-m14.json
+```bash
+python -m pip install -e ".[dev,audio,m4,midi]"
+python -m compileall -q src/reawarp
+python -m pytest -q
+```
 
-The repository now includes an initial M14 pytest regression suite for deterministic random streams, composition planning, signal diagnostics, stem regeneration, and dry FX/automation contracts. CI also runs a short benchmark fixture and an offscreen check of the grouped workspace shell. Additional transform-boundary, score round-trip, project portability, Windows and Pyo-enabled tests remain outstanding.
+Benchmark and matched-listening tools live in `scripts/`: generation (M14), sound objects (M21), independent DSP research modules (M24.1–M24.4) and project archive/reopen (M25).
 
-The four documents under `docs/guides/` remain the musical reference for all milestones. The [M10 FX Lab specification](docs/M10.md), IDM Field Guide, Advanced Composition Appendix, [M3 implementation note](docs/M3.md), [M4 desktop specification](docs/M4.md), [M5 score/MIDI specification](docs/M5.md), [M5.1 sound/rhythm refinement](docs/M5.1.md), [M6 library specification](docs/M6.md), and [dependency ecosystem review](docs/DEPENDENCY_ECOSYSTEM.md) provide the musical and technical reference.
+## Documentation
 
-## M7 — Composition Workbench (0.7.0)
+- [Milestone history and current status](docs/MILESTONES.md) — the single milestone/roadmap source.
+- [Implementation notes](docs/IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
+- [Dependency ecosystem](docs/DEPENDENCY_ECOSYSTEM.md) — optional dependencies, platform constraints and licensing.
+- [Sample banks and hybrid composition](docs/SAMPLE_BANKS_HYBRID_COMPOSITION.md) — role banks, switching and hybrid percussion.
+- [IRO integration](docs/IRO_INTEGRATION.md) — shared manifests, source identity and missing-asset policy.
+- [IDM field guide](docs/guides/IDM_Field_Guide_for_Composers_Producers_and_Programmers.md).
+- [Composition atlas](docs/guides/IDM_Composition_Atlas_Patterns_Phrases_and_Track_Structures.md).
+- [Sound-design architecture](docs/guides/IDM_Sound_Design_Synthesis_and_Hybrid_Sound_Architecture.md).
+- [Advanced composition appendix](docs/guides/IDM_Advanced_Composition_and_Generation_Appendix.md).
 
-M7 adds a deterministic formal section director above the existing mathematical event generators. Available structures are evolving, additive, subtractive, episodic, and drift. Section transitions are quantised to 4/4 bars where the requested duration permits; the final audio buffer still ends at the exact requested duration.
-
-Use the same formal controls in the command line or the desktop Generator:
-
-    reawarp --duration 45 --structure episodic --energy 0.72 --variation 0.8 --seed 211 --sample-rate 22050 --output output/m7-episodic
-
-Composition energy is not master gain. Structural variation changes section allocation and bounded macro targets; it is not a global probability of extra hits. The local break grammar retains its separate phrase-variation control.
-
-The Generator is divided into Form, Voices, and Rhythm sub-pages. Workspaces are grouped into Compose (Generator, Break Lab), Produce (Stem Mixer, FX Lab), and Assets (Library). A persistent project-context header and shared audition transport keep the in-memory composition connected across production workspaces; the Stem Mixer presents an explicit empty state until a project exists. The Library indexes, searches, and auditions local material. Mixer controls can regenerate procedural layers and imported sample overlays against a frozen project, preserving unrelated stems. The packaged application icon lives at `src/reawarp/resources/icons/Icon.ico`; closing the main window exits the application rather than hiding it in the tray.
-
-See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.
-
-- [IRO integration contract](docs/IRO_INTEGRATION.md) — shared sample identity, provenance and the phrase grammar bridge to the IRO project.
-
-### Advanced DSP research track (M24)
-
-M24 is an independent research track, not a bundled effects release. M24.1 starts with a NumPy-only partitioned convolution engine, designed modal impulse responses, hash-verified portable IR archives, explicit full-tail/zero-offline-latency semantics, benchmarks and a matched-level resonator example. It is not inserted into role routing or master by default. Spectral delay, cross-synthesis, oversampled nonlinear processing, sidechain routing, feedback networks and parallel branches remain separate planned modules. See [M24](docs/M24.md) and [M24.1](docs/M24.1.md).
-
-## Current roadmap
-
-The current implementation baseline is **M21–M23 implemented and closed**. M20 compiles director decisions into rational-beat phrase, cycle, role-relationship, attention, hand-off, mutation and transition intent on every generated Score; subjective listening sign-off remains experimentally unverified. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M19.1–M19.5 add optional harmonic context, tuning-aware sonority generation, sequence-level melodic voice-leading, six independent bass roles, explicit motif identity contracts, sonority-aware motif resolution and exact Reawarp pitch metadata in MIDI exports, without imposing functional tonality. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs.
-
-- [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
-- [Consolidated Roadmap](docs/ROADMAP.md) — post-M18 status and M19–M25 forward plan.
-- [Architecture and Musical Reassessment](docs/REASSESSMENT.md) — philosophy-to-architecture gaps and sequencing rationale.
-- [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
-- [M16 Score-driven Render Core](docs/M16.md) — frame-accurate score scheduling, typed automation and migration status.
-- [M18 Close-out](docs/M18_CLOSEOUT.md) — accepted implementation scope and separate experimental sign-offs.
-- [M19 Harmonic Context and Voice-leading](docs/M19.md) — M19.1–M19.5 harmonic, voice-leading, bass-role, motif and MIDI integration.
-- [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
-
-
-Exported project folders can be reopened and validated with `ReawarpProject.load("output/my_idm_project")`. The loader restores the validated configuration, event records and aligned PCM stems, and verifies the score metadata.
+The IRO manifests and indexes are present in this repository, but the IRO WAV payloads are currently absent under `samples/Iro`; those manifest entries are metadata-only until the audio files are supplied.

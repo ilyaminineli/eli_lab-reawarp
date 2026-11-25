@@ -1,60 +1,73 @@
 # Reawarp implementation notes
 
-## Architecture
+These notes describe enduring code and engineering contracts. Milestone scope and status live in [MILESTONES.md](MILESTONES.md).
 
-1. Mathematics produces normalized control data, event indices, pitch values, and trajectories. It does not render audio.
-2. Generators translate mathematical data into musical events with roles, timing, velocity, and duration.
-3. The offline NumPy engine synthesizes aligned float32 stem buffers from the event/configuration model.
-4. Break transformations operate on copied buffers and never write back to source samples.
-5. Named random streams make generation and stem-only regeneration reproducible.
-6. Export writes synchronized stems and machine-readable project/event/score provenance.
-7. The GUI and optional processing integrations are clients of the engine, not owners of its state.
+## Architecture boundaries
 
-## Deterministic stream policy
+1. **Composition planning** creates deterministic sections, motifs, role relationships, sample choices and symbolic Score events. It does not own device playback.
+2. **The Score** is canonical for event-backed scheduling. Rational beat positions remain exact until RenderTimeline resolves them to frames.
+3. **ScoreRenderer** schedules discrete events and calls production voice adapters. Noise texture and ambience remain specialist whole-field renders documented by Score markers.
+4. **Dry stem ownership** remains with the generated project. Transforms, inserts, routing, variations and audition processors work on copies and never rewrite source assets.
+5. **Production routing** uses per-stem serial inserts and two wet-only shared returns (SPACE/ECHO). Keep the graph explicit and bounded; do not silently introduce arbitrary feedback or plug-in routing.
+6. **Playback** consumes completed buffers only. Audio callbacks must not synthesize, allocate large buffers, access disk, or call GUI code.
+7. **Export** snapshots mutable UI state before background work and writes a portable project with configuration, Score/events, source assets, routing, automation, render provenance and integrity inventory.
 
-Never consume a single global RNG for the entire project. Derive one named NumPy generator from the root seed for each lane, profile selector, and transformation chain. Stem-only regeneration must render the selected stream and preserve all unrelated buffers byte-for-byte.
+## Determinism
 
-## Current implementation
+- Derive generators from stable named streams and explicit seeds. Do not use a project-wide global RNG for unrelated roles.
+- Stem-only regeneration must preserve unrelated stems bit-identically where the contract promises invariance.
+- Variation candidates derive seeds from frozen base identity, request and candidate index. Store the request and lineage needed to reproduce a candidate.
+- Do not use Python's process-randomised `hash()` to derive musical decisions.
+- Define the reproducibility boundary: same code/environment is stronger than cross-platform floating-point bit identity.
 
-- Independent mathematical rhythm and melody generators with formal section planning up to 180 seconds.
-- Role-driven lead synthesis, separate generated percussion, and a dedicated ambience stem.
-- Sample overlays and a frame-accurate break analysis/transformation pipeline.
-- Universal score and event model, rational time, tempo/meter maps, tuning interface, and optional Mido MIDI 1.0 import/export.
-- Local SQLite sample/stem library with audio descriptors, search, similarity ranking, named collections, and variation genealogy.
-- PySide6 workspaces for Generator, Break Lab, Stem Mixer, Library, and FX Lab.
-- Optional Pyo offline effect processing behind an isolated adapter. The base generator and NumPy reference renderer do not import Pyo.
-- Portable 16-bit/24-bit PCM WAV output, project JSON, event JSON, and score JSON.
+## Audio and signal contracts
 
-## Dependency boundaries
+- Use float32 working audio; validate finite mono/stereo data and consistent frame alignment.
+- Preserve dry references and source arrays. Every destructive-looking transform returns a new buffer.
+- Keep gain laws, wet/dry blends, pre/post insert/fader taps, pan, mute/solo gates, tail extension and master peak protection explicit.
+- Do not normalise source stems or silently change a processor's output gain.
+- Report peak, RMS, headroom, latency/alignment and tails where meaningful. Metrics are diagnostic, not artistic rankings.
+- Match levels only on audition copies; production and exported buffers remain unchanged.
 
-The core requirement is NumPy. SoundFile, SciPy, PySide6, pyqtgraph, SoundDevice, librosa, Mido, music21, FluidSynth bindings, and Pyo are used only through their documented optional features or extras. Pippi remains a separately pinned pre-release research option; it is not required for the Windows desktop. Pedalboard stays inactive pending a distribution/licensing decision.
+## Score, MIDI and schemas
 
-Optional libraries must not replace Reawarp's event model, deterministic random-stream policy, or NumPy reference renderer. Review Python/platform wheels, native-runtime requirements, and redistribution licenses before bundling any dependency into a desktop release.
+- Keep Score time in rational beats until frame placement.
+- Score schema, project/events schemas and all user-authored routing/control documents are versioned and validated.
+- MIDI 1.0 is a compatibility projection. Fractional pitch and some exact event/provenance values remain Score-specific; escaped Reawarp metadata supports round trips through compatible importers.
+- Unknown schema versions fail explicitly. Migrations are additive and in-memory unless a deliberate export/save is requested.
 
-## Validation policy
+Current compatibility snapshot:
 
-The repository maintains a pytest regression suite for deterministic streams, composition planning, audio diagnostics, transforms, score/MIDI interchange, project export/reopen, FX contracts and offscreen UI navigation. GitHub Actions runs the suite on Python 3.10–3.12 on Linux and Python 3.11 on Windows, alongside CLI and benchmark smoke checks. Target-machine long-render profiling and Pyo listening remain separate validation tasks.
+| Data | Version |
+|---|---:|
+| Project | 1 |
+| Project manifest | 1 |
+| Events | 1 |
+| Score | 1 |
+| FX routing | 3 (v1/v2 migrate) |
+| FX automation | 1 |
+| Sound Object | 1 |
+| Variation candidate | 1 |
 
-## Milestone status
+See the compatibility fixture at `tests/fixtures/m25/legacy_contracts_v1.json`.
 
-- **M3–M5:** break transformation, desktop instrument, universal score model, tuning interface, and MIDI interchange.
-- **M6:** searchable sample/stem library, descriptors, collections, and variation genealogy.
-- **M7–M8:** formal composition planning, section-aware patterns, motif transformations, long-form structure presets, and selectable synthesis architectures.
-- **M9:** restrained subtractive synthesis, dedicated generated drum voices, sparser defaults, monochrome UI, and dependency inventory.
-- **M10:** optional Pyo offline FX backend, four starter chains, FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
-- **M11:** editable ordered effect chains, stage-level parameter controls, and portable chain JSON.
-- **M12:** deliberately small role-aware routing with per-stem inserts, two shared SPACE/ECHO returns, portable routing JSON, and offline routed export. Direct stems remain dry/frame-aligned; insert tails can reach shared sends and returns can extend the master.
-- **M13:** deterministic beat-based automation for insert wet, stem sends, and shared return wet; tempo-synchronised delay divisions; portable automation JSON; compact routing/automation sub-tabs in the Stem Mixer.
+## Optional dependencies
 
-M12 remains a fixed two-bus offline pass rather than a general-purpose graph. M13 evaluates beat-based control lanes against the project's constant BPM. Automation is evaluated sample-by-sample from ordered points, uses hold/linear/smooth curves, and does not consume or alter named synthesis random streams. Pyo processing is still offline; the current desktop render path can block during longer FX renders, which remains a future asynchronous-rendering task.
+NumPy is the core requirement. PySide6/pyqtgraph and SoundDevice are used by the desktop; Mido supports MIDI; SoundFile/SciPy/librosa and music21 are optional adapters; Pyo is only required for actual offline FX Lab/Mixer rendering. Native/runtime constraints and licence notes belong in [DEPENDENCY_ECOSYSTEM.md](DEPENDENCY_ECOSYSTEM.md).
 
-## Audio engineering notes
+Keep optional/native libraries lazy-loaded and out of the normal generation import path. Review Python wheel support, external runtimes, redistribution and licence before bundling any new dependency.
 
-- Render offline first; do not tie the render graph to an audio callback.
-- Use 32-bit floating point internally and leave headroom before export.
-- Keep individual stems time-aligned with identical frame counts.
-- Apply attenuation locally and avoid changing unrelated lanes during stem regeneration.
-- Preserve a dry reference and level-match bypass comparisons when processing.
-- Store the generator algorithm version and complete configuration with each project.
+## Validation
 
-See [DEPENDENCY_ECOSYSTEM.md](DEPENDENCY_ECOSYSTEM.md) for dependency roles, adoption status, platform notes, and licensing considerations.
+The maintained pytest suite covers deterministic streams, planning, Score timing/rendering/automation, transforms, samples, routing, signal diagnostics, project manifests, archive round trips, candidate lineage and offscreen UI navigation. GitHub Actions runs Linux Python 3.10–3.12 and Windows Python 3.11, with CLI and short benchmark smoke checks.
+
+CI establishes software/data contracts. It does not establish target-machine performance, Pyo sound quality, low-volume/mono compatibility or artistic acceptance. Track those sign-offs in [MILESTONES.md](MILESTONES.md).
+
+## Code organisation guidance
+
+- Keep renderers/services independent of Qt.
+- Keep GUI widgets thin; pass immutable snapshots to cancellable workers.
+- Do not refactor the entire main window in one pass. Extract stable services at a time with regression coverage.
+- Reuse the same completed routing snapshot for preview, stage audition and export.
+- Cache by project revision plus all routing, automation, mixer and tempo inputs. Discard stale worker results.
+- Keep long-lived project sources separate from temporary effect-variation render caches.

@@ -115,19 +115,11 @@ The M3 research review identified licensing considerations for Pyo (LGPL-3.0-or-
 
 No external project should be copied into Reawarp merely because it is useful. Prefer documented adapters, optional installation groups, source attribution, and reproducible version pins for release builds.
 
-## 7. Implementation sequence
+## 7. Implemented feature boundary
 
-- **M3 — complete:** dependency-free break analysis/transformation and profile-based percussion synthesis.
-- **M4 — implemented:** PySide6 Generator, Break Lab, and Stem Mixer workspaces, SoundDevice audition, waveform/spectrogram views, asynchronous rendering, and stem controls.
-- **M5 — implemented:** universal score/event model, rational beat time, tempo/meter maps, automation lanes, tuning interface, project score conversion, and Mido MIDI 1.0 import/export.
-- **M6 — implemented:** searchable sample/stem catalogue, metadata indexing, similarity features, collections, and variation genealogy.
-- **M7 — implemented:** section-aware motifs, layer regeneration, workspaces, and searchable library.
-- **M8 — implemented:** up-to-three-minute formal presets and flow modes, pattern relationships, motif transformations, and selectable native synthesis palettes.
-- **M9 — implemented:** minimal subtractive lead and transient/body/tail drum renderers, sparser default drum generation, requirements inventory, and monochrome UI refinement.
-- **M10 — implemented:** optional Pyo offline FX backend, four starter chains, non-destructive FX Lab workspace, dry/processed comparison, and `reawarp-fx` CLI.
-- **M11 — implemented:** editable ordered FX chains, per-stage parameter editing, and portable chain JSON. Per-stem routing, tempo-synced delay, convolution, spectral delay, FDNs, cross-synthesis, and oversampling remain follow-on modules.
+The authoritative implementation history, current feature status, compatibility contracts and planned DSP sequence are maintained in [MILESTONES.md](MILESTONES.md). Do not use a dependency list or this ecosystem review as a second product roadmap.
 
-The project should grow through small, testable adapters. Its identity remains in its mathematics, event model, and deterministic renderer.
+The architectural rule remains: add small, explicit adapters around Reawarp's mathematical event model and NumPy reference renderer. Optional libraries must not become mandatory merely because they appear in the research inventory.
 
 
 ### M10 dependency decisions
