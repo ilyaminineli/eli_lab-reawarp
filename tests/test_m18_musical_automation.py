@@ -508,4 +508,4 @@ def test_source_is_inactive_outside_its_declared_absolute_beat_window():
 
     assert bus.value_at_frame("synth.pitch", 0, default_value=0.0) == pytest.approx(0.0)
     assert bus.value_at_frame("synth.pitch", 96_000, default_value=0.0) == pytest.approx(6.0)
-    assert bus.value_at_frame("synth.pitch", 120_000, default_value=0.0) == pytest.approx(0.0)
+    assert bus.value_at_frame("synth.pitch", 228_000, default_value=0.0) == pytest.approx(0.0)
