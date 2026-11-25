@@ -180,6 +180,7 @@ def _case(duration: float, args: argparse.Namespace) -> dict[str, Any]:
     stem_bytes = sum(int(audio.nbytes) for audio in project.stems.values())
     master_bytes = int(project.frame_count * 2 * np.dtype(np.float32).itemsize)
     performance = dict(project.metadata.get("performance", {}))
+    performance_detail = dict(project.metadata.get("performance_detail", {}))
     stage_timings = {
         "planning_seconds": performance.get("planning_seconds"),
         "composition_plan_seconds": performance.get("composition_plan_seconds"),
@@ -205,6 +206,7 @@ def _case(duration: float, args: argparse.Namespace) -> dict[str, Any]:
         "render_environment": archive_manifest.get("render_environment", {}),
         "stage_timings": stage_timings,
         "engine_performance": performance,
+        "engine_performance_detail": performance_detail,
         "frame_count": project.frame_count,
         "event_count": len(project.events),
         "stem_count": len(project.stems),

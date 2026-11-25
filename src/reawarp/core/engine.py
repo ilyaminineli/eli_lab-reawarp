@@ -339,10 +339,6 @@ class ReawarpEngine:
             "voice_callback_seconds": render_performance.get("voice_callback_seconds", 0.0),
             "sample_trigger_callback_seconds": render_performance.get("sample_trigger_callback_seconds", 0.0),
             "event_accumulation_seconds": render_performance.get("event_accumulation_seconds", 0.0),
-            "callback_seconds_by_voice": render_performance.get("callback_seconds_by_voice", {}),
-            "callback_counts_by_voice": render_performance.get("callback_counts_by_voice", {}),
-            "callback_seconds_by_kind": render_performance.get("callback_seconds_by_kind", {}),
-            "callback_counts_by_kind": render_performance.get("callback_counts_by_kind", {}),
             "scheduled_event_count": render_performance.get("scheduled_event_count", 0),
             "rendered_event_count": render_performance.get("rendered_event_count", 0),
             "rendered_sample_trigger_count": render_performance.get("rendered_sample_trigger_count", 0),
@@ -352,7 +348,17 @@ class ReawarpEngine:
             "total_engine_seconds": perf_counter() - total_started,
         }
         metadata = dict(project_score.metadata)
+        performance_detail = {
+            "callback_seconds_by_voice": render_performance.get("callback_seconds_by_voice", {}),
+            "callback_counts_by_voice": render_performance.get("callback_counts_by_voice", {}),
+            "callback_seconds_by_kind": render_performance.get("callback_seconds_by_kind", {}),
+            "callback_counts_by_kind": render_performance.get("callback_counts_by_kind", {}),
+            "rendered_event_count": render_performance.get("rendered_event_count", 0),
+            "rendered_sample_trigger_count": render_performance.get("rendered_sample_trigger_count", 0),
+        }
         metadata.update({
+            "performance": performance,
+            "performance_detail": performance_detail,
             "algorithm_version": self.VERSION,
             "renderer_version": renderer_version,
             "variation": {"stem": regenerate, "index": variation} if regenerate else None,

@@ -290,7 +290,7 @@ def test_background_archive_service_rejects_invalid_return_and_nonfinite_master(
 
 def test_generation_records_separate_sample_voice_and_event_timing():
     config = GenerationConfig(
-        duration=1.0,
+        duration=5.0,
         sample_rate=8_000,
         seed=211,
         complexity=0.25,
@@ -306,11 +306,12 @@ def test_generation_records_separate_sample_voice_and_event_timing():
         "event_scheduling_seconds", "voice_callback_seconds",
         "sample_trigger_callback_seconds", "event_accumulation_seconds",
         "field_render_seconds", "headroom_seconds", "total_engine_seconds",
-        "callback_seconds_by_voice", "callback_counts_by_voice",
     }
+    detail = project.metadata["performance_detail"]
+    assert {"callback_seconds_by_voice", "callback_counts_by_voice"} <= set(detail)
     assert required <= set(performance)
     assert performance["scheduled_event_count"] >= performance["rendered_event_count"] > 0
-    assert sum(performance["callback_counts_by_voice"].values()) == performance["rendered_event_count"]
+    assert sum(detail["callback_counts_by_voice"].values()) == performance["rendered_event_count"]
     assert performance["voice_callback_seconds"] >= performance["sample_trigger_callback_seconds"]
     assert performance["total_engine_seconds"] > 0.0
     assert project.metadata["performance"] == performance
@@ -341,7 +342,7 @@ def test_generation_and_archive_export_observe_cooperative_cancellation(tmp_path
     cancelled = threading.Event()
     cancelled.set()
     config = GenerationConfig(
-        duration=1.0, sample_rate=8_000, seed=211,
+        duration=5.0, sample_rate=8_000, seed=211,
         include_melody=False, include_texture=False, include_ambience=False,
     )
     try:

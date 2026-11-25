@@ -7,6 +7,7 @@ import json
 import os
 import platform
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
