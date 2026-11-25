@@ -239,6 +239,7 @@ class ReawarpProject:
 
         config_data = record.get("config")
         asset_validation = None
+        file_validation = None
         manifest_path = root / "manifest.json"
         if manifest_path.is_file():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -256,7 +257,6 @@ class ReawarpProject:
             )
             config_data = resolve_project_asset_paths(config_data, root)
         config = GenerationConfig.from_dict(config_data)
-        file_validation = None
         if asset_validation is None:
             legacy_assets, _legacy_config = prepare_project_assets(
                 config_data, root, asset_policy="reference", cancel_event=cancel_event
@@ -361,9 +361,22 @@ class ReawarpProject:
             metadata=metadata,
             score=score,
         )
-        if asset_validation is not None:
+        asset_records_present = bool(
+            asset_validation and asset_validation.get("assets")
+        )
+        asset_findings = bool(
+            asset_validation and (
+                asset_validation.get("missing") or asset_validation.get("changed")
+            )
+        )
+        file_findings = bool(
+            file_validation and (
+                file_validation.get("missing") or file_validation.get("changed")
+            )
+        )
+        if asset_validation is not None and (asset_records_present or asset_findings):
             project.metadata["project_asset_validation"] = asset_validation
-        if file_validation is not None:
+        if file_validation is not None and (asset_records_present or file_findings):
             project.metadata["project_file_validation"] = file_validation
         candidate_ids = record.get("variation_candidates", [])
         if not isinstance(candidate_ids, list):

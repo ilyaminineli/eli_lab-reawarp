@@ -291,7 +291,7 @@ def test_background_archive_service_rejects_invalid_return_and_nonfinite_master(
 def test_generation_records_separate_sample_voice_and_event_timing():
     config = GenerationConfig(
         duration=5.0,
-        sample_rate=8_000,
+        sample_rate=22_050,
         seed=211,
         complexity=0.25,
         include_melody=False,
@@ -342,7 +342,7 @@ def test_generation_and_archive_export_observe_cooperative_cancellation(tmp_path
     cancelled = threading.Event()
     cancelled.set()
     config = GenerationConfig(
-        duration=5.0, sample_rate=8_000, seed=211,
+        duration=5.0, sample_rate=22_050, seed=211,
         include_melody=False, include_texture=False, include_ambience=False,
     )
     try:
