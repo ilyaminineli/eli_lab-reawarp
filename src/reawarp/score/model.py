@@ -79,22 +79,23 @@ class Score:
                     raise ValueError(f"harmonic_context {key} must be a list of finite numbers")
             for key in ("stability_weights", "tension_weights"):
                 values = harmonic_context.get(key, {})
-                if not isinstance(values, dict) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in values.values()):
+                if not isinstance(values, dict) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in values.values()):
                     raise ValueError(f"harmonic_context {key} must map labels to finite numbers")
-        sonorities = tuple(json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False)) for item in self.sonorities)
+        raw_sonorities = tuple(self.sonorities)
+        if any(not isinstance(item, dict) for item in raw_sonorities):
+            raise ValueError("each sonority must be an object")
+        sonorities = tuple(json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False)) for item in raw_sonorities)
         sonority_ids = [str(item.get("sonority_id", "")) for item in sonorities]
         if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
             raise ValueError("sonorities require unique non-empty sonority_id values")
         for item in sonorities:
-            if not isinstance(item, dict):
-                raise ValueError("each sonority must be an object")
             from reawarp.score.time import as_fraction
             start = as_fraction(item.get("onset_beats", 0))
             duration = as_fraction(item.get("duration_beats", 1))
             if start < 0 or duration <= 0:
                 raise ValueError("sonority onset must be non-negative and duration positive")
             pitches = item.get("pitches", [])
-            if not isinstance(pitches, list) or any(not isinstance(value, (int, float)) or not __import__("math").isfinite(float(value)) for value in pitches):
+            if not isinstance(pitches, list) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in pitches):
                 raise ValueError("sonority pitches must be a list of finite pitch coordinates")
         modulations = tuple(self.modulations)
         modulation_keys = [
