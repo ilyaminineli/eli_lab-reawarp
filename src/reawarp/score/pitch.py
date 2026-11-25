@@ -183,15 +183,26 @@ class PitchField:
         )
         allowed_collection = (
             not self.pitch_collection
-            or any(math.isclose(pitch % tuning.divisions_per_period, value % tuning.divisions_per_period,
-                                abs_tol=1e-7) for value in self.pitch_collection)
-        )
-        allowed_intervals = (
-            not self.allowed_intervals
-            or self.centre_pitch is None
             or any(
                 math.isclose(
-                    abs(pitch - self.centre_pitch), value, abs_tol=1e-7
+                    ((pitch - value) / tuning.divisions_per_period)
+                    - round((pitch - value) / tuning.divisions_per_period),
+                    0.0,
+                    abs_tol=1e-7,
+                )
+                for value in self.pitch_collection
+            )
+        )
+        interval = pitch - self.centre_pitch if self.centre_pitch is not None else None
+        allowed_intervals = (
+            not self.allowed_intervals
+            or interval is None
+            or any(
+                math.isclose(
+                    interval - value
+                    - round(interval / tuning.divisions_per_period) * tuning.divisions_per_period,
+                    0.0,
+                    abs_tol=1e-7,
                 )
                 for value in self.allowed_intervals
             )
