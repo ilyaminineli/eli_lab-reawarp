@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox,
+    QLabel, QListWidget, QPushButton, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -181,8 +181,12 @@ class ScoreAutomationEditor(QGroupBox):
             self.scope.addItem(label, value)
         self.scope.currentIndexChanged.connect(self._scope_changed)
         form.addRow("Scope", self.scope)
-        self.scope_id = QLineEdit()
-        self.scope_id.setPlaceholderText("e.g. melody, development, note-001")
+        self.scope_id = QComboBox()
+        self.scope_id.setEditable(True)
+        self.scope_id.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.scope_id.lineEdit().setPlaceholderText(
+            "Select a Score ID or type an exact custom ID"
+        )
         form.addRow("Scope ID", self.scope_id)
 
         self.retrigger = QComboBox()
@@ -257,13 +261,51 @@ class ScoreAutomationEditor(QGroupBox):
         self.amount.setValue(_TARGET_AMOUNTS.get(target, 0.25))
 
     def _scope_changed(self, *_args: Any) -> None:
-        is_global = self.scope.currentData() == "global"
+        scope = str(self.scope.currentData() or "global")
+        is_global = scope == "global"
         self.scope_id.setEnabled(not is_global)
         if is_global:
             self.scope_id.clear()
+            self.scope_id.setToolTip("Global controls apply to every matching Score event.")
+            return
+        self._refresh_scope_ids()
+
+    def _refresh_scope_ids(self) -> None:
+        """Suggest exact scope IDs from the loaded Score while retaining free-form entry."""
+        scope = str(self.scope.currentData() or "global")
+        if self._score is None or scope == "global":
+            return
+        previous = self.scope_id.currentText().strip()
+        if scope == "role":
+            identifiers = {event.voice_id for event in self._score.events}
+        elif scope == "section":
+            identifiers = {
+                str(value)
+                for event in self._score.events
+                if (value := event.parameters.get(
+                    "section_id", event.parameters.get("section_name")
+                )) is not None and str(value).strip()
+            }
+        else:
+            identifiers = {event.event_id for event in self._score.events}
+        ordered = sorted(identifiers)
+        # Keep very large Scores responsive; the editable field still accepts any exact ID.
+        if scope == "event" and len(ordered) > 250:
+            ordered = ordered[:250]
+            self.scope_id.setToolTip(
+                "Showing the first 250 event IDs. You can type any exact event ID."
+            )
+        else:
+            self.scope_id.setToolTip(
+                "Suggestions are drawn from the loaded Score. You can also type an exact ID."
+            )
+        self.scope_id.clear()
+        self.scope_id.addItems(ordered)
+        self.scope_id.setCurrentText(previous if previous else "")
 
     def set_score(self, score: Score | None) -> None:
         self._score = score
+        self._refresh_scope_ids()
         self._sources = list(score.automation_sources) if score is not None else []
         self._modulations = list(score.modulations) if score is not None else []
         self.controls.clear()
@@ -347,7 +389,7 @@ class ScoreAutomationEditor(QGroupBox):
 
     def _add_control(self) -> None:
         scope = str(self.scope.currentData())
-        scope_id = self.scope_id.text().strip() or None
+        scope_id = self.scope_id.currentText().strip() or None
         if scope != "global" and not scope_id:
             self.status.setText(f"Enter a {scope} ID before adding this control.")
             return
