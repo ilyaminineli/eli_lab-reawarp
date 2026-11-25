@@ -207,7 +207,7 @@ See [M23.md](M23.md).
 
 ## M24: Advanced DSP research modules
 
-**Status:** Active research track. M24.1 has a portable NumPy-only convolution/IR reference implementation, benchmark and listening-example renderer; CI and human-listening gates remain distinct. M24.2–M24.7 remain independent planned modules. No M24 module is enabled as a default mixer effect.
+**Status:** Active research track. M24.1 has a portable NumPy-only convolution/IR reference implementation and passes Python 3.10/3.11/3.12 and Windows CI; human listening and target-machine performance sign-offs remain open. M24.2–M24.7 remain independent planned modules. No M24 module is enabled as a default mixer effect.
 
 **Goal:** Introduce advanced DSP as independently planned, implemented and accepted sound instruments/processors, with explicit latency, tail, CPU/memory and portability contracts.
 
