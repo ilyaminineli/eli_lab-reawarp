@@ -75,6 +75,7 @@ class ReawarpProject:
             fx_routing: dict[str, Any] | None = None,
             fx_automation: dict[str, Any] | None = None,
             asset_policy: str = "copy",
+            include_midi: bool = False,
             cancel_event: Any | None = None,
             _include_variations: bool = True,
     ) -> Path:
@@ -124,7 +125,7 @@ class ReawarpProject:
             },
             "export": {
                 "bit_depth": bit_depth, "master": include_master, "stems": include_stems,
-                "asset_policy": asset_policy,
+                "asset_policy": asset_policy, "midi": bool(include_midi),
             },
         }
         if fx_routing is None:
@@ -212,7 +213,53 @@ class ReawarpProject:
                 encoding="utf-8",
             )
         _check_cancelled(cancel_event, "project export")
-        self.to_score().save(output / "score.json")
+        score = self.to_score()
+        score.save(output / "score.json")
+        if include_midi:
+            _check_cancelled(cancel_event, "project MIDI export")
+            midi_root = output / "midi"
+            voice_root = midi_root / "voices"
+            voice_root.mkdir(parents=True, exist_ok=True)
+            score.export_midi(midi_root / "score.mid")
+            import hashlib
+            import re
+
+            exported_voice_files = []
+            voices = sorted({
+                event.voice_id for event in score.events
+                if event.kind not in {"control", "marker"}
+            })
+            for voice_id in voices:
+                _check_cancelled(cancel_event, "project MIDI export")
+                events = tuple(
+                    event for event in score.events if event.voice_id == voice_id
+                )
+                voice_score = replace(
+                    score,
+                    title=f"{score.title} — {voice_id}",
+                    events=events,
+                    automation=(),
+                    automation_sources=(),
+                    modulations=(),
+                )
+                slug = re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                digest = hashlib.sha256(str(voice_id).encode("utf-8")).hexdigest()[:8]
+                voice_path = voice_root / f"{slug[:48]}-{digest}.mid"
+                voice_score.export_midi(voice_path)
+                exported_voice_files.append(voice_path.relative_to(output).as_posix())
+            project_record["midi"] = {
+                "combined_score": "midi/score.mid",
+                "voice_files": exported_voice_files,
+                "format": "Standard MIDI 1.0",
+                "notes": (
+                    "Fractional pitches are rounded for MIDI playback; exact Reawarp pitch, "
+                    "event identity and orchestration metadata are retained in Reawarp text events."
+                ),
+            }
+            (output / "project.json").write_text(
+                json.dumps(project_record, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
         write_project_manifest(
             output, source_assets=asset_records, cancel_event=cancel_event
         )
