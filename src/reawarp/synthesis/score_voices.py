@@ -67,8 +67,8 @@ def _control_curve(
     scheduled: ScheduledScoreEvent,
     sample_rate: int,
     default: float,
-) -> np.ndarray | None:
-    """Interpolate a control-bus lane at 1 kHz over the scheduled event frames."""
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Interpolate a control-bus lane and its active mask at 1 kHz."""
     if target_id not in controls.target_ids or scheduled.duration_frames <= 0:
         return None
     step = max(1, int(sample_rate) // 1000)
@@ -81,12 +81,19 @@ def _control_curve(
         event_id=scheduled.event.event_id,
     )
     if not len(sampled.frames):
-        return np.full(scheduled.duration_frames, float(default), dtype=np.float32)
+        return None
     frames = np.arange(
         scheduled.start_frame, scheduled.end_frame, dtype=np.float64
     )
     values = np.interp(frames, sampled.frames, sampled.values).astype(np.float32)
-    return values
+    active_samples = (
+        np.ones(len(sampled.frames), dtype=bool)
+        if sampled.active is None else np.asarray(sampled.active, dtype=bool)
+    )
+    sample_indices = np.searchsorted(sampled.frames, frames, side="right") - 1
+    sample_indices = np.clip(sample_indices, 0, len(active_samples) - 1)
+    active = active_samples[sample_indices]
+    return values, active
 
 
 def _apply_musical_controls(
@@ -95,23 +102,34 @@ def _apply_musical_controls(
     sample_rate: int,
     controls: AutomationControlBus,
 ) -> np.ndarray:
-    """Apply shared synthesis gain and cutoff/resonance lanes to a mono voice."""
+    """Apply scoped synthesis gain and cutoff/resonance lanes to a mono voice."""
     audio = np.asarray(signal, dtype=np.float32).reshape(-1).copy()
     if not len(audio):
         return audio
     cutoff = _control_curve(controls, 'synth.cutoff', scheduled, sample_rate, 0.0)
     if cutoff is not None:
-        filtered = _one_pole_lowpass(audio, sample_rate, cutoff)
-        resonance = _control_curve(
-            controls, 'synth.resonance', scheduled, sample_rate, 0.0
-        )
-        if resonance is None:
-            audio = filtered
-        else:
-            audio = filtered + (audio - filtered) * np.clip(resonance, 0.0, 1.0)
+        cutoff_values, cutoff_active = cutoff
+        if np.any(cutoff_active):
+            # The inactive region is explicitly passed through: a role-scoped
+            # cutoff on the lead must not filter bass or percussion events.
+            bypass_cutoff = max(100.0, float(sample_rate) * 0.45)
+            safe_cutoff = np.where(cutoff_active, cutoff_values, bypass_cutoff)
+            filtered = _one_pole_lowpass(audio, sample_rate, safe_cutoff)
+            filtered = np.where(cutoff_active, filtered, audio)
+            resonance = _control_curve(
+                controls, 'synth.resonance', scheduled, sample_rate, 0.0
+            )
+            if resonance is None:
+                audio = filtered
+            else:
+                resonance_values, resonance_active = resonance
+                resonance_values = np.where(resonance_active, resonance_values, 0.0)
+                amount = np.clip(resonance_values, 0.0, 1.0)
+                audio = filtered + (audio - filtered) * amount
     gain = _control_curve(controls, 'synth.gain', scheduled, sample_rate, 1.0)
     if gain is not None:
-        audio *= np.clip(gain, 0.0, 1.0)
+        gain_values, gain_active = gain
+        audio *= np.where(gain_active, np.clip(gain_values, 0.0, 1.0), 1.0)
     return np.asarray(audio, dtype=np.float32)
 
 
