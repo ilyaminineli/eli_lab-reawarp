@@ -113,6 +113,7 @@ def test_m18_score_automation_editor_builds_scoped_source_connections():
     assert editor.scope_id.count() == 2
     editor.target.setCurrentIndex(editor.target.findData("synth.pitch"))
     editor.source_kind.setCurrentIndex(editor.source_kind.findData("lfo"))
+    editor.lfo_waveform.setCurrentIndex(editor.lfo_waveform.findData("triangle"))
     editor.scope.setCurrentIndex(editor.scope.findData("role"))
     editor.scope_id.setCurrentText("melody")
     editor.retrigger.setCurrentIndex(editor.retrigger.findData("event"))
@@ -123,6 +124,7 @@ def test_m18_score_automation_editor_builds_scoped_source_connections():
 
     assert len(updated.automation_sources) == 1
     assert len(updated.modulations) == 1
+    assert updated.automation_sources[0].parameters["waveform"] == "triangle"
     assert updated.modulations[0].destination_target_id == "synth.pitch"
     assert updated.modulations[0].scope == "role"
     assert updated.modulations[0].scope_id == "melody"
@@ -133,6 +135,16 @@ def test_m18_score_automation_editor_builds_scoped_source_connections():
     editor._remove_control()
     assert editor.updated_score(score).automation_sources == ()
     assert editor.updated_score(score).modulations == ()
+
+    editor.source_kind.setCurrentIndex(editor.source_kind.findData("phrase_curve"))
+    editor.source_values.setText("0.0, 0.35, 1.0, 0.2")
+    editor._add_control()
+    curve_score = editor.updated_score(score)
+    assert curve_score.automation_sources[0].parameters["values"] == [
+        0.0, 0.35, 1.0, 0.2
+    ]
+    editor._remove_control()
+    assert editor.updated_score(score).automation_sources == ()
 
 
 def test_mixer_includes_separate_fx_and_score_control_editors():

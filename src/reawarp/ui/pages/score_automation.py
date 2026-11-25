@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from dataclasses import replace
 from fractions import Fraction
+import math
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QListWidget, QPushButton, QSpinBox,
+    QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox,
     QVBoxLayout, QWidget,
 )
 
@@ -169,7 +170,22 @@ class ScoreAutomationEditor(QGroupBox):
         self.source_kind.addItem("STEPPED", "stepped")
         self.source_kind.addItem("BOUNDED RANDOM WALK", "random_walk")
         self.source_kind.addItem("PHRASE CURVE", "phrase_curve")
+        self.source_kind.currentIndexChanged.connect(self._source_kind_changed)
         form.addRow("Source shape", self.source_kind)
+
+        self.lfo_waveform = QComboBox()
+        for value, label in (
+            ("sine", "SINE"),
+            ("triangle", "TRIANGLE"),
+            ("square", "SQUARE"),
+            ("saw", "SAW"),
+        ):
+            self.lfo_waveform.addItem(label, value)
+        form.addRow("LFO waveform", self.lfo_waveform)
+
+        self.source_values = QLineEdit("0.0, 1.0, 0.0")
+        self.source_values.setPlaceholderText("Comma-separated values from 0 to 1")
+        form.addRow("Curve / step values", self.source_values)
 
         self.scope = QComboBox()
         for value, label in (
@@ -246,6 +262,7 @@ class ScoreAutomationEditor(QGroupBox):
         root.addWidget(self.status)
         self.remove_button.setEnabled(False)
         self._scope_changed()
+        self._source_kind_changed()
 
     @staticmethod
     def _number(minimum: float, maximum: float, value: float, decimals: int) -> QDoubleSpinBox:
@@ -259,6 +276,25 @@ class ScoreAutomationEditor(QGroupBox):
     def _target_changed(self, *_args: Any) -> None:
         target = str(self.target.currentData())
         self.amount.setValue(_TARGET_AMOUNTS.get(target, 0.25))
+
+    def _source_kind_changed(self, *_args: Any) -> None:
+        kind = str(self.source_kind.currentData())
+        self.lfo_waveform.setEnabled(kind == "lfo")
+        self.source_values.setEnabled(
+            kind in {"envelope", "stepped", "phrase_curve"}
+        )
+
+    def _source_values(self) -> list[float]:
+        tokens = [part.strip() for part in self.source_values.text().split(",")]
+        if len(tokens) < 2 or any(not token for token in tokens):
+            raise ValueError("enter at least two comma-separated curve values")
+        try:
+            values = [float(token) for token in tokens]
+        except ValueError as exc:
+            raise ValueError("curve values must be numbers between 0 and 1") from exc
+        if any(not math.isfinite(value) or not 0.0 <= value <= 1.0 for value in values):
+            raise ValueError("curve values must be finite and between 0 and 1")
+        return values
 
     def _scope_changed(self, *_args: Any) -> None:
         scope = str(self.scope.currentData() or "global")
@@ -353,19 +389,24 @@ class ScoreAutomationEditor(QGroupBox):
         if kind == "lfo":
             parameters = {
                 "period_beats": period,
-                "waveform": "sine",
+                "waveform": str(self.lfo_waveform.currentData()),
                 "center": 0.5,
                 "depth": 0.5,
                 "sample_count": 128,
             }
         elif kind == "envelope":
+            values = self._source_values()
+            denominator = max(1, len(values) - 1)
             parameters = {
-                "shape": [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]],
+                "shape": [
+                    [index / denominator, value]
+                    for index, value in enumerate(values)
+                ],
                 "curve": "smooth",
             }
         elif kind == "stepped":
             parameters = {
-                "values": [0.0, 1.0, 0.45, 0.8],
+                "values": self._source_values(),
                 "step_beats": period,
             }
         elif kind == "random_walk":
@@ -376,7 +417,7 @@ class ScoreAutomationEditor(QGroupBox):
             }
         else:
             parameters = {
-                "values": [0.0, 0.75, 0.3, 1.0],
+                "values": self._source_values(),
                 "curve": "smooth",
             }
         return AutomationSource(
