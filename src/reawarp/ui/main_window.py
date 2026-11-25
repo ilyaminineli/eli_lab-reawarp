@@ -2466,7 +2466,10 @@ class MainWindow(QMainWindow):
         if str(message).startswith("CANCELLED:"):
             self.statusBar().showMessage("Background render cancelled.", 8000)
             return
-        self._show_error(message)
+        # Workers print the complete traceback; keep the dialog concise so the
+        # error can be copied from the terminal instead of a giant modal.
+        first_line = str(message).splitlines()[0] if str(message) else "Unknown render error"
+        self._show_error(first_line + "\n\nFull traceback was printed in the terminal.")
 
     def _show_error(self, message: str) -> None:
         self.statusBar().showMessage(message, 10000)
