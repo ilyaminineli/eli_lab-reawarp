@@ -698,6 +698,15 @@ def _transform_events(
             + (event.onset_beats - phrase.start_beats + shift) % span,
         ) for event in source]
 
+    if operation == "augmentation":
+        # The phrase occupies its complete semantic span: doubling material's
+        # internal timescale is constrained to half-span offsets, not a longer
+        # phrase. Keep the phrase clock fixed and report the rhythmic change.
+        output = [replace(
+            event,
+            onset_beats=phrase.start_beats + (event.onset_beats - phrase.start_beats) / 2,
+            duration_beats=event.duration_beats * 2,
+        ) for event in source]
     output.sort(key=lambda item: (item.onset_beats, item.voice_id, item.event_id))
     for event in output:
         if event.onset_beats < phrase.start_beats or event.end_beats > phrase.end_beats:
@@ -723,6 +732,30 @@ def _transform_events(
     return tuple(output), transformation
 
 
+def _phrase_for_score(score: Score, phrase_id: str) -> PhraseSpan:
+    """Resolve a phrase using persisted freeze lineage when its original span changed."""
+    plan = PhrasePlan.from_score(score)
+    phrase = next((item for item in plan.phrases if item.phrase_id == phrase_id), None)
+    if phrase is None:
+        raise ValueError(f"unknown phrase ID: {phrase_id}")
+    freeze = score.metadata.get("m28_phrase_freezes", {}).get(phrase_id)
+    if freeze:
+        target_ids = set(freeze.get("frozen_event_ids", ()))
+        events = [event for event in score.events if event.event_id in target_ids]
+        if events:
+            start = min(event.onset_beats for event in events)
+            end = max(event.end_beats for event in events)
+            # Keep the semantic phrase boundary as the wider declared region when
+            # a transform is contained; this prevents candidate clock drift.
+            phrase = replace(
+                phrase,
+                event_ids=tuple(event.event_id for event in events),
+                start_beats=min(phrase.start_beats, start),
+                end_beats=max(phrase.end_beats, end),
+            )
+    return phrase
+
+
 def _context_ids(score: Score, phrase: PhraseSpan) -> dict[str, tuple[str, ...]]:
     return {
         "preceding": tuple(
@@ -746,10 +779,7 @@ def build_phrase_candidate_batch(
     batch_id: str | None = None,
 ) -> "PhraseCandidateBatch":
     """Generate an offline, repeatable set of phrase alternatives from a frozen Score."""
-    plan = PhrasePlan.from_score(score)
-    phrase = next((item for item in plan.phrases if item.phrase_id == phrase_id), None)
-    if phrase is None:
-        raise ValueError(f"unknown phrase ID: {phrase_id}")
+    phrase = _phrase_for_score(score, phrase_id)
     if isinstance(count, bool) or not 1 <= int(count) <= 16:
         raise ValueError("phrase candidate count must be between 1 and 16")
     if variation_ladder not in VARIATION_LADDER:
@@ -842,7 +872,6 @@ def freeze_phrase_candidate(
     """Freeze candidate events in the Score and retain reversible source lineage."""
     if _score_fingerprint(base_score) != candidate.base_score_fingerprint:
         raise ValueError("candidate base Score is stale; regenerate against the current Score")
-    PhrasePlan.from_score(base_score)
     source_ids = set(candidate.source_event_ids)
     target_events = tuple(
         item for item in candidate.candidate_score.events
@@ -954,7 +983,7 @@ def phrase_context_events(score: Score, phrase_id: str) -> dict[str, tuple[Music
     index = next((i for i, item in enumerate(phrases) if item.phrase_id == phrase_id), None)
     if index is None:
         raise ValueError(f"unknown phrase ID: {phrase_id}")
-    phrase = phrases[index]
+    phrase = _phrase_for_score(score, phrase_id)
     by_id = {event.event_id: event for event in score.events}
     solo = tuple(by_id[item] for item in phrase.event_ids)
     predecessor_start = phrases[index - 1].start_beats if index > 0 else phrase.start_beats
