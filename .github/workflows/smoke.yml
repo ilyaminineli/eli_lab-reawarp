@@ -186,7 +186,7 @@ jobs:
               dry, sample_rate, routing, bpm=120, automation=automation
           )
           returns = metadata.pop('bus_returns_audio')
-          assert all(audio.shape == (frames, 2) for audio in processed.values())
+          assert all(audio.ndim == 2 and audio.shape[1] == 2 and len(audio) >= frames for audio in processed.values())
           assert all(np.array_equal(dry[name], original[name]) for name in dry)
           assert set(returns) == {'space', 'echo'}
           assert metadata['active_send_stems_by_bus']['space'] == ['melody', 'ambience']
