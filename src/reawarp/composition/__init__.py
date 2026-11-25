@@ -17,7 +17,7 @@ from reawarp.composition.motifs import (
     render_motif_events,
     transform_motif,
 )
-from reawarp.composition.orchestration import (
+from reawarp.composition.perceptual import build_perceptual_orchestration_plan\nfrom reawarp.composition.orchestration import (
     ROLE_NAMES,
     RoleIntent,
     SectionOrchestrationPlan,
@@ -44,6 +44,7 @@ __all__ = [
     "TransitionGesture",
     "build_composition_plan",
     "build_motif_plan",
+    "build_perceptual_orchestration_plan",
     "build_motif_role_accents",
     "build_section_orchestration_plan",
     "build_transition_plan",
