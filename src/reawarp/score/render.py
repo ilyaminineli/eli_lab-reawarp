@@ -293,6 +293,11 @@ class ScoreRenderer:
                 raise ValueError(f"voice renderer for {event.voice_id!r} returned non-finite audio")
             if rendered.ndim == 1:
                 pan = float(event.parameters.get("pan", 0.0))
+                if "spatial.pan" in controls.target_ids:
+                    pan += controls.value_for_context(
+                        "spatial.pan", scheduled.start_frame,
+                        event_id=event.event_id, default_value=0.0,
+                    )
                 if not math.isfinite(pan):
                     raise ValueError(f"event {event.event_id!r} has a non-finite pan value")
                 pan = float(np.clip(pan, -1.0, 1.0))
@@ -302,7 +307,17 @@ class ScoreRenderer:
                     rendered * math.sin(angle),
                 )).astype(np.float32, copy=False)
             else:
-                rendered_stereo = rendered
+                rendered_stereo = rendered.copy()
+                if "spatial.width" in controls.target_ids:
+                    width = controls.value_for_context(
+                        "spatial.width", scheduled.start_frame,
+                        event_id=event.event_id, default_value=1.0,
+                    )
+                    mid = 0.5 * (rendered_stereo[:, 0] + rendered_stereo[:, 1])
+                    side = 0.5 * (rendered_stereo[:, 0] - rendered_stereo[:, 1]) * width
+                    rendered_stereo = np.column_stack((mid + side, mid - side)).astype(
+                        np.float32, copy=False
+                    )
 
             target = stems.setdefault(
                 event.voice_id, np.zeros((frame_count, 2), dtype=np.float32)
