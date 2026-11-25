@@ -17,7 +17,8 @@ from reawarp.composition.motifs import (
     render_motif_events,
     transform_motif,
 )
-from reawarp.composition.perceptual import build_perceptual_orchestration_plan\nfrom reawarp.composition.orchestration import (
+from reawarp.composition.perceptual import build_perceptual_orchestration_plan
+from reawarp.composition.orchestration import (
     ROLE_NAMES,
     RoleIntent,
     SectionOrchestrationPlan,
