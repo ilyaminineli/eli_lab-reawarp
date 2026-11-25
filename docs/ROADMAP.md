@@ -207,11 +207,11 @@ See [M23.md](M23.md).
 
 ## M24: Advanced DSP research modules
 
-**Status:** Planned research track. Each module is independent and must be justified by a real compositional use-case.
+**Status:** Active research track. M24.1 has a portable NumPy-only convolution/IR reference implementation, benchmark and listening-example renderer; CI and human-listening gates remain distinct. M24.2–M24.7 remain independent planned modules. No M24 module is enabled as a default mixer effect.
 
-**Goal:** Add convolution, spectral delay, cross-synthesis, oversampling, sidechain routing and feedback networks one at a time, with explicit CPU, latency, tail and portability contracts.
+**Goal:** Introduce advanced DSP as independently planned, implemented and accepted sound instruments/processors, with explicit latency, tail, CPU/memory and portability contracts.
 
-See [M24.md](M24.md).
+See [M24.md](M24.md) and [M24.1.md](M24.1.md).
 
 ## M25: Performance, portability and project durability
 

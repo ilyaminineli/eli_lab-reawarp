@@ -354,6 +354,11 @@ The Generator is divided into Form, Voices, and Rhythm sub-pages. Workspaces are
 See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented behaviour and remaining limitations.
 
 - [IRO integration contract](docs/IRO_INTEGRATION.md) — shared sample identity, provenance and the phrase grammar bridge to the IRO project.
+
+### Advanced DSP research track (M24)
+
+M24 is an independent research track, not a bundled effects release. M24.1 starts with a NumPy-only partitioned convolution engine, designed modal impulse responses, hash-verified portable IR archives, explicit full-tail/zero-offline-latency semantics, benchmarks and a matched-level resonator example. It is not inserted into role routing or master by default. Spectral delay, cross-synthesis, oversampled nonlinear processing, sidechain routing, feedback networks and parallel branches remain separate planned modules. See [M24](docs/M24.md) and [M24.1](docs/M24.1.md).
+
 ## Current roadmap
 
 The current implementation baseline is **M21–M23 implemented and closed**. M20 compiles director decisions into rational-beat phrase, cycle, role-relationship, attention, hand-off, mutation and transition intent on every generated Score; subjective listening sign-off remains experimentally unverified. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M19.1–M19.5 add optional harmonic context, tuning-aware sonority generation, sequence-level melodic voice-leading, six independent bass roles, explicit motif identity contracts, sonority-aware motif resolution and exact Reawarp pitch metadata in MIDI exports, without imposing functional tonality. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs.

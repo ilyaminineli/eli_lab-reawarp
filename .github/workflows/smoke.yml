@@ -49,6 +49,10 @@ jobs:
           PY
       - name: Run short benchmark fixture
         run: python scripts/benchmark_generation.py --durations 5 --palettes subtractive --sample-rate 22050 --output /tmp/reawarp-m14-benchmark.json
+      - name: Benchmark portable M24.1 convolution reference
+        run: python scripts/benchmark_m24_convolution.py --durations 0.15 --ir-durations 0.05 --sample-rates 22050 --output /tmp/reawarp-m24-1-benchmark.json
+      - name: Render M24.1 matched-level listening example
+        run: python scripts/render_m24_1_listening_example.py --output /tmp/reawarp-m24-1-listening
       - name: Smoke-test CLI
         run: reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-ci
       - name: Smoke-test FX preset and stage registries
