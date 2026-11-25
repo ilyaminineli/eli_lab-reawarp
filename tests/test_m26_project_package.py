@@ -10,8 +10,9 @@ from reawarp.core.project import ReawarpProject
 from reawarp.export.project_archive import export_project_package
 from reawarp.export.wav import read_wav
 from reawarp.score.events import MusicalEvent
-from reawarp.score.model import Score
 from fractions import Fraction
+
+from reawarp.score.model import Score
 
 
 def _package_project() -> ReawarpProject:
@@ -67,7 +68,7 @@ def test_delivery_folder_contains_only_readme_master_stems_and_midi(tmp_path: Pa
         master_audio=master,
         bit_depth=24,
         include_midi=True,
-        fx_render_status="rendered",
+        fx_render_status="not_configured",
     )
 
     assert output == destination
@@ -89,6 +90,12 @@ def test_delivery_folder_contains_only_readme_master_stems_and_midi(tmp_path: Pa
         if item.startswith("midi/voices/") and item.endswith(".mid")
     }
     assert len(voice_files) == 2
+    assert all(
+        item in {"README.md", "master.wav"}
+        or item.startswith("stems/")
+        or item.startswith("midi/")
+        for item in files
+    )
     assert all(not item.startswith("assets/") for item in files)
     assert not any(item in files for item in {
         "project.json", "score.json", "events.json", "manifest.json",
@@ -99,6 +106,7 @@ def test_delivery_folder_contains_only_readme_master_stems_and_midi(tmp_path: Pa
     readme = (output / "README.md").read_text(encoding="utf-8")
     assert "M26 手渡し / test" in readme
     assert "final routed mix" in readme
+    assert "No project FX routing was configured" in readme
     assert "original aligned dry generation stems" in readme
     assert "no copied source samples" in readme
 
