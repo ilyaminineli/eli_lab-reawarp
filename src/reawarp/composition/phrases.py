@@ -661,13 +661,14 @@ def _transform_events(
             + span - (event.onset_beats - phrase.start_beats) - event.duration_beats,
         ) for event in reversed(source)]
     elif operation == "augmentation":
-        # Stretch each phrase event around the phrase start at a half-rate.
+        # Expand phrase positions from the first half into the complete span.
         output = [replace(
             event,
-            onset_beats=phrase.start_beats + (event.onset_beats - phrase.start_beats) / 2,
-            duration_beats=event.duration_beats / 2,
+            onset_beats=phrase.start_beats + 2 * (event.onset_beats - phrase.start_beats),
+            duration_beats=2 * event.duration_beats,
         ) for event in source]
     elif operation == "diminution":
+        # Compress phrase material into its first half.
         output = [replace(
             event,
             onset_beats=phrase.start_beats + (event.onset_beats - phrase.start_beats) / 2,
@@ -735,15 +736,11 @@ def _phrase_for_score(score: Score, phrase_id: str) -> PhraseSpan:
         target_ids = set(freeze.get("frozen_event_ids", ()))
         events = [event for event in score.events if event.event_id in target_ids]
         if events:
-            start = min(event.onset_beats for event in events)
-            end = max(event.end_beats for event in events)
-            # Keep the semantic phrase boundary as the wider declared region when
-            # a transform is contained; this prevents candidate clock drift.
             phrase = replace(
                 phrase,
                 event_ids=tuple(event.event_id for event in events),
-                start_beats=min(phrase.start_beats, start),
-                end_beats=max(phrase.end_beats, end),
+                start_beats=as_fraction(freeze.get("phrase_start_beats", phrase.start_beats)),
+                end_beats=as_fraction(freeze.get("phrase_end_beats", phrase.end_beats)),
             )
     return phrase
 
@@ -914,6 +911,14 @@ def freeze_phrase_candidate(
         "parent_candidate_id": parent_candidate_id,
         "base_score_fingerprint": candidate.base_score_fingerprint,
         "frozen_event_ids": list(candidate.target_event_ids),
+        "phrase_start_beats": str(
+            next(item.start_beats for item in PhrasePlan.from_score(base_score).phrases
+                 if item.phrase_id == candidate.phrase_id)
+        ),
+        "phrase_end_beats": str(
+            next(item.end_beats for item in PhrasePlan.from_score(base_score).phrases
+                 if item.phrase_id == candidate.phrase_id)
+        ),
         "source_events": [
             item.to_dict() for item in base_score.events if item.event_id in source_ids
         ],
@@ -925,6 +930,21 @@ def freeze_phrase_candidate(
         "candidate_event_fingerprint": _fingerprint([item.to_dict() for item in target_events]),
     }
     metadata = copy.deepcopy(base_score.metadata)
+    phrase_plan = PhrasePlan.from_score(base_score)
+    replaced_phrase = next(
+        item for item in phrase_plan.phrases if item.phrase_id == candidate.phrase_id
+    )
+    updated_phrases = tuple(
+        replace(item, event_ids=tuple(candidate.target_event_ids))
+        if item.phrase_id == candidate.phrase_id else item
+        for item in phrase_plan.phrases
+    )
+    updated_plan = PhrasePlan(
+        phrases=updated_phrases,
+        motif_families=phrase_plan.motif_families,
+    )
+    metadata["m28_phrase_plan"] = updated_plan.to_dict()
+    metadata["m28_phrase_plan_fingerprint"] = _fingerprint(updated_plan.to_dict())
     freezes[candidate.phrase_id] = record
     metadata["m28_phrase_freezes"] = freezes
     frozen_score = replace(base_score, events=new_events, metadata=metadata)
@@ -952,6 +972,22 @@ def restore_phrase_base(
     restored = tuple(remaining) + source_events
     freezes.pop(phrase_id, None)
     metadata = copy.deepcopy(current_score.metadata)
+    phrase_plan = PhrasePlan.from_dict(metadata["m28_phrase_plan"])
+    updated_phrases = tuple(
+        replace(
+            item,
+            event_ids=tuple(
+                event.event_id for event in source_events
+            ),
+        ) if item.phrase_id == phrase_id else item
+        for item in phrase_plan.phrases
+    )
+    updated_plan = PhrasePlan(
+        phrases=updated_phrases,
+        motif_families=phrase_plan.motif_families,
+    )
+    metadata["m28_phrase_plan"] = updated_plan.to_dict()
+    metadata["m28_phrase_plan_fingerprint"] = _fingerprint(updated_plan.to_dict())
     metadata["m28_phrase_freezes"] = freezes
     return replace(current_score, events=restored, metadata=metadata)
 
