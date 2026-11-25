@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from typing import Callable, Mapping
 
@@ -86,6 +86,115 @@ def _stable_event_probability_seed(event: MusicalEvent) -> int:
             break
     digest = hashlib.blake2b(event_id.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "little", signed=False)
+
+
+def _stable_control_value(event: MusicalEvent, domain: str) -> float:
+    """Return a domain-separated, event-stable value in [0, 1)."""
+    digest = hashlib.blake2b(
+        f"{event.event_id}:{domain}".encode("utf-8"), digest_size=8
+    ).digest()
+    return int.from_bytes(digest, "little", signed=False) / float(1 << 64)
+
+
+def _apply_score_performance_controls(
+    event: MusicalEvent,
+    start_frame: int,
+    frame_count: int,
+    controls: AutomationControlBus,
+    timeline: RenderTimeline,
+) -> MusicalEvent | None:
+    """Resolve composition controls once per event without mutating the source Score.
+
+    Density is stable event thinning; syncopation advances eligible percussion by one
+    sixteenth without crossing a bar; articulation changes note gate length. The
+    transformed event is a render-performance view and repeated renders stay idempotent.
+    """
+    event_id = event.event_id
+    event_gain = event
+    if "role.density" in controls.target_ids:
+        density, active = controls.value_and_active_for_context(
+            "role.density", start_frame, event_id=event_id, default_value=1.0
+        )
+        if active and _stable_control_value(event, "m18-density") >= float(
+            np.clip(density, 0.0, 1.0)
+        ):
+            return None
+
+    if "role.syncopation" in controls.target_ids and event.voice_id in {
+        "snare", "hat", "break"
+    }:
+        syncopation, active = controls.value_and_active_for_context(
+            "role.syncopation", start_frame, event_id=event_id, default_value=0.0
+        )
+        step_value = event.parameters.get("step")
+        if step_value is None:
+            raw_step = event.onset_beats * 4
+            step_value = int(raw_step) if raw_step.denominator == 1 else None
+        try:
+            step = int(step_value) if step_value is not None else None
+        except (TypeError, ValueError):
+            step = None
+        motif_relation = str(event.parameters.get("motif_relation") or "")
+        eligible = (
+            step is not None
+            and step % 2 == 0
+            and not (event.voice_id == "snare" and step % 16 in {4, 12})
+            and motif_relation not in {"shadow", "response"}
+        )
+        if (
+            active and eligible
+            and _stable_control_value(event, "m18-syncopation")
+            < 0.5 * float(np.clip(syncopation, 0.0, 1.0))
+        ):
+            shifted_onset = event.onset_beats + Fraction(1, 4)
+            if (
+                timeline.bar_and_beat(shifted_onset)[0]
+                == timeline.bar_and_beat(event.onset_beats)[0]
+            ):
+                shifted_start, shifted_end = timeline.beat_span_to_frames(
+                    shifted_onset, event.duration_beats
+                )
+                if shifted_start < frame_count and shifted_end <= frame_count:
+                    parameters = dict(event.parameters)
+                    parameters["step"] = step + 1
+                    parameters["m18_syncopation_shift_beats"] = "1/4"
+                    event_gain = replace(
+                        event, onset_beats=shifted_onset, parameters=parameters
+                    )
+
+    if "role.articulation" in controls.target_ids and event_gain.kind == "note":
+        articulation, active = controls.value_and_active_for_context(
+            "role.articulation",
+            start_frame,
+            event_id=event_id,
+            default_value=0.0,
+        )
+        if active:
+            index = int(np.clip(round(articulation), 0, 4))
+            gate_ratios = (1.0, 0.55, 0.78, 1.0, 1.15)
+            articulation_names = (
+                event_gain.articulation,
+                "staccato",
+                "detached",
+                "tenuto",
+                "legato",
+            )
+            base_gate = Fraction(str(
+                event_gain.parameters.get("gate_duration_beats", event_gain.duration_beats)
+            ))
+            gate = max(Fraction(1, 64), min(
+                event_gain.duration_beats,
+                base_gate * Fraction(str(gate_ratios[index])),
+            ))
+            parameters = dict(event_gain.parameters)
+            parameters["gate_duration_beats"] = str(gate)
+            parameters["m18_articulation_index"] = index
+            event_gain = replace(
+                event_gain,
+                articulation=articulation_names[index],
+                parameters=parameters,
+            )
+    return event_gain
 
 
 def _default_voice_renderer(
@@ -242,7 +351,15 @@ class ScoreRenderer:
         frame_count = int(frame_count)
 
         schedule: list[ScheduledScoreEvent] = []
-        for event in score.events:
+        for source_event in score.events:
+            source_start = timeline.beat_to_frame(source_event.onset_beats)
+            if source_start >= frame_count:
+                continue
+            event = _apply_score_performance_controls(
+                source_event, source_start, frame_count, controls, timeline
+            )
+            if event is None:
+                continue
             start, end = timeline.beat_span_to_frames(
                 event.onset_beats, event.duration_beats
             )

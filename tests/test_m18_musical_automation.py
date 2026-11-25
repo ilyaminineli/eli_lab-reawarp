@@ -622,3 +622,106 @@ def test_melodic_envelope_and_vibrato_controls_reach_production_voices(palette):
     assert not np.allclose(dry, shaped, atol=1e-7)
     assert not np.allclose(dry, bent, atol=1e-7)
     np.testing.assert_array_equal(bent, bent_again)
+
+
+def test_role_density_control_thins_events_deterministically_and_is_idempotent():
+    events = tuple(
+        MusicalEvent(
+            event_id=f"hat-density-{index:03d}",
+            voice_id="hat",
+            onset_beats=Fraction(index, 2),
+            duration_beats=Fraction(1, 8),
+            kind="hit",
+            parameters={"step": index * 2, "source_kind": "hat"},
+        )
+        for index in range(32)
+    )
+    score = Score(
+        events=events,
+        automation=(
+            AutomationLane(
+                "role.density",
+                (AutomationPoint(Fraction(0), 0.35),),
+                unit="normalized",
+                scope="role",
+                scope_id="hat",
+            ),
+        ),
+    )
+    first = ScoreRenderer().render(score, 48_000)
+    second = ScoreRenderer().render(score, 48_000)
+
+    assert 0 < len(first.schedule) < len(events)
+    assert [item.event_id for item in first.schedule] == [
+        item.event_id for item in second.schedule
+    ]
+    assert len(first.score.events) == len(events)
+
+
+def test_role_syncopation_moves_only_eligible_events_within_their_bar():
+    events = tuple(
+        MusicalEvent(
+            event_id=f"hat-sync-{index:03d}",
+            voice_id="hat",
+            onset_beats=Fraction(index, 2),
+            duration_beats=Fraction(1, 8),
+            kind="hit",
+            parameters={"step": index * 2, "source_kind": "hat"},
+        )
+        for index in range(32)
+    )
+    score = Score(
+        events=events,
+        automation=(
+            AutomationLane(
+                "role.syncopation",
+                (AutomationPoint(Fraction(0), 1.0),),
+                unit="normalized",
+                scope="role",
+                scope_id="hat",
+            ),
+        ),
+    )
+    rendered = ScoreRenderer().render(score, 48_000)
+    by_id = {item.event_id: item for item in rendered.schedule}
+    shifted = [
+        item for item in rendered.schedule
+        if item.event.parameters.get("m18_syncopation_shift_beats") == "1/4"
+    ]
+
+    assert shifted
+    assert len(rendered.schedule) == len(events)
+    for item in shifted:
+        original = next(event for event in events if event.event_id == item.event_id)
+        assert item.event.onset_beats == original.onset_beats + Fraction(1, 4)
+        assert item.bar_number == rendered.timeline.bar_and_beat(item.event.onset_beats)[0]
+
+
+def test_role_articulation_control_changes_note_gate_without_changing_symbolic_score():
+    event = MusicalEvent(
+        event_id="lead-articulation",
+        voice_id="melody",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(2),
+        kind="note",
+        frequency_hz=440.0,
+        parameters={"gate_duration_beats": "1"},
+    )
+    score = Score(
+        events=(event,),
+        automation=(
+            AutomationLane(
+                "role.articulation",
+                (AutomationPoint(Fraction(0), 1.0),),
+                unit="articulation_index",
+                scope="role",
+                scope_id="melody",
+            ),
+        ),
+    )
+    rendered = ScoreRenderer().render(score, 48_000)
+    scheduled = rendered.schedule[0]
+
+    assert scheduled.event.articulation == "staccato"
+    assert scheduled.event.parameters["gate_duration_beats"] == "11/20"
+    assert "gate_duration_beats" not in event.parameters
