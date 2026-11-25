@@ -31,7 +31,7 @@ class RenderWorker(QRunnable):
         except Exception as exc:
             detail = traceback.format_exc()
             logger.error("Background render failed:\n%s", detail)
-            self.signals.error.emit(f"{type(exc).__name__}: {exc}\n\n{detail}")
+            self.signals.error.emit(f"{type(exc).__name__}: {exc}")
 
 
 class CancellableRenderWorker(QRunnable):
