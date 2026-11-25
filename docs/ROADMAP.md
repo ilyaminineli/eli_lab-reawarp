@@ -167,7 +167,7 @@ See [M18.md](M18.md).
 
 ## M19: Harmonic context and voice-leading
 
-**Status:** M19.1 and M19.2 implemented on main. Optional Score harmonic-context/sonority persistence, tuning-aware pitch fields, deterministic voice-leading primitives, seeded sonority generation, spacing/register constraints, spectral derivation and provenance-preserving transformations are integrated. M19.3 voice-leading sequence planning and bass-role grammar, M19.4 motif/MIDI/UI integration remain.
+**Status:** M19.1–M19.3 implemented on main. Optional Score harmonic-context and sonority persistence, tuning-aware pitch fields, seeded sonority generation, provenance-preserving transformations, boundary-driven whole-sequence melodic voice-leading, serializable cost weights/hard constraints and deliberate high-friction motion are integrated. M19.4 bass-role planning and M19.5 motif/MIDI integration remain.
 
 **Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 

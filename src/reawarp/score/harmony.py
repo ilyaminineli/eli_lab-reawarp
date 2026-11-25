@@ -10,19 +10,63 @@ from typing import Sequence
 
 @dataclass(frozen=True, slots=True)
 class VoiceLeadingWeights:
-    """Transparent soft-cost weights; they are not a universal musical-quality score."""
+    """Transparent soft-cost weights; they are not a universal musical-quality score.
+
+    ``crossing`` is retained as the original M19.1 voice-crossing weight.
+    M19.3 adds independent weights for leaving a role register, target-role
+    affinity, motion-style preferences, and deliberate crossing.
+    """
 
     motion: float = 1.0
     leap: float = 0.25
     common_tone_bonus: float = 0.5
     crossing: float = 2.0
     leap_threshold: float = 5.0
+    register_crossing: float = 1.0
+    target_role: float = 1.0
+    contrary_motion: float = 1.0
+    oblique_motion: float = 1.0
+    parallel_motion: float = 1.0
+    deliberate_crossing_bonus: float = 2.0
 
     def __post_init__(self) -> None:
-        for name in ("motion", "leap", "common_tone_bonus", "crossing", "leap_threshold"):
-            value = float(getattr(self, name))
-            if not math.isfinite(value) or value < 0:
+        for name in (
+            "motion", "leap", "common_tone_bonus", "crossing", "leap_threshold",
+            "register_crossing", "target_role", "contrary_motion", "oblique_motion",
+            "parallel_motion", "deliberate_crossing_bonus",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not math.isfinite(float(value)) or float(value) < 0:
                 raise ValueError(f"{name} must be finite and non-negative")
+
+    def to_dict(self) -> dict[str, float]:
+        return {
+            "motion": float(self.motion),
+            "leap": float(self.leap),
+            "common_tone_bonus": float(self.common_tone_bonus),
+            "crossing": float(self.crossing),
+            "leap_threshold": float(self.leap_threshold),
+            "register_crossing": float(self.register_crossing),
+            "target_role": float(self.target_role),
+            "contrary_motion": float(self.contrary_motion),
+            "oblique_motion": float(self.oblique_motion),
+            "parallel_motion": float(self.parallel_motion),
+            "deliberate_crossing_bonus": float(self.deliberate_crossing_bonus),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "VoiceLeadingWeights":
+        if not isinstance(data, dict):
+            raise ValueError("voice-leading weights must be an object")
+        allowed = {
+            "motion", "leap", "common_tone_bonus", "crossing", "leap_threshold",
+            "register_crossing", "target_role", "contrary_motion", "oblique_motion",
+            "parallel_motion", "deliberate_crossing_bonus",
+        }
+        unknown = set(data) - allowed
+        if unknown:
+            raise ValueError("unknown voice-leading weight(s): " + ", ".join(sorted(unknown)))
+        return cls(**{key: value for key, value in data.items()})
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,10 +105,15 @@ def assign_voice_leading(
     if any(not math.isfinite(value) for value in (*source, *target)):
         raise ValueError("voice-leading pitches must be finite")
     if maximum_leap is not None and (
-        not math.isfinite(float(maximum_leap)) or maximum_leap < 0
+        isinstance(maximum_leap, bool)
+        or not math.isfinite(float(maximum_leap)) or maximum_leap < 0
     ):
         raise ValueError("maximum_leap must be finite and non-negative")
-    if not math.isfinite(float(common_tone_tolerance)) or common_tone_tolerance < 0:
+    if (
+        isinstance(common_tone_tolerance, bool)
+        or not math.isfinite(float(common_tone_tolerance))
+        or common_tone_tolerance < 0
+    ):
         raise ValueError("common_tone_tolerance must be finite and non-negative")
 
     best_key: tuple[float, tuple[int, ...]] | None = None

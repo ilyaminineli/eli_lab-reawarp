@@ -23,6 +23,11 @@ from reawarp.score.pitch import (
 from reawarp.score.harmony import (
     VoiceLeadingResult, VoiceLeadingWeights, assign_voice_leading,
 )
+from reawarp.score.voice_leading import (
+    SonorityBoundary, SonoritySequencePlan, VoiceLeadingConstraints,
+    VoiceLeadingPlanConfig, VoiceLeadingPreferences, VoiceLeadingTransition,
+    VoiceRoleTarget, plan_sonority_sequence,
+)
 from reawarp.score.sonority import (
     derive_spectral_sonority,
     displace_register,
@@ -75,6 +80,14 @@ __all__ = [
     "TuningSystem",
     "VoiceLeadingResult",
     "VoiceLeadingWeights",
+    "VoiceLeadingConstraints",
+    "VoiceLeadingPreferences",
+    "VoiceLeadingPlanConfig",
+    "VoiceLeadingTransition",
+    "VoiceRoleTarget",
+    "SonorityBoundary",
+    "SonoritySequencePlan",
+    "plan_sonority_sequence",
     "assign_voice_leading",
     "generate_sonority",
     "rotate_sonority",

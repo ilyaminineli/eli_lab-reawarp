@@ -31,6 +31,7 @@ class Score:
     tuning_divisions_per_period: int = 12
     metadata: dict[str, Any] = field(default_factory=dict)
     schema_version: int = 1
+    sonority_plan: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.title.strip():
