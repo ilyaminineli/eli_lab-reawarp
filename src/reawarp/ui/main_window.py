@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import secrets
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,7 @@ from reawarp.ui.audio_player import AudioPlayer
 from reawarp.ui.pages.fx_lab import FxLabPage
 from reawarp.ui.pages.fx_automation import FXAutomationEditor
 from reawarp.ui.pages.fx_routing import FXRoutingEditor
+from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
@@ -944,8 +946,16 @@ class MainWindow(QMainWindow):
         automation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         automation_scroll.setWidget(self.fx_automation_editor)
 
+        self.score_automation_editor = ScoreAutomationEditor()
+        self.score_automation_editor.applyRequested.connect(self._apply_score_automation)
+        score_automation_scroll = QScrollArea()
+        score_automation_scroll.setWidgetResizable(True)
+        score_automation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        score_automation_scroll.setWidget(self.score_automation_editor)
+
         self.fx_workspace_tabs.addTab(routing_scroll, "ROUTING")
-        self.fx_workspace_tabs.addTab(automation_scroll, "AUTOMATION")
+        self.fx_workspace_tabs.addTab(automation_scroll, "FX AUTOMATION")
+        self.fx_workspace_tabs.addTab(score_automation_scroll, "SCORE CONTROL")
         mixer_layout.addWidget(self.fx_workspace_tabs, 2)
         self.mixer_stack.addWidget(mixer_content_page)
         self.mixer_stack.setCurrentIndex(0)
@@ -1252,6 +1262,82 @@ class MainWindow(QMainWindow):
             return
         self._run_render(lambda: ReawarpEngine().generate(config), "Generating full loop…")
 
+    def _apply_score_automation(self) -> None:
+        """Apply the staged M18 score controls without mutating the source project."""
+        if self.project is None:
+            return
+        try:
+            edited_score = self.score_automation_editor.updated_score(
+                self.project.to_score()
+            )
+        except Exception as exc:
+            self._show_error(f"Could not prepare score automation: {exc}")
+            return
+        base_project = self.project
+        self._run_render(
+            lambda: self._render_score_automation_project(base_project, edited_score),
+            "Applying score automation and re-rendering event-backed voices…",
+        )
+
+    @staticmethod
+    def _render_score_automation_project(
+        project: ReawarpProject,
+        score,
+    ) -> ReawarpProject:
+        """Render a controlled Score and retain the specialist whole-field layers."""
+        rendered = ReawarpEngine().render_score(score, config=project.config)
+        canonical_score = rendered.score or score
+        stems = {
+            name: np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in project.stems.items()
+        }
+        aliases = {"hat": "hats", "break": "synthetic_break"}
+        event_voices = {
+            event.voice_id for event in canonical_score.events
+            if event.kind not in {"control", "marker"}
+        }
+        empty = np.zeros((rendered.frame_count, 2), dtype=np.float32)
+        peak_ceiling = 10.0 ** (-1.0 / 20.0)
+        for voice_id in sorted(event_voices):
+            name = aliases.get(voice_id, voice_id)
+            audio = rendered.stems.get(voice_id)
+            updated = empty.copy() if audio is None else np.asarray(
+                audio, dtype=np.float32
+            ).copy()
+            peak = float(np.max(np.abs(updated))) if updated.size else 0.0
+            if peak > peak_ceiling:
+                updated *= peak_ceiling / peak
+            stems[name] = updated
+
+        automation_summary = {
+            "source_count": len(canonical_score.automation_sources),
+            "modulation_count": len(canonical_score.modulations),
+            "control_targets": sorted({
+                lane.target_id for lane in canonical_score.automation
+            } | {
+                item.destination_target_id for item in canonical_score.modulations
+            }),
+            "renderer": "ScoreRenderer",
+            "event_backed_voices_re_rendered": sorted(event_voices),
+            "whole_field_layers_preserved": [
+                name for name in ("noise_texture", "ambience") if name in stems
+            ],
+        }
+        score_metadata = dict(canonical_score.metadata)
+        score_metadata["m18_score_automation"] = automation_summary
+        score_metadata["render_stems"] = list(stems)
+        controlled_score = replace(canonical_score, metadata=score_metadata)
+        project_metadata = dict(project.metadata)
+        project_metadata["m18_score_automation"] = automation_summary
+        return ReawarpProject(
+            config=project.config,
+            sample_rate=project.sample_rate,
+            stems=stems,
+            events=list(project.events),
+            metadata=project_metadata,
+            score=controlled_score,
+        )
+
     def _regenerate_stem(self, name: str) -> None:
         if self.project is None:
             return
@@ -1297,7 +1383,8 @@ class MainWindow(QMainWindow):
         self.player.stop()
         self._playback_stopped()
         self.project = result
-        self._fx_processed_stems = {}
+        self.score_automation_editor.set_score(result.to_score())
+        self._fx_processed_stems = {};
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._rebuild_mixer()
