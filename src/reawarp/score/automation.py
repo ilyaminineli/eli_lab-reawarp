@@ -594,8 +594,15 @@ class AutomationControlBus:
         return self._targets.get(target_id)
 
     def recommended_step_frames(self, target_id: str) -> int | None:
-        """Return the frame step for a continuous target, or None for event-clock controls."""
-        target = self.target(target_id)
+        """Return the frame step for a registered target, even before a lane is attached.
+
+        Event-clock destinations return None because they are evaluated at a scheduled
+        event boundary. Unknown opt-in custom targets use the conservative 1 kHz default.
+        """
+        if target_id in self._lanes or target_id in self._modulations:
+            target = self._targets.get(target_id)
+        else:
+            target = self.registry.resolve(target_id)
         if target is None:
             return max(1, int(round(self.timeline.sample_rate / 1_000.0)))
         if target.update_clock == "event":
