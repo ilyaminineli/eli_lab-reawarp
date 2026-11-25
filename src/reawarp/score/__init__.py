@@ -16,7 +16,9 @@ from reawarp.score.planner import (
     score_from_planner_events,
     score_to_legacy_grid_events,
 )
-from reawarp.score.pitch import EqualTemperamentTuning, Pitch, TuningSystem
+from reawarp.score.pitch import (
+    EqualTemperamentTuning, Pitch, PitchCandidate, PitchField, Sonority, TuningSystem,
+)
 from reawarp.score.time import (
     Beat,
     MeterMap,
@@ -42,6 +44,9 @@ __all__ = [
     "MeterPoint",
     "MusicalEvent",
     "Pitch",
+    "PitchCandidate",
+    "PitchField",
+    "Sonority",
     "RenderTimeline",
     "ScheduledScoreEvent",
     "Score",
