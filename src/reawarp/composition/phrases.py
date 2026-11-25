@@ -902,6 +902,9 @@ def freeze_phrase_candidate(
     existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
     if existing_freeze:
         raise ValueError("phrase is already frozen; restore its base before replacing it")
+    existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
+    if existing_freeze:
+        raise ValueError("phrase is already frozen; restore its base before replacing it")
     if _score_fingerprint(base_score) != candidate.base_score_fingerprint:
         raise ValueError("candidate base Score is stale; regenerate against the current Score")
     source_ids = set(candidate.source_event_ids)
