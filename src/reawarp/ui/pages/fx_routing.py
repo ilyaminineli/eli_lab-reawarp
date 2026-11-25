@@ -329,6 +329,17 @@ class FXRoutingEditor(QGroupBox):
             record["mute"] = bool(values.get("mute", record.get("mute", False)))
             record["solo"] = bool(values.get("solo", record.get("solo", False)))
 
+    def set_mixer_state(self, states: dict[str, dict[str, Any]]) -> None:
+        for name, values in states.items():
+            if name not in self._routing["stems"]:
+                continue
+            self._routing["stems"][name].update({
+                "gain_db": float(values.get("gain_db", 0.0)),
+                "pan": float(values.get("pan", 0.0)),
+                "mute": bool(values.get("mute", False)),
+                "solo": bool(values.get("solo", False)),
+            })
+
     def match_audition_level(self) -> bool:
         return bool(self.match_level_checkbox.isChecked())
 
