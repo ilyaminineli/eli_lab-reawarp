@@ -339,7 +339,7 @@ See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented b
 - [IRO integration contract](docs/IRO_INTEGRATION.md) — shared sample identity, provenance and the phrase grammar bridge to the IRO project.
 ## Current roadmap
 
-The current implementation baseline is **M18 complete; M19 in progress**. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs. M19 begins optional harmonic context, tuning-aware pitch fields, sonorities and inspectable voice-leading without imposing functional tonality.
+The current implementation baseline is **M18 complete; M19 in progress**. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs. M19.1–M19.2 now add optional harmonic context, tuning-aware pitch fields, seeded sonority generation, provenance-preserving transformations and inspectable voice-leading primitives without imposing functional tonality.
 
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
 - [Consolidated Roadmap](docs/ROADMAP.md) — post-M18 status and M19–M25 forward plan.
@@ -347,7 +347,7 @@ The current implementation baseline is **M18 complete; M19 in progress**. M18 cl
 - [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
 - [M16 Score-driven Render Core](docs/M16.md) — frame-accurate score scheduling, typed automation and migration status.
 - [M18 Close-out](docs/M18_CLOSEOUT.md) — accepted implementation scope and separate experimental sign-offs.
-- [M19 Harmonic Context and Voice-leading](docs/M19.md) — next milestone specification and active implementation sequence.
+- [M19 Harmonic Context and Voice-leading](docs/M19.md) — M19.1/M19.2 implementation and remaining sequence.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
 
 

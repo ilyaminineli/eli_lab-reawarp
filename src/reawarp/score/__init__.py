@@ -23,6 +23,17 @@ from reawarp.score.pitch import (
 from reawarp.score.harmony import (
     VoiceLeadingResult, VoiceLeadingWeights, assign_voice_leading,
 )
+from reawarp.score.sonority import (
+    derive_spectral_sonority,
+    displace_register,
+    expand_contract_sonority,
+    generate_sonority,
+    invert_sonority,
+    replace_sonority_voice,
+    resolve_sonority_frequencies,
+    rotate_sonority,
+    transpose_sonority,
+)
 from reawarp.score.time import (
     Beat,
     MeterMap,
@@ -65,6 +76,15 @@ __all__ = [
     "VoiceLeadingResult",
     "VoiceLeadingWeights",
     "assign_voice_leading",
+    "generate_sonority",
+    "rotate_sonority",
+    "transpose_sonority",
+    "invert_sonority",
+    "expand_contract_sonority",
+    "displace_register",
+    "derive_spectral_sonority",
+    "replace_sonority_voice",
+    "resolve_sonority_frequencies",
     "as_fraction",
     "melody_to_score_events",
     "percussion_to_score_events",

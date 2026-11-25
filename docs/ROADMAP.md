@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; its accepted CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18 now includes typed automation/source models, scoped ScoreRenderer consumers, per-note envelope/vibrato control across five melodic palettes, Score-aware scope suggestions, selectable LFO waveforms and editable normalized source points; its cross-platform CI matrix passes 129 tests on Linux Python 3.10–3.12 and Windows Python 3.11. Planner/FX expansion, M18 critical listening and M14 target-machine profiling/Pyo listening remain pending  
+**Current implementation baseline:** M18 is closed as an implementation milestone on `main`; M19.1 and M19.2 are implemented. M19.2 provides seeded pitch-field sonority generation, spacing/register constraints, provenance-preserving transformations and tuning-aware spectral derivation. Linux Python 3.10–3.12 and Windows regression/smoke checks passed on the M18/M19.1 merge. Hardware profiling and matched-level listening remain separate experimental sign-offs.  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -167,7 +167,7 @@ See [M18.md](M18.md).
 
 ## M19: Harmonic context and voice-leading
 
-**Status:** In progress. Optional Score harmonic-context/sonority persistence, equal-period tuning conversion, pitch-field candidate evaluation and deterministic voice-leading matching with inspectable cost components are implemented as M19.1 foundations. Sonority planning, bass-role grammar, full planner integration, motif preservation and UI remain.
+**Status:** M19.1 and M19.2 implemented on main. Optional Score harmonic-context/sonority persistence, tuning-aware pitch fields, deterministic voice-leading primitives, seeded sonority generation, spacing/register constraints, spectral derivation and provenance-preserving transformations are integrated. M19.3 voice-leading sequence planning and bass-role grammar, M19.4 motif/MIDI/UI integration remain.
 
 **Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 

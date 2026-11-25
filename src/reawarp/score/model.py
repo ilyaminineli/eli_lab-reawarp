@@ -10,7 +10,7 @@ from typing import Any
 
 from reawarp.score.events import AutomationLane, MusicalEvent
 from reawarp.score.automation import AutomationModulation, AutomationSource
-from reawarp.score.time import MeterMap, TempoMap
+from reawarp.score.time import MeterMap, TempoMap, as_fraction
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,8 +95,33 @@ class Score:
             if start < 0 or duration <= 0:
                 raise ValueError("sonority onset must be non-negative and duration positive")
             pitches = item.get("pitches", [])
-            if not isinstance(pitches, list) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in pitches):
-                raise ValueError("sonority pitches must be a list of finite pitch coordinates")
+            if not isinstance(pitches, list) or not pitches or any(
+                not isinstance(value, (int, float)) or not math.isfinite(float(value))
+                for value in pitches
+            ):
+                raise ValueError("sonority pitches must be a non-empty list of finite pitch coordinates")
+            bass_pitch = item.get("bass_pitch")
+            if bass_pitch is not None and (
+                not isinstance(bass_pitch, (int, float))
+                or not math.isfinite(float(bass_pitch))
+            ):
+                raise ValueError("sonority bass_pitch must be finite or None")
+            tension = item.get("tension", 0.0)
+            if not isinstance(tension, (int, float)) or not math.isfinite(float(tension)):
+                raise ValueError("sonority tension must be finite")
+            transform = item.get("transform", "original")
+            if not isinstance(transform, str) or not transform.strip():
+                raise ValueError("sonority transform must be a non-empty string")
+            source_id = item.get("source_sonority_id")
+            if source_id is not None and (
+                not isinstance(source_id, str) or not source_id.strip()
+            ):
+                raise ValueError("sonority source_sonority_id must be a non-empty string")
+            parameters = item.get("transform_parameters", {})
+            if not isinstance(parameters, dict):
+                raise ValueError("sonority transform_parameters must be an object")
+            as_fraction(item.get("onset_beats", 0))
+            as_fraction(item.get("duration_beats", 1))
         modulations = tuple(self.modulations)
         modulation_keys = [
             (
@@ -134,7 +159,15 @@ class Score:
             default=0,
         )
         source_end = max((source.end for source in self.automation_sources), default=0)
-        return max(event_end, automation_end, source_end)
+        sonority_end = max(
+            (
+                as_fraction(item.get("onset_beats", 0))
+                + as_fraction(item.get("duration_beats", 1))
+                for item in self.sonorities
+            ),
+            default=0,
+        )
+        return max(event_end, automation_end, source_end, sonority_end)
 
     def beat_to_seconds(self, beat) -> float:
         return self.tempo_map.beat_to_seconds(beat)

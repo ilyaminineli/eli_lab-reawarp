@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Mapping, Protocol, runtime_checkable
 
 
@@ -13,6 +14,7 @@ class TuningSystem(Protocol):
 
     identifier: str
     divisions_per_period: int
+    period_ratio: float
 
     def frequency_for_pitch(self, pitch: float) -> float: ...
     def pitch_for_frequency(self, frequency_hz: float) -> float: ...
@@ -92,13 +94,21 @@ class Pitch:
 
 @dataclass(frozen=True, slots=True)
 class PitchCandidate:
-    """A tuning-aware pitch candidate with transparent soft preference data."""
+    """A tuning-aware pitch candidate with inspectable vocabulary matches."""
 
     pitch: float
     frequency_hz: float
     stability: float = 0.0
     tension: float = 0.0
     allowed: bool = True
+    in_pitch_collection: bool = True
+    in_allowed_intervals: bool = True
+    in_register: bool = True
+
+    @property
+    def preference(self) -> float:
+        """Net declared preference; hard eligibility remains separate."""
+        return self.stability - self.tension
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,7 +195,7 @@ class PitchField:
             (self.minimum_pitch is None or pitch >= self.minimum_pitch)
             and (self.maximum_pitch is None or pitch <= self.maximum_pitch)
         )
-        allowed_collection = (
+        in_collection = (
             not self.pitch_collection
             or any(
                 math.isclose(
@@ -198,7 +208,7 @@ class PitchField:
             )
         )
         interval = pitch - self.centre_pitch if self.centre_pitch is not None else None
-        allowed_intervals = (
+        in_intervals = (
             not self.allowed_intervals
             or interval is None
             or any(
@@ -211,7 +221,7 @@ class PitchField:
                 for value in self.allowed_intervals
             )
         )
-        allowed = in_range and allowed_collection and allowed_intervals
+        allowed = in_range and in_collection and in_intervals
         key = f"{pitch:g}"
         pitch_class_key = f"{pitch % tuning.divisions_per_period:g}"
         stability_weights = self.stability_weights or {}
@@ -226,6 +236,9 @@ class PitchField:
             stability=stability,
             tension=tension,
             allowed=(allowed or not self.hard_constraint),
+            in_pitch_collection=in_collection,
+            in_allowed_intervals=in_intervals,
+            in_register=in_range,
         )
 
     def candidates(self, pitches: tuple[float, ...], tuning: TuningSystem) -> tuple[PitchCandidate, ...]:
@@ -239,7 +252,11 @@ class PitchField:
 
 @dataclass(frozen=True, slots=True)
 class Sonority:
-    """Small immutable sonority primitive stored on a rational-beat timeline."""
+    """A tuning-aware sonority on a rational-beat timeline.
+
+    Pitch values remain in the Score's tuning coordinates. Transformations
+    retain their immediate source ID and explicit parameters for inspection.
+    """
 
     sonority_id: str
     onset_beats: str
@@ -248,24 +265,45 @@ class Sonority:
     bass_pitch: float | None = None
     tension: float = 0.0
     transform: str = "original"
+    source_sonority_id: str | None = None
+    transform_parameters: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         from reawarp.score.time import as_fraction
-        if not self.sonority_id.strip():
+
+        if not isinstance(self.sonority_id, str) or not self.sonority_id.strip():
             raise ValueError("sonority_id cannot be empty")
+        if not isinstance(self.transform, str) or not self.transform.strip():
+            raise ValueError("sonority transform cannot be empty")
         onset = as_fraction(self.onset_beats)
         duration = as_fraction(self.duration_beats)
         if onset < 0 or duration <= 0:
             raise ValueError("sonority requires non-negative onset and positive duration")
-        if any(not math.isfinite(float(pitch)) for pitch in self.pitches):
-            raise ValueError("sonority pitches must be finite")
+        pitches = tuple(float(value) for value in self.pitches)
+        if not pitches or any(not math.isfinite(value) for value in pitches):
+            raise ValueError("sonority pitches must be non-empty and finite")
         if self.bass_pitch is not None and not math.isfinite(float(self.bass_pitch)):
             raise ValueError("bass_pitch must be finite")
         if not math.isfinite(float(self.tension)):
             raise ValueError("sonority tension must be finite")
+        if self.source_sonority_id is not None and (
+            not isinstance(self.source_sonority_id, str)
+            or not self.source_sonority_id.strip()
+        ):
+            raise ValueError("source_sonority_id must be a non-empty string")
+        if not isinstance(self.transform_parameters, Mapping):
+            raise ValueError("transform_parameters must be an object")
+        parameters = json.loads(json.dumps(
+            dict(self.transform_parameters), ensure_ascii=False, allow_nan=False
+        ))
+        object.__setattr__(self, "onset_beats", str(onset))
+        object.__setattr__(self, "duration_beats", str(duration))
+        object.__setattr__(self, "pitches", pitches)
+        object.__setattr__(self, "tension", float(self.tension))
+        object.__setattr__(self, "transform_parameters", parameters)
 
     def to_score_record(self) -> dict[str, object]:
-        return {
+        record: dict[str, object] = {
             "sonority_id": self.sonority_id,
             "onset_beats": self.onset_beats,
             "duration_beats": self.duration_beats,
@@ -274,6 +312,33 @@ class Sonority:
             "tension": self.tension,
             "transform": self.transform,
         }
+        if self.source_sonority_id is not None:
+            record["source_sonority_id"] = self.source_sonority_id
+        if self.transform_parameters:
+            record["transform_parameters"] = dict(self.transform_parameters)
+        return record
+
+    @classmethod
+    def from_score_record(cls, record: Mapping[str, object]) -> "Sonority":
+        if not isinstance(record, Mapping):
+            raise ValueError("sonority record must be an object")
+        return cls(
+            sonority_id=str(record.get("sonority_id", "")),
+            onset_beats=str(record.get("onset_beats", "0")),
+            duration_beats=str(record.get("duration_beats", "1")),
+            pitches=tuple(float(value) for value in record.get("pitches", ())),
+            bass_pitch=(
+                None if record.get("bass_pitch") is None
+                else float(record["bass_pitch"])
+            ),
+            tension=float(record.get("tension", 0.0)),
+            transform=str(record.get("transform", "original")),
+            source_sonority_id=(
+                None if record.get("source_sonority_id") is None
+                else str(record["source_sonority_id"])
+            ),
+            transform_parameters=dict(record.get("transform_parameters", {})),
+        )
 
 def pitch_field_from_score(score) -> PitchField:
     """Construct the optional pitch field carried by a Score."""
