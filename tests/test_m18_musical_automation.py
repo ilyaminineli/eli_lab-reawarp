@@ -172,13 +172,21 @@ def test_lfo_modulation_supports_explicit_event_retrigger_phase():
         _timeline(),
         sources=(source,),
         modulations=(modulation,),
-        event_contexts={"note-a": {"event_onset_frame": 48_000}},
+        event_contexts={
+            "note-a": {
+                "role_id": "lead",
+                "event_onset_frame": 48_000,
+            }
+        },
     )
 
     assert bus.value_for_context(
         "synth.pitch", 48_000, event_id="note-a"
     ) == pytest.approx(6.0)
-    assert bus.value_at_frame("synth.pitch", 48_000) == pytest.approx(-6.0)
+    assert bus.value_for_context(
+        "synth.pitch", 48_000,
+        context={"role_id": "bass", "event_onset_frame": 48_000},
+    ) == pytest.approx(0.0)
 
 
 def test_control_rate_smoothing_and_hysteresis_reduce_small_steps():
@@ -234,6 +242,7 @@ def test_score_round_trip_preserves_scopes_sources_and_modulation():
                 "breathing", "synth.cutoff", amount=800.0,
                 retrigger="section", smoothing_seconds=0.03,
                 minimum=100.0, maximum=12_000.0,
+                base_value=2_400.0,
                 scope="role", scope_id="melody",
             ),
         ),
@@ -405,3 +414,61 @@ def test_event_probability_is_a_stable_score_render_gate():
     assert first.schedule[0].event.event_id == "probability-gate"
     assert "hats" not in first.stems
     assert first.stems.keys() == second.stems.keys()
+
+
+
+def test_modulation_only_destination_uses_explicit_base_value():
+    source = AutomationSource(
+        "quiet-lfo", "lfo", Fraction(0), Fraction(4),
+        parameters={"period_beats": 4, "center": 0.5, "depth": 0.5, "phase_cycles": 0.0},
+    )
+    modulation = AutomationModulation(
+        "quiet-lfo",
+        "synth.cutoff",
+        amount=0.0,
+        base_value=2_400.0,
+        minimum=20.0,
+        maximum=18_000.0,
+    )
+    bus = AutomationControlBus(
+        (), _timeline(), sources=(source,), modulations=(modulation,)
+    )
+
+    assert bus.value_at_frame("synth.cutoff", 0, default_value=0.0) == pytest.approx(2_400.0)
+
+
+def test_probability_one_never_skips_an_event_and_generated_triggers_share_parent_seed():
+    from reawarp.score.render import _stable_event_probability_seed
+
+    parent = MusicalEvent(
+        event_id="kick-no-explicit-seed",
+        voice_id="kick",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(1, 4),
+        kind="hit",
+    )
+    generated_trigger = MusicalEvent(
+        event_id="sample-trigger-kick-no-explicit-seed",
+        voice_id="kick",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(1, 4),
+        kind="trigger",
+        articulation="sample-trigger",
+        tags=("sample",),
+    )
+    assert _stable_event_probability_seed(parent) == _stable_event_probability_seed(
+        generated_trigger
+    )
+
+    score = Score(
+        events=(parent,),
+        automation=(
+            AutomationLane(
+                "event.probability",
+                (AutomationPoint(Fraction(0), 1.0),),
+                unit="normalized",
+            ),
+        ),
+    )
+    result = ScoreRenderer().render(score, 48_000)
+    assert "kick" in result.stems
