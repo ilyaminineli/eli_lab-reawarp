@@ -949,7 +949,7 @@ class MainWindow(QMainWindow):
         title.setObjectName("sectionTitle")
         header.addWidget(title)
         header.addStretch(1)
-        self.export_button = QPushButton("EXPORT STEMS + MASTER…")
+        self.export_button = QPushButton("EXPORT PROJECT PACKAGE…")
         self.export_button.setEnabled(False)
         self.export_button.clicked.connect(self._export_project)
         header.addWidget(self.export_button)
