@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; its accepted CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18's typed automation/source model, scoped ScoreRenderer consumers and first Score Control editor are partially implemented; its CI matrix now passes 124 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18 critical listening and M14 target-machine profiling/Pyo listening remain pending  
+**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; its accepted CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18 now includes typed automation/source models, scoped ScoreRenderer consumers, per-note envelope/vibrato control across five melodic palettes, and Score-aware scope suggestions; its cross-platform CI matrix passes 129 tests on Linux Python 3.10–3.12 and Windows Python 3.11. Planner/FX expansion, M18 critical listening and M14 target-machine profiling/Pyo listening remain pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -12,7 +12,7 @@ The canonical target workflow is:
 
 `Configuration → Form/Role Plan → Score → Dry Stem Render → FX Routing/Automation → Export + Provenance`
 
-M17.5 completed the canonical Score-first cutover for event-backed roles: `generate()` now plans a rational-beat Score before rendering, ScoreRenderer owns event scheduling, and the legacy project-event dictionaries are derived afterwards. Noise texture and ambience remain specialised whole-field passes represented by Score markers. M18 now extends the shared control bus into reusable deterministic score sources and scoped modulation; the remaining work is musical authoring coverage, listening and target-machine validation.
+M17.5 completed the canonical Score-first cutover for event-backed roles: `generate()` now plans a rational-beat Score before rendering, ScoreRenderer owns event scheduling, and the legacy project-event dictionaries are derived afterwards. Noise texture and ambience remain specialised whole-field passes represented by Score markers. M18 extends the shared control bus into deterministic score sources and scoped modulation, and now drives per-note ADSR and vibrato in the production melodic palettes; planner authoring, remaining synthesis/FX mappings, listening and target-machine validation remain.
 
 ## Implemented baseline
 
@@ -31,7 +31,7 @@ M17.5 completed the canonical Score-first cutover for event-backed roles: `gener
 | Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
 | GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
-| Regression testing | Implemented baseline; M18 CI passed | Latest M18 matrix: 124 tests passed on Linux Python 3.10, 3.11 and 3.12 and Windows Python 3.11; desktop and CLI/benchmark smoke checks passed |
+| Regression testing | Implemented baseline; M18 CI passed | Latest M18 matrix: 129 tests passed on Linux Python 3.10, 3.11 and 3.12 and Windows Python 3.11; desktop and CLI/benchmark smoke checks passed |
 | Target-machine DSP listening validation | Pending | Requires Pyo-enabled Windows render and critical audition |
 | Performance benchmark baseline | Partially implemented | Reproducible benchmark harness and phase timings are present; target-Windows 30/180-second results are pending |
 
@@ -159,7 +159,7 @@ See [M16 — Score-driven render core](M16.md) for the timing/render foundation 
 
 ## M18: Musical automation and control performance
 
-**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers and a first Score Control editor are landed. Cross-platform CI passes (124 tests per job). Planner authoring, broader instrument/FX destinations and critical listening remain open.
+**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers, per-note ADSR/vibrato across five melodic palettes, and Score-aware scope suggestions are landed. Cross-platform CI passes (129 tests per job). Planner authoring, remaining synthesis/FX destinations and critical listening remain open.
 
 **Goal:** Turn the typed control bus into a compositional instrument. Add inspectable and editable score trajectories for synthesis, role behaviour, spatial motion and selected FX parameters.
 
