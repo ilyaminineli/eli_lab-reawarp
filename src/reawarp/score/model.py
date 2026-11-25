@@ -266,7 +266,6 @@ class Score:
         object.__setattr__(self, "sonority_plan", sonority_plan)
         object.__setattr__(self, "bass_plan", bass_plan)
         object.__setattr__(self, "orchestration_plan", orchestration_plan)
-        object.__setattr__(self, "orchestration_plan", orchestration_plan)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
