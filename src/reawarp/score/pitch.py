@@ -117,6 +117,7 @@ class PitchField:
     stability_weights: Mapping[str, float] | None = None
     tension_weights: Mapping[str, float] | None = None
     hard_constraint: bool = False
+    centre_weight: float = 0.0
     minimum_pitch: float | None = None
     maximum_pitch: float | None = None
 
@@ -130,6 +131,8 @@ class PitchField:
             raise ValueError(f"unsupported pitch-field mode: {self.mode}")
         if not math.isfinite(float(self.period_ratio)) or self.period_ratio <= 1.0:
             raise ValueError("period_ratio must be finite and greater than one")
+        if not math.isfinite(float(self.centre_weight)) or self.centre_weight < 0:
+            raise ValueError("centre_weight must be finite and non-negative")
         if self.centre_pitch is not None and not math.isfinite(float(self.centre_pitch)):
             raise ValueError("centre_pitch must be finite")
         for name, values in (
@@ -169,6 +172,7 @@ class PitchField:
             stability_weights=dict(context.get("stability_weights", {})),
             tension_weights=dict(context.get("tension_weights", {})),
             hard_constraint=bool(context.get("hard_constraint", False)),
+            centre_weight=float(context.get("centre_weight", 0.0)),
             minimum_pitch=None if context.get("minimum_pitch") is None else float(context["minimum_pitch"]),
             maximum_pitch=None if context.get("maximum_pitch") is None else float(context["maximum_pitch"]),
         )
@@ -208,6 +212,8 @@ class PitchField:
             )
         )
         allowed = in_range and allowed_collection and allowed_intervals
+        if self.mode == "centred" and self.centre_pitch is not None:
+            stability += self.centre_weight / (1.0 + abs(pitch - self.centre_pitch))
         key = f"{pitch:g}"
         pitch_class_key = f"{pitch % tuning.divisions_per_period:g}"
         stability_weights = self.stability_weights or {}
