@@ -585,7 +585,6 @@ def prepare_score_sample_renderers(
             sample_rate: int,
             controls,
         ) -> np.ndarray:
-            del controls
             params = scheduled.event.parameters
             start = int(params["break_source_frame_start"])
             end = int(params["break_source_frame_end"])
@@ -593,10 +592,17 @@ def prepare_score_sample_renderers(
             # The schedule span is the absolute next-trigger boundary. Never
             # let a slice run into the following event or past the track end.
             segment = segment[:scheduled.duration_frames]
-            return _fit_frames(
+            audio = _fit_frames(
                 _fade_edges(segment, sample_rate),
                 scheduled.duration_frames,
             )
+            if "sample.mix" in controls.target_ids:
+                sample_mix = controls.value_for_context(
+                    "sample.mix", scheduled.start_frame,
+                    event_id=scheduled.event.event_id, default_value=1.0,
+                )
+                audio = audio * np.float32(sample_mix)
+            return audio
 
         sample_triggers.extend(break_triggers)
         break_voice_renderer = render_break
@@ -608,7 +614,6 @@ def prepare_score_sample_renderers(
             sample_rate: int,
             controls,
         ) -> np.ndarray:
-            del controls
             params = scheduled.event.parameters
             asset = assets_by_id.get(str(params.get("sample_asset_id", "")))
             if asset is None:
@@ -628,6 +633,11 @@ def prepare_score_sample_renderers(
             segment = segment[:scheduled.duration_frames]
             segment = _fade_edges(segment, sample_rate)
             sample_gain = float(np.clip(params.get("sample_gain", 1.0), 0.0, 1.0))
+            if "sample.mix" in controls.target_ids:
+                sample_gain = controls.value_for_context(
+                    "sample.mix", scheduled.start_frame,
+                    event_id=scheduled.event.event_id, default_value=sample_gain,
+                )
             return _fit_frames(segment, scheduled.duration_frames) * np.float32(sample_gain)
         return render
 
