@@ -114,6 +114,12 @@ def export_project_archive(
     )
     temporary.replace(output / "mix.json")
     _check_cancelled(cancel_event, "project export")
+    midi_contents = (
+        "- `midi/score.mid`: combined Standard MIDI 1.0 export with one track per voice.\n"
+        "- `midi/voices/`: separate voice MIDI files for individual instrument/role import.\n"
+        if include_midi else
+        "- MIDI export was not requested for this folder.\n"
+    )
     package_readme = """# Reawarp project package
 
 This is a portable Reawarp project handoff. Open the extracted folder with Reawarp's
@@ -125,21 +131,23 @@ project loader or use `ReawarpProject.load(folder)`.
 - `stems/`: original aligned dry generation stems; these are not overwritten by FX.
 - `returns/`: rendered SPACE/ECHO wet-only auxiliary returns when active.
 - `score.json` and `events.json`: canonical Score and compatibility event records.
-- `midi/score.mid`: combined Standard MIDI 1.0 export with one track per voice.
-- `midi/voices/`: separate voice MIDI files for individual instrument/role import.
 - `project.json`, `fx_routing.json`, `fx_automation.json`, and `mix.json`:
   generation, production, routing and automation settings.
 - `assets/`: copied source samples by default, with hashes and asset identities.
 - `manifest.json`: schema, environment, source-asset audit and SHA-256 file inventory.
 - `candidates/` and `listening_report.json`: variation session data when present.
 
-MIDI 1.0 uses integer semitone notes and finite tick resolution. Reawarp-specific text
-meta events preserve exact pitch/event provenance when the file is read back by Reawarp;
-other MIDI applications may ignore that metadata. The Reawarp Score remains authoritative.
+MIDI 1.0 uses integer semitone notes and finite tick resolution. When MIDI is included,
+Reawarp-specific escaped text metadata preserves exact pitch/event provenance for
+Reawarp-to-Reawarp import. Other MIDI applications may ignore that metadata. The
+Reawarp Score remains authoritative.
 
 For reference-only asset exports, external source files must remain available at their
 recorded paths. Missing or changed sources are reported rather than substituted.
 """
+    package_readme = package_readme.replace(
+        "- `project.json`,", midi_contents + "- `project.json`,"
+    )
     (output / "PACKAGE_README.md").write_text(package_readme, encoding="utf-8")
     refresh_project_manifest(output, cancel_event=cancel_event)
     return output
