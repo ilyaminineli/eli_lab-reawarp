@@ -2222,8 +2222,12 @@ class MainWindow(QMainWindow):
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._fx_audition_audio = {}
-        self._clear_fx_variation_cache()
         self.fx_routing_editor.set_variation_choices([])
+        if self._fx_variation_worker is not None:
+            self._fx_variation_worker.cancel()
+            self._fx_variation_signature = None
+        else:
+            self._clear_fx_variation_cache()
         self.fx_routing_editor.set_meter_report({})
         self._rebuild_mixer()
         self.variation_page.set_stems(list(result.stems))
@@ -2890,7 +2894,10 @@ class MainWindow(QMainWindow):
         self._fx_routing_metadata = {}
         if self._fx_variation_worker is not None:
             self._fx_variation_worker.cancel()
-        self._clear_fx_variation_cache()
+            self._fx_variation_signature = None
+            self.fx_routing_editor.set_variation_choices([])
+        else:
+            self._clear_fx_variation_cache()
         self._refresh_preview()
 
     def _render_mix(self) -> np.ndarray | None:
