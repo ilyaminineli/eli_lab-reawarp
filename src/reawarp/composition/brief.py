@@ -16,7 +16,7 @@ import hashlib
 import json
 import math
 import os
-from dataclasses import asdict, dataclass, fields, replace
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -74,6 +74,7 @@ FIELD_SCOPE: dict[str, str] = {
     "drum_change_intensity": "pattern",
     "drum_part_cycle_bars": "pattern",
     "rhythmic_syncopation": "pattern",
+    "synth_palette": "pattern",
     "kick_profile": "pattern",
     "snare_profile": "pattern",
     "hat_profile": "pattern",
@@ -138,6 +139,7 @@ FIELD_TARGET: dict[str, str] = {
     "include_ambience": "ambience",
     "ambience_level": "ambience",
     "percussion_synthesis": "percussion",
+    "synth_palette": "percussion",
     "percussion_source_mode": "percussion",
     "percussion_hybrid_architecture": "percussion",
     "percussion_sample_mix": "percussion",
@@ -204,6 +206,7 @@ ENUM_DOMAINS: dict[str, tuple[Any, ...]] = {
     "melody_profile": ("auto", *MELODY_PROFILES),
     "synth_palette": tuple(SYNTH_PALETTES),
     "percussion_synthesis": ("minimal", "extended", "samples"),
+    "synth_palette": tuple(SYNTH_PALETTES),
     "percussion_source_mode": ("automatic", "synth", "sample", "hybrid"),
     "percussion_hybrid_architecture": ("transient_body", "layered", "feature_guided"),
     "melody_scale": tuple(SCALE_STEPS),
@@ -419,6 +422,7 @@ class PitchWorld:
     reference_pitch: float = 69.0
     reference_frequency_hz: float = 440.0
     divisions_per_period: int = 12
+    period_ratio: float = 2.0
 
     def __post_init__(self) -> None:
         if self.scale not in SCALE_STEPS:
@@ -437,7 +441,11 @@ class PitchWorld:
             raise ValueError("pitch-world divisions_per_period must be positive")
         object.__setattr__(self, "reference_pitch", reference_pitch)
         object.__setattr__(self, "reference_frequency_hz", reference_hz)
+        period_ratio = float(self.period_ratio)
+        if not math.isfinite(period_ratio) or period_ratio <= 1.0:
+            raise ValueError("pitch-world period ratio must be finite and greater than one")
         object.__setattr__(self, "divisions_per_period", int(self.divisions_per_period))
+        object.__setattr__(self, "period_ratio", period_ratio)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -578,6 +586,10 @@ class MutationContract:
         object.__setattr__(self, "decision_boundaries", tuple(
             _text(item, "decision boundary") for item in self.decision_boundaries
         ))
+        if mutable and not self.decision_boundaries:
+            raise ValueError(
+                f"contract {self.contract_id!r} needs a decision boundary for {self.scale} scale"
+            )
         if any(item not in DECISION_BOUNDARIES[self.scale] for item in self.decision_boundaries):
             raise ValueError(
                 f"contract {self.contract_id!r} has a decision boundary invalid for {self.scale} scale"
@@ -947,13 +959,13 @@ def _source_matches(reference: SourceAssetReference, candidate: SourceAssetRefer
         return False
     if reference.asset_id is not None and reference.asset_id != candidate.asset_id:
         return False
-    if reference.sha256 is not None and reference.sha256 != candidate.sha256:
+    if reference.sha256 is not None:
+        return reference.sha256 == candidate.sha256
+    # An asset ID without a content hash is not sufficient evidence that two
+    # different files are the same source. Require path identity as a fallback.
+    if reference.path is None or candidate.path is None:
         return False
-    if reference.asset_id is None and reference.sha256 is None:
-        if reference.path is None or candidate.path is None:
-            return False
-        return _path_key(reference.path) == _path_key(candidate.path)
-    return True
+    return _path_key(reference.path) == _path_key(candidate.path)
 
 
 def resolve_composition_brief(
@@ -1042,13 +1054,19 @@ def _validate_target_field(brief: CompositionBrief, contract: MutationContract, 
         for material in brief.materials if material.role
     }
     resolved_target = material_roles.get(target, target)
+    family_roles = {
+        family.family_id: family.role for family in brief.source_families
+    }
+    resolved_target = material_roles.get(target, family_roles.get(target, target))
     if resolved_target != "composition":
-        if expected_target != "composition" and expected_target != resolved_target:
-            if not (expected_target == "percussion" and resolved_target in {"kick", "snare", "hat"}):
-                raise ValueError(
-                    f"contract {contract.contract_id!r} targets {resolved_target!r}, "
-                    f"but {field_name!r} belongs to {expected_target!r}"
-                )
+        matches = expected_target == resolved_target
+        if expected_target == "percussion" and resolved_target in {"kick", "snare", "hat", "break"}:
+            matches = True
+        if not matches:
+            raise ValueError(
+                f"contract {contract.contract_id!r} targets {resolved_target!r}, "
+                f"but {field_name!r} belongs to {expected_target!r}"
+            )
 
 
 def quick_mutation_contracts(fields_requested: Sequence[str]) -> tuple[MutationContract, ...]:
@@ -1124,6 +1142,20 @@ def _draw_mutated_value(
             raise ValueError(f"field {field_name!r} has no mutation choices")
         if field_name in ENUM_DOMAINS and any(item not in ENUM_DOMAINS[field_name] for item in options):
             raise ValueError(f"contract {contract.contract_id!r} has invalid choices for {field_name!r}")
+        if field_name in {"pattern_follow_structure", "include_melody", "include_texture", "include_ambience"}:
+            if any(not isinstance(item, bool) for item in options):
+                raise ValueError(f"allowed values for {field_name!r} must be booleans")
+        if field_name in NUMERIC_DOMAINS:
+            lower, upper, _kind = NUMERIC_DOMAINS[field_name]
+            if any(
+                isinstance(item, bool) or not isinstance(item, (int, float))
+                or not math.isfinite(float(item))
+                or not lower <= float(item) <= upper
+                for item in options
+            ):
+                raise ValueError(f"allowed values for {field_name!r} exceed its GenerationConfig domain")
+        if field_name == "break_transforms" and any(item not in BREAK_TRANSFORMS for item in options):
+            raise ValueError("break_transforms choices must be implemented transform names")
         return options[int(rng.integers(0, len(options)))]
 
     if default_bounds is not None:
@@ -1134,7 +1166,7 @@ def _draw_mutated_value(
                 f"contract bounds for {field_name!r} must remain inside "
                 f"[{domain_lower}, {domain_upper}]"
             )
-        kind = NUMERIC_DOMAINS[field_name][2]
+        kind = float if field_name in {"bpm", "duration"} else NUMERIC_DOMAINS[field_name][2]
         if kind is int:
             low_int, high_int = int(math.ceil(lower)), int(math.floor(upper))
             if low_int > high_int:
@@ -1199,9 +1231,14 @@ def bounded_explore_generation_config(
         raise ValueError("bounded exploration is enabled but no mutation contract fields are active")
     # replace() re-runs GenerationConfig validation after all field choices.
     updated_config = replace(config, **updates)
-    preserved = tuple(sorted(
-        HARD_INVARIANTS | {"bpm", "duration"} - set(updates)
-    ))
+    always_preserved = set(HARD_INVARIANTS)
+    if brief.tempo_form_policy.bpm_mode == "preserve":
+        always_preserved.add("bpm")
+    if brief.tempo_form_policy.duration_mode == "preserve":
+        always_preserved.add("duration")
+    if brief.tempo_form_policy.form_mode == "preserve":
+        always_preserved.update({"structure", "composition_flow"})
+    preserved = tuple(sorted(always_preserved - set(updates)))
     # BPM/duration/form may be intentionally explored only under their explicit policy.
     return BoundedExplorationResult(
         config=updated_config,
@@ -1219,6 +1256,14 @@ def resolve_and_explore(
     bounded_exploration: bool = False,
 ) -> tuple[GenerationConfig, ResolvedCompositionIntent, BoundedExplorationResult | None]:
     """Validate source identity, apply optional bounded exploration, and re-resolve."""
+    # The pitch world is part of artistic intent and becomes the initial
+    # generation vocabulary. Explicit mutation contracts may deliberately alter
+    # it later; that difference remains visible in the exploration record.
+    config = replace(
+        config,
+        melody_scale=brief.pitch_world.scale,
+        melody_root=brief.pitch_world.root,
+    )
     resolved = resolve_composition_brief(brief, config)
     result = bounded_explore_generation_config(config, brief) if bounded_exploration else None
     selected = result.config if result is not None else config
