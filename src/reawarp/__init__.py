@@ -13,6 +13,9 @@ from reawarp.fx_automation import (
 from reawarp.synthesis.score_voices import build_production_voice_renderers
 from reawarp.score import (
     AttentionSpan,CycleSpec,MutationPolicy,OrchestrationPlan,PhraseSpan,RoleRelationship,build_orchestration_plan,inspect_attention_conflicts,
+    AttentionSpan, CycleSpec, MutationPolicy, OrchestrationPlan, PhraseSpan,
+    RoleRelationship, TransitionSpan, build_orchestration_plan,
+    inspect_attention_conflicts, inspect_event_onset_conflicts,
     AutomationControlBus,
     AutomationLane,
     AutomationModulation,
@@ -41,6 +44,9 @@ from reawarp.score import (
 
 __all__ = [
     "AttentionSpan","CycleSpec","MutationPolicy","OrchestrationPlan","PhraseSpan","RoleRelationship","build_orchestration_plan","inspect_attention_conflicts",
+    "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
+    "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
+    "inspect_attention_conflicts", "inspect_event_onset_conflicts",
     "AutomationControlBus",
     "AutomationLane",
     "AutomationModulation",

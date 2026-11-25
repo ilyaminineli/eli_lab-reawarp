@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "purpose": "Matched-seed listening scenarios for the M20 perceptual orchestration system.",
+  "scenarios": [
+    {
+      "id": "anchor-to-return",
+      "seed": "m20-anchor-return-01",
+      "structure": "uplift_drop_return",
+      "duration_seconds": 60,
+      "bpm": 120,
+      "focus": ["melody", "kick", "snare"],
+      "listen_for": "Learn the motif before its transformed return; compare preserved identity dimensions with changed dimensions."
+    },
+    {
+      "id": "independent-cycle-drift",
+      "seed": "m20-cycle-drift-01",
+      "structure": "autechre_like",
+      "duration_seconds": 60,
+      "bpm": 137,
+      "focus": ["kick", "hat", "break"],
+      "listen_for": "Follow kick, hat and break cycles independently; note alignments, phase drift and re-alignment without imposing bar alignment."
+    },
+    {
+      "id": "foreground-handoff",
+      "seed": "m20-attention-handoff-01",
+      "structure": "free_jazz_episodic",
+      "duration_seconds": 60,
+      "bpm": 127,
+      "focus": ["melody", "texture", "ambience"],
+      "listen_for": "Identify the foreground role before and after each hand-off; check that the new foreground is audible without flattening the background."
+    },
+    {
+      "id": "reserved-negative-space",
+      "seed": "m20-negative-space-01",
+      "structure": "two_movement",
+      "duration_seconds": 60,
+      "bpm": 113,
+      "focus": ["kick", "snare", "ambience"],
+      "listen_for": "Compare the reserved absence and residue with the preceding full section; assess whether the later return gains perceptual weight."
+    },
+    {
+      "id": "same-seed-ab",
+      "seed": "m20-same-seed-ab-01",
+      "structure": "sonata_mutation",
+      "duration_seconds": 60,
+      "bpm": 131,
+      "focus": ["full_mix", "role_solos", "role_pairs"],
+      "listen_for": "Render twice with the same application version and seed. Arrangement intent, role relationships and event identities must match exactly."
+    }
+  ]
+}

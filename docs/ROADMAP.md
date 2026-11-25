@@ -175,7 +175,7 @@ See [M19.md](M19.md).
 
 ## M20: Perceptual orchestration and multi-scale phrase grammar
 
-**Status:** Partially implemented on `feature/m20-perceptual-orchestration`; Score-native phrase/cycle/relationship/attention intent is in place, while director integration and listening validation remain. M15 supplies motifs, role axes and transitions; explicit foreground/midground/background intent, role-pair grammars, asymmetric phrase hierarchy and attention allocation remain future work.
+**Status:** Implemented. The Score-first director now compiles M15 section, motif, role and transition decisions into a versioned rational-beat phrase/cycle/relationship/attention plan. Exact cycle alignment, onset/occupancy warnings, mutation permissions, MIDI/JSON persistence and listening scenarios are covered. Human and target-machine listening sign-off remains experimentally unverified.
 
 **Goal:** Compose relationships between layers and nested time scales, with identity, expectation, negative space and perceptual hierarchy.
 
