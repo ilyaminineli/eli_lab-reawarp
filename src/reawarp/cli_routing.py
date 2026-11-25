@@ -15,7 +15,6 @@ from reawarp.fx_automation import (
 )
 from reawarp.fx_routing import (
     build_role_audition_matrix,
-    default_fx_routing,
     role_aware_fx_routing,
     match_audition_level,
     load_fx_routing,
