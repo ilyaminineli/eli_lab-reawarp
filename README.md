@@ -13,7 +13,7 @@ Reawarp turns musical constraints and generative systems into structured composi
 - **Work with a musical Score:** rational-beat events, tempo/meter maps, tuning-aware pitch, typed automation, Score-first event rendering and optional MIDI 1.0 interchange.
 - **Produce non-destructively:** role-aware per-stem inserts, shared SPACE/ECHO returns, beat automation, routing meters, tail handling, matched-level audition and project-aware FX variations.
 - **Review variations:** deterministic candidate batches, blind A/B, difference inspection, listening sets, review notes and candidate ancestry.
-- **Export complete projects:** routed master, dry stems, returns, Score/events, MIDI, routing/automation, source assets and integrity manifest in a ZIP handoff.
+- **Export deliveries:** one-click folder export containing a package README, routed master WAV, aligned dry stems and combined/per-voice MIDI. No source-sample copying or ZIP archive.
 
 ## Architecture
 
@@ -166,19 +166,33 @@ reawarp-midi-export imported-score.json --output exported.mid --ppq 960
 
 MIDI 1.0 uses integer semitone notes and finite tick resolution. Reawarp preserves exact pitch/event context in its Score and escaped text metadata for Reawarp-to-Reawarp interchange. Other MIDI software may ignore that metadata.
 
-## Complete project package
+## Delivery export
 
-The desktop **EXPORT STEMS + MASTER…** action now writes a ZIP handoff. It includes:
+The desktop **EXPORT MASTER + STEMS + MIDI…** action creates a normal folder in the destination directory. It automatically completes the current FX routing render first, then exports:
 
-- routed `master.wav`, original aligned dry `stems/` and rendered `returns/`;
-- canonical `score.json`, compatibility `events.json`, combined `midi/score.mid` and separate `midi/voices/*.mid`;
-- `project.json`, `fx_routing.json`, `fx_automation.json`, `mix.json` and package instructions;
-- copied source samples under `assets/` by default, plus manifest and SHA-256 file inventory;
-- variation candidates and listening report when they are part of the project session.
+```text
+Track_Reawarp_Export/
+├── README.md
+├── master.wav
+├── stems/
+│   ├── kick.wav
+│   ├── snare.wav
+│   └── ...
+└── midi/
+    ├── score.mid
+    └── voices/
+        ├── kick-<id>.mid
+        └── ...
+```
 
-The extracted project folder can be reopened with Reawarp. MIDI 1.0 playback is a lossy pitch/timing projection; the Score remains authoritative. The Python packaging service is `reawarp.export.project_archive.export_project_package`.
+- `README.md` documents the track, render settings, sample rate, bit depth, tempo, stem semantics and MIDI limitations.
+- `master.wav` contains the final routed master with mixer settings and successfully rendered inserts/returns.
+- `stems/` contains the original aligned dry generation stems. They remain non-destructive and do not include individual insert effects or the shared SPACE/ECHO returns.
+- `midi/score.mid` contains the combined Score; `midi/voices/` contains separate event-backed voice files.
 
-New project exports embed referenced samples by default. The explicit `asset_policy="reference"` mode records external paths and hashes instead. Missing/changed assets are reported rather than silently substituted.
+This is a finished audio/MIDI delivery, **not** a restorable Reawarp project archive. Source samples, sample banks, project JSON, Score JSON, routing files, returns, manifests and intermediate data are not copied. No ZIP is created. The original Reawarp project and its source assets remain in their existing locations.
+
+If the FX render fails, the export still completes with the available dry-fallback master and the README explicitly labels that state. The Python service is `reawarp.export.project_archive.export_project_package`.
 
 ## Performance and validation
 
@@ -202,7 +216,8 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 
 ## Documentation
 
-- [Milestone history and current status](docs/MILESTONES.md) — the single milestone/roadmap source.
+- [Milestone history and current status](docs/MILESTONES.md) — delivered milestone ledger.
+- [M27–M34 development roadmap](docs/ROADMAP_M27_M34.md) — detailed future milestone specifications and agent handoff.
 - [Implementation notes](docs/IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
 - [Dependency ecosystem](docs/DEPENDENCY_ECOSYSTEM.md) — optional dependencies, platform constraints and licensing.
 - [Sample banks and hybrid composition](docs/SAMPLE_BANKS_HYBRID_COMPOSITION.md) — role banks, switching and hybrid percussion.

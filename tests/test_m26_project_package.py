@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import json
-from fractions import Fraction
 from pathlib import Path
-import zipfile
 
 import numpy as np
+import pytest
 
 from reawarp.config import GenerationConfig
 from reawarp.core.project import ReawarpProject
 from reawarp.export.project_archive import export_project_package
-from reawarp.fx_automation import normalise_fx_automation
-from reawarp.fx_routing import default_fx_routing
+from reawarp.export.wav import read_wav
 from reawarp.score.events import MusicalEvent
+from fractions import Fraction
+
 from reawarp.score.model import Score
 
 
@@ -57,46 +56,114 @@ def _package_project() -> ReawarpProject:
     )
 
 
-def test_complete_project_zip_contains_midi_and_reopens(tmp_path: Path):
+def test_delivery_folder_contains_only_readme_master_stems_and_midi(tmp_path: Path):
     project = _package_project()
-    destination = tmp_path / "full-project.zip"
-    empty_automation = normalise_fx_automation(
-        {"schema_version": 1, "lanes": {}}, tuple(project.stems)
-    )
+    originals = {name: audio.copy() for name, audio in project.stems.items()}
+    master = project.render_master()
+    destination = tmp_path / "M26_Delivery"
+
     output = export_project_package(
         project,
         destination,
-        master_audio=project.render_master(),
-        fx_routing=default_fx_routing(tuple(project.stems)),
-        fx_automation=empty_automation,
-        mix_data={"schema_version": 1, "description": "complete package test"},
+        master_audio=master,
+        bit_depth=24,
         include_midi=True,
+        fx_render_status="not_configured",
     )
 
-    assert output.is_file()
-    assert zipfile.is_zipfile(output)
-    extracted = tmp_path / "unpacked"
-    extracted.mkdir()
-    with zipfile.ZipFile(output) as archive:
-        names = set(archive.namelist())
-        assert {
-            "PACKAGE_README.md", "manifest.json", "project.json", "score.json",
-            "events.json", "master.wav", "stems/kick.wav", "stems/melody.wav",
-            "mix.json", "fx_routing.json", "fx_automation.json",
-            "midi/score.mid",
-        } <= names
-        voice_files = [name for name in names if name.startswith("midi/voices/") and name.endswith(".mid")]
-        assert len(voice_files) == 2
-        archive.extractall(extracted)
+    assert output == destination
+    assert output.is_dir()
+    files = {
+        item.relative_to(output).as_posix()
+        for item in output.rglob("*")
+        if item.is_file()
+    }
+    assert {
+        "README.md",
+        "master.wav",
+        "stems/kick.wav",
+        "stems/melody.wav",
+        "midi/score.mid",
+    } <= files
+    voice_files = {
+        item for item in files
+        if item.startswith("midi/voices/") and item.endswith(".mid")
+    }
+    assert len(voice_files) == 2
+    assert all(
+        item in {"README.md", "master.wav"}
+        or item.startswith("stems/")
+        or item.startswith("midi/")
+        for item in files
+    )
+    assert all(not item.startswith("assets/") for item in files)
+    assert not any(item in files for item in {
+        "project.json", "score.json", "events.json", "manifest.json",
+        "fx_routing.json", "fx_automation.json", "mix.json",
+    })
+    assert not list(tmp_path.glob("*.zip"))
 
-    manifest = json.loads((extracted / "manifest.json").read_text(encoding="utf-8"))
-    inventory = {item["path"] for item in manifest["file_inventory"]}
-    assert "midi/score.mid" in inventory
-    assert all(name in inventory for name in voice_files)
-    assert json.loads((extracted / "project.json").read_text(encoding="utf-8"))["export"]["midi"] is True
+    readme = (output / "README.md").read_text(encoding="utf-8")
+    assert "M26 手渡し / test" in readme
+    assert "final routed mix" in readme
+    assert "No project FX routing was configured" in readme
+    assert "original aligned dry generation stems" in readme
+    assert "no copied source samples" in readme
 
-    reopened = ReawarpProject.load(extracted)
-    assert set(reopened.stems) == {"kick", "melody"}
-    assert reopened.frame_count == project.frame_count
-    midi_score = Score.from_midi(extracted / "midi" / "score.mid")
+    exported_master, sample_rate = read_wav(output / "master.wav")
+    assert sample_rate == project.sample_rate
+    assert exported_master.shape == master.shape
+    for name, original in originals.items():
+        exported_stem, stem_rate = read_wav(output / "stems" / f"{name}.wav")
+        assert stem_rate == project.sample_rate
+        assert exported_stem.shape == original.shape
+        np.testing.assert_allclose(project.stems[name], original)
+
+    midi_score = Score.from_midi(output / "midi" / "score.mid")
     assert midi_score.title == "M26 手渡し / test"
+
+
+def test_delivery_folder_readme_labels_dry_fx_fallback(tmp_path: Path):
+    project = _package_project()
+    output = export_project_package(
+        project,
+        tmp_path / "Dry_Fallback",
+        master_audio=project.render_master(),
+        fx_render_status="dry_fallback",
+    )
+    readme = (output / "README.md").read_text(encoding="utf-8")
+    assert "FX rendering failed" in readme
+    assert "No effects are claimed as rendered" in readme
+
+
+def test_delivery_folder_does_not_overwrite_existing_directory(tmp_path: Path):
+    project = _package_project()
+    destination = tmp_path / "Existing"
+    destination.mkdir()
+    marker = destination / "keep.txt"
+    marker.write_text("keep", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        export_project_package(
+            project, destination, master_audio=project.render_master()
+        )
+
+    assert marker.read_text(encoding="utf-8") == "keep"
+
+
+def test_delivery_folder_cancellation_leaves_no_partial_output(tmp_path: Path):
+    class CancelImmediately:
+        @staticmethod
+        def is_set() -> bool:
+            return True
+
+    project = _package_project()
+    destination = tmp_path / "Cancelled"
+    with pytest.raises(RuntimeError, match="cancelled"):
+        export_project_package(
+            project,
+            destination,
+            master_audio=project.render_master(),
+            cancel_event=CancelImmediately(),
+        )
+    assert not destination.exists()

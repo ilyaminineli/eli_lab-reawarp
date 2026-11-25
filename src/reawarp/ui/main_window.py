@@ -81,6 +81,7 @@ class MainWindow(QMainWindow):
         self._break_audio: np.ndarray | None = None
         self._worker: CancellableRenderWorker | None = None
         self._export_worker: CancellableRenderWorker | None = None
+        self._pending_export_destination: Path | None = None
         self._variation_counts: dict[str, int] = {}
         self._variation_origin_project: ReawarpProject | None = None
         self._variation_base_project: ReawarpProject | None = None
@@ -969,7 +970,7 @@ class MainWindow(QMainWindow):
         title.setObjectName("sectionTitle")
         header.addWidget(title)
         header.addStretch(1)
-        self.export_button = QPushButton("EXPORT PROJECT PACKAGE…")
+        self.export_button = QPushButton("EXPORT MASTER + STEMS + MIDI…")
         self.export_button.setEnabled(False)
         self.export_button.clicked.connect(self._export_project)
         header.addWidget(self.export_button)
@@ -2274,6 +2275,13 @@ class MainWindow(QMainWindow):
     def _run_render(self, operation: Any, message: str) -> None:
         if self._worker is not None:
             return
+        if self._pending_export_destination is not None:
+            self._pending_export_destination = None
+            self.export_button.setEnabled(self.project is not None)
+            self.statusBar().showMessage(
+                "Queued delivery export cancelled because a new project render was started.",
+                8000,
+            )
         self._set_busy(True, message)
         worker = CancellableRenderWorker(operation)
         self._worker = worker
@@ -2945,6 +2953,14 @@ class MainWindow(QMainWindow):
             )
         self._fx_queued_signature = None
         self._refresh_preview()
+        pending_export = self._pending_export_destination
+        if (
+            pending_export is not None
+            and signature == self._routing_signature()
+            and self._fx_routing_metadata.get("_routing_signature") == signature
+        ):
+            self._pending_export_destination = None
+            self._start_delivery_export(pending_export)
 
     def _fx_render_failed(self, signature: str, message: str) -> None:
         if self._fx_pending_signature != signature:
@@ -2980,6 +2996,22 @@ class MainWindow(QMainWindow):
             )
         self._fx_queued_signature = None
         self._refresh_preview()
+        pending_export = self._pending_export_destination
+        if cancelled and pending_export is not None:
+            self._pending_export_destination = None
+            self.export_button.setEnabled(self.project is not None)
+            self.statusBar().showMessage(
+                "FX rendering was cancelled; the queued delivery export was cancelled too.",
+                10000,
+            )
+        elif (
+            pending_export is not None
+            and signature == self._routing_signature()
+            and self._fx_routing_metadata.get("_routing_signature") == signature
+            and self._fx_routing_metadata.get("fallback") == "dry_source_stems"
+        ):
+            self._pending_export_destination = None
+            self._start_delivery_export(pending_export)
 
     def _audition_fx_component(self, stage: str, stem: str) -> None:
         """Audition direct/insert/send/return/master stages from the cached routing pass."""
@@ -3208,72 +3240,99 @@ class MainWindow(QMainWindow):
         )
 
     def _export_project(self) -> None:
-        if self.project is None or self._export_worker is not None:
+        """Choose a parent folder and automatically render FX before delivery export."""
+        if (
+            self.project is None
+            or self._export_worker is not None
+            or self._pending_export_destination is not None
+        ):
             return
-        archive_path, _ = QFileDialog.getSaveFileName(
+        default_export_parent = Path.cwd() / "output"
+        default_export_parent.mkdir(parents=True, exist_ok=True)
+        export_parent = QFileDialog.getExistingDirectory(
             self,
-            "Export complete Reawarp project package",
-            str(Path.cwd() / "reawarp-project.zip"),
-            "Reawarp project package (*.zip)",
+            "Choose a folder for the Reawarp delivery export",
+            str(default_export_parent),
         )
-        if not archive_path:
+        if not export_parent:
             return
-        if not self._ensure_routing_render():
+
+        score_title = str(self.project.to_score().title or "Reawarp")
+        slug = "".join(
+            character if character.isascii() and (
+                character.isalnum() or character in "-_"
+            ) else "-"
+            for character in score_title
+        ).strip("-_") or "Reawarp"
+        destination = Path(export_parent) / f"{slug}_Reawarp_Export"
+        suffix = 2
+        while destination.exists():
+            destination = Path(export_parent) / f"{slug}_Reawarp_Export_{suffix:02d}"
+            suffix += 1
+
+        self._pending_export_destination = destination
+        self.export_button.setEnabled(False)
+        if self._ensure_routing_render():
+            self._pending_export_destination = None
+            self._start_delivery_export(destination)
+        else:
             self.statusBar().showMessage(
-                "FX routing is being rendered in the background. Export again when it is ready.",
-                8000,
+                "Delivery export queued. Reawarp will finish the current FX render "
+                "and automatically write README, master, stems and MIDI.",
+                12000,
             )
+
+    def _start_delivery_export(self, destination: Path) -> None:
+        """Snapshot the final routed master and launch the folder writer."""
+        if self.project is None or self._export_worker is not None:
+            self._pending_export_destination = destination
             return
         master = self._render_mix()
         if master is None:
-            self.statusBar().showMessage("FX master is not ready; export cancelled.", 8000)
-            return
+            self._pending_export_destination = destination
+            if not self._ensure_routing_render():
+                self.statusBar().showMessage(
+                    "Waiting for the current FX render before creating the delivery folder.",
+                    10000,
+                )
+                return
+            master = self._render_mix()
+            if master is None:
+                self._pending_export_destination = None
+                self.export_button.setEnabled(self.project is not None)
+                self.statusBar().showMessage(
+                    "Could not produce a master render; delivery export was not created.",
+                    10000,
+                )
+                return
 
         export_project = self._project_with_variation_session()
-        sample_rate = self.project.sample_rate
         master_snapshot = np.asarray(master, dtype=np.float32).copy()
-        routing = copy.deepcopy(self.fx_routing_editor.routing())
-        automation = copy.deepcopy(self.fx_automation_editor.automation())
-        returns = {
-            name: np.asarray(audio, dtype=np.float32).copy()
-            for name, audio in self._fx_bus_returns.items()
-        }
-        mix_data = {
-            "schema_version": 1,
-            "description": (
-                "Mixer settings are applied to master.wav; stem WAVs remain the original aligned render buffers."
-            ),
-            "stems": {name: row.state() for name, row in self._mix_rows.items()},
-            "master_peak": (
-                float(np.max(np.abs(master_snapshot))) if master_snapshot.size else 0.0
-            ),
-            "fx_routing": "fx_routing.json",
-            "fx_automation": "fx_automation.json",
-            "fx_returns": list(returns),
-            "routing_render": copy.deepcopy(self._fx_routing_metadata),
-        }
+        fx_status = (
+            "dry_fallback"
+            if self._fx_routing_metadata.get("fallback") == "dry_source_stems"
+            else "rendered"
+        )
 
         def operation(cancel_event):
             output = export_project_package(
                 export_project,
-                archive_path,
+                destination,
                 master_audio=master_snapshot,
-                fx_routing=routing,
-                fx_automation=automation,
-                returns=returns,
-                mix_data=mix_data,
                 bit_depth=24,
-                asset_policy="copy",
                 include_midi=True,
+                fx_render_status=fx_status,
                 cancel_event=cancel_event,
             )
             return str(output)
 
+        self._pending_export_destination = None
         self.export_button.setEnabled(False)
         self.cancel_background_button.setVisible(True)
         self.cancel_background_button.setEnabled(True)
         self.statusBar().showMessage(
-            "Building complete project ZIP: audio, stems, Score, MIDI, FX settings, source assets and manifest…", 10000
+            "Writing delivery folder: README.md, master.wav, dry stems and combined/per-voice MIDI…",
+            10000,
         )
         worker = CancellableRenderWorker(operation)
         self._export_worker = worker
@@ -3287,7 +3346,7 @@ class MainWindow(QMainWindow):
         if self._worker is None:
             self.cancel_background_button.setEnabled(False)
             self.cancel_background_button.setVisible(False)
-        self.statusBar().showMessage(f"Exported portable project to {result}", 10000)
+        self.statusBar().showMessage(f"Exported Reawarp delivery folder to {result}", 10000)
 
     def _export_failed(self, message: str) -> None:
         self._export_worker = None
@@ -3296,6 +3355,6 @@ class MainWindow(QMainWindow):
             self.cancel_background_button.setEnabled(False)
             self.cancel_background_button.setVisible(False)
         if str(message).startswith("CANCELLED:"):
-            self.statusBar().showMessage("Project export cancelled.", 8000)
+            self.statusBar().showMessage("Delivery export cancelled.", 8000)
             return
         self._show_error(f"Export failed: {message}")

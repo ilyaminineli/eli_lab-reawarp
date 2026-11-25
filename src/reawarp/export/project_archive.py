@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-import zipfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -155,62 +154,168 @@ recorded paths. Missing or changed sources are reported rather than substituted.
 
 def export_project_package(
     project: ReawarpProject,
-    archive_path: str | Path,
+    directory: str | Path,
     *,
     master_audio: Any,
-    fx_routing: Mapping[str, Any],
-    fx_automation: Mapping[str, Any],
-    returns: Mapping[str, Any] | None = None,
-    mix_data: Mapping[str, Any] | None = None,
     bit_depth: int = 24,
-    asset_policy: str = "copy",
     include_midi: bool = True,
+    fx_render_status: str = "not_configured",
     cancel_event: Any | None = None,
 ) -> Path:
-    """Build a complete folder export and atomically package it as a ZIP handoff.
+    """Export a delivery folder containing README, routed master, dry stems and MIDI.
 
-    ZIP creation is intentionally outside the generated project folder so that
-    the manifest inventory remains stable and does not hash its own archive.
+    This is deliberately not a restorable Reawarp project archive. Source sample
+    files, project JSON, manifests, FX configuration, returns and ZIP packaging
+    are intentionally excluded. The master contains the current routed mix;
+    stem files are the original aligned generation stems, kept non-destructive.
     """
-    destination = Path(archive_path).expanduser()
-    if destination.suffix.lower() != ".zip":
-        destination = destination.with_suffix(".zip")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temporary_archive = destination.with_suffix(destination.suffix + ".tmp")
-    try:
-        with tempfile.TemporaryDirectory(prefix="reawarp-project-package-") as temporary:
-            folder = export_project_archive(
-                project,
-                Path(temporary) / "Reawarp_Project",
-                master_audio=master_audio,
-                fx_routing=fx_routing,
-                fx_automation=fx_automation,
-                returns=returns,
-                mix_data=mix_data,
-                bit_depth=bit_depth,
-                asset_policy=asset_policy,
-                include_midi=include_midi,
-                cancel_event=cancel_event,
-            )
-            _check_cancelled(cancel_event, "project package")
-            with zipfile.ZipFile(
-                temporary_archive, mode="w",
-                compression=zipfile.ZIP_DEFLATED, compresslevel=6,
-            ) as archive:
-                for source in sorted(folder.rglob("*")):
-                    _check_cancelled(cancel_event, "project package")
-                    if not source.is_file():
-                        continue
-                    resolved = source.resolve()
-                    if not resolved.is_relative_to(folder.resolve()):
-                        raise ValueError(f"package member escapes export folder: {source}")
-                    archive.write(source, source.relative_to(folder).as_posix())
-        _check_cancelled(cancel_event, "project package")
-        temporary_archive.replace(destination)
-        return destination
-    except Exception:
-        try:
-            temporary_archive.unlink(missing_ok=True)
-        except OSError:
-            pass
-        raise
+    if not isinstance(project, ReawarpProject):
+        raise TypeError("project must be a ReawarpProject")
+    if isinstance(bit_depth, bool) or not isinstance(bit_depth, int) or bit_depth not in {16, 24, 32}:
+        raise ValueError("bit_depth must be 16, 24 or 32")
+    if fx_render_status not in {"rendered", "dry_fallback", "not_configured"}:
+        raise ValueError("invalid FX render status")
+    destination = Path(directory).expanduser()
+    if not destination.name or destination.name in {".", ".."}:
+        raise ValueError("delivery directory must have a valid final folder name")
+    parent = destination.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise FileExistsError(f"delivery folder already exists: {destination}")
+    master = _audio_snapshot(master_audio, "master_audio")
+    if len(master) < project.frame_count:
+        raise ValueError("master_audio cannot be shorter than the project stem duration")
+    if not project.stems:
+        raise ValueError("project must contain at least one source stem")
+
+    stem_snapshots: dict[str, np.ndarray] = {}
+    channel_counts: set[int] = set()
+    safe_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+    for name, audio in project.stems.items():
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in {".", ".."}
+            or any(character not in safe_characters for character in name)
+        ):
+            raise ValueError(f"invalid project stem name: {name!r}")
+        snapshot = _audio_snapshot(audio, f"stem {name}")
+        if len(snapshot) != project.frame_count:
+            raise ValueError(f"stem {name!r} must align to the project frame count")
+        channel_counts.add(int(snapshot.shape[1]))
+        stem_snapshots[name] = snapshot
+    if len(channel_counts) != 1:
+        raise ValueError("project stems must use a consistent channel count")
+    if master.shape[1] != next(iter(channel_counts)):
+        raise ValueError("master channel count must match project stems")
+
+    score = project.to_score()
+    with tempfile.TemporaryDirectory(
+        prefix=f".{destination.name}.tmp-", dir=str(parent)
+    ) as temporary:
+        staging = Path(temporary) / destination.name
+        staging.mkdir(parents=True)
+        _check_cancelled(cancel_event, "delivery export")
+        write_wav(staging / "master.wav", master, project.sample_rate, bit_depth)
+
+        stems_directory = staging / "stems"
+        stems_directory.mkdir()
+        for name, audio in stem_snapshots.items():
+            _check_cancelled(cancel_event, "delivery export")
+            write_wav(stems_directory / f"{name}.wav", audio, project.sample_rate, bit_depth)
+
+        if include_midi:
+            import hashlib
+            import re
+            from dataclasses import replace
+
+            midi_root = staging / "midi"
+            voice_root = midi_root / "voices"
+            voice_root.mkdir(parents=True)
+            _check_cancelled(cancel_event, "delivery MIDI export")
+            combined_midi = midi_root / "score.mid"
+            score.export_midi(combined_midi)
+            voice_ids = sorted({
+                event.voice_id for event in score.events
+                if event.kind not in {"control", "marker"}
+            })
+            for voice_id in voice_ids:
+                _check_cancelled(cancel_event, "delivery MIDI export")
+                events = tuple(event for event in score.events if event.voice_id == voice_id)
+                voice_score = replace(
+                    score,
+                    title=f"{score.title} — {voice_id}",
+                    events=events,
+                    automation=(),
+                    automation_sources=(),
+                    modulations=(),
+                )
+                slug = re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                digest = hashlib.sha256(str(voice_id).encode("utf-8")).hexdigest()[:8]
+                voice_path = voice_root / f"{slug[:48]}-{digest}.mid"
+                voice_score.export_midi(voice_path)
+
+        _check_cancelled(cancel_event, "delivery export")
+        title = str(getattr(score, "title", "") or "Untitled Reawarp composition")
+        config = project.config
+        if fx_render_status == "rendered":
+            fx_description = "The master includes the completed routed FX render and current mixer settings."
+        elif fx_render_status == "dry_fallback":
+            fx_description = "FX rendering failed; the master is a dry-fallback mix. No effects are claimed as rendered."
+        else:
+            fx_description = "No project FX routing was configured; the master reflects the available mix."
+        midi_description = (
+            "- midi/score.mid: combined Standard MIDI 1.0 file.\n"
+            "- midi/voices/: separate MIDI file for each event-backed voice.\n"
+            if include_midi else "MIDI export was not requested.\n"
+        )
+        package_readme = f"""# {title}
+
+A Reawarp audio delivery folder.
+
+## Contents
+
+- master.wav — final master mix at {project.sample_rate:,} Hz, {bit_depth}-bit.
+- stems/ — aligned dry generation stems, one WAV per source role.
+{midi_description}
+## Render information
+
+- Tempo: {config.bpm:g} BPM
+- Duration: {project.duration:.3f} seconds
+- Sample rate: {project.sample_rate:,} Hz
+- Channels: {master.shape[1]}
+- Bit depth: {bit_depth}-bit PCM
+- Generation seed: {config.seed}
+- Structure: {config.structure}
+- Pattern family: {config.pattern_family}
+
+## Audio semantics
+
+The master is the final routed mix, including the mixer levels and any successfully
+rendered inserts and shared returns. {fx_description}
+
+The files in stems/ are the original aligned dry generation stems. They are
+intentionally not rewritten by the mixer or FX routing, so they remain suitable
+for independent processing and remixing. The individual dry stems do not include
+their insert effects or the shared SPACE/ECHO returns.
+
+## MIDI notes
+
+MIDI 1.0 is an interchange format with integer semitone notes and finite tick
+resolution. Reawarp-specific escaped text metadata may be ignored by other MIDI
+applications. The MIDI files are provided for musical interchange; WAV files
+remain the audio deliverables.
+
+## Source material and project files
+
+This delivery contains no copied source samples, sample banks, project database,
+Score JSON, routing JSON, manifests, intermediate returns or ZIP archive.
+It is a finished audio/MIDI handoff, not a self-contained, restorable Reawarp
+project. Reopening the original Reawarp project or regenerating it may require
+the source samples at their original locations.
+"""
+        (staging / "README.md").write_text(package_readme, encoding="utf-8")
+        _check_cancelled(cancel_event, "delivery export")
+        staging.replace(destination)
+
+    return destination

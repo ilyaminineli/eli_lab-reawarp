@@ -25,7 +25,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | Variation browser and candidate genealogy | Implemented | Candidate selection remains human-authored |
 | M24.1–M24.4 DSP research | NumPy reference APIs and CI coverage | Not default production inserts; listening and target profiling remain open |
 | M25 portability and project durability | Implementation complete; prior short CI acceptance passed | Target-Windows long benchmark and declared resource budgets remain open |
-| M26 production FX variations and complete package export | Implemented on `main`; corrected regression cases are being revalidated | Latest CI result is pending; Pyo and human listening remain separate gates |
+| M26 production FX variations and delivery export | Implemented; this change simplifies the delivery handoff | Linux Python 3.10–3.12 smoke and Windows regression jobs passed on the implementation commit; local Pyo/audio listening and human musical acceptance remain separate gates |
 | M24.5–M24.7 | Planned / research gate | No implementation claim |
 
 **Previous M25 validation baseline:** [CI run 45701978735](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45701978735) passed Linux Python 3.10–3.12 and Windows. The 5-second 48 kHz export/reopen smoke passed in all four jobs and Windows reported 307 passing tests. This is a short portability/integrity check, not a 30/180-second target-machine performance sign-off. M26 adds further regression coverage; see the latest [Actions runs](https://github.com/ilyaminineli/eli_lab-reawarp/actions).
@@ -91,7 +91,7 @@ M18's render-time density, syncopation and articulation do not silently rewrite 
 | **M23 — Variation browser and critical listening** | Implemented; listening remains human-led | Deterministic candidate batches, frozen bases, blind matched A/B, difference waveform/spectrogram, listening sets, notes, keep/discard/promote/branch/restore, nested project persistence and SQLite ancestry. |
 | **M24 — Advanced DSP research** | M24.1–M24.4 reference implementations; M24.5–M24.7 planned | Independent NumPy reference APIs. None is automatically inserted into the M22 production role map. |
 | **M25 — Performance, portability and project durability** | Implemented; long target benchmark open | Manifest v1, source-asset copy/reference policy, file inventory and SHA-256 audit, compatibility fixtures, background archive service, detailed Score/voice timings and cooperative cancellation. |
-| **M26 — Connected project FX and complete handoff** | Implemented on `main`; corrected regression suite pending CI | FX Lab loads active project channels and can assign custom serial chains as per-stem inserts. Stem Mixer can pre-render channel inserts/SPACE/ECHO returns, generate deterministic role-aware FX alternatives from project context/seed, audition them from a temporary disk cache and apply a chosen route. Desktop Export creates a ZIP handoff containing routed master, original dry stems, returns, Score/events, routing/automation/mix data, copied source assets, manifest and combined/per-voice MIDI. |
+| **M26 — Connected project FX and delivery export** | Implemented; Windows/Pyo and human listening sign-off remain separate | FX Lab loads active project channels and can assign custom serial chains as per-stem inserts. Stem Mixer pre-renders channel inserts/SPACE/ECHO returns, generates deterministic role-aware FX alternatives and reuses the completed routing snapshot for audition and master render. Desktop Delivery Export automatically completes FX rendering, then writes a normal folder containing README.md, routed master.wav, original aligned dry stems/ and combined/per-voice MIDI. It does not copy source samples, create a ZIP, or claim to be a restorable Reawarp project archive. |
 
 #### M24 module ledger
 
@@ -181,9 +181,10 @@ CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs 
 
 ## Documentation that remains separate
 
-The following documents are reference material, not duplicate milestone plans:
+The following documents are maintained separately from this delivered-milestone ledger:
 
 - [Implementation notes](IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
+- [M27–M34 development roadmap](ROADMAP_M27_M34.md) — detailed forward milestone specifications and implementation handoff for agents.
 - [Dependency ecosystem](DEPENDENCY_ECOSYSTEM.md) — dependencies, platform constraints and licences.
 - [Sample banks and hybrid composition](SAMPLE_BANKS_HYBRID_COMPOSITION.md) — source selection and hybrid percussion.
 - [IRO integration](IRO_INTEGRATION.md) — shared manifests, source identity and missing-asset policy.
@@ -192,4 +193,7 @@ The following documents are reference material, not duplicate milestone plans:
 - [Sound-design architecture](guides/IDM_Sound_Design_Synthesis_and_Hybrid_Sound_Architecture.md).
 - [Advanced composition appendix](guides/IDM_Advanced_Composition_and_Generation_Appendix.md).
 
-The per-milestone Markdown files and dated assessment snapshots have been consolidated into this document. Their previous versions remain available in Git history.
+The completed milestone history remains consolidated in this document. Future M27–M34 specifications are maintained in the dedicated roadmap so agents can work from a focused implementation brief.
+
+---
+

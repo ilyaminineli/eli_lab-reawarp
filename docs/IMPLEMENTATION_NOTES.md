@@ -10,7 +10,7 @@ These notes describe enduring code and engineering contracts. Milestone scope an
 4. **Dry stem ownership** remains with the generated project. Transforms, inserts, routing, variations and audition processors work on copies and never rewrite source assets.
 5. **Production routing** uses per-stem serial inserts and two wet-only shared returns (SPACE/ECHO). Keep the graph explicit and bounded; do not silently introduce arbitrary feedback or plug-in routing.
 6. **Playback** consumes completed buffers only. Audio callbacks must not synthesize, allocate large buffers, access disk, or call GUI code.
-7. **Export** snapshots mutable UI state before background work and writes a portable project with configuration, Score/events, source assets, routing, automation, render provenance and integrity inventory.
+7. **Project persistence and delivery export are separate contracts.** Reawarp project archives retain configuration, Score/events, external-asset policy, routing and provenance for reopenability. The desktop delivery export is intentionally smaller: a normal folder with README.md, routed master.wav, aligned dry stems/ and combined/per-voice MIDI. It never copies source samples or creates a ZIP and is not a restorable project archive.
 
 ## Determinism
 
@@ -50,6 +50,22 @@ Current compatibility snapshot:
 | Variation candidate | 1 |
 
 See the compatibility fixture at `tests/fixtures/m25/legacy_contracts_v1.json`.
+
+## Delivery export contract
+
+The desktop **EXPORT MASTER + STEMS + MIDI** action is a delivery operation, not a project archive operation.
+
+- The export service receives an immutable project snapshot and the completed routed master buffer.
+- FX pre-render is automatically completed before delivery begins. If it fails, the retained dry fallback may still be exported, but README.md must say that the master is dry fallback.
+- The delivery folder contains only README.md, master.wav, stems/*.wav, midi/score.mid and midi/voices/*.mid (the MIDI directory is omitted only when MIDI is explicitly disabled).
+- master.wav is the final routed mix, including current mixer settings and successful insert/return processing.
+- stems/*.wav are the original aligned dry generation stems. They are not overwritten by inserts or shared returns.
+- Do not include source samples, sample banks, project.json, score.json, events.json, FX JSON, returns, manifests, candidate caches, or a ZIP.
+- The folder is not a restorable Reawarp project. Original project/source assets remain managed separately.
+- Write into a sibling temporary directory and rename into a new destination only after every file is complete. Never overwrite a non-empty existing destination; cancellation must leave no partial delivery folder.
+- The package README is part of the deliverable and must report title, tempo, duration, sample rate, bit depth, channels, seed, structure, FX render state, stem semantics and MIDI 1.0 limitations.
+
+The complete project archive APIs remain distinct and may continue to support project portability where that is explicitly requested.
 
 ## Optional dependencies
 
