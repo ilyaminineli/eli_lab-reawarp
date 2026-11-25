@@ -53,6 +53,18 @@ jobs:
         run: python scripts/benchmark_m24_convolution.py --durations 0.15 --ir-durations 0.05 --sample-rates 22050 --output /tmp/reawarp-m24-1-benchmark.json
       - name: Render M24.1 matched-level listening example
         run: python scripts/render_m24_1_listening_example.py --output /tmp/reawarp-m24-1-listening
+      - name: Benchmark portable M24.2 spectral delay
+        run: python scripts/benchmark_m24_2_spectral_delay.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-2-benchmark.json
+      - name: Render M24.2 matched-level listening example
+        run: python scripts/render_m24_2_listening_example.py --output /tmp/reawarp-m24-2-listening --sample-rate 22050
+      - name: Benchmark portable M24.3 cross-synthesis
+        run: python scripts/benchmark_m24_3_cross_synthesis.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-3-benchmark.json
+      - name: Render M24.3 listening example
+        run: python scripts/render_m24_3_listening_example.py --output /tmp/reawarp-m24-3-listening --sample-rate 22050
+      - name: Benchmark portable M24.4 oversampled nonlinear processing
+        run: python scripts/benchmark_m24_4_nonlinear.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-4-benchmark.json
+      - name: Render M24.4 nonlinear listening example
+        run: python scripts/render_m24_4_listening_example.py --output /tmp/reawarp-m24-4-listening --sample-rate 22050
       - name: Smoke-test CLI
         run: reawarp --duration 5 --sample-rate 22050 --seed 211 --output /tmp/reawarp-ci
       - name: Smoke-test FX preset and stage registries
