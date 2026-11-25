@@ -44,6 +44,10 @@ _TARGET_AMOUNTS = {
     "spatial.width": 0.25,
 }
 
+_TARGET_BASE_VALUES = {
+    "synth.cutoff": 2_400.0,
+}
+
 _TARGET_RANGES = {
     "synth.cutoff": (20.0, 18_000.0),
     "synth.resonance": (0.0, 1.0),
@@ -253,7 +257,13 @@ class ScoreAutomationEditor(QGroupBox):
                 destinations = "unconnected"
             self.controls.addItem(f"{source.source_id}  →  {destinations}")
         self.apply_button.setEnabled(score is not None)
-        self._counter = max(self._counter, len(self._sources))
+        existing_indices = [
+            int(source.source_id.rsplit("-", 1)[-1])
+            for source in self._sources
+            if source.source_id.startswith("m18-control-")
+            and source.source_id.rsplit("-", 1)[-1].isdigit()
+        ]
+        self._counter = max([self._counter, *existing_indices], default=self._counter)
         self._select_control(self.controls.currentRow())
         self.status.setText(
             f"{len(self._sources)} source(s) · {len(self._modulations)} connection(s). "
@@ -343,6 +353,7 @@ class ScoreAutomationEditor(QGroupBox):
                 retrigger=str(self.retrigger.currentData()),
                 minimum=low,
                 maximum=high,
+                base_value=_TARGET_BASE_VALUES.get(target),
                 scope=scope,
                 scope_id=scope_id,
             )
