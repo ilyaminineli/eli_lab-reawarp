@@ -310,11 +310,12 @@ def build_fx_variation_routings(
             echo_scale = float(rng.uniform(0.75, 1.30))
 
             # Never perturb the low-frequency foundation in generated variants.
-        if role == "kick":
-            route["insert"] = _bypass_insert()
-            route["sends"] = {"space": 0.0, "echo": 0.0}
+            if role == "kick":
+                route["insert"] = _bypass_insert()
+                route["sends"] = {"space": 0.0, "echo": 0.0}
+                continue
 
-        if profile_name in {"space_depth", "open_space", "close_room"}:
+            if profile_name in {"space_depth", "open_space", "close_room"}:
                 preset_by_role = {
                     "snare": "restrained_space", "hats": "restrained_space",
                     "break": "restrained_space", "melody": "metallic_machine",
