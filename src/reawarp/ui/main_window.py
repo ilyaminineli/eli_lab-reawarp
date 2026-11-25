@@ -1859,7 +1859,20 @@ class MainWindow(QMainWindow):
         return None
 
     def _refresh_preview(self, *_args: Any) -> None:
-        """Schedule a preview refresh after rapid control changes settle."""
+        """Schedule a preview refresh and sync portable fader state."""
+        if self.project is not None and hasattr(self, "fx_routing_editor"):
+            states = {
+                name: {
+                    "gain_db": 20.0 * float(
+                        np.log10(max(row.gain.value() / 100.0, 0.001))
+                    ),
+                    "pan": row.pan.value() / 100.0,
+                    "mute": row.mute.isChecked(),
+                    "solo": row.solo.isChecked(),
+                }
+                for name, row in self._mix_rows.items()
+            }
+            self.fx_routing_editor.set_mixer_state(states)
         self._preview_refresh_timer.start()
 
     def _apply_preview_refresh(self) -> None:
