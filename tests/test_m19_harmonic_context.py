@@ -209,7 +209,7 @@ def test_modal_and_intervallic_pitch_fields_are_explicit_and_round_trip():
         hard_constraint=True,
     )
     assert intervallic.evaluate(63.5, tuning).allowed is True
-    assert intervallic.evaluate(75.0, tuning).allowed is True
+    assert intervallic.evaluate(72.0, tuning).allowed is True
     assert intervallic.evaluate(64.0, tuning).allowed is False
 
     with pytest.raises(ValueError, match="requires centre_pitch and allowed_intervals"):
