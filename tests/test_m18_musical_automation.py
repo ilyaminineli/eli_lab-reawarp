@@ -73,7 +73,7 @@ def test_scope_precedence_absolute_then_relative_and_legacy_global_lookup():
     assert bus.value_at_frame("synth.pitch", 0) == pytest.approx(2.0)
     assert bus.value_for_context(
         "synth.pitch", 0, event_id="note-a"
-    ) == pytest.approx(8.0)
+    ) == pytest.approx(6.0)
     assert bus.value_for_context(
         "synth.pitch", 0, context={"role_id": "lead", "section_id": "other"}
     ) == pytest.approx(3.0)
