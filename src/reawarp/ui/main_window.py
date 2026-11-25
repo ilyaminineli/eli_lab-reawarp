@@ -23,7 +23,8 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import (
-    match_audition_level, measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,
+    match_audition_level, measure_signal, render_fx_routing,
+    render_master_with_returns, save_fx_routing,
 )
 from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
@@ -1744,6 +1745,8 @@ class MainWindow(QMainWindow):
             audio = self._fx_bus_returns.get("echo")
         elif stage == "direct":
             audio = self._fx_audition_audio.get("direct", {}).get(stem)
+            if audio is None and stem in self.project.stems:
+                audio = self.project.stems[stem]
         elif stage == "insert":
             audio = self._fx_audition_audio.get("insert", {}).get(stem)
         elif stage.startswith("send."):
