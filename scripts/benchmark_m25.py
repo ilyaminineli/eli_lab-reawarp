@@ -200,6 +200,8 @@ def _case(duration: float, args: argparse.Namespace) -> dict[str, Any]:
         "complexity": args.complexity,
         "wall_seconds": total_seconds,
         "generation_seconds": generation_seconds,
+        "export_seconds": export_seconds,
+        "reopen_seconds": reopen_seconds,
         "generation_real_time_factor": generation_seconds / duration,
         "real_time_factor": total_seconds / duration,
         "config": config.to_dict(),
