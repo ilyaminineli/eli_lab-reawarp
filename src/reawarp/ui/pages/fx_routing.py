@@ -11,19 +11,30 @@ from PySide6.QtWidgets import (
 )
 
 from reawarp.fx import FX_PRESETS
-from reawarp.fx_routing import (FX_BUSES, FX_DELAY_DIVISIONS, default_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing)
+from reawarp.fx_routing import (
+    FX_BUSES, FX_DELAY_DIVISIONS, SEND_TAP_POINTS, default_fx_routing,
+    role_aware_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing,
+)
 
 
 class FXRoutingEditor(QGroupBox):
     changed = Signal()
+    auditionRequested = Signal(str, str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("ROLE-AWARE FX ROUTING", parent)
         self.setToolTip("Per-stem inserts and shared post-insert send/return buses.")
         self._stem_names: tuple[str, ...] = ()
         self._routing: dict[str, Any] = default_fx_routing()
+        self.send_taps: dict[str, QComboBox] = {}
+        self._loading = False
         root = QVBoxLayout(self)
-        intro = QLabel("INSERT processes one stem. SPACE / ECHO sends share a return across selected roles. Dry source stems remain untouched.")
+        intro = QLabel(
+            "Role-aware routing is applied automatically: kick/sub stays dry, "
+            "while transient, melodic and texture roles receive restrained inserts "
+            "and shared SPACE/ECHO sends. Adjust per-role overrides below; dry routing "
+            "remains available for A/B. Original stems stay immutable."
+        )
         intro.setWordWrap(True)
         intro.setObjectName("muted")
         root.addWidget(intro)
@@ -54,7 +65,14 @@ class FXRoutingEditor(QGroupBox):
             slider.setRange(0, 100)
             slider.valueChanged.connect(self._store_selected)
             self.sends[bus] = slider
+            tap = QComboBox()
+            for value in SEND_TAP_POINTS:
+                tap.addItem(value.replace("_", " ").upper(), value)
+            tap.setCurrentIndex(tap.findData("post_insert_post_fader"))
+            tap.currentIndexChanged.connect(self._store_selected)
+            self.send_taps[bus] = tap
             bus_form.addRow(bus.upper(), slider)
+            bus_form.addRow(f"{bus.upper()} TAP", tap)
         root.addWidget(bus_group)
         return_group = QGroupBox("BUS RETURNS")
         return_form = QFormLayout(return_group)
@@ -94,6 +112,12 @@ class FXRoutingEditor(QGroupBox):
             tail.valueChanged.connect(self._store_buses)
         root.addWidget(return_group)
         actions = QHBoxLayout()
+        self.auto_button = QPushButton("AUTO ROLE ROUTING")
+        self.dry_button = QPushButton("RESET DRY")
+        self.auto_button.clicked.connect(self._apply_auto_routing)
+        self.dry_button.clicked.connect(self._apply_dry_routing)
+        actions.addWidget(self.auto_button)
+        actions.addWidget(self.dry_button)
         self.load_button = QPushButton("LOAD ROUTING…")
         self.save_button = QPushButton("SAVE ROUTING…")
         self.load_button.clicked.connect(self._load_file)
@@ -107,12 +131,28 @@ class FXRoutingEditor(QGroupBox):
         self.status.setWordWrap(True)
         root.addWidget(self.status)
 
+        audition_row = QHBoxLayout()
+        self.audition_stage = QComboBox()
+        for label, stage in (
+            ("DIRECT", "direct"), ("INSERT", "insert"),
+            ("SPACE SEND", "send.space"), ("ECHO SEND", "send.echo"),
+            ("SPACE RETURN", "return.space"), ("ECHO RETURN", "return.echo"),
+            ("MASTER", "master"),
+        ):
+            self.audition_stage.addItem(label, stage)
+        self.audition_button = QPushButton("AUDITION SELECTED")
+        self.audition_button.clicked.connect(self._request_audition)
+        audition_row.addWidget(self.audition_stage, 1)
+        audition_row.addWidget(self.audition_button)
+        root.addLayout(audition_row)
+
     def set_stems(self, names: list[str] | tuple[str, ...], sample_rate: int, bpm: float = 120.0) -> None:
         self._stem_names = tuple(names)
         self._sample_rate = int(sample_rate)
         self._bpm = float(bpm)
         current = self.stem.currentData()
-        self._routing = default_fx_routing(self._stem_names)
+        self._loading = True
+        self._routing = role_aware_fx_routing(self._stem_names)
         self.stem.blockSignals(True)
         self.stem.clear()
         self.stem.addItems([])
@@ -123,7 +163,12 @@ class FXRoutingEditor(QGroupBox):
         self.stem.setCurrentIndex(index if index >= 0 else 0)
         self._load_selected()
         self._load_buses_into_widgets()
-        self.status.setText(f"{len(names)} stems · {self._bpm:g} BPM · dry by default; insert and sends are opt-in.")
+        self._loading = False
+        self.status.setText(
+            f"{len(names)} stems · automatic role routing · kick/sub protected · "
+            "manual overrides available"
+        )
+        self.changed.emit()
 
     def _load_selected(self, *_args: Any) -> None:
         name = self.stem.currentData()
@@ -142,18 +187,28 @@ class FXRoutingEditor(QGroupBox):
             slider.blockSignals(True)
             slider.setValue(round(float(record["sends"][bus]) * 100))
             slider.blockSignals(False)
+            tap = self.send_taps[bus]
+            tap.blockSignals(True)
+            tap.setCurrentIndex(tap.findData(record.get("send_taps", {}).get(
+                bus, "post_insert_post_fader"
+            )))
+            tap.blockSignals(False)
 
     def _store_selected(self, *_args: Any) -> None:
         name = self.stem.currentData()
-        if name not in self._routing["stems"]:
+        if self._loading or name not in self._routing["stems"]:
             return
         choice = self.insert.currentData()
         insert = ({"kind": "bypass"} if choice == "bypass" else
                   {"kind": "preset", "preset": choice, "wet": self.insert_wet.value() / 100, "tail_seconds": 1.5})
+        prior = self._routing["stems"][name]
         self._routing["stems"][name] = {
+            **prior,
             "insert": insert,
             "sends": {bus: slider.value() / 100 for bus, slider in self.sends.items()},
+            "send_taps": {bus: tap.currentData() for bus, tap in self.send_taps.items()},
         }
+        self._routing["routing_mode"] = "manual"
         self.changed.emit()
 
     def _load_buses_into_widgets(self) -> None:
@@ -172,7 +227,7 @@ class FXRoutingEditor(QGroupBox):
                 sync.setEnabled(has_delay)
 
     def _store_buses(self, *_args: Any) -> None:
-        if not hasattr(self, "bus_chain"):
+        if self._loading or not hasattr(self, "bus_chain"):
             return
         echo_preset = str(self.bus_chain["echo"].currentData())
         echo_has_delay = any(
@@ -183,6 +238,7 @@ class FXRoutingEditor(QGroupBox):
             self.bus_sync["echo"].setCurrentIndex(self.bus_sync["echo"].findData("off"))
             self.bus_sync["echo"].blockSignals(False)
         self.bus_sync["echo"].setEnabled(echo_has_delay)
+        self._routing["routing_mode"] = "manual"
         self._routing["buses"] = {
             bus: {
                 "chain": self.bus_chain[bus].currentData(),
@@ -205,9 +261,11 @@ class FXRoutingEditor(QGroupBox):
         except Exception as exc:
             QMessageBox.warning(self, "FX routing", str(exc))
             return
+        self._loading = True
         self._routing = routing
         self._load_selected()
         self._load_buses_into_widgets()
+        self._loading = False
         self.status.setText(f"Loaded routing: {Path(path).name}")
         self.changed.emit()
 
@@ -225,10 +283,25 @@ class FXRoutingEditor(QGroupBox):
         self.status.setText(f"Saved {Path(path).resolve()}")
 
     def set_routing(self, payload: dict[str, Any]) -> None:
+        self._loading = True
         self._routing = normalise_fx_routing(payload, self._stem_names, self._sample_rate)
         self._load_selected()
         self._load_buses_into_widgets()
+        self._loading = False
         self.changed.emit()
+
+    def _apply_auto_routing(self) -> None:
+        self.set_routing(role_aware_fx_routing(self._stem_names))
+
+    def _apply_dry_routing(self) -> None:
+        self.set_routing(default_fx_routing(self._stem_names))
+
+    def _request_audition(self) -> None:
+        stem = str(self.stem.currentData() or "")
+        stage = str(self.audition_stage.currentData() or "direct")
+        if stage == "master":
+            stem = "master"
+        self.auditionRequested.emit(stage, stem)
 
     def routing(self) -> dict[str, Any]:
         return normalise_fx_routing(self._routing, self._stem_names, self._sample_rate) if self._stem_names else default_fx_routing()
