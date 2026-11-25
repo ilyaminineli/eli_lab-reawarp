@@ -254,7 +254,7 @@ def score_to_midi(
             mido.MetaMessage(
                 "text",
                 text="REAWARP_EVENT:" + json.dumps(
-                    payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+                    payload, ensure_ascii=True, separators=(",", ":"), allow_nan=False
                 ),
                 time=0,
             ),
@@ -286,7 +286,7 @@ def score_to_midi(
     cc_pattern = re.compile(r"^midi\.cc\.(\d+)\.(\d+)$")
     for lane in score.automation:
         payload = json.dumps(
-            lane.to_dict(), ensure_ascii=False, separators=(",", ":"), allow_nan=False
+            lane.to_dict(), ensure_ascii=True, separators=(",", ":"), allow_nan=False
         )
         sequence += 1
         automation_items.append((
