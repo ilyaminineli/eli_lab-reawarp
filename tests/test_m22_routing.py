@@ -217,3 +217,27 @@ def test_pre_fader_send_can_leave_muted_track_silent_but_ignores_fader_gain(monk
     send = metadata["audition_audio"]["sends"]["melody"]["space"]
     assert send[0, 0] == pytest.approx(0.2)
     assert send[0, 1] == pytest.approx(0.2)
+
+
+
+def test_matched_level_audition_is_peak_safe_and_never_mutates_mix_audio():
+    time = np.arange(4_800, dtype=np.float32) / 48_000
+    source = (0.05 * np.sin(2.0 * np.pi * 440.0 * time)).astype(np.float32)
+    original = source.copy()
+    matched, report = fx.match_audition_level(source)
+    assert report["rms_target_reached"] is True
+    assert report["output_rms_dbfs"] == pytest.approx(-18.0, abs=0.01)
+    assert report["output_peak"] <= 0.95
+    assert not np.shares_memory(source, matched)
+    np.testing.assert_array_equal(source, original)
+
+    transient = np.zeros(1_000, dtype=np.float32)
+    transient[0] = 1.0
+    peak_limited, peak_report = fx.match_audition_level(transient)
+    assert peak_report["rms_target_reached"] is False
+    assert peak_report["output_peak"] <= 0.95
+    assert peak_limited[0] == pytest.approx(0.95)
+
+    silence, silent_report = fx.match_audition_level(np.zeros((16, 2), dtype=np.float32))
+    assert np.count_nonzero(silence) == 0
+    assert silent_report["linear_gain"] == 1.0
