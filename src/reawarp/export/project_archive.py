@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -39,6 +41,7 @@ def export_project_archive(
     mix_data: Mapping[str, Any] | None = None,
     bit_depth: int = 24,
     asset_policy: str = "copy",
+    include_midi: bool = False,
     cancel_event: Any | None = None,
 ) -> Path:
     """Export a frozen project/mixer snapshot, WAV assets and integrity manifest.
@@ -92,6 +95,7 @@ def export_project_archive(
         fx_routing=dict(fx_routing),
         fx_automation=dict(fx_automation),
         asset_policy=asset_policy,
+        include_midi=include_midi,
         cancel_event=cancel_event,
     )
     _check_cancelled(cancel_event, "project export")
@@ -110,5 +114,95 @@ def export_project_archive(
     )
     temporary.replace(output / "mix.json")
     _check_cancelled(cancel_event, "project export")
+    package_readme = """# Reawarp project package
+
+This is a portable Reawarp project handoff. Open the extracted folder with Reawarp's
+project loader or use `ReawarpProject.load(folder)`.
+
+## Contents
+
+- `master.wav`: the final routed master from the exported mixer snapshot.
+- `stems/`: original aligned dry generation stems; these are not overwritten by FX.
+- `returns/`: rendered SPACE/ECHO wet-only auxiliary returns when active.
+- `score.json` and `events.json`: canonical Score and compatibility event records.
+- `midi/score.mid`: combined Standard MIDI 1.0 export with one track per voice.
+- `midi/voices/`: separate voice MIDI files for individual instrument/role import.
+- `project.json`, `fx_routing.json`, `fx_automation.json`, and `mix.json`:
+  generation, production, routing and automation settings.
+- `assets/`: copied source samples by default, with hashes and asset identities.
+- `manifest.json`: schema, environment, source-asset audit and SHA-256 file inventory.
+- `candidates/` and `listening_report.json`: variation session data when present.
+
+MIDI 1.0 uses integer semitone notes and finite tick resolution. Reawarp-specific text
+meta events preserve exact pitch/event provenance when the file is read back by Reawarp;
+other MIDI applications may ignore that metadata. The Reawarp Score remains authoritative.
+
+For reference-only asset exports, external source files must remain available at their
+recorded paths. Missing or changed sources are reported rather than substituted.
+"""
+    (output / "PACKAGE_README.md").write_text(package_readme, encoding="utf-8")
     refresh_project_manifest(output, cancel_event=cancel_event)
     return output
+
+
+def export_project_package(
+    project: ReawarpProject,
+    archive_path: str | Path,
+    *,
+    master_audio: Any,
+    fx_routing: Mapping[str, Any],
+    fx_automation: Mapping[str, Any],
+    returns: Mapping[str, Any] | None = None,
+    mix_data: Mapping[str, Any] | None = None,
+    bit_depth: int = 24,
+    asset_policy: str = "copy",
+    include_midi: bool = True,
+    cancel_event: Any | None = None,
+) -> Path:
+    """Build a complete folder export and atomically package it as a ZIP handoff.
+
+    ZIP creation is intentionally outside the generated project folder so that
+    the manifest inventory remains stable and does not hash its own archive.
+    """
+    destination = Path(archive_path).expanduser()
+    if destination.suffix.lower() != ".zip":
+        destination = destination.with_suffix(".zip")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_archive = destination.with_suffix(destination.suffix + ".tmp")
+    try:
+        with tempfile.TemporaryDirectory(prefix="reawarp-project-package-") as temporary:
+            folder = export_project_archive(
+                project,
+                Path(temporary) / "Reawarp_Project",
+                master_audio=master_audio,
+                fx_routing=fx_routing,
+                fx_automation=fx_automation,
+                returns=returns,
+                mix_data=mix_data,
+                bit_depth=bit_depth,
+                asset_policy=asset_policy,
+                include_midi=include_midi,
+                cancel_event=cancel_event,
+            )
+            _check_cancelled(cancel_event, "project package")
+            with zipfile.ZipFile(
+                temporary_archive, mode="w",
+                compression=zipfile.ZIP_DEFLATED, compresslevel=6,
+            ) as archive:
+                for source in sorted(folder.rglob("*")):
+                    _check_cancelled(cancel_event, "project package")
+                    if not source.is_file():
+                        continue
+                    resolved = source.resolve()
+                    if not resolved.is_relative_to(folder.resolve()):
+                        raise ValueError(f"package member escapes export folder: {source}")
+                    archive.write(source, source.relative_to(folder).as_posix())
+        _check_cancelled(cancel_event, "project package")
+        temporary_archive.replace(destination)
+        return destination
+    except Exception:
+        try:
+            temporary_archive.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
