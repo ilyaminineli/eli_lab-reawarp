@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
-from reawarp.export.project_archive import export_project_archive
+from reawarp.export.project_archive import export_project_package
 from reawarp.fx_routing import (
     build_fx_variation_routings, match_audition_level, measure_signal,
     render_fx_routing, render_master_with_returns,
@@ -3020,10 +3020,13 @@ class MainWindow(QMainWindow):
     def _export_project(self) -> None:
         if self.project is None or self._export_worker is not None:
             return
-        directory = QFileDialog.getExistingDirectory(
-            self, "Export Reawarp project", str(Path.cwd())
+        archive_path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Export complete Reawarp project package",
+            str(Path.cwd() / "reawarp-project.zip"),
+            "Reawarp project package (*.zip)",
         )
-        if not directory:
+        if not archive_path:
             return
         if not self._ensure_routing_render():
             self.statusBar().showMessage(
@@ -3061,9 +3064,9 @@ class MainWindow(QMainWindow):
         }
 
         def operation(cancel_event):
-            output = export_project_archive(
+            output = export_project_package(
                 export_project,
-                directory,
+                archive_path,
                 master_audio=master_snapshot,
                 fx_routing=routing,
                 fx_automation=automation,
@@ -3071,6 +3074,7 @@ class MainWindow(QMainWindow):
                 mix_data=mix_data,
                 bit_depth=24,
                 asset_policy="copy",
+                include_midi=True,
                 cancel_event=cancel_event,
             )
             return str(output)
@@ -3079,7 +3083,7 @@ class MainWindow(QMainWindow):
         self.cancel_background_button.setVisible(True)
         self.cancel_background_button.setEnabled(True)
         self.statusBar().showMessage(
-            "Exporting project, assets and integrity manifest in the background…", 10000
+            "Building complete project ZIP: audio, stems, Score, MIDI, FX settings, source assets and manifest…", 10000
         )
         worker = CancellableRenderWorker(operation)
         self._export_worker = worker
