@@ -95,4 +95,4 @@ __all__ = [
     "score_lanes_to_fx_automation",
     "score_to_fx_automation",
 ]
-__version__ = "0.8.0"
+__version__ = "0.12.0"
