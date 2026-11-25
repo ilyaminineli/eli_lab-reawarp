@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import math
+import logging
+import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Mapping, Sequence
@@ -15,6 +17,9 @@ from typing import Any, Mapping, Sequence
 import numpy as np
 
 FX_CHAIN_SCHEMA_VERSION = 1
+
+logger = logging.getLogger(__name__)
+_PYO_RENDER_LOCK = threading.RLock()
 FX_MAX_STAGES = 12
 
 FX_STAGE_DEFAULTS: dict[str, dict[str, float]] = {
@@ -300,11 +305,12 @@ def render_pyo_fx(
     wet: float = 0.75,
     tail_seconds: float = 1.5,
 ) -> np.ndarray:
-    """Render a preset or custom ordered chain to a new float32 buffer.
+    """Render an ordered Pyo chain with isolated files and a serialised server.
 
-    This is an offline render: it does not open an audio device. Pyo and
-    SoundFile are imported lazily so the rest of Reawarp remains usable without
-    either optional package.
+    Pyo's offline server is process-global in some builds. A process-wide lock
+    prevents concurrent server lifecycles, while the unique TemporaryDirectory
+    gives each render independent source and result paths. Explicitly release
+    the player/graph before deleting its input WAV (important on Windows).
     """
     if stages is None:
         if preset is None or preset not in FX_PRESETS:
@@ -337,54 +343,78 @@ def render_pyo_fx(
 
     duration = len(samples) / float(sample_rate)
     render_duration = duration + float(tail_seconds)
-    with TemporaryDirectory(prefix="reawarp-fx-") as temporary:
-        source_path = Path(temporary) / "source.wav"
-        rendered_path = Path(temporary) / "processed.wav"
-        sf.write(str(source_path), samples, int(sample_rate), subtype="FLOAT")
-
-        server = pyo.Server(
-            sr=int(sample_rate),
-            nchnls=int(samples.shape[1]),
-            buffersize=512,
-            duplex=0,
-            audio="offline",
-            verbosity=0,
-        )
-        try:
-            server.boot()
-            server.recordOptions(
-                dur=render_duration,
-                filename=str(rendered_path),
-                fileformat=0,
-                sampletype=3,
+    with _PYO_RENDER_LOCK:
+        with TemporaryDirectory(prefix="reawarp-fx-") as temporary:
+            source_path = Path(temporary) / "source.wav"
+            rendered_path = Path(temporary) / "processed.wav"
+            logger.debug(
+                "Pyo FX start: rate=%s frames=%s channels=%s stages=%s source=%s",
+                sample_rate, len(samples), samples.shape[1],
+                [str(stage["type"]) for stage in chain], source_path,
             )
-            source = pyo.SfPlayer(str(source_path), loop=False, interp=4)
-            processed = source
-            for stage in chain:
-                processed = _make_stage(pyo, processed, dict(stage), int(sample_rate))
-
-            output = source * (1.0 - float(wet)) + processed * float(wet)
-            output.out()
-            server.start()
-        finally:
+            sf.write(str(source_path), samples, int(sample_rate), subtype="FLOAT")
+            server = pyo.Server(
+                sr=int(sample_rate),
+                nchnls=int(samples.shape[1]),
+                buffersize=512,
+                duplex=0,
+                audio="offline",
+                verbosity=0,
+            )
+            source = processed = output = None
             try:
-                server.stop()
-            except Exception:
-                pass
-            server.shutdown()
+                server.boot()
+                server.recordOptions(
+                    dur=render_duration,
+                    filename=str(rendered_path),
+                    fileformat=0,
+                    sampletype=3,
+                )
+                source = pyo.SfPlayer(str(source_path), loop=False, interp=4)
+                processed = source
+                for stage in chain:
+                    processed = _make_stage(pyo, processed, dict(stage), int(sample_rate))
+                output = source * (1.0 - float(wet)) + processed * float(wet)
+                output.out()
+                server.start()
+            finally:
+                # Stop the file player explicitly, then release the graph before
+                # temporary-file cleanup. Deleting the graph is significant on
+                # Windows, where an open SfPlayer handle prevents unlinking.
+                if source is not None:
+                    try:
+                        source.stop()
+                    except Exception:
+                        logger.debug("Pyo SfPlayer stop raised during cleanup", exc_info=True)
+                try:
+                    server.stop()
+                except Exception:
+                    logger.debug("Pyo server stop raised during cleanup", exc_info=True)
+                try:
+                    server.shutdown()
+                except Exception:
+                    logger.debug("Pyo server shutdown raised during cleanup", exc_info=True)
+                del output, processed, source
+                import gc
+                gc.collect()
 
-        if not rendered_path.is_file():
-            raise RuntimeError("Pyo offline render finished without producing an output file")
-        rendered, rendered_rate = sf.read(
-            str(rendered_path), dtype="float32", always_2d=True
-        )
-        if int(rendered_rate) != int(sample_rate):
-            raise RuntimeError(
-                f"Pyo changed the sample rate unexpectedly: {rendered_rate} != {sample_rate}"
+            if not rendered_path.is_file():
+                raise RuntimeError(
+                    "Pyo offline render finished without producing an output file "
+                    f"(expected {rendered_path})"
+                )
+            rendered, rendered_rate = sf.read(
+                str(rendered_path), dtype="float32", always_2d=True
             )
+            if int(rendered_rate) != int(sample_rate):
+                raise RuntimeError(
+                    f"Pyo changed the sample rate unexpectedly: {rendered_rate} != {sample_rate}"
+                )
 
     rendered = np.nan_to_num(rendered, nan=0.0, posinf=0.0, neginf=0.0)
     peak = float(np.max(np.abs(rendered))) if rendered.size else 0.0
     if peak > 0.98:
         rendered *= 0.98 / peak
+    logger.debug("Pyo FX complete: %s frames", len(rendered))
     return np.ascontiguousarray(rendered, dtype=np.float32)
+
