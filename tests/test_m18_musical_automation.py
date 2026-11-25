@@ -558,4 +558,4 @@ def test_scoped_modulation_base_value_does_not_leak_to_other_roles():
         default_value=0.0, context={"role_id": "bass"},
     )
     assert inactive.active is not None
-    assert not bool(np.any(inactive.active)
+    assert not bool(np.any(inactive.active))
