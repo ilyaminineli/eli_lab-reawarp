@@ -302,6 +302,11 @@ def render_extended_note(
         release_seconds: float | None = None,
         vibrato_depth_semitones: float = 0.0,
         vibrato_rate_hz: float = 0.0,
+        wavetable_position: float | None = None,
+        partial_balance: float | None = None,
+        grain_size_ms: float | None = None,
+        grain_position: float | None = None,
+        grain_density_hz: float | None = None,
 ) -> np.ndarray:
     """Render extended tonal families with NumPy-only reference algorithms.
 
@@ -314,8 +319,22 @@ def render_extended_note(
         raise ValueError("frequency, sample_rate, and duration must be positive")
     if not 0 <= brightness <= 1 or not 0 <= instability <= 1:
         raise ValueError("brightness and instability must be between zero and one")
-    if palette not in {"hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"}:
+    if palette not in {
+        "hybrid", "fm", "additive", "modal", "inharmonic",
+        "wavetable", "granular", "physical",
+    }:
         raise ValueError(f"unknown synthesis palette: {palette}")
+    for name, value, low, high in (
+        ("wavetable_position", wavetable_position, 0.0, 1.0),
+        ("partial_balance", partial_balance, 0.0, 1.0),
+        ("grain_position", grain_position, 0.0, 1.0),
+        ("grain_density_hz", grain_density_hz, 0.0, 200.0),
+        ("grain_size_ms", grain_size_ms, 1.0, 500.0),
+    ):
+        if value is not None and (
+            not np.isfinite(float(value)) or not low <= float(value) <= high
+        ):
+            raise ValueError(f"{name} must be finite and between {low:g} and {high:g}")
 
     if palette in {"hybrid", "fm"}:
         profile = "soft_keys" if palette == "hybrid" else "metallic_fm"
@@ -347,6 +366,17 @@ def render_extended_note(
     rng_phase = rng.uniform(0.0, 2.0 * np.pi, 12)
     signal = np.zeros(length, dtype=np.float64)
 
+    def partial_level(ratio: float) -> float:
+        if partial_balance is None:
+            return 1.0
+        balance = float(partial_balance)
+        # Neutral at 0.5; endpoints tilt energy between the fundamental and overtones.
+        return (
+            1.0 + 0.8 * (0.5 - balance)
+            if float(ratio) <= 1.000001
+            else 1.0 + 1.2 * (balance - 0.5)
+        )
+
     # Data-driven inharmonic/modal-style voices provide reproducible partial recipes.
     # For these palettes, the recipe is used to distribute partial ratios/decays.
     if palette in {"additive", "inharmonic"}:
@@ -364,7 +394,7 @@ def render_extended_note(
             ratios = extended_profile.partials
         for index, (ratio, amp) in enumerate(ratios):
             detune = 1.0 + instability * (0.0007 * np.sin(2*np.pi*(.11+index*.017)*t))
-            signal += amp * np.sin(
+            signal += amp * partial_level(float(ratio)) * np.sin(
                 carrier_phase * float(ratio) * detune + rng_phase[index]
             )
     elif palette == "modal" or palette == "physical":
@@ -382,13 +412,30 @@ def render_extended_note(
         excitation = np.exp(-t / (0.004 + (1.0-brightness)*0.012))
         for index, (ratio, amp, decay) in enumerate(modes):
             mode = np.sin(carrier_phase * float(ratio) + rng_phase[index])
-            signal += amp * mode * np.exp(-t / (decay * (0.35 + duration))) * excitation
+            signal += (
+                amp * partial_level(float(ratio)) * mode
+                * np.exp(-t / (decay * (0.35 + duration))) * excitation
+            )
     elif palette == "granular":
         # Micro-grain cloud around a tuned carrier; fixed windows avoid clicks.
-        grain_count = max(8, int(duration * (18 + 70 * brightness)))
-        centres = np.linspace(0.015, max(0.02, duration), grain_count)
+        grain_count = (
+            max(8, int(duration * (18 + 70 * brightness)))
+            if grain_density_hz is None
+            else max(0, int(round(duration * float(grain_density_hz))))
+        )
+        centres = (
+            np.linspace(0.015, max(0.02, duration), grain_count)
+            if grain_count else np.empty(0, dtype=np.float64)
+        )
+        grain_duration = (
+            (0.012 + 0.055 * (1.0 - brightness))
+            if grain_size_ms is None else float(grain_size_ms) / 1000.0
+        )
+        grain_phase_offset = (
+            0.0 if grain_position is None
+            else (float(grain_position) - 0.5) * 2.0 * np.pi
+        )
         for index, centre in enumerate(centres):
-            grain_duration = (0.012 + 0.055 * (1.0 - brightness))
             rate = 1.0 + rng.uniform(-0.12, 0.12) * (0.25 + instability)
             start = max(0, int((centre - grain_duration * .5) * sample_rate))
             end = min(length, int((centre + grain_duration * .5) * sample_rate))
@@ -398,19 +445,32 @@ def render_extended_note(
             window = np.hanning(max(3, end-start))
             local_phase = carrier_phase[start:end] - carrier_phase[start]
             grain = np.sin(
-                local_phase * rate + rng_phase[index % len(rng_phase)]
+                local_phase * rate
+                + rng_phase[index % len(rng_phase)]
+                + grain_phase_offset
             )
             signal[start:end] += grain * window * (0.55 / max(1, grain_count)**0.35)
     else:
         # Wavetable/pulsar hybrid: smoothly scan harmonic tables by varying
         # partial amplitudes over a slow cycle; pulses expose microscopic slices.
-        phase = (carrier_phase / (2.0 * np.pi)) % 1.0
+        table_position = 0.5 if wavetable_position is None else float(wavetable_position)
+        phase = (
+            carrier_phase / (2.0 * np.pi) + table_position - 0.5
+        ) % 1.0
         pulse_width = 0.18 + 0.72 * brightness
         pulse = np.clip((pulse_width - phase) * 28.0, 0.0, 1.0)
-        scan = 0.5 + 0.5 * np.sin(2*np.pi*(0.17 + instability*.31)*t)
+        scan = 0.5 + 0.5 * np.sin(
+            2 * np.pi * (0.17 + instability * 0.31) * t
+            + 2 * np.pi * (table_position - 0.5)
+        )
         for index, ratio in enumerate((1.0, 2.0, 3.01, 4.2, 5.7, 7.4)):
-            amp = (0.55 / (index + 1)) * (0.2 + 0.8 * scan ** (1 + index*.35))
-            signal += amp * np.sin(carrier_phase * ratio + rng_phase[index]) * pulse
+            amp = (
+                0.55 / (index + 1)
+            ) * (0.2 + 0.8 * scan ** (1 + index * 0.35))
+            signal += (
+                amp * partial_level(float(ratio))
+                * np.sin(carrier_phase * ratio + rng_phase[index]) * pulse
+            )
 
     signal *= body_env
     # Gentle spectral darkening, implemented without an external DSP backend.

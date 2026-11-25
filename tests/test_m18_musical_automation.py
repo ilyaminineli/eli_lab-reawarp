@@ -725,3 +725,85 @@ def test_role_articulation_control_changes_note_gate_without_changing_symbolic_s
     assert scheduled.event.articulation == "staccato"
     assert scheduled.event.parameters["gate_duration_beats"] == "11/20"
     assert "gate_duration_beats" not in event.parameters
+
+
+@pytest.mark.parametrize(
+    ("palette", "target_id", "value"),
+    [
+        ("additive", "synth.partial.balance", 1.0),
+        ("wavetable", "synth.wavetable.position", 0.92),
+        ("granular", "synth.grain.size", 220.0),
+        ("granular", "synth.grain.position", 0.95),
+        ("granular", "synth.grain.density", 105.0),
+    ],
+)
+def test_extended_synth_destinations_change_their_matching_voice(
+    palette, target_id, value
+):
+    event = MusicalEvent(
+        event_id=f"m18-extended-{palette}-{target_id}",
+        voice_id="melody",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(2),
+        kind="note",
+        frequency_hz=220.0,
+        velocity=1.0,
+        parameters={"gate_duration_beats": "1"},
+    )
+    config = GenerationConfig(
+        seed=18019, synth_palette=palette,
+        include_texture=False, include_ambience=False,
+    )
+    voices = build_production_voice_renderers(config)
+    renderer = ScoreRenderer()
+    dry = renderer.render(Score(events=(event,)), 24_000, voice_renderers=voices)
+    controlled = renderer.render(
+        Score(
+            events=(event,),
+            automation=(
+                AutomationLane(
+                    target_id,
+                    (AutomationPoint(Fraction(0), value),),
+                    unit={
+                        "synth.partial.balance": "normalized",
+                        "synth.wavetable.position": "normalized",
+                        "synth.grain.size": "milliseconds",
+                        "synth.grain.position": "normalized",
+                        "synth.grain.density": "Hz",
+                    }[target_id],
+                    scope="role",
+                    scope_id="melody",
+                ),
+            ),
+        ),
+        24_000,
+        voice_renderers=voices,
+    )
+    assert not np.allclose(
+        dry.stems["melody"], controlled.stems["melody"], atol=1e-7
+    )
+    repeated = renderer.render(
+        Score(
+            events=(event,),
+            automation=(
+                AutomationLane(
+                    target_id,
+                    (AutomationPoint(Fraction(0), value),),
+                    unit={
+                        "synth.partial.balance": "normalized",
+                        "synth.wavetable.position": "normalized",
+                        "synth.grain.size": "milliseconds",
+                        "synth.grain.position": "normalized",
+                        "synth.grain.density": "Hz",
+                    }[target_id],
+                    scope="role",
+                    scope_id="melody",
+                ),
+            ),
+        ),
+        24_000,
+        voice_renderers=voices,
+    )
+    np.testing.assert_array_equal(
+        controlled.stems["melody"], repeated.stems["melody"]
+    )

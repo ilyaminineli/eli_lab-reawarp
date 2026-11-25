@@ -234,6 +234,21 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
         ) or 0.0
         vibrato_depth_semitones = float(np.clip(vibrato_depth, 0.0, 1.0)) * 0.5
         vibrato_rate_hz = float(np.clip(vibrato_rate, 0.0, 40.0))
+        wavetable_position = _event_control_value(
+            controls, "synth.wavetable.position", scheduled
+        )
+        partial_balance = _event_control_value(
+            controls, "synth.partial.balance", scheduled
+        )
+        grain_size_ms = _event_control_value(
+            controls, "synth.grain.size", scheduled
+        )
+        grain_position = _event_control_value(
+            controls, "synth.grain.position", scheduled
+        )
+        grain_density_hz = _event_control_value(
+            controls, "synth.grain.density", scheduled
+        )
         rng = _event_rng(event, config.seed, 'melody')
         brightness = float(np.clip(parameters.get('brightness', config.tonal_brightness), 0.0, 1.0))
         instability = float(np.clip(parameters.get('instability', config.arrangement_instability), 0.0, 1.0))
@@ -266,6 +281,11 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
                 release_seconds=release_seconds,
                 vibrato_depth_semitones=vibrato_depth_semitones,
                 vibrato_rate_hz=vibrato_rate_hz,
+                wavetable_position=wavetable_position,
+                partial_balance=partial_balance,
+                grain_size_ms=grain_size_ms,
+                grain_position=grain_position,
+                grain_density_hz=grain_density_hz,
             )
         audio = _fit_frames(audio, scheduled.duration_frames)
         return _apply_musical_controls(audio, scheduled, sample_rate, controls)

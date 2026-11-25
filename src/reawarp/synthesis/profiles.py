@@ -140,7 +140,7 @@ MELODY_PROFILES: dict[str, MelodyProfile] = {
 
 # Extended sound-object palette. Renderer selection is explicit and deterministic.
 SYNTH_PALETTES = (
-    "subtractive", "hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical",
+    "subtractive", "hybrid", "fm", "additive", "modal", "inharmonic", "wavetable", "granular", "physical",
 )
 
 # Each voice is a compact, serialisable recipe: its oscillator family, spectral
