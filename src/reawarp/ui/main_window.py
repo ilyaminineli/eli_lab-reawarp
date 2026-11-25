@@ -2275,6 +2275,13 @@ class MainWindow(QMainWindow):
     def _run_render(self, operation: Any, message: str) -> None:
         if self._worker is not None:
             return
+        if self._pending_export_destination is not None:
+            self._pending_export_destination = None
+            self.export_button.setEnabled(self.project is not None)
+            self.statusBar().showMessage(
+                "Queued delivery export cancelled because a new project render was started.",
+                8000,
+            )
         self._set_busy(True, message)
         worker = CancellableRenderWorker(operation)
         self._worker = worker
@@ -3240,10 +3247,12 @@ class MainWindow(QMainWindow):
             or self._pending_export_destination is not None
         ):
             return
+        default_export_parent = Path.cwd() / "output"
+        default_export_parent.mkdir(parents=True, exist_ok=True)
         export_parent = QFileDialog.getExistingDirectory(
             self,
             "Choose a folder for the Reawarp delivery export",
-            str(Path.cwd() / "output"),
+            str(default_export_parent),
         )
         if not export_parent:
             return
