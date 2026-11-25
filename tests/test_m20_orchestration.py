@@ -35,3 +35,77 @@ def test_overlap_must_be_intentional():
 
 def test_mutation_default_is_one_principal_development():
  assert MutationPolicy("p").principal_developments==1
+
+
+def test_cycles_report_exact_rational_alignment_points():
+    plan = build_orchestration_plan(cycles=(
+        CycleSpec("three", "hat", 3, 0),
+        CycleSpec("two", "kick", 2, 0),
+    ))
+    assert plan.cycle_alignments("three", "two", end_beats=13) == (
+        Fraction(0), Fraction(6), Fraction(12)
+    )
+
+
+def test_legacy_schema_v1_orchestration_plan_still_loads():
+    legacy = make_plan().to_dict()
+    legacy["schema_version"] = 1
+    legacy.pop("transitions", None)
+    restored = OrchestrationPlan.from_dict(legacy)
+    assert restored.phrases == make_plan().phrases
+    assert restored.transitions == ()
+
+
+def test_event_onset_diagnostics_identify_role_collisions_only():
+    from reawarp.score import MusicalEvent, inspect_event_onset_conflicts
+
+    events = (
+        MusicalEvent("kick-a", "kick", 0, Fraction(1, 4), kind="hit"),
+        MusicalEvent("lead-a", "melody", 0, 1, kind="note", pitch=60),
+        MusicalEvent("lead-b", "melody", 0, 1, kind="note", pitch=64),
+    )
+    warnings = inspect_event_onset_conflicts(events)
+    assert len(warnings) == 1
+    assert warnings[0]["roles"] == ["kick", "melody"]
+    assert warnings[0]["heuristic_only"] is True
+
+
+def test_score_generation_compiles_complete_m20_director_intent():
+    from reawarp import GenerationConfig
+    from reawarp.core.score_generation import build_score_generation_plan
+
+    config = GenerationConfig(
+        duration=24.0, bpm=120.0, seed="m20-director-bridge",
+        structure="autechre_like", complexity=0.38,
+        break_cycle_bars=2,
+    )
+    generated = build_score_generation_plan(config)
+    plan = OrchestrationPlan.from_dict(generated.score.orchestration_plan)
+
+    assert generated.score.metadata["perceptual_orchestration"] == plan.to_dict()
+    assert len(plan.phrases) == len(generated.composition_plan.sections)
+    assert len(plan.mutation_policies) == len(plan.phrases)
+    assert len(plan.transitions) == len(generated.transition_plan)
+    assert {cycle.role for cycle in plan.cycles} >= {"kick", "snare", "hat", "break", "melody"}
+    assert len({cycle.length_beats for cycle in plan.cycles}) > 1
+    assert plan.relationships
+    assert plan.attention
+    assert any(span.depth == "absence" for span in plan.attention)
+    assert all(transition.source_phrase_id != transition.target_phrase_id
+               for transition in plan.transitions)
+    assert all(item["heuristic_only"] for item in
+               generated.score.metadata["perceptual_attention_warnings"]
+               + generated.score.metadata["perceptual_onset_warnings"])
+
+
+def test_perceptual_director_bridge_is_deterministic_for_same_seed():
+    from reawarp import GenerationConfig
+    from reawarp.core.score_generation import build_score_generation_plan
+
+    config = GenerationConfig(
+        duration=24.0, bpm=120.0, seed="m20-listening-fixture",
+        structure="uplift_drop_return", complexity=0.35,
+    )
+    first = build_score_generation_plan(config).score.orchestration_plan
+    second = build_score_generation_plan(config).score.orchestration_plan
+    assert first == second
