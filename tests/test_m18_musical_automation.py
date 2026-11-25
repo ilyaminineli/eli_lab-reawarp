@@ -166,7 +166,6 @@ def test_lfo_modulation_supports_explicit_event_retrigger_phase():
         scope_id="lead",
         minimum=-12.0,
         maximum=12.0,
-        base_value=1.0,
     )
     bus = AutomationControlBus(
         (lane,),
@@ -187,7 +186,7 @@ def test_lfo_modulation_supports_explicit_event_retrigger_phase():
     assert bus._modulations["synth.pitch"][0].scope_id == "lead"
     assert bus.value_for_context(
         "synth.pitch", 48_000, event_id="note-a"
-    ) == pytest.approx(7.0)
+    ) == pytest.approx(6.0)
     assert bus.value_for_context(
         "synth.pitch", 48_000,
         context={"role_id": "bass", "event_onset_frame": 48_000},
@@ -509,3 +508,46 @@ def test_source_is_inactive_outside_its_declared_absolute_beat_window():
     assert bus.value_at_frame("synth.pitch", 0, default_value=0.0) == pytest.approx(0.0)
     assert bus.value_at_frame("synth.pitch", 96_000, default_value=0.0) == pytest.approx(6.0)
     assert bus.value_at_frame("synth.pitch", 228_000, default_value=0.0) == pytest.approx(0.0)
+
+
+
+def test_scoped_modulation_base_value_does_not_leak_to_other_roles():
+    source = AutomationSource(
+        "lead-only-lfo",
+        "lfo",
+        Fraction(0),
+        Fraction(4),
+        parameters={
+            "period_beats": 4,
+            "phase_cycles": 0.25,
+            "center": 0.5,
+            "depth": 0.5,
+            "sample_count": 9,
+        },
+    )
+    modulation = AutomationModulation(
+        "lead-only-lfo",
+        "synth.cutoff",
+        amount=600.0,
+        base_value=2_400.0,
+        scope="role",
+        scope_id="lead",
+        retrigger="event",
+    )
+    bus = AutomationControlBus(
+        (),
+        _timeline(),
+        sources=(source,),
+        modulations=(modulation,),
+        event_contexts={
+            "lead-note": {"role_id": "lead", "event_onset_frame": 0},
+        },
+    )
+
+    assert bus.value_for_context(
+        "synth.cutoff", 0, event_id="lead-note", default_value=0.0
+    ) == pytest.approx(3_000.0)
+    assert bus.value_for_context(
+        "synth.cutoff", 0, default_value=0.0,
+        context={"role_id": "bass"},
+    ) == pytest.approx(20.0)
