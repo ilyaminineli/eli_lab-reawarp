@@ -6,6 +6,8 @@ migrated in memory to v2. No arbitrary routing graph or feedback bus is implied.
 """
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import math
 import threading
@@ -242,6 +244,248 @@ def build_role_audition_matrix(stem_names: Sequence[str]) -> dict[str, dict[str,
         route["buses"]["echo"]["wet"] = spec["echo_wet"]
         result[name] = route
     return result
+
+
+def build_fx_variation_routings(
+    stem_names: Sequence[str],
+    sample_rate: int,
+    base_routing: Mapping[str, Any] | None = None,
+    *,
+    project_context: Mapping[str, Any] | None = None,
+    variation_seed: int = 211,
+    count: int = 4,
+    bpm: float = 120.0,
+) -> list[dict[str, Any]]:
+    """Create deterministic, role-aware FX alternatives for one frozen project.
+
+    Candidate values are derived from the project context, variation seed,
+    candidate index and stem identity. The same generation and settings produce
+    the same routing alternatives. Only routing parameters change; source audio,
+    Score events and generation random streams are never touched.
+    """
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 8:
+        raise ValueError("FX variation count must be between 1 and 8")
+    if isinstance(variation_seed, bool) or not isinstance(variation_seed, int):
+        raise ValueError("variation_seed must be an integer")
+    tempo = _finite(bpm, "bpm", 1.0, 1000.0)
+    names = tuple(str(name) for name in stem_names)
+    base = normalise_fx_routing(
+        base_routing if base_routing is not None else role_aware_fx_routing(names),
+        names, int(sample_rate),
+    )
+    context = dict(project_context or {})
+    context_json = json.dumps(
+        {"context": context, "variation_seed": variation_seed},
+        sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str,
+        allow_nan=False,
+    )
+    root_digest = hashlib.blake2b(context_json.encode("utf-8"), digest_size=16).digest()
+    root_seed = int.from_bytes(root_digest[:8], "little", signed=False)
+
+    profiles = (
+        ("space_depth", "A shared dark room with slightly longer role tails."),
+        ("metallic_motion", "Narrow resonant inserts and restrained frequency movement."),
+        ("digital_fracture", "Short saturation/filter/delay gestures on rhythmic roles."),
+        ("rhythmic_echo", "Tempo-related echoes and phrase replies without changing the source rhythm."),
+        ("soft_contrast", "Reduced insert density with selective space and clear dry anchors."),
+        ("hybrid_texture", "Role-specific contrast between dry anchors, fractured percussion and spacious layers."),
+        ("close_room", "Shorter, closer inserts and restrained shared returns."),
+        ("open_space", "Wider shared spatial contribution with conservative direct inserts."),
+    )
+    output: list[dict[str, Any]] = []
+    for index in range(count):
+        profile_name, description = profiles[index % len(profiles)]
+        routing = copy.deepcopy(base)
+        routing["routing_mode"] = "manual"
+        for name in names:
+            role = classify_fx_role(name)
+            route = routing["stems"][name]
+            stem_digest = hashlib.blake2b(
+                root_seed.to_bytes(8, "little") + index.to_bytes(4, "little")
+                + name.encode("utf-8"), digest_size=8,
+            ).digest()
+            rng = np.random.default_rng(int.from_bytes(stem_digest, "little"))
+            wet_scale = float(rng.uniform(0.82, 1.18))
+            space_scale = float(rng.uniform(0.85, 1.25))
+            echo_scale = float(rng.uniform(0.75, 1.30))
+
+            if profile_name in {"space_depth", "open_space", "close_room"}:
+                preset_by_role = {
+                    "snare": "restrained_space", "hats": "restrained_space",
+                    "break": "restrained_space", "melody": "metallic_machine",
+                    "texture": "restrained_space",
+                }
+                preset = preset_by_role.get(role)
+                if preset:
+                    route["insert"] = {
+                        "kind": "preset", "preset": preset,
+                        "wet": float(np.clip(
+                            (0.055 if role in {"snare", "hats", "break"} else 0.075)
+                            * wet_scale, 0.025, 0.16,
+                        )),
+                        "tail_seconds": (
+                            0.55 if profile_name == "close_room" else
+                            2.4 if profile_name == "open_space" else 1.8
+                        ),
+                    }
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * space_scale
+                    + (0.025 if profile_name == "open_space" else 0.0),
+                    0.0, 0.22,
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * echo_scale, 0.0, 0.12
+                ))
+            elif profile_name == "metallic_motion":
+                preset_by_role = {
+                    "snare": "metallic_machine", "hats": "digital_fracture",
+                    "break": "metallic_machine", "melody": "metallic_machine",
+                    "texture": "metallic_machine",
+                }
+                preset = preset_by_role.get(role)
+                if preset:
+                    route["insert"] = {
+                        "kind": "preset", "preset": preset,
+                        "wet": float(np.clip(
+                            (0.085 if role in {"melody", "texture"} else 0.06)
+                            * wet_scale, 0.025, 0.18,
+                        )),
+                        "tail_seconds": 1.4,
+                    }
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * space_scale, 0.0, 0.16
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * echo_scale, 0.0, 0.10
+                ))
+            elif profile_name == "digital_fracture":
+                preset_by_role = {
+                    "snare": "digital_fracture", "hats": "digital_fracture",
+                    "break": "digital_fracture", "melody": "metallic_machine",
+                    "texture": "digital_fracture",
+                }
+                preset = preset_by_role.get(role)
+                if preset:
+                    route["insert"] = {
+                        "kind": "preset", "preset": preset,
+                        "wet": float(np.clip(
+                            (0.11 if role in {"hats", "break", "texture"} else 0.075)
+                            * wet_scale, 0.03, 0.20,
+                        )),
+                        "tail_seconds": 0.8,
+                    }
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * 0.75, 0.0, 0.12
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * echo_scale + 0.015, 0.0, 0.13
+                ))
+            elif profile_name == "rhythmic_echo":
+                preset_by_role = {
+                    "snare": "tape_echo", "hats": "tape_echo",
+                    "break": "tape_echo", "melody": "tape_echo",
+                }
+                preset = preset_by_role.get(role)
+                if preset:
+                    route["insert"] = {
+                        "kind": "preset", "preset": preset,
+                        "wet": float(np.clip(
+                            (0.055 if role in {"snare", "hats"} else 0.085)
+                            * wet_scale, 0.02, 0.16,
+                        )),
+                        "tail_seconds": 1.5,
+                    }
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * 0.8, 0.0, 0.12
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * echo_scale + 0.025, 0.0, 0.16
+                ))
+            elif profile_name == "soft_contrast":
+                if role in {"snare", "hats", "break", "melody", "texture"}:
+                    insert = route["insert"]
+                    if insert["kind"] != "bypass":
+                        insert["wet"] = float(np.clip(
+                            float(insert.get("wet", 0.0)) * 0.62 * wet_scale,
+                            0.0, 0.12,
+                        ))
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * 0.72, 0.0, 0.12
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * 0.65, 0.0, 0.08
+                ))
+            else:  # hybrid_texture
+                if role in {"hats", "break"}:
+                    route["insert"] = {
+                        "kind": "preset", "preset": "digital_fracture",
+                        "wet": float(np.clip(0.09 * wet_scale, 0.03, 0.16)),
+                        "tail_seconds": 0.7,
+                    }
+                elif role in {"melody", "texture"}:
+                    route["insert"] = {
+                        "kind": "preset", "preset": "metallic_machine",
+                        "wet": float(np.clip(0.075 * wet_scale, 0.03, 0.15)),
+                        "tail_seconds": 1.8,
+                    }
+                route["sends"]["space"] = float(np.clip(
+                    route["sends"]["space"] * space_scale, 0.0, 0.18
+                ))
+                route["sends"]["echo"] = float(np.clip(
+                    route["sends"]["echo"] * echo_scale, 0.0, 0.12
+                ))
+
+        if profile_name in {"space_depth", "open_space", "close_room"}:
+            routing["buses"]["space"].update({
+                "chain": "restrained_space",
+                "wet": float(np.clip(
+                    (0.13 if profile_name == "close_room" else
+                     0.22 if profile_name == "open_space" else 0.18)
+                    * float(np.random.default_rng(root_seed + index).uniform(0.92, 1.08)),
+                    0.06, 0.28,
+                )),
+                "tail_seconds": 1.0 if profile_name == "close_room" else 3.0,
+            })
+            routing["buses"]["echo"]["wet"] = 0.025
+        elif profile_name == "rhythmic_echo":
+            routing["buses"]["echo"].update({
+                "chain": "tape_echo",
+                "wet": float(np.random.default_rng(root_seed + index).uniform(0.07, 0.12)),
+                "tail_seconds": 1.7,
+                "delay_sync": "1/8" if tempo >= 95.0 else "1/4",
+            })
+        elif profile_name == "digital_fracture":
+            routing["buses"]["echo"].update({
+                "chain": "tape_echo",
+                "wet": float(np.random.default_rng(root_seed + index).uniform(0.04, 0.09)),
+                "tail_seconds": 1.0,
+                "delay_sync": "1/16" if tempo >= 120.0 else "1/8",
+            })
+        elif profile_name == "metallic_motion":
+            routing["buses"]["space"].update({
+                "chain": "restrained_space", "wet": 0.16, "tail_seconds": 2.0,
+            })
+            routing["buses"]["echo"]["wet"] = 0.02
+        elif profile_name == "soft_contrast":
+            routing["buses"]["space"].update({"wet": 0.11, "tail_seconds": 1.2})
+            routing["buses"]["echo"]["wet"] = 0.0
+        else:
+            routing["buses"]["space"].update({"wet": 0.17, "tail_seconds": 2.2})
+            routing["buses"]["echo"]["wet"] = 0.045
+
+        normalized = normalise_fx_routing(routing, names, int(sample_rate))
+        candidate_seed = hashlib.blake2b(
+            root_seed.to_bytes(8, "little") + index.to_bytes(4, "little"),
+            digest_size=6,
+        ).hexdigest()
+        output.append({
+            "candidate_id": f"fx_{index + 1:02d}_{profile_name}",
+            "label": profile_name.replace("_", " ").title(),
+            "description": description,
+            "seed": candidate_seed,
+            "routing": normalized,
+        })
+    return output
 
 
 def normalise_fx_routing(
