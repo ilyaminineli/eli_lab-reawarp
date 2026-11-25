@@ -846,3 +846,135 @@ def resample_audio_non_destructive(
         changed_dimensions=("sample_rate", "frame_count"),
     )
     return output, record
+
+
+
+def build_score_sound_object_renderer(
+    patch: SoundObjectPatch,
+    source_audio: Mapping[str, np.ndarray],
+):
+    """Adapt one sound-object patch to the ScoreRenderer voice callback contract.
+
+    The score event duration must contain the complete patch layer span. Any
+    longer event duration becomes explicit post-object silence/tail room. The
+    callback returns exactly ScheduledScoreEvent.duration_frames and consumes
+    the patch-scoped typed automation targets registered by
+    `register_sound_object_automation_targets`.
+    """
+    from reawarp.synthesis.sound_object import HybridVoiceRenderer as _Renderer
+
+    if not isinstance(patch, SoundObjectPatch):
+        patch = SoundObjectPatch.from_dict(patch)
+    frozen_sources: dict[str, np.ndarray] = {}
+    source_specs = {item.source_id: item for item in patch.sources}
+    for source_id, audio in source_audio.items():
+        if source_id not in source_specs:
+            raise ValueError(f"audio supplied for undeclared source {source_id!r}")
+        array = np.asarray(audio, dtype=np.float32)
+        if array.ndim not in {1, 2} or (
+            array.ndim == 2 and array.shape[1] not in {1, 2}
+        ):
+            raise ValueError(f"source {source_id!r} must be mono or stereo")
+        if not np.isfinite(array).all():
+            raise ValueError(f"source {source_id!r} contains non-finite samples")
+        frozen_sources[source_id] = np.ascontiguousarray(array).copy()
+    missing = set(source_specs) - set(frozen_sources)
+    if missing:
+        raise KeyError("missing sound-object source(s): " + ", ".join(sorted(missing)))
+    target_ids = {
+        target.target_id for target in sound_object_automation_targets(patch)
+    }
+    renderer = _Renderer()
+
+    def render(scheduled, sample_rate: int, controls) -> np.ndarray:
+        if int(sample_rate) != patch.sample_rate:
+            raise ValueError(
+                "Score sample rate must match sound-object patch; resample sources explicitly"
+            )
+        if scheduled.duration_frames < patch.duration_frames:
+            raise ValueError(
+                "Score event duration is shorter than the sound-object layers; "
+                "extend the event so the tail can complete"
+            )
+        values: dict[str, float] = {}
+        for target_id in target_ids.intersection(controls.target_ids):
+            value, active = controls.value_and_active_for_context(
+                target_id,
+                scheduled.start_frame,
+                event_id=scheduled.event.event_id,
+                default_value=0.0,
+            )
+            if active:
+                values[target_id] = float(value)
+        result = renderer.render(
+            patch,
+            frozen_sources,
+            frame_count=scheduled.duration_frames,
+            control_values=values,
+        )
+        return result.audio
+
+    return render
+
+
+def sound_object_editor_model(patch: SoundObjectPatch) -> dict[str, Any]:
+    """Return a stable, UI-neutral editing model with units, ranges and choices."""
+    if not isinstance(patch, SoundObjectPatch):
+        patch = SoundObjectPatch.from_dict(patch)
+    return {
+        "format": SOUND_OBJECT_FORMAT,
+        "schema_version": patch.schema_version,
+        "identity": {
+            "patch_id": patch.patch_id,
+            "name": patch.name,
+            "source_identity_id": patch.source_identity_id,
+            "processing_identity_id": patch.processing_identity_id,
+            "seed": patch.seed,
+        },
+        "clock": {"sample_rate_hz": patch.sample_rate, "frame_unit": "frames"},
+        "sources": [
+            {
+                **item.to_dict(),
+                "hash_verified_on_library_save": item.source_kind == "asset",
+            }
+            for item in patch.sources
+        ],
+        "layers": [
+            {
+                **item.to_dict(),
+                "frame_count": item.frame_count,
+                "editable_fields": {
+                    "role": sorted(LAYER_ROLES),
+                    "start_frame": {"minimum": 0, "unit": "frames"},
+                    "end_frame": {"minimum": item.start_frame + 1, "unit": "frames"},
+                    "source_start_frame": {"minimum": 0, "unit": "frames"},
+                    "gain": {"minimum": 0.0, "maximum": 4.0, "unit": "linear"},
+                    "pan": {"minimum": -1.0, "maximum": 1.0, "unit": "normalized"},
+                    "envelope": {
+                        "attack_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
+                        "decay_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
+                        "sustain_level": {"minimum": 0.0, "maximum": 1.0, "unit": "normalized"},
+                        "release_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
+                    },
+                },
+            }
+            for item in patch.layers
+        ],
+        "pitch_model": patch.pitch_model,
+        "spectrum": patch.spectrum,
+        "modulation": patch.modulation,
+        "spatial": patch.spatial,
+        "transformations": [item.to_dict() for item in patch.transformations],
+        "controls": [
+            {
+                "target_id": item.target_id,
+                "domain": item.domain,
+                "unit": item.unit,
+                "value_type": item.value_type,
+                "minimum": item.minimum,
+                "maximum": item.maximum,
+                "update_clock": item.update_clock,
+            }
+            for item in sound_object_automation_targets(patch)
+        ],
+    }
