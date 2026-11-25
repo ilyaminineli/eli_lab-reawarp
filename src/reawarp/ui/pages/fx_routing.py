@@ -20,6 +20,7 @@ from reawarp.fx_routing import (
 class FXRoutingEditor(QGroupBox):
     changed = Signal()
     auditionRequested = Signal(str, str)
+    mixerStateRequested = Signal(dict)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("ROLE-AWARE FX ROUTING", parent)
@@ -276,6 +277,15 @@ class FXRoutingEditor(QGroupBox):
         self._load_selected()
         self._load_buses_into_widgets()
         self._loading = False
+        self.mixerStateRequested.emit({
+            name: {
+                "gain_db": float(record.get("gain_db", 0.0)),
+                "pan": float(record.get("pan", 0.0)),
+                "mute": bool(record.get("mute", False)),
+                "solo": bool(record.get("solo", False)),
+            }
+            for name, record in self._routing["stems"].items()
+        })
         self.status.setText(f"Loaded routing: {Path(path).name}")
         self.changed.emit()
 
@@ -305,6 +315,19 @@ class FXRoutingEditor(QGroupBox):
 
     def _apply_dry_routing(self) -> None:
         self.set_routing(default_fx_routing(self._stem_names))
+
+    def set_mixer_state(self, states: dict[str, dict[str, Any]]) -> None:
+        """Synchronise portable v2 fader state without changing effect routing mode."""
+        if not self._stem_names:
+            return
+        for name, values in states.items():
+            if name not in self._routing["stems"]:
+                continue
+            record = self._routing["stems"][name]
+            record["gain_db"] = float(values.get("gain_db", record.get("gain_db", 0.0)))
+            record["pan"] = float(values.get("pan", record.get("pan", 0.0)))
+            record["mute"] = bool(values.get("mute", record.get("mute", False)))
+            record["solo"] = bool(values.get("solo", record.get("solo", False)))
 
     def match_audition_level(self) -> bool:
         return bool(self.match_level_checkbox.isChecked())
