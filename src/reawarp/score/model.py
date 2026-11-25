@@ -132,6 +132,16 @@ class Score:
                 orchestration_plan = OrchestrationPlan.from_dict(payload).to_dict()
             except (TypeError, ValueError, KeyError, OverflowError) as exc:
                 raise ValueError(f"invalid orchestration_plan: {exc}") from exc
+        orchestration_plan = self.orchestration_plan
+        if orchestration_plan is not None:
+            from reawarp.score.orchestration_intent import OrchestrationPlan
+            if not isinstance(orchestration_plan, dict):
+                raise ValueError("orchestration_plan must be an object or None")
+            try:
+                payload = json.loads(json.dumps(orchestration_plan, ensure_ascii=False, allow_nan=False))
+                orchestration_plan = OrchestrationPlan.from_dict(payload).to_dict()
+            except (TypeError, ValueError, KeyError, OverflowError) as exc:
+                raise ValueError(f"invalid orchestration_plan: {exc}") from exc
         bass_plan = self.bass_plan
         if bass_plan is not None:
             if not isinstance(bass_plan, dict):
@@ -255,6 +265,7 @@ class Score:
         object.__setattr__(self, "sonorities", sonorities)
         object.__setattr__(self, "sonority_plan", sonority_plan)
         object.__setattr__(self, "bass_plan", bass_plan)
+        object.__setattr__(self, "orchestration_plan", orchestration_plan)
         object.__setattr__(self, "orchestration_plan", orchestration_plan)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
