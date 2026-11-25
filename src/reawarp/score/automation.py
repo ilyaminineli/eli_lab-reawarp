@@ -522,7 +522,10 @@ class AutomationControlBus:
                     f"{lane.target_id}/{lane.scope}/{lane.scope_id}"
                 )
             lane_keys.add(key)
-            target = registry.validate_lane(lane, allow_custom=allow_custom_targets)
+            target = registry.validate_lane(
+                lane,
+                allow_custom=allow_custom_targets or lane.target_id.startswith("source."),
+            )
             self._lanes.setdefault(lane.target_id, []).append(lane)
             self._targets[lane.target_id] = target
         for target_lanes in self._lanes.values():
@@ -532,16 +535,21 @@ class AutomationControlBus:
         for modulation in modulations:
             if modulation.source_id not in self._sources:
                 raise ValueError(f"unknown modulation source: {modulation.source_id}")
-            self._modulations.setdefault(modulation.destination_target_id, []).append(modulation)
+            destination = modulation.destination_target_id
+            target = registry.resolve(destination)
+            if target is None and not allow_custom_targets:
+                raise ValueError(f"unregistered modulation destination: {destination}")
+            self._targets.setdefault(destination, target)
+            self._modulations.setdefault(destination, []).append(modulation)
 
     @property
     def target_ids(self) -> tuple[str, ...]:
-        return tuple(self._lanes)
+        return tuple(dict.fromkeys((*self._lanes, *self._modulations)))
 
     def target(self, target_id: str) -> AutomationTarget | None:
-        if target_id not in self._lanes:
-            raise KeyError(f"automation lane not found: {target_id}")
-        return self._targets[target_id]
+        if target_id not in self._lanes and target_id not in self._modulations:
+            raise KeyError(f"automation target not found: {target_id}")
+        return self._targets.get(target_id)
 
     def _lane_position(self, lane: AutomationLane, frame: int) -> Fraction:
         frame = max(0, int(frame))
