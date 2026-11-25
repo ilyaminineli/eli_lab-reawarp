@@ -159,7 +159,7 @@ def export_project_package(
     master_audio: Any,
     bit_depth: int = 24,
     include_midi: bool = True,
-    fx_render_status: str = "rendered",
+    fx_render_status: str = "not_configured",
     cancel_event: Any | None = None,
 ) -> Path:
     """Export a delivery folder containing README, routed master, dry stems and MIDI.
@@ -224,7 +224,6 @@ def export_project_package(
             _check_cancelled(cancel_event, "delivery export")
             write_wav(stems_directory / f"{name}.wav", audio, project.sample_rate, bit_depth)
 
-        midi_files: list[str] = []
         if include_midi:
             import hashlib
             import re
@@ -236,7 +235,6 @@ def export_project_package(
             _check_cancelled(cancel_event, "delivery MIDI export")
             combined_midi = midi_root / "score.mid"
             score.export_midi(combined_midi)
-            midi_files.append("midi/score.mid")
             voice_ids = sorted({
                 event.voice_id for event in score.events
                 if event.kind not in {"control", "marker"}
@@ -256,7 +254,6 @@ def export_project_package(
                 digest = hashlib.sha256(str(voice_id).encode("utf-8")).hexdigest()[:8]
                 voice_path = voice_root / f"{slug[:48]}-{digest}.mid"
                 voice_score.export_midi(voice_path)
-                midi_files.append(voice_path.relative_to(staging).as_posix())
 
         _check_cancelled(cancel_event, "delivery export")
         title = str(getattr(score, "title", "") or "Untitled Reawarp composition")
