@@ -33,7 +33,7 @@ def _package_project() -> ReawarpProject:
     stems["kick"][0] = (0.25, 0.25)
     stems["melody"][0] = (0.05, -0.05)
     score = Score(
-        title="M26 handoff",
+        title="M26 手渡し / test",
         events=(
             MusicalEvent(
                 event_id="kick-1", voice_id="kick", onset_beats=0,
@@ -98,3 +98,5 @@ def test_complete_project_zip_contains_midi_and_reopens(tmp_path: Path):
     reopened = ReawarpProject.load(extracted)
     assert set(reopened.stems) == {"kick", "melody"}
     assert reopened.frame_count == project.frame_count
+    midi_score = Score.from_midi(extracted / "midi" / "score.mid")
+    assert midi_score.title == "M26 手渡し / test"
