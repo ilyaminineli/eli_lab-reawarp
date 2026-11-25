@@ -2402,6 +2402,248 @@ class MainWindow(QMainWindow):
             row.solo.setChecked(bool(values.get("solo", False)))
         self._refresh_preview()
 
+    def _clear_fx_variation_cache(self) -> None:
+        """Release the previous on-disk audition batch and its route snapshots."""
+        directory = self._fx_variation_cache_dir
+        self._fx_variation_cache_dir = None
+        self._fx_variation_renders.clear()
+        self._fx_variation_signature = None
+        if directory is not None:
+            shutil.rmtree(directory, ignore_errors=True)
+        if hasattr(self, "fx_routing_editor"):
+            self.fx_routing_editor.set_variation_choices([])
+
+    def _apply_fx_lab_chain_to_stem(
+        self, stem_name: str, stages: object, wet: float, tail_seconds: float
+    ) -> None:
+        if self.project is None:
+            self.statusBar().showMessage("Generate or load a project before assigning a stem insert.")
+            return
+        try:
+            self.fx_routing_editor.set_custom_insert(
+                stem_name, list(stages), wet=float(wet),
+                tail_seconds=float(tail_seconds),
+            )
+        except Exception as exc:
+            self._show_error(f"Could not assign the FX Lab chain: {exc}")
+            return
+        self._set_workspace(2)
+        self.statusBar().showMessage(
+            f"Custom FX Lab chain assigned to {stem_name}; pre-render the channel FX to audition the mix.",
+            8000,
+        )
+
+    def _pre_render_channel_fx(self) -> None:
+        """Explicitly pre-render all current stem inserts and shared returns."""
+        if self.project is None:
+            self.statusBar().showMessage("Generate or load a composition before pre-rendering FX.")
+            return
+        if self._fx_worker is not None:
+            self.statusBar().showMessage("Channel FX are already rendering in the background.")
+            return
+        if self._ensure_routing_render():
+            self.statusBar().showMessage(
+                "Current channel FX are already pre-rendered; PLAY now uses the processed stems and returns.",
+                8000,
+            )
+        else:
+            self.statusBar().showMessage(
+                "Pre-rendering every channel insert and the shared SPACE/ECHO returns…",
+                8000,
+            )
+
+    def _generate_fx_variations(self, count: int, variation_seed: int) -> None:
+        """Render deterministic role-aware FX alternatives from the frozen project."""
+        if self.project is None:
+            self.statusBar().showMessage("Generate or load a composition before making FX variations.")
+            return
+        if self._fx_worker is not None:
+            self.statusBar().showMessage(
+                "Wait for the current channel FX pre-render to finish before generating variants.",
+                8000,
+            )
+            return
+        if self._fx_variation_worker is not None:
+            return
+
+        signature = self._routing_signature()
+        project = self.project
+        score = project.to_score()
+        legacy_automation = copy.deepcopy(self.fx_automation_editor.automation())
+        stem_names = tuple(project.stems)
+        controls = None
+        if score.automation or score.automation_sources or score.modulations:
+            if legacy_automation:
+                score = attach_fx_automation_to_score(score, legacy_automation, stem_names)
+            controls = build_score_control_bus(
+                score, project.sample_rate,
+                automation_registry=fx_automation_registry(stem_names),
+            )
+        base_routing = copy.deepcopy(self.fx_routing_editor.routing())
+        dry_stems = {
+            name: np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in project.stems.items()
+        }
+        sample_rate = int(project.sample_rate)
+        bpm = float(project.config.bpm)
+        project_context = {
+            "config": project.config.to_dict(),
+            "project_fingerprint": project_fingerprint(project),
+            "algorithm_version": project.metadata.get("algorithm_version"),
+            "renderer_version": project.metadata.get("renderer_version"),
+            "motif_plan": project.metadata.get("motif_plan"),
+            "section_orchestration": project.metadata.get("section_orchestration"),
+            "drum_arrangement": project.metadata.get("drum_arrangement"),
+            "sample_switch_summary": project.metadata.get("sample_switch_summary"),
+        }
+        cache_dir = Path(tempfile.mkdtemp(prefix="reawarp-fx-variants-"))
+        self._clear_fx_variation_cache()
+        self._fx_variation_cache_dir = cache_dir
+        self._fx_variation_signature = signature
+
+        def operation(cancel_event):
+            candidates = build_fx_variation_routings(
+                stem_names, sample_rate, base_routing,
+                project_context=project_context,
+                variation_seed=int(variation_seed),
+                count=int(count),
+                bpm=bpm,
+            )
+            rendered_records = []
+            for candidate in candidates:
+                if cancel_event.is_set():
+                    raise RuntimeError("FX variation render cancelled")
+                processed, metadata = render_fx_routing(
+                    dry_stems, sample_rate, candidate["routing"],
+                    bpm=bpm,
+                    automation=legacy_automation if controls is None else None,
+                    controls=controls,
+                    include_audition_audio=False,
+                    cancel_event=cancel_event,
+                )
+                returns = metadata.pop("bus_returns_audio", {})
+                master = render_master_with_returns(
+                    processed, returns,
+                    master_wet=float(candidate["routing"]["master_wet"]),
+                )
+                cache_path = cache_dir / f"{candidate['candidate_id']}.npy"
+                np.save(cache_path, master, allow_pickle=False)
+                rendered_records.append({
+                    "candidate_id": candidate["candidate_id"],
+                    "label": candidate["label"],
+                    "description": candidate["description"],
+                    "seed": candidate["seed"],
+                    "routing": candidate["routing"],
+                    "cache_path": str(cache_path),
+                    "master_metrics": measure_signal(master, sample_rate=sample_rate),
+                    "render_meters": metadata.get("meters", {}),
+                })
+                del master, processed, returns, metadata
+            return {
+                "signature": signature,
+                "cache_dir": str(cache_dir),
+                "records": rendered_records,
+            }
+
+        worker = CancellableRenderWorker(operation)
+        self._fx_variation_worker = worker
+        self.fx_routing_editor.generate_variations_button.setEnabled(False)
+        self.statusBar().showMessage(
+            f"Pre-rendering {count} role-aware FX alternatives from project seed "
+            f"{project.config.seed} / variation seed {variation_seed}…",
+            10000,
+        )
+        worker.signals.finished.connect(self._fx_variations_finished)
+        worker.signals.error.connect(self._fx_variations_failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _fx_variations_finished(self, result: object) -> None:
+        self._fx_variation_worker = None
+        self.fx_routing_editor.generate_variations_button.setEnabled(True)
+        if not isinstance(result, dict):
+            self._fx_variations_failed("FX variation worker returned an invalid result.")
+            return
+        signature = str(result.get("signature", ""))
+        if (
+            signature != self._routing_signature()
+            or signature != self._fx_variation_signature
+        ):
+            shutil.rmtree(str(result.get("cache_dir", "")), ignore_errors=True)
+            self._clear_fx_variation_cache()
+            self.statusBar().showMessage(
+                "FX variation render discarded because the project or routing changed.",
+                8000,
+            )
+            return
+        self._fx_variation_renders = {
+            str(item["candidate_id"]): item for item in result.get("records", [])
+        }
+        self.fx_routing_editor.set_variation_choices([
+            (candidate_id, str(item["label"]))
+            for candidate_id, item in self._fx_variation_renders.items()
+        ])
+        self.statusBar().showMessage(
+            f"{len(self._fx_variation_renders)} FX alternatives pre-rendered. "
+            "Play a variant, then USE ROUTE to make it the active Stem Mixer setting.",
+            10000,
+        )
+
+    def _fx_variations_failed(self, message: object) -> None:
+        self._fx_variation_worker = None
+        if hasattr(self, "fx_routing_editor"):
+            self.fx_routing_editor.generate_variations_button.setEnabled(True)
+        self._clear_fx_variation_cache()
+        detail = str(message)
+        if "cancelled" in detail.casefold():
+            self.statusBar().showMessage("FX variation rendering cancelled.", 8000)
+        elif "pyo" in detail.casefold() or "portaudio" in detail.casefold():
+            self.statusBar().showMessage(
+                f"FX variation render needs the optional Pyo backend. Install with "
+                f"python -m pip install -e \".[pyo]\" · {detail}",
+                12000,
+            )
+        else:
+            self._show_error(f"FX variation render failed: {detail}")
+
+    def _audition_fx_variation(self, candidate_id: str) -> None:
+        record = self._fx_variation_renders.get(str(candidate_id))
+        if record is None or self.project is None:
+            return
+        if self._fx_variation_signature != self._routing_signature():
+            self.statusBar().showMessage(
+                "This FX batch is stale. Generate a fresh batch for the current routing.",
+                8000,
+            )
+            return
+        try:
+            audio = np.load(record["cache_path"], allow_pickle=False)
+            self.player.stop()
+            self.player.start(
+                audio, self.project.sample_rate,
+                device=self.output_device.currentData(),
+            )
+            self.play_button.setText("PAUSE")
+            self.statusBar().showMessage(
+                f"Auditioning {record['label']} · matched route only; source stems remain unchanged.",
+                8000,
+            )
+        except Exception as exc:
+            self._show_error(f"Could not audition FX variation: {exc}")
+
+    def _apply_fx_variation(self, candidate_id: str) -> None:
+        record = self._fx_variation_renders.get(str(candidate_id))
+        if record is None:
+            return
+        try:
+            self.fx_routing_editor.set_routing(copy.deepcopy(record["routing"]))
+        except Exception as exc:
+            self._show_error(f"Could not apply FX variation route: {exc}")
+            return
+        self.statusBar().showMessage(
+            f"Applied {record['label']} routing. Channels will be pre-rendered for the active project.",
+            8000,
+        )
+
     def _routing_signature(self) -> str:
         import hashlib
 
@@ -2644,8 +2886,11 @@ class MainWindow(QMainWindow):
         return result
 
     def _refresh_routing(self) -> None:
-        """Invalidate the offline FX cache only when routing controls change."""
+        """Invalidate all processed snapshots when routing controls change."""
         self._fx_routing_metadata = {}
+        if self._fx_variation_worker is not None:
+            self._fx_variation_worker.cancel()
+        self._clear_fx_variation_cache()
         self._refresh_preview()
 
     def _render_mix(self) -> np.ndarray | None:
