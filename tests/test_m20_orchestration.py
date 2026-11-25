@@ -109,3 +109,17 @@ def test_perceptual_director_bridge_is_deterministic_for_same_seed():
     first = build_score_generation_plan(config).score.orchestration_plan
     second = build_score_generation_plan(config).score.orchestration_plan
     assert first == second
+
+
+def test_authored_listening_fixture_set_has_all_m20_comparisons():
+    import json
+    from pathlib import Path
+
+    fixture = Path(__file__).parent / "fixtures" / "m20" / "listening_scenarios.json"
+    data = json.loads(fixture.read_text(encoding="utf-8"))
+    ids = {item["id"] for item in data["scenarios"]}
+    assert {
+        "anchor-to-return", "independent-cycle-drift", "foreground-handoff",
+        "reserved-negative-space", "same-seed-ab",
+    } <= ids
+    assert all(item["seed"] and item["listen_for"] for item in data["scenarios"])
