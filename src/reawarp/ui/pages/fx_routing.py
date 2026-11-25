@@ -130,6 +130,10 @@ class FXRoutingEditor(QGroupBox):
         self.status.setObjectName("muted")
         self.status.setWordWrap(True)
         root.addWidget(self.status)
+        self.meter_report = QLabel("ROUTING METERS · waiting for render")
+        self.meter_report.setObjectName("muted")
+        self.meter_report.setWordWrap(True)
+        root.addWidget(self.meter_report)
 
         audition_row = QHBoxLayout()
         self.audition_stage = QComboBox()
@@ -302,6 +306,45 @@ class FXRoutingEditor(QGroupBox):
         if stage == "master":
             stem = "master"
         self.auditionRequested.emit(stage, stem)
+
+    def set_meter_report(self, meters: dict[str, Any] | None) -> None:
+        if not meters:
+            self.meter_report.setText("ROUTING METERS · not rendered yet")
+            return
+        def summarize(record: dict[str, Any]) -> str:
+            return (
+                f"peak {float(record.get('peak_dbfs', -240.0)):.1f} dBFS · "
+                f"RMS {float(record.get('rms_dbfs', -240.0)):.1f} dBFS · "
+                f"crest {float(record.get('crest_factor_db', 0.0)):.1f} dB · "
+                f"headroom {float(record.get('headroom_db', 0.0)):.1f} dB"
+            )
+        rows = []
+        for boundary in ("direct", "insert", "returns"):
+            records = meters.get(boundary, {})
+            if not records:
+                continue
+            values = " | ".join(
+                f"{name}: {summarize(record)}" for name, record in records.items()
+            )
+            rows.append(f"{boundary.upper()} · {values}")
+        sends = meters.get("sends", {})
+        send_records = [
+            (stem, bus, record)
+            for stem, buses in sends.items()
+            for bus, record in buses.items()
+        ]
+        if send_records:
+            rows.append(
+                "SEND CONTRIBUTIONS · " + " | ".join(
+                    f"{stem}/{bus}: peak {record['peak_dbfs']:.1f} dBFS · "
+                    f"RMS {record['rms_dbfs']:.1f} dBFS"
+                    for stem, bus, record in send_records
+                )
+            )
+        master = meters.get("master")
+        if master:
+            rows.append(f"MASTER · {summarize(master)}")
+        self.meter_report.setText("\n".join(rows) if rows else "ROUTING METERS · silence")
 
     def routing(self) -> dict[str, Any]:
         return normalise_fx_routing(self._routing, self._stem_names, self._sample_rate) if self._stem_names else default_fx_routing()
