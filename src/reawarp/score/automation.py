@@ -434,6 +434,10 @@ class AutomationModulation:
     retrigger: str = "free"
     smoothing_seconds: float = 0.0
     hysteresis: float = 0.0
+    minimum: float | None = None
+    maximum: float | None = None
+    scope: str = "global"
+    scope_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_id.strip() or not self.destination_target_id.strip():
@@ -450,6 +454,18 @@ class AutomationModulation:
             raise ValueError("modulation smoothing_seconds must be finite and non-negative")
         if not math.isfinite(float(self.hysteresis)) or self.hysteresis < 0:
             raise ValueError("modulation hysteresis must be finite and non-negative")
+        if self.minimum is not None and not math.isfinite(float(self.minimum)):
+            raise ValueError("modulation minimum must be finite")
+        if self.maximum is not None and not math.isfinite(float(self.maximum)):
+            raise ValueError("modulation maximum must be finite")
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise ValueError("modulation minimum cannot exceed maximum")
+        if self.scope not in {"global", "section", "role", "event"}:
+            raise ValueError("modulation scope must be global, section, role, or event")
+        if self.scope == "global" and self.scope_id is not None:
+            raise ValueError("global modulation cannot have a scope_id")
+        if self.scope != "global" and not str(self.scope_id or "").strip():
+            raise ValueError(f"{self.scope} modulation requires a scope_id")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -461,6 +477,10 @@ class AutomationModulation:
             "retrigger": self.retrigger,
             "smoothing_seconds": self.smoothing_seconds,
             "hysteresis": self.hysteresis,
+            "minimum": self.minimum,
+            "maximum": self.maximum,
+            "scope": self.scope,
+            "scope_id": self.scope_id,
         }
 
     @classmethod
@@ -474,6 +494,10 @@ class AutomationModulation:
             retrigger=str(data.get("retrigger", "free")),
             smoothing_seconds=float(data.get("smoothing_seconds", 0.0)),
             hysteresis=float(data.get("hysteresis", 0.0)),
+            minimum=None if data.get("minimum") is None else float(data["minimum"]),
+            maximum=None if data.get("maximum") is None else float(data["maximum"]),
+            scope=str(data.get("scope", "global")),
+            scope_id=None if data.get("scope_id") is None else str(data["scope_id"]),
         )
 
 
@@ -631,6 +655,14 @@ class AutomationControlBus:
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
         for modulation in self._modulations.get(target_id, ()):
+            scope_key = {
+                "global": None,
+                "section": "section_id",
+                "role": "role_id",
+                "event": "event_id",
+            }[modulation.scope]
+            if scope_key is not None and str(resolved_context.get(scope_key)) != modulation.scope_id:
+                continue
             source_lane = self._source_lanes[modulation.source_id]
             origin_key = {
                 "free": None,
@@ -651,6 +683,10 @@ class AutomationControlBus:
                 value = base * (1.0 + signal * modulation.amount)
             else:
                 value = base + signal * modulation.amount
+            if modulation.minimum is not None:
+                value = max(modulation.minimum, value)
+            if modulation.maximum is not None:
+                value = min(modulation.maximum, value)
         if value is None:
             value = 0.0
         target = self._targets.get(target_id)
@@ -693,6 +729,14 @@ class AutomationControlBus:
                 smoothing = max(smoothing, lane.smoothing_seconds)
                 hysteresis = max(hysteresis, lane.hysteresis)
         for modulation in self._modulations.get(target_id, ()):
+            scope_key = {
+                "global": None,
+                "section": "section_id",
+                "role": "role_id",
+                "event": "event_id",
+            }[modulation.scope]
+            if scope_key is not None and str(resolved_context.get(scope_key)) != modulation.scope_id:
+                continue
             smoothing = max(smoothing, modulation.smoothing_seconds)
             hysteresis = max(hysteresis, modulation.hysteresis)
         return smoothing, hysteresis, continuous
