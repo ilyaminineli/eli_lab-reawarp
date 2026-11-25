@@ -430,13 +430,12 @@ def _tempo_stages(
 
 def _apply_pan(audio: np.ndarray, pan: float) -> np.ndarray:
     result = np.asarray(audio, dtype=np.float32).copy()
-    angle = (float(pan) + 1.0) * math.pi / 4.0
-    left = math.cos(angle)
-    right = math.sin(angle)
-    mid = (result[:, 0] + result[:, 1]) * 0.5
-    side = (result[:, 0] - result[:, 1]) * 0.5
-    result[:, 0] = (mid + side) * left * math.sqrt(2.0)
-    result[:, 1] = (mid - side) * right * math.sqrt(2.0)
+    value = _finite(pan, "pan", -1.0, 1.0)
+    # Constant-power balance pan; centre remains unity on both channels.
+    if value < 0.0:
+        result[:, 1] *= math.cos(abs(value) * math.pi / 2.0)
+    elif value > 0.0:
+        result[:, 0] *= math.cos(value * math.pi / 2.0)
     return result
 
 
@@ -632,13 +631,14 @@ def render_fx_routing(
                 send_level = np.full(send_frames, float(static_amount), dtype=np.float32)
 
             tap = route["send_taps"][bus]
-            pre_insert, pre_fader = tap.startswith("pre_insert"), tap.endswith("pre_fader")
+            pre_insert = tap.startswith("pre_insert")
+            post_fader = tap.endswith("post_fader")
             selected = dry if pre_insert else post_insert
             selected = _pad_to(selected, send_frames).copy()
             fader = effective[name]
             if name not in audible:
                 send_level = np.zeros_like(send_level)
-            elif not pre_fader:
+            elif post_fader:
                 selected *= float(fader["gain"])
                 selected = _apply_pan(selected, float(fader["pan"])) if channels == 2 else selected
             contribution = np.ascontiguousarray(selected * send_level[:, None], dtype=np.float32)
@@ -679,7 +679,11 @@ def render_fx_routing(
                 np.zeros((0, channels), dtype=np.float32), sample_rate=int(sample_rate)
             )
             continue
-        stages = _tempo_stages(record, int(sample_rate), tempo)
+        stages = tuple(
+            {**stage, "mix": 1.0} for stage in _tempo_stages(
+                record, int(sample_rate), tempo
+            )
+        )
         processed = _stereo(
             render_pyo_fx(
                 source, int(sample_rate), preset=None, stages=stages,
