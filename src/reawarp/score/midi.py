@@ -167,6 +167,7 @@ def score_to_midi(
         "sonorities": list(score.sonorities),
         "sonority_plan": score.sonority_plan,
         "bass_plan": score.bass_plan,
+        "orchestration_plan": score.orchestration_plan,
         "metadata": score.metadata,
     }
     conductor_items.append((
@@ -529,5 +530,6 @@ def score_from_midi(path: str | Path) -> Score:
         sonorities=tuple(custom_score.get("sonorities", ())),
         sonority_plan=custom_score.get("sonority_plan"),
         bass_plan=custom_score.get("bass_plan"),
+        orchestration_plan=custom_score.get("orchestration_plan"),
         metadata=metadata,
     )
