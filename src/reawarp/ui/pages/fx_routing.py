@@ -24,6 +24,7 @@ class FXRoutingEditor(QGroupBox):
     preRenderRequested = Signal()
     variationsRequested = Signal(int, int)
     variationAuditionRequested = Signal(str)
+    variationApplyRequested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("AUTOMATIC ROLE FX · INSERTS + SHARED RETURNS", parent)
@@ -168,12 +169,20 @@ class FXRoutingEditor(QGroupBox):
                 str(self.variation_choice.currentData())
             ) if self.variation_choice.currentData() else None
         )
+        self.apply_variation_button = QPushButton("USE ROUTE")
+        self.apply_variation_button.setEnabled(False)
+        self.apply_variation_button.clicked.connect(
+            lambda: self.variationApplyRequested.emit(
+                str(self.variation_choice.currentData())
+            ) if self.variation_choice.currentData() else None
+        )
         self.variation_choice.currentIndexChanged.connect(
             lambda: self.play_variation_button.setEnabled(
                 self.variation_choice.currentData() is not None
             )
         )
         prerender_row.addWidget(self.play_variation_button)
+        prerender_row.addWidget(self.apply_variation_button)
         root.addLayout(prerender_row)
 
         self.status = QLabel("No project loaded.")
