@@ -227,7 +227,7 @@ class ReawarpProject:
         from reawarp.score.model import Score
 
         _check_cancelled(cancel_event, "project load")
-        root = Path(directory).expanduser()
+        root = Path(directory).expanduser().resolve()
         record = json.loads((root / "project.json").read_text(encoding="utf-8"))
         if not isinstance(record, dict) or record.get("schema_version") != 1:
             raise ValueError("unsupported or invalid Reawarp project schema")
