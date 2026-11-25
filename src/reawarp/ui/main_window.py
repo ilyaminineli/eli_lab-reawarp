@@ -2621,14 +2621,23 @@ class MainWindow(QMainWindow):
             return
         try:
             audio = np.load(record["cache_path"], allow_pickle=False)
+            match_report = None
+            if self.fx_routing_editor.match_audition_level():
+                audio, match_report = match_audition_level(
+                    audio, target_rms_dbfs=-18.0, peak_ceiling=0.95
+                )
             self.player.stop()
             self.player.start(
                 audio, self.project.sample_rate,
                 device=self.output_device.currentData(),
             )
             self.play_button.setText("PAUSE")
+            suffix = (
+                f" · audition RMS {match_report['output_rms_dbfs']:.1f} dBFS"
+                if match_report is not None else ""
+            )
             self.statusBar().showMessage(
-                f"Auditioning {record['label']} · matched route only; source stems remain unchanged.",
+                f"Auditioning {record['label']}{suffix}; production routing and dry stems are unchanged.",
                 8000,
             )
         except Exception as exc:
@@ -2814,9 +2823,17 @@ class MainWindow(QMainWindow):
                 "fallback": "dry_source_stems",
             }
             self.fx_routing_editor.set_meter_report({})
-            self.statusBar().showMessage(
-                f"FX render failed; dry sources retained: {message}", 10000
-            )
+            detail = str(message)
+            if "pyo" in detail.casefold() or "soundfile" in detail.casefold():
+                self.statusBar().showMessage(
+                    f"Pyo offline FX is unavailable; preview is currently dry. "
+                    f"Install with python -m pip install -e \".[pyo]\" and retry. {detail}",
+                    15000,
+                )
+            else:
+                self.statusBar().showMessage(
+                    f"FX render failed; dry sources retained: {detail}", 10000
+                )
         self._fx_queued_signature = None
         self._refresh_preview()
 
