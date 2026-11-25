@@ -113,6 +113,7 @@ class PitchField:
     centre_pitch: float | None = None
     pitch_collection: tuple[float, ...] = ()
     allowed_intervals: tuple[float, ...] = ()
+    period_ratio: float = 2.0
     stability_weights: Mapping[str, float] | None = None
     tension_weights: Mapping[str, float] | None = None
     hard_constraint: bool = False
@@ -127,6 +128,8 @@ class PitchField:
     def __post_init__(self) -> None:
         if self.mode not in self.MODES:
             raise ValueError(f"unsupported pitch-field mode: {self.mode}")
+        if not math.isfinite(float(self.period_ratio)) or self.period_ratio <= 1.0:
+            raise ValueError("period_ratio must be finite and greater than one")
         if self.centre_pitch is not None and not math.isfinite(float(self.centre_pitch)):
             raise ValueError("centre_pitch must be finite")
         for name, values in (
@@ -162,6 +165,7 @@ class PitchField:
             centre_pitch=None if context.get("centre_pitch") is None else float(context["centre_pitch"]),
             pitch_collection=tuple(float(value) for value in context.get("pitch_collection", ())),
             allowed_intervals=tuple(float(value) for value in context.get("allowed_intervals", ())),
+            period_ratio=float(context.get("period_ratio", 2.0)),
             stability_weights=dict(context.get("stability_weights", {})),
             tension_weights=dict(context.get("tension_weights", {})),
             hard_constraint=bool(context.get("hard_constraint", False)),
