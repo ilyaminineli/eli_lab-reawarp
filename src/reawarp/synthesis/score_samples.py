@@ -384,7 +384,23 @@ def prepare_score_sample_renderers(
     ) if banks else ({}, {})
 
     prepared_events = []
-    sample_triggers = []
+    generated_trigger_articulations = {"sample-trigger", "break-slice"}
+    existing_generated_triggers = {
+        event.event_id for event in score.events
+        if event.kind == "trigger"
+        and (
+            "sample" in event.tags
+            or event.articulation in generated_trigger_articulations
+        )
+    }
+    sample_triggers = [
+        event for event in score.events
+        if event.kind == "trigger"
+        and (
+            "sample" in event.tags
+            or event.articulation in generated_trigger_articulations
+        )
+    ]
     manifest: dict[str, Any] = {}
     variant_usage: dict[str, dict[str, int]] = {
         role: {} for role in banks
@@ -419,7 +435,15 @@ def prepare_score_sample_renderers(
 
     for event in score.events:
         role = event.voice_id
+        if event.kind == "trigger" and (
+            "sample" in event.tags
+            or event.articulation in generated_trigger_articulations
+        ):
+            continue
         if event.kind != "hit" or role not in banks:
+            prepared_events.append(event)
+            continue
+        if f"sample-trigger-{event.event_id}" in existing_generated_triggers:
             prepared_events.append(event)
             continue
         section = _section_context(score, event, timeline, config.drum_part_cycle_bars)
@@ -502,6 +526,8 @@ def prepare_score_sample_renderers(
         manifest["break"] = break_manifest
         break_triggers = []
         for index, event in enumerate(break_events):
+            if f"sample-break-{event.event_id}" in existing_generated_triggers:
+                continue
             meter = score.meter_map.at(event.onset_beats)
             bar_beats = Fraction(int(meter.numerator) * 4, int(meter.denominator))
             _bar_number, beat_in_bar = timeline.bar_and_beat(event.onset_beats)
