@@ -191,7 +191,7 @@ See [M21.md](M21.md).
 
 ## M22: Mixer and routing quality
 
-**Status:** Planned. Current two-bus SPACE/ECHO routing and automation are implemented; full signal-path observability, explicit pre/post semantics, robust tail/latency rules and asynchronous FX rendering remain follow-on work.
+**Status:** Implemented. Role-derived default inserts/sends, v2 routing migration, pre/post insert/fader taps, wet-only auxiliary returns, meters, tail/latency reporting, stage audition, matched-level audition copies and a cancellable background cache are integrated. Target-Windows Pyo listening remains experimentally unverified.
 
 **Goal:** Make the fixed routing architecture transparent and predictable before considering arbitrary routing graphs.
 
