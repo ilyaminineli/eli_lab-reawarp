@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M18 is closed as an implementation milestone on `main`; M19.1 and M19.2 are implemented. M19.2 provides seeded pitch-field sonority generation, spacing/register constraints, provenance-preserving transformations and tuning-aware spectral derivation. Linux Python 3.10–3.12 and Windows regression/smoke checks passed on the M18/M19.1 merge. Hardware profiling and matched-level listening remain separate experimental sign-offs.  
+**Current implementation baseline:** M18 is closed and M19.1–M19.4 are implemented on `main`. M19.4 supplies six independent bass-role grammars, shared phrase/form timing, real kick-event relationships, explicit density/register/movement/cadence controls, deterministic provenance and Score persistence. M19.5 motif/MIDI integration remains. M14 hardware profiling and matched-level/Pyo listening remain separate experimental sign-offs.
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -167,7 +167,7 @@ See [M18.md](M18.md).
 
 ## M19: Harmonic context and voice-leading
 
-**Status:** M19.1–M19.3 implemented on main. Optional Score harmonic-context and sonority persistence, tuning-aware pitch fields, seeded sonority generation, provenance-preserving transformations, boundary-driven whole-sequence melodic voice-leading, serializable cost weights/hard constraints and deliberate high-friction motion are integrated. M19.4 bass-role planning and M19.5 motif/MIDI integration remain.
+**Status:** M19.1–M19.4 implemented on main. Optional Score harmonic-context and sonority persistence, tuning-aware pitch fields, seeded sonority generation, provenance-preserving transformations, boundary-driven whole-sequence melodic voice-leading, and six independent bass-role grammars with kick relationships/cadence controls are integrated. M19.5 motif/MIDI integration remains.
 
 **Goal:** Support centred, modal, intervallic, spectral, microtonal and ambiguous pitch languages without imposing conventional functional harmony.
 

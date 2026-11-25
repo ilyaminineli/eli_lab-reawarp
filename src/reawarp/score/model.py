@@ -32,6 +32,7 @@ class Score:
     metadata: dict[str, Any] = field(default_factory=dict)
     schema_version: int = 1
     sonority_plan: dict[str, Any] | None = None
+    bass_plan: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.title.strip():
@@ -106,6 +107,69 @@ class Score:
             score_ids = [str(item.get("sonority_id", "")) for item in sonorities]
             if planned_ids and planned_ids != score_ids:
                 raise ValueError("sonority_plan boundary IDs must match Score.sonorities order")
+        bass_plan = self.bass_plan
+        if bass_plan is not None:
+            if not isinstance(bass_plan, dict):
+                raise ValueError("bass_plan must be an object or None")
+            bass_plan = json.loads(json.dumps(
+                bass_plan, ensure_ascii=False, allow_nan=False
+            ))
+            if bass_plan.get("format") != "eli_lab_reawarp_bass_role_plan":
+                raise ValueError("unsupported bass_plan format")
+            if int(bass_plan.get("schema_version", 1)) != 1:
+                raise ValueError("unsupported bass_plan schema version")
+            bass_config = bass_plan.get("config")
+            bass_boundaries = bass_plan.get("boundaries")
+            if not isinstance(bass_config, dict) or not isinstance(
+                bass_boundaries, list
+            ) or any(not isinstance(item, dict) for item in bass_boundaries):
+                raise ValueError("bass_plan requires a config object and boundary objects")
+            boundary_ids = [
+                str(item.get("sonority_id", "")) for item in bass_boundaries
+            ]
+            if (
+                not boundary_ids
+                or any(not item for item in boundary_ids)
+                or len(boundary_ids) != len(set(boundary_ids))
+            ):
+                raise ValueError("bass_plan boundary IDs must be unique and non-empty")
+            bass_ids = bass_plan.get("event_ids", [])
+            if (
+                not isinstance(bass_ids, list)
+                or any(not isinstance(value, str) or not value for value in bass_ids)
+                or len(bass_ids) != len(set(bass_ids))
+            ):
+                raise ValueError("bass_plan event_ids must be unique non-empty strings")
+            score_event_ids = {event.event_id for event in events}
+            missing_bass_ids = set(bass_ids) - score_event_ids
+            if missing_bass_ids:
+                raise ValueError(
+                    "bass_plan references missing Score event(s): "
+                    + ", ".join(sorted(missing_bass_ids))
+                )
+            expected_voice = str(bass_config.get("voice_id", "bass"))
+            bass_events = [event for event in events if event.event_id in set(bass_ids)]
+            if any(event.voice_id != expected_voice or event.kind != "note"
+                   for event in bass_events):
+                raise ValueError("bass_plan event IDs must reference its note voice")
+            kick_ids = bass_plan.get("kick_event_ids", [])
+            if (
+                not isinstance(kick_ids, list)
+                or any(not isinstance(value, str) or not value for value in kick_ids)
+                or len(kick_ids) != len(set(kick_ids))
+            ):
+                raise ValueError("bass_plan kick_event_ids must be unique non-empty strings")
+            event_by_id = {event.event_id: event for event in events}
+            for kick_id in kick_ids:
+                kick = event_by_id.get(kick_id)
+                if kick is None or kick.kind != "hit":
+                    raise ValueError("bass_plan kick provenance must reference Score hit events")
+                if not (
+                    kick.voice_id.casefold() == "kick"
+                    or str(kick.parameters.get("source_kind", "")).casefold() == "kick"
+                    or "kick" in {tag.casefold() for tag in kick.tags}
+                ):
+                    raise ValueError("bass_plan kick provenance references a non-kick event")
         sonority_ids = [str(item.get("sonority_id", "")) for item in sonorities]
         if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
             raise ValueError("sonorities require unique non-empty sonority_id values")
@@ -165,6 +229,7 @@ class Score:
         object.__setattr__(self, "harmonic_context", harmonic_context)
         object.__setattr__(self, "sonorities", sonorities)
         object.__setattr__(self, "sonority_plan", sonority_plan)
+        object.__setattr__(self, "bass_plan", bass_plan)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
@@ -218,6 +283,7 @@ class Score:
             "harmonic_context": self.harmonic_context,
             "sonorities": list(self.sonorities),
             "sonority_plan": self.sonority_plan,
+            "bass_plan": self.bass_plan,
             "metadata": self.metadata,
         }
 
@@ -250,6 +316,7 @@ class Score:
             harmonic_context=data.get("harmonic_context"),
             sonorities=tuple(data.get("sonorities", ())),
             sonority_plan=data.get("sonority_plan"),
+            bass_plan=data.get("bass_plan"),
             tuning_id=str(tuning.get("id", "12tet")),
             tuning_reference_pitch=float(tuning.get("reference_pitch", 69.0)),
             tuning_reference_frequency_hz=float(

@@ -28,6 +28,7 @@ from reawarp.score.voice_leading import (
     VoiceLeadingPlanConfig, VoiceLeadingPreferences, VoiceLeadingTransition,
     VoiceRoleTarget, plan_sonority_sequence,
 )
+from reawarp.score.bass_role import BassRoleConfig, BassRolePlan, plan_bass_role
 from reawarp.score.sonority import (
     derive_spectral_sonority,
     displace_register,
@@ -87,6 +88,9 @@ __all__ = [
     "VoiceRoleTarget",
     "SonorityBoundary",
     "SonoritySequencePlan",
+    "BassRoleConfig",
+    "BassRolePlan",
+    "plan_bass_role",
     "plan_sonority_sequence",
     "assign_voice_leading",
     "generate_sonority",
