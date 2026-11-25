@@ -47,7 +47,7 @@ def render(output: Path, sample_rate: int = 48_000, seed: int = 2401) -> dict:
     )
     convolved = convolve_partitioned(excitation, ir, sample_rate, block_size=1024)
     dry_padded = np.zeros_like(convolved.audio)
-    dry_padded[:len(excitation)] = excitation
+    dry_padded[:len(excitation), :] = excitation[:, None]
     blended = dry_padded + (convolved.audio - dry_padded) * np.float32(0.28)
 
     dry_matched, dry_report = match_audition_level(dry_padded)
