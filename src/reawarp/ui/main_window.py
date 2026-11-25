@@ -5,6 +5,8 @@ from __future__ import annotations
 import copy
 import json
 import secrets
+import shutil
+import tempfile
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -24,8 +26,8 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.project_archive import export_project_archive
 from reawarp.fx_routing import (
-    match_audition_level, measure_signal, render_fx_routing,
-    render_master_with_returns,
+    build_fx_variation_routings, match_audition_level, measure_signal,
+    render_fx_routing, render_master_with_returns,
 )
 from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry,
@@ -96,6 +98,10 @@ class MainWindow(QMainWindow):
         self._fx_audition_audio: dict[str, Any] = {}
         self._fx_worker: CancellableRenderWorker | None = None
         self._fx_pending_signature: str | None = None
+        self._fx_variation_worker: CancellableRenderWorker | None = None
+        self._fx_variation_renders: dict[str, dict[str, Any]] = {}
+        self._fx_variation_cache_dir: Path | None = None
+        self._fx_variation_signature: str | None = None
         self._fx_queued_signature: str | None = None
         self._fx_project_revision = 0
         self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
@@ -150,6 +156,7 @@ class MainWindow(QMainWindow):
         break_page = self._build_break_page()
         mixer_page = self._build_mixer_page()
         self.fx_lab_page = FxLabPage(self.player, self)
+        self.fx_lab_page.applyChainRequested.connect(self._apply_fx_lab_chain_to_stem)
         self.library_page = LibraryPage(self)
         self.library_page.sampleSelected.connect(self._accept_library_sample)
         self.variation_page = VariationBrowserPage(self)
@@ -757,7 +764,7 @@ class MainWindow(QMainWindow):
             self._tray_icon.hide()
         workers = (
             self._worker, self._export_worker, self._variation_batch_worker,
-            self._variation_compare_worker, self._fx_worker,
+            self._variation_compare_worker, self._fx_worker, self._fx_variation_worker,
         )
         for worker in workers:
             if worker is not None:
@@ -770,6 +777,8 @@ class MainWindow(QMainWindow):
         self._variation_batch_worker = None
         self._variation_compare_worker = None
         self._fx_worker = None
+        self._fx_variation_worker = None
+        self._clear_fx_variation_cache()
 
     def _quit_from_tray(self) -> None:
         self._shutdown()
@@ -998,6 +1007,10 @@ class MainWindow(QMainWindow):
         self.fx_routing_editor.changed.connect(self._refresh_routing)
         self.fx_routing_editor.auditionRequested.connect(self._audition_fx_component)
         self.fx_routing_editor.mixerStateRequested.connect(self._apply_routing_mixer_state)
+        self.fx_routing_editor.preRenderRequested.connect(self._pre_render_channel_fx)
+        self.fx_routing_editor.variationsRequested.connect(self._generate_fx_variations)
+        self.fx_routing_editor.variationAuditionRequested.connect(self._audition_fx_variation)
+        self.fx_routing_editor.variationApplyRequested.connect(self._apply_fx_variation)
         routing_scroll = QScrollArea()
         routing_scroll.setWidgetResizable(True)
         routing_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -2209,11 +2222,14 @@ class MainWindow(QMainWindow):
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._fx_audition_audio = {}
+        self._clear_fx_variation_cache()
+        self.fx_routing_editor.set_variation_choices([])
         self.fx_routing_editor.set_meter_report({})
         self._rebuild_mixer()
         self.variation_page.set_stems(list(result.stems))
         self._refresh_sound_object_targets()
         self._restore_variation_session(result)
+        self.fx_lab_page.set_project_sources(result.stems, result.sample_rate)
         self.mixer_stack.setCurrentIndex(1)
         self._update_project_context()
         self.preview_source.setEnabled(True)
