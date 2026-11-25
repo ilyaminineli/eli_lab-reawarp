@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from fractions import Fraction
 from pathlib import Path
 import zipfile
 
@@ -57,9 +58,6 @@ def _package_project() -> ReawarpProject:
 
 
 def test_complete_project_zip_contains_midi_and_reopens(tmp_path: Path):
-    from fractions import Fraction
-    from reawarp.core.project import ReawarpProject
-
     project = _package_project()
     destination = tmp_path / "full-project.zip"
     empty_automation = normalise_fx_automation(
