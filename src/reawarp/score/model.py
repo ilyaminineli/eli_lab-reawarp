@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from fractions import Fraction
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -124,7 +125,7 @@ class Score:
                 raise ValueError("sonority_plan boundary IDs must match Score.sonorities order")
         orchestration_plan = self.orchestration_plan
         if orchestration_plan is not None:
-            from reawarp.score.orchestration import OrchestrationPlan
+            from reawarp.score.orchestration_intent import OrchestrationPlan
             if not isinstance(orchestration_plan, dict):
                 raise ValueError("orchestration_plan must be an object or None")
             try:
@@ -282,7 +283,7 @@ class Score:
         )
         orchestration_end = Fraction(0)
         if self.orchestration_plan is not None:
-            from reawarp.score.orchestration import OrchestrationPlan
+            from reawarp.score.orchestration_intent import OrchestrationPlan
             orchestration_end = OrchestrationPlan.from_dict(self.orchestration_plan).duration_beats
         return max(event_end, automation_end, source_end, sonority_end, orchestration_end)
 
