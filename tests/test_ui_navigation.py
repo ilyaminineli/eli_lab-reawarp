@@ -154,3 +154,56 @@ def test_mixer_includes_separate_fx_and_score_control_editors():
     assert window.fx_workspace_tabs.tabText(1) == "FX AUTOMATION"
     assert window.fx_workspace_tabs.tabText(2) == "SCORE CONTROL"
     window.close()
+
+
+def test_m18_score_control_exposes_live_planner_synth_and_fx_destinations():
+    _application()
+    score = Score(
+        title="M18 FX target fixture",
+        metadata={"render_stems": ["kick", "melody"]},
+    )
+    editor = ScoreAutomationEditor()
+    editor.set_score(score)
+    targets = {
+        editor.target.itemData(index)
+        for index in range(editor.target.count())
+    }
+
+    assert {
+        "role.density",
+        "role.syncopation",
+        "role.articulation",
+        "synth.wavetable.position",
+        "synth.partial.balance",
+        "synth.grain.size",
+        "synth.grain.position",
+        "synth.grain.density",
+        "stem.kick.insert_wet",
+        "stem.melody.send.space",
+        "stem.melody.send.echo",
+        "bus.space.wet",
+        "bus.echo.wet",
+    }.issubset(targets)
+
+    editor.target.setCurrentIndex(editor.target.findData("stem.melody.insert_wet"))
+    assert editor.scope.currentData() == "global"
+    assert not editor.scope.isEnabled()
+    editor._add_control()
+    modulation = editor.updated_score(score).modulations[0]
+    assert modulation.destination_target_id == "stem.melody.insert_wet"
+    assert modulation.scope == "global"
+    assert modulation.scope_id is None
+    editor.close()
+
+
+def test_m18_curve_preview_points_are_editable_only_for_curve_sources():
+    _application()
+    editor = ScoreAutomationEditor()
+    editor.source_kind.setCurrentIndex(editor.source_kind.findData("phrase_curve"))
+    editor.source_values.setText("0.0, 0.5, 1.0")
+    editor._draft_source_preview_changed()
+    assert editor.preview._editable is True
+    assert editor.preview._values == (0.0, 0.5, 1.0)
+    editor.source_kind.setCurrentIndex(editor.source_kind.findData("lfo"))
+    assert editor.preview._editable is False
+    editor.close()

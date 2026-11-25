@@ -7,7 +7,9 @@ from fractions import Fraction
 import math
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+import numpy as np
+
+from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
@@ -15,6 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from reawarp.fx_automation import automation_targets
 from reawarp.score.automation import AutomationModulation, AutomationSource
 from reawarp.score.model import Score
 
@@ -29,9 +32,17 @@ _TARGETS = (
     ("synth.release", "Release · seconds"),
     ("synth.modulation.depth", "Vibrato depth · normalized"),
     ("synth.modulation.rate", "Vibrato rate · Hz"),
+    ("synth.wavetable.position", "Wavetable position"),
+    ("synth.partial.balance", "Partial balance"),
+    ("synth.grain.size", "Grain size · ms"),
+    ("synth.grain.position", "Grain phase position"),
+    ("synth.grain.density", "Grain density · Hz"),
     ("event.velocity_scale", "Event velocity scale"),
     ("event.probability", "Event probability"),
     ("role.activity", "Role activity"),
+    ("role.density", "Role density · normalized"),
+    ("role.syncopation", "Role syncopation"),
+    ("role.articulation", "Role articulation · 0–4"),
     ("sample.mix", "Sample contribution"),
     ("spatial.pan", "Stereo pan"),
     ("spatial.width", "Stereo width"),
@@ -47,6 +58,14 @@ _TARGET_AMOUNTS = {
     "synth.release": 0.12,
     "synth.modulation.depth": 0.25,
     "synth.modulation.rate": 2.0,
+    "synth.wavetable.position": 0.25,
+    "synth.partial.balance": 0.25,
+    "synth.grain.size": 60.0,
+    "synth.grain.position": 0.25,
+    "synth.grain.density": 30.0,
+    "role.density": 0.5,
+    "role.syncopation": 0.5,
+    "role.articulation": 2.0,
     "event.velocity_scale": 0.25,
     "event.probability": 0.25,
     "role.activity": 0.25,
@@ -62,6 +81,21 @@ _TARGET_BASE_VALUES = {
     "synth.release": 0.18,
     "synth.modulation.depth": 0.5,
     "synth.modulation.rate": 6.0,
+    "synth.wavetable.position": 0.5,
+    "synth.partial.balance": 0.5,
+    "synth.grain.size": 80.0,
+    "synth.grain.position": 0.5,
+    "synth.grain.density": 50.0,
+    "role.activity": 0.5,
+    "role.density": 0.5,
+    "role.syncopation": 0.5,
+    "role.articulation": 2.0,
+    "event.velocity_scale": 1.0,
+    "event.probability": 0.5,
+    "sample.mix": 0.5,
+    "spatial.pan": 0.0,
+    "spatial.width": 1.0,
+    "synth.gain": 0.75,
 }
 
 _TARGET_RANGES = {
@@ -74,6 +108,14 @@ _TARGET_RANGES = {
     "synth.release": (0.02, 0.65),
     "synth.modulation.depth": (0.0, 1.0),
     "synth.modulation.rate": (0.0, 40.0),
+    "synth.wavetable.position": (0.0, 1.0),
+    "synth.partial.balance": (0.0, 1.0),
+    "synth.grain.size": (1.0, 500.0),
+    "synth.grain.position": (0.0, 1.0),
+    "synth.grain.density": (0.0, 200.0),
+    "role.density": (0.0, 1.0),
+    "role.syncopation": (0.0, 1.0),
+    "role.articulation": (0.0, 4.0),
     "event.velocity_scale": (0.0, 2.0),
     "event.probability": (0.0, 1.0),
     "role.activity": (0.0, 1.0),
@@ -84,16 +126,31 @@ _TARGET_RANGES = {
 
 
 class AutomationCurvePreview(QWidget):
-    """Small dependency-free preview of the currently selected generated curve."""
+    """Compact curve editor with draggable normalized control points."""
+
+    valuesChanged = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setMinimumHeight(104)
         self.setMaximumHeight(136)
         self._values: tuple[float, ...] = ()
+        self._editable = False
+        self._drag_index: int | None = None
 
-    def set_values(self, values: list[float] | tuple[float, ...]) -> None:
+    def set_values(
+        self,
+        values: list[float] | tuple[float, ...],
+        *,
+        editable: bool = False,
+    ) -> None:
         self._values = tuple(float(value) for value in values)
+        self._editable = bool(editable)
+        self._drag_index = None
+        self.setToolTip(
+            "Drag points vertically to edit this curve."
+            if self._editable else "Generated automation curve preview."
+        )
         self.update()
 
     def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
@@ -114,23 +171,66 @@ class AutomationCurvePreview(QWidget):
             painter.drawText(bounds, Qt.AlignmentFlag.AlignCenter, "ADD A SOURCE TO PREVIEW ITS SHAPE")
             painter.end()
             return
-        low = min(self._values)
-        high = max(self._values)
+        low = 0.0 if self._editable else min(self._values)
+        high = 1.0 if self._editable else max(self._values)
         span = max(1e-9, high - low)
         path = QPainterPath()
+        points = []
         for index, value in enumerate(self._values):
             x = bounds.left() + bounds.width() * index / (len(self._values) - 1)
             y = bounds.bottom() - bounds.height() * (value - low) / span
+            points.append(QPointF(x, y))
             if index == 0:
                 path.moveTo(x, y)
             else:
                 path.lineTo(x, y)
         painter.setPen(QPen(QColor("#9b9cf6"), 2.0))
         painter.drawPath(path)
+        if self._editable:
+            painter.setPen(QPen(QColor("#d8d8ff"), 1.0))
+            painter.setBrush(QColor("#9b9cf6"))
+            for point in points:
+                painter.drawEllipse(point, 4.0, 4.0)
         painter.setPen(QColor("#818894"))
         painter.drawText(bounds.adjusted(3, 2, -3, -2), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft, f"{high:.3g}")
         painter.drawText(bounds.adjusted(3, 2, -3, -2), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft, f"{low:.3g}")
         painter.end()
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt API
+        if not self._editable or event.button() != Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(event)
+        bounds = self.rect().adjusted(8, 8, -8, -8)
+        if len(self._values) < 2 or bounds.width() <= 0 or bounds.height() <= 0:
+            return
+        x = float(event.position().x())
+        positions = [
+            bounds.left() + bounds.width() * index / (len(self._values) - 1)
+            for index in range(len(self._values))
+        ]
+        nearest = min(range(len(positions)), key=lambda index: abs(positions[index] - x))
+        if abs(positions[nearest] - x) <= 14.0:
+            self._drag_index = nearest
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 - Qt API
+        if self._drag_index is None or not self._editable:
+            return super().mouseMoveEvent(event)
+        bounds = self.rect().adjusted(8, 8, -8, -8)
+        if bounds.height() <= 0:
+            return
+        position = (bounds.bottom() - float(event.position().y())) / bounds.height()
+        values = list(self._values)
+        values[self._drag_index] = float(np.clip(position, 0.0, 1.0))
+        self._values = tuple(values)
+        self.valuesChanged.emit(list(self._values))
+        self.update()
+        event.accept()
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 - Qt API
+        self._drag_index = None
+        super().mouseReleaseEvent(event)
 
 
 class ScoreAutomationEditor(QGroupBox):
@@ -157,6 +257,7 @@ class ScoreAutomationEditor(QGroupBox):
         root.addWidget(intro)
 
         form = QFormLayout()
+        self._target_ranges = dict(_TARGET_RANGES)
         self.target = QComboBox()
         for target_id, label in _TARGETS:
             self.target.addItem(label, target_id)
@@ -185,7 +286,13 @@ class ScoreAutomationEditor(QGroupBox):
 
         self.source_values = QLineEdit("0.0, 1.0, 0.0")
         self.source_values.setPlaceholderText("Comma-separated values from 0 to 1")
+        self.source_values.textChanged.connect(self._draft_source_preview_changed)
         form.addRow("Curve / step values", self.source_values)
+
+        self.random_step_size = self._number(0.001, 1.0, 0.12, 3)
+        self.random_initial = self._number(0.0, 1.0, 0.5, 3)
+        form.addRow("Random-walk step size", self.random_step_size)
+        form.addRow("Random-walk initial value", self.random_initial)
 
         self.scope = QComboBox()
         for value, label in (
@@ -230,6 +337,11 @@ class ScoreAutomationEditor(QGroupBox):
         root.addLayout(form)
 
         self.preview = AutomationCurvePreview()
+        self.preview.valuesChanged.connect(
+            lambda values: self.source_values.setText(
+                ", ".join(f"{float(value):.4f}" for value in values)
+            )
+        )
         root.addWidget(self.preview)
 
         action_row = QHBoxLayout()
@@ -263,6 +375,7 @@ class ScoreAutomationEditor(QGroupBox):
         self.remove_button.setEnabled(False)
         self._scope_changed()
         self._source_kind_changed()
+        self._target_changed()
 
     @staticmethod
     def _number(minimum: float, maximum: float, value: float, decimals: int) -> QDoubleSpinBox:
@@ -275,7 +388,12 @@ class ScoreAutomationEditor(QGroupBox):
 
     def _target_changed(self, *_args: Any) -> None:
         target = str(self.target.currentData())
-        self.amount.setValue(_TARGET_AMOUNTS.get(target, 0.25))
+        self.amount.setValue(_TARGET_AMOUNTS.get(target, 0.2))
+        if hasattr(self, "scope"):
+            fx_target = target.startswith(("stem.", "bus."))
+            self.scope.setEnabled(not fx_target)
+            if fx_target:
+                self.scope.setCurrentIndex(self.scope.findData("global"))
 
     def _source_kind_changed(self, *_args: Any) -> None:
         kind = str(self.source_kind.currentData())
@@ -283,6 +401,62 @@ class ScoreAutomationEditor(QGroupBox):
         self.source_values.setEnabled(
             kind in {"envelope", "stepped", "phrase_curve"}
         )
+        self.random_step_size.setEnabled(kind == "random_walk")
+        self.random_initial.setEnabled(kind == "random_walk")
+        if kind not in {"envelope", "stepped", "phrase_curve"}:
+            self.preview.set_values((), editable=False)
+        else:
+            self._draft_source_preview_changed()
+
+    def _draft_source_preview_changed(self, *_args: Any) -> None:
+        kind = str(self.source_kind.currentData())
+        if kind not in {"envelope", "stepped", "phrase_curve"}:
+            return
+        try:
+            values = self._source_values()
+        except ValueError:
+            self.preview.set_values((), editable=False)
+            return
+        self.preview.set_values(values, editable=True)
+
+    @staticmethod
+    def _fx_target_label(target_id: str) -> str:
+        if target_id.startswith("stem."):
+            _prefix, stem_name, action = target_id.split(".", 2)
+            labels = {
+                "insert_wet": "INSERT WET",
+                "send.space": "SPACE SEND",
+                "send.echo": "ECHO SEND",
+            }
+            action_label = labels.get(action, action.upper().replace("_", " "))
+            return f"FX · {stem_name.upper()} · {action_label}"
+        if target_id == "bus.space.wet":
+            return "FX · SPACE RETURN WET"
+        if target_id == "bus.echo.wet":
+            return "FX · ECHO RETURN WET"
+        return target_id
+
+    def _populate_targets(self, score: Score | None) -> None:
+        selected = self.target.currentData()
+        self.target.blockSignals(True)
+        self.target.clear()
+        for target_id, label in _TARGETS:
+            self.target.addItem(label, target_id)
+        self._target_ranges = dict(_TARGET_RANGES)
+        if score is not None:
+            stems = tuple(score.metadata.get("render_stems", ()))
+            if not stems:
+                stems = tuple(sorted({
+                    event.voice_id for event in score.events
+                    if event.voice_id != "sample_break"
+                }))
+            for target_id in automation_targets(stems):
+                self.target.addItem(self._fx_target_label(target_id), target_id)
+                self._target_ranges[target_id] = (0.0, 1.0)
+        restored = self.target.findData(selected)
+        self.target.setCurrentIndex(restored if restored >= 0 else 0)
+        self.target.blockSignals(False)
+        self._target_changed()
 
     def _source_values(self) -> list[float]:
         tokens = [part.strip() for part in self.source_values.text().split(",")]
@@ -345,6 +519,7 @@ class ScoreAutomationEditor(QGroupBox):
 
     def set_score(self, score: Score | None) -> None:
         self._score = score
+        self._populate_targets(score)
         self._refresh_scope_ids()
         self._sources = list(score.automation_sources) if score is not None else []
         self._modulations = list(score.modulations) if score is not None else []
@@ -412,8 +587,8 @@ class ScoreAutomationEditor(QGroupBox):
         elif kind == "random_walk":
             parameters = {
                 "step_beats": period,
-                "step_size": 0.12,
-                "initial": 0.5,
+                "step_size": float(self.random_step_size.value()),
+                "initial": float(self.random_initial.value()),
             }
         else:
             parameters = {
@@ -448,7 +623,7 @@ class ScoreAutomationEditor(QGroupBox):
             # Generate now so malformed source parameters fail before a render starts.
             lane = source.to_lane()
             target = str(self.target.currentData())
-            low, high = _TARGET_RANGES[target]
+            low, high = self._target_ranges[target]
             amount = float(self.amount.value())
             polarity = "bipolar"
             modulation = AutomationModulation(
@@ -471,7 +646,22 @@ class ScoreAutomationEditor(QGroupBox):
         self._modulations.append(modulation)
         self.controls.addItem(f"{source_id}  →  {target}  ·  {scope.upper()}")
         self.controls.setCurrentRow(self.controls.count() - 1)
-        self.preview.set_values([point.value for point in lane.points])
+        editable_values: list[float] = []
+        if source.kind == "envelope":
+            editable_values = [
+                float(point[1])
+                for point in source.parameters.get(
+                    "shape", [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]]
+                )
+            ]
+        elif source.kind in {"phrase_curve", "stepped"}:
+            editable_values = [
+                float(value) for value in source.parameters.get("values", [0.0, 1.0])
+            ]
+        self.preview.set_values(
+            editable_values if editable_values else [point.value for point in lane.points],
+            editable=source.kind in {"envelope", "phrase_curve", "stepped"},
+        )
         self.changed.emit()
         self.status.setText(
             f"Added {source.kind} → {target}. Control motion is bounded by {low:g}…{high:g}."
@@ -500,5 +690,20 @@ class ScoreAutomationEditor(QGroupBox):
         except Exception:
             self.preview.set_values(())
             return
-        self.preview.set_values([point.value for point in lane.points])
+        editable_values: list[float] = []
+        if source.kind == "envelope":
+            editable_values = [
+                float(point[1])
+                for point in source.parameters.get(
+                    "shape", [[0.0, 0.0], [0.15, 1.0], [1.0, 0.0]]
+                )
+            ]
+        elif source.kind in {"phrase_curve", "stepped"}:
+            editable_values = [
+                float(value) for value in source.parameters.get("values", [0.0, 1.0])
+            ]
+        self.preview.set_values(
+            editable_values if editable_values else [point.value for point in lane.points],
+            editable=source.kind in {"envelope", "phrase_curve", "stepped"},
+        )
 
