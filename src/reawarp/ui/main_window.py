@@ -2484,15 +2484,15 @@ class MainWindow(QMainWindow):
                 automation_registry=fx_automation_registry(stem_names),
             )
         base_routing = copy.deepcopy(self.fx_routing_editor.routing())
+        # render_fx_routing owns its working copies and never mutates source arrays.
         dry_stems = {
-            name: np.asarray(audio, dtype=np.float32).copy()
+            name: np.asarray(audio, dtype=np.float32)
             for name, audio in project.stems.items()
         }
         sample_rate = int(project.sample_rate)
         bpm = float(project.config.bpm)
         project_context = {
             "config": project.config.to_dict(),
-            "project_fingerprint": project_fingerprint(project),
             "algorithm_version": project.metadata.get("algorithm_version"),
             "renderer_version": project.metadata.get("renderer_version"),
             "motif_plan": project.metadata.get("motif_plan"),
@@ -2709,8 +2709,10 @@ class MainWindow(QMainWindow):
                 automation_registry=fx_automation_registry(stem_names),
             )
 
+        # The routing renderer snapshots each input internally; retaining the
+        # immutable project arrays here avoids a second full-project audio copy.
         dry_stems = {
-            name: np.asarray(audio, dtype=np.float32).copy()
+            name: np.asarray(audio, dtype=np.float32)
             for name, audio in self.project.stems.items()
         }
         routing = self.fx_routing_editor.routing()
