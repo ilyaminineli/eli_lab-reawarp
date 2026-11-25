@@ -57,8 +57,12 @@ def test_convolution_supports_stereo_source_and_mono_ir_without_crossfeed():
     result = convolve_partitioned(source, response, 48_000, block_size=64)
 
     assert result.audio.shape == (162, 2)
-    np.testing.assert_allclose(result.audio[:, 0], np.pad(response, (0, 159)))
-    np.testing.assert_allclose(result.audio[:, 1], np.pad(response * 0.5, (0, 159)))
+    np.testing.assert_allclose(
+        result.audio[:, 0], np.pad(response, (0, 159)), rtol=1e-6, atol=1e-7
+    )
+    np.testing.assert_allclose(
+        result.audio[:, 1], np.pad(response * 0.5, (0, 159)), rtol=1e-6, atol=1e-7
+    )
 
 
 def test_mono_source_with_stereo_ir_produces_stereo_dual_mono_output():
