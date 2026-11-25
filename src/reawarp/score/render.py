@@ -251,6 +251,27 @@ class ScoreRenderer:
             event = scheduled.event
             if event.kind in {"control", "marker"} or event.velocity <= 0.0:
                 continue
+            event_gain = float(event.velocity)
+            if "event.velocity_scale" in controls.target_ids:
+                event_gain *= controls.value_for_context(
+                    "event.velocity_scale", scheduled.start_frame,
+                    event_id=event.event_id, default_value=1.0,
+                )
+            if "role.activity" in controls.target_ids:
+                event_gain *= controls.value_for_context(
+                    "role.activity", scheduled.start_frame,
+                    event_id=event.event_id, default_value=1.0,
+                )
+            if "event.probability" in controls.target_ids:
+                probability = float(np.clip(controls.value_for_context(
+                    "event.probability", scheduled.start_frame,
+                    event_id=event.event_id, default_value=1.0,
+                ), 0.0, 1.0))
+                draw = _stable_event_seed(event) / float(2**64)
+                if draw >= probability:
+                    continue
+            if event_gain <= 0.0:
+                continue
             renderer = renderers.get(event.voice_id, renderers.get(event.kind))
             if renderer is None:
                 renderer = _default_voice_renderer
@@ -287,9 +308,7 @@ class ScoreRenderer:
                 event.voice_id, np.zeros((frame_count, 2), dtype=np.float32)
             )
             start = scheduled.start_frame
-            target[start:scheduled.end_frame] += (
-                rendered_stereo * float(event.velocity)
-            )
+            target[start:scheduled.end_frame] += rendered_stereo * event_gain
 
         return ScoreRenderResult(
             stems=stems,
