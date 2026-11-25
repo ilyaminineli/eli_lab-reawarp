@@ -96,6 +96,24 @@ def _control_curve(
     return values, active
 
 
+def _event_control_value(
+    controls: AutomationControlBus,
+    target_id: str,
+    scheduled: ScheduledScoreEvent,
+    default: float | None = None,
+) -> float | None:
+    """Resolve one event-scoped parameter, preserving profile defaults when inactive."""
+    if target_id not in controls.target_ids:
+        return default
+    value, active = controls.value_and_active_for_context(
+        target_id,
+        scheduled.start_frame,
+        event_id=scheduled.event.event_id,
+        default_value=default,
+    )
+    return float(value) if active else default
+
+
 def _apply_musical_controls(
     signal: np.ndarray,
     scheduled: ScheduledScoreEvent,
@@ -199,6 +217,23 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
             except (TypeError, ValueError, ZeroDivisionError):
                 gate_frames = scheduled.duration_frames
         gate_seconds = gate_frames / float(sample_rate)
+        attack_seconds = _event_control_value(
+            controls, "synth.attack", scheduled
+        )
+        decay_seconds = _event_control_value(
+            controls, "synth.decay", scheduled
+        )
+        release_seconds = _event_control_value(
+            controls, "synth.release", scheduled
+        )
+        vibrato_depth = _event_control_value(
+            controls, "synth.modulation.depth", scheduled, 0.0
+        ) or 0.0
+        vibrato_rate = _event_control_value(
+            controls, "synth.modulation.rate", scheduled, 5.0
+        ) or 0.0
+        vibrato_depth_semitones = float(np.clip(vibrato_depth, 0.0, 1.0)) * 0.5
+        vibrato_rate_hz = float(np.clip(vibrato_rate, 0.0, 40.0))
         rng = _event_rng(event, config.seed, 'melody')
         brightness = float(np.clip(parameters.get('brightness', config.tonal_brightness), 0.0, 1.0))
         instability = float(np.clip(parameters.get('instability', config.arrangement_instability), 0.0, 1.0))
@@ -207,18 +242,30 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
             audio = render_subtractive_note(
                 frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
                 profile=profile, brightness=brightness, instability=instability,
+                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                release_seconds=release_seconds,
+                vibrato_depth_semitones=vibrato_depth_semitones,
+                vibrato_rate_hz=vibrato_rate_hz,
             )
         elif config.synth_palette in {'hybrid', 'fm'}:
             profile = str(parameters.get('synthesis_profile') or selected_profile)
             audio = render_fm_note(
                 frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
                 profile=profile, brightness=brightness, instability=instability,
+                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                release_seconds=release_seconds,
+                vibrato_depth_semitones=vibrato_depth_semitones,
+                vibrato_rate_hz=vibrato_rate_hz,
             )
         else:
             audio = render_extended_note(
                 frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
                 palette=config.synth_palette, brightness=brightness,
                 instability=instability,
+                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                release_seconds=release_seconds,
+                vibrato_depth_semitones=vibrato_depth_semitones,
+                vibrato_rate_hz=vibrato_rate_hz,
             )
         audio = _fit_frames(audio, scheduled.duration_frames)
         return _apply_musical_controls(audio, scheduled, sample_rate, controls)

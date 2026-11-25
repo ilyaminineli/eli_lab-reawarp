@@ -132,6 +132,43 @@ def _spectral_lowpass(
     return np.fft.irfft(spectrum * response, n=len(signal))
 
 
+def _envelope_time(
+        override: float | None,
+        fallback: float,
+        minimum: float,
+        name: str,
+) -> float:
+    """Resolve a finite, positive envelope time while retaining profile defaults."""
+    value = float(fallback if override is None else override)
+    if not np.isfinite(value) or value < 0.0:
+        raise ValueError(f"{name} must be finite and non-negative")
+    return max(float(minimum), value)
+
+
+def _carrier_phase(
+        frequency: float,
+        time: np.ndarray,
+        sample_rate: int,
+        vibrato_depth_semitones: float = 0.0,
+        vibrato_rate_hz: float = 0.0,
+) -> np.ndarray:
+    """Integrate a bounded sinusoidal pitch trajectory into continuous oscillator phase."""
+    depth = float(vibrato_depth_semitones)
+    rate = float(vibrato_rate_hz)
+    if not np.isfinite(depth) or not 0.0 <= depth <= 2.0:
+        raise ValueError("vibrato_depth_semitones must be finite and between 0 and 2")
+    if not np.isfinite(rate) or not 0.0 <= rate <= 40.0:
+        raise ValueError("vibrato_rate_hz must be finite and between 0 and 40")
+    if depth <= 0.0 or rate <= 0.0 or len(time) < 2:
+        return 2.0 * np.pi * float(frequency) * time
+    bend = depth * np.sin(2.0 * np.pi * rate * time)
+    ratios = np.power(2.0, bend / 12.0)
+    cycles = np.empty(len(time), dtype=np.float64)
+    cycles[0] = 0.0
+    cycles[1:] = np.cumsum(0.5 * (ratios[:-1] + ratios[1:])) / float(sample_rate)
+    return 2.0 * np.pi * float(frequency) * cycles
+
+
 def render_fm_note(
         frequency: float,
         sample_rate: int,
@@ -143,6 +180,11 @@ def render_fm_note(
         profile: str = "soft_keys",
         brightness: float = 0.5,
         instability: float = 0.0,
+        attack_seconds: float | None = None,
+        decay_seconds: float | None = None,
+        release_seconds: float | None = None,
+        vibrato_depth_semitones: float = 0.0,
+        vibrato_rate_hz: float = 0.0,
 ) -> np.ndarray:
     """Render a softly evolving additive/FM note with a defined release tail.
 
@@ -161,14 +203,19 @@ def render_fm_note(
             f"unknown melody profile: {profile}; choose from {', '.join(MELODY_PROFILES)}"
         )
     shape = MELODY_PROFILES[profile]
-    release = max(0.02, float(shape.release))
+    attack = _envelope_time(attack_seconds, shape.attack, 0.001, "attack_seconds")
+    decay = _envelope_time(decay_seconds, shape.decay, 0.01, "decay_seconds")
+    release = _envelope_time(release_seconds, shape.release, 0.02, "release_seconds")
     length = max(48, int(round(sample_rate * (duration + release))))
     time = np.arange(length, dtype=np.float64) / float(sample_rate)
+    carrier_phase = _carrier_phase(
+        frequency, time, sample_rate, vibrato_depth_semitones, vibrato_rate_hz
+    )
 
     ratio = float(modulation_ratio if modulation_ratio is not None else shape.fm_ratio)
     index = float(modulation_index if modulation_index is not None else shape.fm_index)
     mod_phase = float(rng.uniform(0.0, 2.0 * np.pi))
-    modulator = np.sin(2.0 * np.pi * frequency * ratio * time + mod_phase)
+    modulator = np.sin(carrier_phase * ratio + mod_phase)
     bounded_drift = 1.0 + 0.16 * float(instability) * np.sin(
         2.0 * np.pi * 0.19 * time + mod_phase * 0.37
     )
@@ -182,7 +229,7 @@ def render_fm_note(
         phase_offset = float(rng.uniform(0.0, 2.0 * np.pi))
         partial_index = index_curve * min(1.0, float(partial_ratio) ** 0.25)
         phase = (
-                2.0 * np.pi * partial_frequency * time
+                carrier_phase * float(partial_ratio)
                 + partial_index * modulator
                 + phase_offset
         )
@@ -192,14 +239,12 @@ def render_fm_note(
     detune_cents = float(shape.detune_cents) + 8.0 * float(instability)
     detune_ratio = 2.0 ** (detune_cents / 1_200.0)
     signal += 0.14 * np.sin(
-        2.0 * np.pi * float(frequency) * detune_ratio * time
+        carrier_phase * detune_ratio
         + float(rng.uniform(0.0, 2.0 * np.pi))
     )
     transient = rng.standard_normal(length) * np.exp(-time / 0.006) * 0.012
     signal += transient
 
-    attack = max(0.001, float(shape.attack))
-    decay = max(0.01, float(shape.decay))
     sustain = float(np.clip(shape.sustain, 0.0, 1.0))
     attack_curve = 1.0 - np.exp(-time / attack)
     decay_curve = sustain + (1.0 - sustain) * np.exp(-time / decay)
@@ -252,6 +297,11 @@ def render_extended_note(
         palette: str = "hybrid",
         brightness: float = 0.5,
         instability: float = 0.0,
+        attack_seconds: float | None = None,
+        decay_seconds: float | None = None,
+        release_seconds: float | None = None,
+        vibrato_depth_semitones: float = 0.0,
+        vibrato_rate_hz: float = 0.0,
 ) -> np.ndarray:
     """Render extended tonal families with NumPy-only reference algorithms.
 
@@ -272,14 +322,28 @@ def render_extended_note(
         return render_fm_note(
             frequency, sample_rate, rng, duration, velocity,
             profile=profile, brightness=brightness, instability=instability,
+            attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+            release_seconds=release_seconds,
+            vibrato_depth_semitones=vibrato_depth_semitones,
+            vibrato_rate_hz=vibrato_rate_hz,
         )
 
-    length = max(64, int(round(sample_rate * (duration + 0.28))))
+    attack_time = _envelope_time(attack_seconds, 0.006, 0.001, "attack_seconds")
+    release_time = _envelope_time(release_seconds, 0.28, 0.02, "release_seconds")
+    length = max(64, int(round(sample_rate * (duration + release_time))))
     t = np.arange(length, dtype=np.float64) / float(sample_rate)
     note_end = float(duration)
-    release = np.exp(-np.maximum(0.0, t - note_end) / 0.28)
-    attack = 1.0 - np.exp(-t / 0.006)
+    release = np.exp(-np.maximum(0.0, t - note_end) / release_time)
+    attack = 1.0 - np.exp(-t / attack_time)
     body_env = np.where(t < note_end, attack, attack * release)
+    if decay_seconds is not None:
+        decay_time = _envelope_time(decay_seconds, 0.2, 0.01, "decay_seconds")
+        decay_curve = 0.72 + 0.28 * np.exp(-t / decay_time)
+        held_decay = 0.72 + 0.28 * np.exp(-note_end / decay_time)
+        body_env *= np.where(t < note_end, decay_curve, held_decay)
+    carrier_phase = _carrier_phase(
+        frequency, t, sample_rate, vibrato_depth_semitones, vibrato_rate_hz
+    )
     rng_phase = rng.uniform(0.0, 2.0 * np.pi, 12)
     signal = np.zeros(length, dtype=np.float64)
 
@@ -300,8 +364,9 @@ def render_extended_note(
             ratios = extended_profile.partials
         for index, (ratio, amp) in enumerate(ratios):
             detune = 1.0 + instability * (0.0007 * np.sin(2*np.pi*(.11+index*.017)*t))
-            partial = frequency * ratio * detune
-            signal += amp * np.sin(2*np.pi*partial*t + rng_phase[index])
+            signal += amp * np.sin(
+                carrier_phase * float(ratio) * detune + rng_phase[index]
+            )
     elif palette == "modal" or palette == "physical":
         # Modal bank: inharmonic frequencies with individual decay constants.
         mode_profile = EXTENDED_MELODY_PROFILES.get(
@@ -316,7 +381,7 @@ def render_extended_note(
         )
         excitation = np.exp(-t / (0.004 + (1.0-brightness)*0.012))
         for index, (ratio, amp, decay) in enumerate(modes):
-            mode = np.sin(2*np.pi*frequency*ratio*t + rng_phase[index])
+            mode = np.sin(carrier_phase * float(ratio) + rng_phase[index])
             signal += amp * mode * np.exp(-t / (decay * (0.35 + duration))) * excitation
     elif palette == "granular":
         # Micro-grain cloud around a tuned carrier; fixed windows avoid clicks.
@@ -331,18 +396,21 @@ def render_extended_note(
                 continue
             local_t = np.arange(end-start, dtype=np.float64) / sample_rate
             window = np.hanning(max(3, end-start))
-            grain = np.sin(2*np.pi*frequency*rate*local_t + rng_phase[index % len(rng_phase)])
+            local_phase = carrier_phase[start:end] - carrier_phase[start]
+            grain = np.sin(
+                local_phase * rate + rng_phase[index % len(rng_phase)]
+            )
             signal[start:end] += grain * window * (0.55 / max(1, grain_count)**0.35)
     else:
         # Wavetable/pulsar hybrid: smoothly scan harmonic tables by varying
         # partial amplitudes over a slow cycle; pulses expose microscopic slices.
-        phase = (frequency * t) % 1.0
+        phase = (carrier_phase / (2.0 * np.pi)) % 1.0
         pulse_width = 0.18 + 0.72 * brightness
         pulse = np.clip((pulse_width - phase) * 28.0, 0.0, 1.0)
         scan = 0.5 + 0.5 * np.sin(2*np.pi*(0.17 + instability*.31)*t)
         for index, ratio in enumerate((1.0, 2.0, 3.01, 4.2, 5.7, 7.4)):
             amp = (0.55 / (index + 1)) * (0.2 + 0.8 * scan ** (1 + index*.35))
-            signal += amp * np.sin(2*np.pi*frequency*ratio*t + rng_phase[index]) * pulse
+            signal += amp * np.sin(carrier_phase * ratio + rng_phase[index]) * pulse
 
     signal *= body_env
     # Gentle spectral darkening, implemented without an external DSP backend.
@@ -389,6 +457,11 @@ def render_subtractive_note(
         profile: str = "dry_pluck",
         brightness: float = 0.42,
         instability: float = 0.0,
+        attack_seconds: float | None = None,
+        decay_seconds: float | None = None,
+        release_seconds: float | None = None,
+        vibrato_depth_semitones: float = 0.0,
+        vibrato_rate_hz: float = 0.0,
 ) -> np.ndarray:
     """Render a genuinely subtractive voice: harmonic source, moving filter, ADSR.
 
@@ -402,22 +475,28 @@ def render_subtractive_note(
     if not 0.0 <= brightness <= 1.0 or not 0.0 <= instability <= 1.0:
         raise ValueError("brightness and instability must be between zero and one")
     shape = SUBTRACTIVE_VOICES[profile]
-    length = max(64, int(round(sample_rate * (duration + shape.release + 0.04))))
+    attack_time = _envelope_time(attack_seconds, shape.attack, 0.0001, "attack_seconds")
+    decay_time = _envelope_time(decay_seconds, shape.decay, 0.0001, "decay_seconds")
+    release_time = _envelope_time(release_seconds, shape.release, 0.0001, "release_seconds")
+    length = max(64, int(round(sample_rate * (duration + release_time + 0.04))))
     t = np.arange(length, dtype=np.float64) / float(sample_rate)
     phase_drift = np.sin(2*np.pi*0.13*t) * shape.drift_cents * instability
     source = np.zeros(length, dtype=np.float64)
-    phase = 2*np.pi*frequency*np.power(2.0, phase_drift/1200.0)*t
+    carrier_phase = _carrier_phase(
+        frequency, t, sample_rate, vibrato_depth_semitones, vibrato_rate_hz
+    )
+    phase = carrier_phase * np.power(2.0, phase_drift / 1200.0)
     for harmonic, amplitude in enumerate(shape.harmonics, start=1):
         source += amplitude * np.sin(harmonic * phase)
     if len(shape.harmonics) > 4:
         source += 0.12 * np.sign(np.sin(phase))
-    attack = np.clip(t / max(shape.attack, 1e-4), 0.0, 1.0)
+    attack = np.clip(t / max(attack_time, 1e-4), 0.0, 1.0)
     decay = shape.sustain + (1.0-shape.sustain)*np.exp(
-        -np.maximum(0.0, t-shape.attack)/max(shape.decay, 1e-4)
+        -np.maximum(0.0, t-attack_time)/max(decay_time, 1e-4)
     )
     envelope = attack * decay
     release_start = duration
-    release = np.exp(-np.maximum(0.0, t-release_start)/max(shape.release, 1e-4))
+    release = np.exp(-np.maximum(0.0, t-release_start)/max(release_time, 1e-4))
     envelope *= np.where(t >= release_start, release, 1.0)
     filter_env = np.exp(-t/max(shape.decay*1.8, 1e-3))
     cutoff = frequency * (

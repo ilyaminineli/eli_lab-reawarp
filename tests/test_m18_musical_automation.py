@@ -17,6 +17,8 @@ from reawarp import (
 )
 from reawarp.score.automation import AutomationControlBus
 from reawarp.score.timeline import RenderTimeline
+from reawarp.config import GenerationConfig
+from reawarp.synthesis.score_voices import build_production_voice_renderers
 
 
 def _timeline(sample_rate=48_000):
@@ -559,3 +561,64 @@ def test_scoped_modulation_base_value_does_not_leak_to_other_roles():
     )
     assert inactive.active is not None
     assert not bool(np.any(inactive.active))
+
+
+@pytest.mark.parametrize("palette", ["subtractive", "fm", "additive", "modal", "granular"])
+def test_melodic_envelope_and_vibrato_controls_reach_production_voices(palette):
+    event = MusicalEvent(
+        event_id=f"m18-expression-{palette}",
+        voice_id="melody",
+        onset_beats=Fraction(0),
+        duration_beats=Fraction(2),
+        kind="note",
+        frequency_hz=220.0,
+        velocity=1.0,
+        parameters={"gate_duration_beats": "1"},
+    )
+    base_score = Score(events=(event,))
+    expression = (
+        AutomationLane(
+            "synth.attack", (AutomationPoint(Fraction(0), 0.12),),
+            unit="seconds", scope="role", scope_id="melody",
+        ),
+        AutomationLane(
+            "synth.decay", (AutomationPoint(Fraction(0), 0.8),),
+            unit="seconds", scope="role", scope_id="melody",
+        ),
+        AutomationLane(
+            "synth.release", (AutomationPoint(Fraction(0), 0.5),),
+            unit="seconds", scope="role", scope_id="melody",
+        ),
+    )
+    vibrato = (
+        AutomationLane(
+            "synth.modulation.depth", (AutomationPoint(Fraction(0), 0.9),),
+            unit="normalized", scope="role", scope_id="melody",
+        ),
+        AutomationLane(
+            "synth.modulation.rate", (AutomationPoint(Fraction(0), 7.0),),
+            unit="Hz", scope="role", scope_id="melody",
+        ),
+    )
+    config = GenerationConfig(
+        seed=18018, synth_palette=palette,
+        include_texture=False, include_ambience=False,
+    )
+    voices = build_production_voice_renderers(config)
+    renderer = ScoreRenderer()
+    dry = renderer.render(base_score, 24_000, voice_renderers=voices).stems["melody"]
+    shaped = renderer.render(
+        Score(events=(event,), automation=expression),
+        24_000, voice_renderers=voices,
+    ).stems["melody"]
+    bent_score = Score(events=(event,), automation=vibrato)
+    bent = renderer.render(
+        bent_score, 24_000, voice_renderers=voices,
+    ).stems["melody"]
+    bent_again = renderer.render(
+        bent_score, 24_000, voice_renderers=voices,
+    ).stems["melody"]
+
+    assert not np.allclose(dry, shaped, atol=1e-7)
+    assert not np.allclose(dry, bent, atol=1e-7)
+    np.testing.assert_array_equal(bent, bent_again)

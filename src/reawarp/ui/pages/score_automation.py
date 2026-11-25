@@ -23,6 +23,11 @@ _TARGETS = (
     ("synth.resonance", "Filter resonance"),
     ("synth.gain", "Voice gain"),
     ("synth.pitch", "Pitch offset · semitones"),
+    ("synth.attack", "Attack · seconds"),
+    ("synth.decay", "Decay · seconds"),
+    ("synth.release", "Release · seconds"),
+    ("synth.modulation.depth", "Vibrato depth · normalized"),
+    ("synth.modulation.rate", "Vibrato rate · Hz"),
     ("event.velocity_scale", "Event velocity scale"),
     ("event.probability", "Event probability"),
     ("role.activity", "Role activity"),
@@ -36,6 +41,11 @@ _TARGET_AMOUNTS = {
     "synth.resonance": 0.2,
     "synth.gain": 0.2,
     "synth.pitch": 2.0,
+    "synth.attack": 0.03,
+    "synth.decay": 0.20,
+    "synth.release": 0.12,
+    "synth.modulation.depth": 0.25,
+    "synth.modulation.rate": 2.0,
     "event.velocity_scale": 0.25,
     "event.probability": 0.25,
     "role.activity": 0.25,
@@ -46,6 +56,11 @@ _TARGET_AMOUNTS = {
 
 _TARGET_BASE_VALUES = {
     "synth.cutoff": 2_400.0,
+    "synth.attack": 0.02,
+    "synth.decay": 0.24,
+    "synth.release": 0.18,
+    "synth.modulation.depth": 0.5,
+    "synth.modulation.rate": 6.0,
 }
 
 _TARGET_RANGES = {
@@ -53,6 +68,11 @@ _TARGET_RANGES = {
     "synth.resonance": (0.0, 1.0),
     "synth.gain": (0.0, 1.0),
     "synth.pitch": (-48.0, 48.0),
+    "synth.attack": (0.001, 2.0),
+    "synth.decay": (0.01, 4.0),
+    "synth.release": (0.02, 0.65),
+    "synth.modulation.depth": (0.0, 1.0),
+    "synth.modulation.rate": (0.0, 40.0),
     "event.velocity_scale": (0.0, 2.0),
     "event.probability": (0.0, 1.0),
     "role.activity": (0.0, 1.0),
