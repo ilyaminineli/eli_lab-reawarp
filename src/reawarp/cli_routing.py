@@ -16,6 +16,8 @@ from reawarp.fx_automation import (
 from reawarp.fx_routing import (
     build_role_audition_matrix,
     default_fx_routing,
+    role_aware_fx_routing,
+    match_audition_level,
     load_fx_routing,
     normalise_fx_routing,
     render_fx_routing,
@@ -63,6 +65,10 @@ def _write_render(
         processed, returns, master_wet=float(metadata["master_wet"])
     )
     write_wav(output / "master.wav", master, sample_rate, 24)
+    matched_master, matched_report = match_audition_level(
+        master, target_rms_dbfs=-18.0, peak_ceiling=0.95
+    )
+    write_wav(output / "master_matched.wav", matched_master, sample_rate, 24)
     save_fx_routing(output / "fx_routing.json", routing, tuple(stems), sample_rate)
     save_fx_automation(output / "fx_automation.json", automation, tuple(stems))
 
@@ -86,6 +92,11 @@ def _write_render(
         "return_names": list(returns),
     }
     metadata["mix_analysis"] = analysis
+    metadata["matched_audition"] = {
+        **matched_report,
+        "file": "master_matched.wav",
+        "production_master_modified": False,
+    }
     (output / "render.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -146,7 +157,7 @@ def main() -> None:
                 if args.validate:
                     raise SystemExit("--routing is required with --validate")
                 routing_path = args.output / "fx_routing.json"
-                save_fx_routing(routing_path, default_fx_routing(names), names, sample_rate)
+                save_fx_routing(routing_path, role_aware_fx_routing(names), names, sample_rate)
             routings = {"custom": load_fx_routing(routing_path, names, sample_rate)}
     except SystemExit:
         raise
