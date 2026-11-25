@@ -22,7 +22,7 @@ def clone_project(project: ReawarpProject, *, readonly: bool = False) -> Reawarp
     return ReawarpProject(
         config=project.config, sample_rate=project.sample_rate, stems=stems,
         events=copy.deepcopy(project.events), metadata=copy.deepcopy(project.metadata),
-        score=project.score,
+        score=copy.deepcopy(project.score),
     )
 
 def project_fingerprint(project: ReawarpProject) -> str:
@@ -289,7 +289,7 @@ class VariationBatchService:
             values["seed"] = request.config_overrides.get("seed", variation_seed)
             return self.engine.generate(GenerationConfig.from_dict(values))
         if request.mode == "automation":
-            score_data = base.to_score().to_dict()
+            score_data = copy.deepcopy(base.to_score().to_dict())
             if request.score_patch:
                 score_data.update(copy.deepcopy(request.score_patch))
             else:

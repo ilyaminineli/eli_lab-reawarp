@@ -3,6 +3,7 @@ from fractions import Fraction
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import numpy as np
 import pytest
 
 pytest.importorskip("PySide6")
