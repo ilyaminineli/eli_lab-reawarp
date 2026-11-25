@@ -436,6 +436,7 @@ class AutomationModulation:
     hysteresis: float = 0.0
     minimum: float | None = None
     maximum: float | None = None
+    base_value: float | None = None
     scope: str = "global"
     scope_id: str | None = None
 
@@ -458,6 +459,8 @@ class AutomationModulation:
             raise ValueError("modulation minimum must be finite")
         if self.maximum is not None and not math.isfinite(float(self.maximum)):
             raise ValueError("modulation maximum must be finite")
+        if self.base_value is not None and not math.isfinite(float(self.base_value)):
+            raise ValueError("modulation base_value must be finite")
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise ValueError("modulation minimum cannot exceed maximum")
         if self.scope not in {"global", "section", "role", "event"}:
@@ -479,6 +482,7 @@ class AutomationModulation:
             "hysteresis": self.hysteresis,
             "minimum": self.minimum,
             "maximum": self.maximum,
+            "base_value": self.base_value,
             "scope": self.scope,
             "scope_id": self.scope_id,
         }
@@ -496,6 +500,7 @@ class AutomationModulation:
             hysteresis=float(data.get("hysteresis", 0.0)),
             minimum=None if data.get("minimum") is None else float(data["minimum"]),
             maximum=None if data.get("maximum") is None else float(data["maximum"]),
+            base_value=None if data.get("base_value") is None else float(data["base_value"]),
             scope=str(data.get("scope", "global")),
             scope_id=None if data.get("scope_id") is None else str(data["scope_id"]),
         )
@@ -654,7 +659,18 @@ class AutomationControlBus:
         value = self._value_before_modulation(
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
-        for modulation in self._modulations.get(target_id, ()):
+        destination_modulations = self._modulations.get(target_id, ())
+        if not self._lanes.get(target_id):
+            explicit_base = next(
+                (
+                    item.base_value for item in destination_modulations
+                    if item.base_value is not None
+                ),
+                None,
+            )
+            if explicit_base is not None:
+                value = float(explicit_base)
+        for modulation in destination_modulations:
             scope_key = {
                 "global": None,
                 "section": "section_id",
