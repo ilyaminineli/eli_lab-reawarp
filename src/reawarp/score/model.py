@@ -45,7 +45,7 @@ class Score:
             raise ValueError("tuning reference pitch must be finite")
         if not math.isfinite(float(self.tuning_reference_frequency_hz)) or self.tuning_reference_frequency_hz <= 0:
             raise ValueError("tuning reference frequency must be positive")
-        if self.tuning_divisions_per_period < 1:
+        if isinstance(self.tuning_divisions_per_period, bool) or not isinstance(self.tuning_divisions_per_period, int) or self.tuning_divisions_per_period < 1:
             raise ValueError("tuning divisions per period must be positive")
         events = tuple(self.events)
         ids = [event.event_id for event in events]
