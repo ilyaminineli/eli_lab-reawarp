@@ -642,6 +642,8 @@ def prepare_score_sample_renderers(
         meter_map=score.meter_map,
         events=tuple((*prepared_events, *sample_triggers)),
         automation=score.automation,
+        automation_sources=score.automation_sources,
+        modulations=score.modulations,
         tuning_id=score.tuning_id,
         tuning_reference_pitch=score.tuning_reference_pitch,
         tuning_reference_frequency_hz=score.tuning_reference_frequency_hz,
