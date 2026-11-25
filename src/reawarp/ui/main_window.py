@@ -22,7 +22,7 @@ from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
-from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
+from reawarp.fx_routing import (\n    measure_signal, render_fx_routing, render_master_with_returns, save_fx_routing,\n)
 from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
 )
@@ -1402,6 +1402,7 @@ class MainWindow(QMainWindow):
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
         self._fx_audition_audio = {}
+        self.fx_routing_editor.set_meter_report({})
         self._rebuild_mixer()
         self.mixer_stack.setCurrentIndex(1)
         self._update_project_context()
@@ -1663,12 +1664,16 @@ class MainWindow(QMainWindow):
         return False
 
     def _fx_render_finished(self, result: object) -> None:
-        self._fx_worker = None
-        self._fx_pending_signature = None
         if not isinstance(result, dict):
-            self._fx_render_failed("", "FX worker returned an invalid result.")
+            self._fx_render_failed(
+                self._fx_pending_signature or "", "FX worker returned an invalid result."
+            )
             return
         signature = str(result.get("signature", ""))
+        if self._fx_pending_signature != signature:
+            return
+        self._fx_worker = None
+        self._fx_pending_signature = None
         if signature == self._routing_signature():
             metadata = dict(result["metadata"])
             self._fx_bus_returns = {
@@ -1693,6 +1698,8 @@ class MainWindow(QMainWindow):
         self._refresh_preview()
 
     def _fx_render_failed(self, signature: str, message: str) -> None:
+        if self._fx_pending_signature != signature:
+            return
         self._fx_worker = None
         self._fx_pending_signature = None
         cancelled = str(message).startswith("CANCELLED:")
@@ -1709,6 +1716,7 @@ class MainWindow(QMainWindow):
                 "error": str(message),
                 "fallback": "dry_source_stems",
             }
+            self.fx_routing_editor.set_meter_report({})
             self.statusBar().showMessage(
                 f"FX render failed; dry sources retained: {message}", 10000
             )
@@ -1794,12 +1802,18 @@ class MainWindow(QMainWindow):
             bus: audio for bus, audio in self._fx_bus_returns.items()
             if set(active_sends.get(bus, ())).intersection(audible)
         }
-        return render_master_with_returns(
+        master = render_master_with_returns(
             mixed, audible_returns, master_wet=float(routing["master_wet"]),
         )
+        meters = self._fx_routing_metadata.setdefault("meters", {})
+        meters["master"] = measure_signal(master, sample_rate=self.project.sample_rate)
+        self.fx_routing_editor.set_meter_report(meters)
+        return master
 
     def _current_preview_audio(self) -> np.ndarray | None:
         if self.project is None:
+            return None
+        if not self._ensure_routing_render():
             return None
         selection = self.preview_source.currentData()
         if selection == "master":
