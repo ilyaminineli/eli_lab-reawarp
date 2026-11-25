@@ -129,6 +129,7 @@ class AutomationCurvePreview(QWidget):
     """Compact curve editor with draggable normalized control points."""
 
     valuesChanged = Signal(object)
+    editStarted = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -209,6 +210,7 @@ class AutomationCurvePreview(QWidget):
         ]
         nearest = min(range(len(positions)), key=lambda index: abs(positions[index] - x))
         if abs(positions[nearest] - x) <= 14.0:
+            self.editStarted.emit()
             self._drag_index = nearest
             event.accept()
             return

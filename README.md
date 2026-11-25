@@ -50,11 +50,11 @@ M12 brings those chains into the generated-project Stem Mixer. Each stem can hav
 
 M13 adds deterministic beat-addressed automation for insert wet, stem sends, and bus return wet, along with tempo-synchronised delay divisions. Automation JSON is portable and independent from routing JSON. Pyo remains optional and is needed only when an active insert or send is rendered.
 
-### Score-level control performance (M18 · in progress)
+### Score-level control performance (M18 · implemented)
 
 The canonical Score now supports global, section, role and event automation scopes, with absolute/relative lane precedence and serialised smoothing/hysteresis. Reusable deterministic sources include LFO, envelope, stepped, bounded random-walk and phrase-curve generators; explicit modulation links define destination, amount, polarity, bounds, scope and retrigger phase. ScoreRenderer consumes the first synthesis, event, sample and spatial controls on the shared tempo-aware frame clock.
 
-The Stem Mixer adds a separate **SCORE CONTROL** editor with source preview and offline Apply & Re-render. Applying score controls preserves specialist texture and ambience field stems. This is an active implementation slice: planner density/syncopation authoring, expanded continuous synthesis/FX targets and critical listening remain open. See [M18 — Musical automation and control performance](docs/M18.md).
+The Stem Mixer adds a separate **SCORE CONTROL** editor with source preview, scope-aware deterministic sources/modulation and offline Apply & Re-render. Event/role density, syncopation, articulation, synthesis, spatial and stem-aware fixed-FX controls are integrated into the Score render pipeline. Hardware profiling and matched-level listening remain separate M14/M22 sign-offs. See [M18 — Musical automation and control performance](docs/M18.md).
 
 ### Integrated composition and source engine
 
@@ -339,13 +339,15 @@ See docs/M7.0.md, docs/M7.1.md, docs/M7.2.md, and docs/M7.3.md for implemented b
 - [IRO integration contract](docs/IRO_INTEGRATION.md) — shared sample identity, provenance and the phrase grammar bridge to the IRO project.
 ## Current roadmap
 
-The current implementation baseline is **M13 with M14 in progress**. M14 has added initial regression coverage, signal diagnostics, render-phase timings, a benchmark harness and a grouped project-centred workspace shell. Its target-machine profiling and expanded validation are still pending. The next milestones deepen composition direction, score-driven rendering, synthesis automation, mixer quality and selected advanced DSP modules.
+The current implementation baseline is **M18 complete; M19 in progress**. M18 closes the deterministic Score automation model, production consumers and authoring workflow. M14 target-machine profiling and M22 matched-level/Pyo listening remain experimentally unverified cross-cutting sign-offs. M19 begins optional harmonic context, tuning-aware pitch fields, sonorities and inspectable voice-leading without imposing functional tonality.
 
 - [Technical and Musical Assessment](docs/TECHNICAL_AND_MUSICAL_ASSESSMENT.md) — source-level review, strengths, weaknesses, optimisation priorities and listening protocol.
-- [Consolidated Roadmap](docs/ROADMAP.md) — post-M17.5 status and M18–M25 forward plan.
+- [Consolidated Roadmap](docs/ROADMAP.md) — post-M18 status and M19–M25 forward plan.
 - [Architecture and Musical Reassessment](docs/REASSESSMENT.md) — philosophy-to-architecture gaps and sequencing rationale.
 - [M14 Reliability and Performance Baseline](docs/M14.md) — current implementation, validation and remaining acceptance work.
 - [M16 Score-driven Render Core](docs/M16.md) — frame-accurate score scheduling, typed automation and migration status.
+- [M18 Close-out](docs/M18_CLOSEOUT.md) — accepted implementation scope and separate experimental sign-offs.
+- [M19 Harmonic Context and Voice-leading](docs/M19.md) — next milestone specification and active implementation sequence.
 - [Historical milestones](docs/) — M10–M13 and earlier specifications retained as the development record.
 
 
