@@ -465,6 +465,54 @@ def measure_signal(audio: np.ndarray, *, sample_rate: int) -> dict[str, Any]:
     }
 
 
+
+def match_audition_level(
+    audio: np.ndarray,
+    *,
+    target_rms_dbfs: float = -18.0,
+    peak_ceiling: float = 0.95,
+) -> tuple[np.ndarray, dict[str, float]]:
+    """Create a level-matched audition copy without changing production audio.
+
+    RMS is matched where headroom allows. Gain is capped so the resulting peak
+    never exceeds the explicit ceiling. Silence remains silence.
+    """
+    target = _finite(target_rms_dbfs, "target_rms_dbfs", -60.0, -3.0)
+    ceiling = _finite(peak_ceiling, "peak_ceiling", 0.1, 1.0)
+    value = np.asarray(audio, dtype=np.float32)
+    if value.ndim not in {1, 2} or (value.ndim == 2 and value.shape[1] not in {1, 2}):
+        raise ValueError("audition audio must be mono or stereo")
+    if not np.isfinite(value).all():
+        raise ValueError("audition audio must contain only finite samples")
+    source = value.copy()
+    rms = float(np.sqrt(np.mean(np.square(source, dtype=np.float64)))) if source.size else 0.0
+    peak = float(np.max(np.abs(source))) if source.size else 0.0
+    target_rms = 10.0 ** (target / 20.0)
+    if rms <= 1e-12 or peak <= 1e-12:
+        gain = 1.0
+    else:
+        requested = target_rms / rms
+        gain = min(requested, ceiling / peak)
+    matched = np.ascontiguousarray(source * gain, dtype=np.float32)
+    matched_rms = (
+        float(np.sqrt(np.mean(np.square(matched, dtype=np.float64))))
+        if matched.size else 0.0
+    )
+    matched_peak = float(np.max(np.abs(matched))) if matched.size else 0.0
+    return matched, {
+        "target_rms_dbfs": target,
+        "input_rms_dbfs": max(-240.0, 20.0 * math.log10(max(rms, 1e-12))),
+        "output_rms_dbfs": max(-240.0, 20.0 * math.log10(max(matched_rms, 1e-12))),
+        "input_peak": peak,
+        "output_peak": matched_peak,
+        "peak_ceiling": ceiling,
+        "linear_gain": gain,
+        "rms_target_reached": bool(
+            rms <= 1e-12 or abs(matched_rms - target_rms) <= max(1e-8, target_rms * 1e-4)
+        ),
+    }
+
+
 def render_fx_routing(
     dry_stems: Mapping[str, np.ndarray],
     sample_rate: int,
