@@ -86,6 +86,26 @@ class Score:
         if any(not isinstance(item, dict) for item in raw_sonorities):
             raise ValueError("each sonority must be an object")
         sonorities = tuple(json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False)) for item in raw_sonorities)
+        sonority_plan = self.sonority_plan
+        if sonority_plan is not None:
+            if not isinstance(sonority_plan, dict):
+                raise ValueError("sonority_plan must be an object or None")
+            sonority_plan = json.loads(json.dumps(
+                sonority_plan, ensure_ascii=False, allow_nan=False
+            ))
+            if sonority_plan.get("format") != "eli_lab_reawarp_sonority_sequence_plan":
+                raise ValueError("unsupported sonority_plan format")
+            if int(sonority_plan.get("schema_version", 1)) != 1:
+                raise ValueError("unsupported sonority_plan schema version")
+            planned_boundaries = sonority_plan.get("boundaries", [])
+            if not isinstance(planned_boundaries, list) or any(
+                not isinstance(item, dict) for item in planned_boundaries
+            ):
+                raise ValueError("sonority_plan boundaries must be a list of objects")
+            planned_ids = [str(item.get("sonority_id", "")) for item in planned_boundaries]
+            score_ids = [str(item.get("sonority_id", "")) for item in sonorities]
+            if planned_ids and planned_ids != score_ids:
+                raise ValueError("sonority_plan boundary IDs must match Score.sonorities order")
         sonority_ids = [str(item.get("sonority_id", "")) for item in sonorities]
         if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
             raise ValueError("sonorities require unique non-empty sonority_id values")
@@ -144,6 +164,7 @@ class Score:
         object.__setattr__(self, "modulations", modulations)
         object.__setattr__(self, "harmonic_context", harmonic_context)
         object.__setattr__(self, "sonorities", sonorities)
+        object.__setattr__(self, "sonority_plan", sonority_plan)
         object.__setattr__(self, "metadata", json.loads(json.dumps(
             self.metadata, ensure_ascii=False, allow_nan=False
         )))
@@ -196,6 +217,7 @@ class Score:
             "modulations": [item.to_dict() for item in self.modulations],
             "harmonic_context": self.harmonic_context,
             "sonorities": list(self.sonorities),
+            "sonority_plan": self.sonority_plan,
             "metadata": self.metadata,
         }
 
@@ -227,6 +249,7 @@ class Score:
             ),
             harmonic_context=data.get("harmonic_context"),
             sonorities=tuple(data.get("sonorities", ())),
+            sonority_plan=data.get("sonority_plan"),
             tuning_id=str(tuning.get("id", "12tet")),
             tuning_reference_pitch=float(tuning.get("reference_pitch", 69.0)),
             tuning_reference_frequency_hz=float(
