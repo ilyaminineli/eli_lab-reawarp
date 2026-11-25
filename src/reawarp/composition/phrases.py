@@ -6,14 +6,15 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, replace
 from fractions import Fraction
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import numpy as np
 
 from reawarp.core.random_streams import derive_seed
-from reawarp.score.events import MusicalEvent
-from reawarp.score.model import Score
-from reawarp.score.time import as_fraction
+
+if TYPE_CHECKING:
+    from reawarp.score.events import MusicalEvent
+    from reawarp.score.model import Score
 
 PHRASE_SCHEMA_VERSION = 1
 PHRASE_FORMAT = "eli_lab_reawarp_phrase_plan"
@@ -56,7 +57,9 @@ def _json_copy(value: Any, field: str) -> Any:
 
 def _fraction(value: Any, field: str, *, positive: bool = False) -> Fraction:
     try:
-        result = as_fraction(value)
+        if isinstance(value, bool):
+            raise TypeError("boolean is not a beat value")
+        result = value if isinstance(value, Fraction) else Fraction(str(value))
     except (TypeError, ValueError, ZeroDivisionError) as exc:
         raise ValueError(f"{field} must be a valid rational beat value") from exc
     if result < 0 or (positive and result <= 0):
@@ -528,8 +531,8 @@ class PhraseCandidate:
             raise ValueError("candidate operation and transformation provenance differ")
         if self.seed < 0 or not self.seed_name or not self.generator_version:
             raise ValueError("candidate seed lineage and generator version are required")
-        if not isinstance(self.candidate_score, Score):
-            raise ValueError("candidate_score must be a Score")
+        if not callable(getattr(self.candidate_score, "to_dict", None)):
+            raise ValueError("candidate_score must provide Score serialization")
         object.__setattr__(self, "config_delta", _json_copy(dict(self.config_delta), "config delta"))
         object.__setattr__(self, "context_event_ids", {
             key: tuple(value) for key, value in dict(self.context_event_ids).items()
@@ -963,6 +966,8 @@ def restore_phrase_base(
     record = freezes.get(phrase_id)
     if not isinstance(record, dict):
         raise ValueError(f"phrase {phrase_id!r} is not frozen")
+    from reawarp.score.events import MusicalEvent
+
     source_events = tuple(MusicalEvent.from_dict(x) for x in record.get("source_events", ()))
     frozen_ids = set(record.get("frozen_event_ids", ()))
     remaining = [item for item in current_score.events if item.event_id not in frozen_ids]
