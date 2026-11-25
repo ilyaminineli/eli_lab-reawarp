@@ -18,6 +18,7 @@ from reawarp.score.planner import (
 )
 from reawarp.score.pitch import (
     EqualTemperamentTuning, Pitch, PitchCandidate, PitchField, Sonority, TuningSystem,
+    pitch_field_from_score, tuning_from_score,
 )
 from reawarp.score.harmony import (
     VoiceLeadingResult, VoiceLeadingWeights, assign_voice_leading,
@@ -49,6 +50,8 @@ __all__ = [
     "Pitch",
     "PitchCandidate",
     "PitchField",
+    "pitch_field_from_score",
+    "tuning_from_score",
     "Sonority",
     "RenderTimeline",
     "ScheduledScoreEvent",
