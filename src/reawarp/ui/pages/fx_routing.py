@@ -7,10 +7,10 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QMessageBox, QPushButton, QSlider, QVBoxLayout, QWidget,
+    QLabel, QMessageBox, QPushButton, QSlider, QSpinBox, QVBoxLayout, QWidget,
 )
 
-from reawarp.fx import FX_PRESETS
+from reawarp.fx import FX_PRESETS, normalise_fx_stages
 from reawarp.fx_routing import (
     FX_BUSES, FX_DELAY_DIVISIONS, SEND_TAP_POINTS, default_fx_routing,
     role_aware_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing,
@@ -21,6 +21,9 @@ class FXRoutingEditor(QGroupBox):
     changed = Signal()
     auditionRequested = Signal(str, str)
     mixerStateRequested = Signal(dict)
+    preRenderRequested = Signal()
+    variationsRequested = Signal(int, int)
+    variationAuditionRequested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("AUTOMATIC ROLE FX · INSERTS + SHARED RETURNS", parent)
@@ -49,6 +52,7 @@ class FXRoutingEditor(QGroupBox):
         self.insert.addItem("BYPASS", "bypass")
         for key in FX_PRESETS:
             self.insert.addItem(key.replace("_", " ").upper(), key)
+        self.insert.addItem("CUSTOM FX LAB CHAIN", "__custom__")
         top.addWidget(QLabel("Insert"))
         top.addWidget(self.insert, 1)
         root.addLayout(top)
@@ -128,6 +132,50 @@ class FXRoutingEditor(QGroupBox):
         actions.addWidget(self.save_button)
         actions.addStretch(1)
         root.addLayout(actions)
+
+        prerender_row = QHBoxLayout()
+        self.prerender_button = QPushButton("PRE-RENDER CHANNEL FX")
+        self.prerender_button.setToolTip(
+            "Render the current insert/send/return snapshot for every channel in the background."
+        )
+        self.prerender_button.clicked.connect(self.preRenderRequested.emit)
+        prerender_row.addWidget(self.prerender_button)
+        self.variation_count = QSpinBox()
+        self.variation_count.setRange(2, 8)
+        self.variation_count.setValue(4)
+        self.variation_seed = QSpinBox()
+        self.variation_seed.setRange(0, 2_147_483_647)
+        self.variation_seed.setValue(211)
+        prerender_row.addWidget(QLabel("FX VARIANTS"))
+        prerender_row.addWidget(self.variation_count)
+        prerender_row.addWidget(QLabel("SEED"))
+        prerender_row.addWidget(self.variation_seed)
+        self.generate_variations_button = QPushButton("GENERATE + PRE-RENDER")
+        self.generate_variations_button.clicked.connect(
+            lambda: self.variationsRequested.emit(
+                self.variation_count.value(), self.variation_seed.value()
+            )
+        )
+        prerender_row.addWidget(self.generate_variations_button)
+        self.variation_choice = QComboBox()
+        self.variation_choice.setMinimumWidth(150)
+        self.variation_choice.addItem("NO VARIATIONS", None)
+        prerender_row.addWidget(self.variation_choice, 1)
+        self.play_variation_button = QPushButton("PLAY VARIANT")
+        self.play_variation_button.setEnabled(False)
+        self.play_variation_button.clicked.connect(
+            lambda: self.variationAuditionRequested.emit(
+                str(self.variation_choice.currentData())
+            ) if self.variation_choice.currentData() else None
+        )
+        self.variation_choice.currentIndexChanged.connect(
+            lambda: self.play_variation_button.setEnabled(
+                self.variation_choice.currentData() is not None
+            )
+        )
+        prerender_row.addWidget(self.play_variation_button)
+        root.addLayout(prerender_row)
+
         self.status = QLabel("No project loaded.")
         self.status.setObjectName("muted")
         self.status.setWordWrap(True)
@@ -188,9 +236,12 @@ class FXRoutingEditor(QGroupBox):
             return
         record = self._routing["stems"][name]
         insert = record["insert"]
-        preset = insert.get("preset") if insert["kind"] == "preset" else None
+        preset = (
+            insert.get("preset") if insert["kind"] == "preset"
+            else "__custom__" if insert["kind"] == "stages" else "bypass"
+        )
         self.insert.blockSignals(True)
-        self.insert.setCurrentIndex(max(0, self.insert.findData(preset or "bypass")))
+        self.insert.setCurrentIndex(max(0, self.insert.findData(preset)))
         self.insert.blockSignals(False)
         self.insert_wet.blockSignals(True)
         self.insert_wet.setValue(round(float(insert.get("wet", 0.0)) * 100))
@@ -211,9 +262,22 @@ class FXRoutingEditor(QGroupBox):
         if self._loading or name not in self._routing["stems"]:
             return
         choice = self.insert.currentData()
-        insert = ({"kind": "bypass"} if choice == "bypass" else
-                  {"kind": "preset", "preset": choice, "wet": self.insert_wet.value() / 100, "tail_seconds": 1.5})
         prior = self._routing["stems"][name]
+        if choice == "bypass":
+            insert = {"kind": "bypass"}
+        elif choice == "__custom__":
+            if prior["insert"].get("kind") != "stages":
+                return
+            insert = {
+                **prior["insert"],
+                "stages": [dict(stage) for stage in prior["insert"]["stages"]],
+                "wet": self.insert_wet.value() / 100,
+            }
+        else:
+            insert = {
+                "kind": "preset", "preset": choice,
+                "wet": self.insert_wet.value() / 100, "tail_seconds": 1.5,
+            }
         self._routing["stems"][name] = {
             **prior,
             "insert": insert,
@@ -379,6 +443,47 @@ class FXRoutingEditor(QGroupBox):
         if master:
             rows.append(f"MASTER · {summarize(master)}")
         self.meter_report.setText("\n".join(rows) if rows else "ROUTING METERS · silence")
+
+    def set_custom_insert(
+        self,
+        stem_name: str,
+        stages: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+        *,
+        wet: float = 0.75,
+        tail_seconds: float = 1.5,
+    ) -> None:
+        """Install the current FX Lab chain as a portable custom stem insert."""
+        if stem_name not in self._routing.get("stems", {}):
+            raise ValueError(f"unknown project stem: {stem_name}")
+        chain = normalise_fx_stages(stages, sample_rate=self._sample_rate)
+        if not 0.0 <= float(wet) <= 1.0:
+            raise ValueError("custom insert wet must be between 0 and 1")
+        if not 0.0 <= float(tail_seconds) <= 12.0:
+            raise ValueError("custom insert tail must be between 0 and 12 seconds")
+        self._routing["stems"][stem_name]["insert"] = {
+            "kind": "stages",
+            "stages": [dict(stage) for stage in chain],
+            "wet": float(wet),
+            "tail_seconds": float(tail_seconds),
+        }
+        self._routing["routing_mode"] = "manual"
+        self._loading = True
+        self.stem.setCurrentIndex(max(0, self.stem.findData(stem_name)))
+        self._load_selected()
+        self._loading = False
+        self.changed.emit()
+
+    def set_variation_choices(
+        self, choices: list[tuple[str, str]] | tuple[tuple[str, str], ...]
+    ) -> None:
+        self.variation_choice.blockSignals(True)
+        self.variation_choice.clear()
+        self.variation_choice.addItem("NO VARIATIONS", None)
+        for candidate_id, label in choices:
+            self.variation_choice.addItem(str(label), str(candidate_id))
+        self.variation_choice.blockSignals(False)
+        self.play_variation_button.setEnabled(False)
+
 
     def routing(self) -> dict[str, Any]:
         return normalise_fx_routing(self._routing, self._stem_names, self._sample_rate) if self._stem_names else default_fx_routing()
