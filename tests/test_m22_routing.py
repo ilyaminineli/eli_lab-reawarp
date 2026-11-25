@@ -119,8 +119,8 @@ def test_auxiliary_returns_are_wet_only_metered_and_extend_the_master(monkeypatc
     def fx_render(audio, sample_rate, *, preset=None, stages=None, wet=1.0, tail_seconds=0.0):
         seen_stages.append(tuple(dict(stage) for stage in (stages or ())))
         input_audio = np.asarray(audio, dtype=np.float32)
-        tail = np.full((16, input_audio.shape[1]), 0.025, dtype=np.float32)
-        return np.concatenate((input_audio * 0.2, tail))
+        tail = np.full((16, input_audio.shape[1]), 0.005, dtype=np.float32)
+        return np.concatenate((input_audio * 0.4, tail))
 
     monkeypatch.setattr(fx, "render_pyo_fx", fx_render)
     route = default_fx_routing(("snare",))
