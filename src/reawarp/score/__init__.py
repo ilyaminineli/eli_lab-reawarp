@@ -19,6 +19,9 @@ from reawarp.score.planner import (
 from reawarp.score.pitch import (
     EqualTemperamentTuning, Pitch, PitchCandidate, PitchField, Sonority, TuningSystem,
 )
+from reawarp.score.harmony import (
+    VoiceLeadingResult, VoiceLeadingWeights, assign_voice_leading,
+)
 from reawarp.score.time import (
     Beat,
     MeterMap,
@@ -56,6 +59,9 @@ __all__ = [
     "TempoMap",
     "TempoPoint",
     "TuningSystem",
+    "VoiceLeadingResult",
+    "VoiceLeadingWeights",
+    "assign_voice_leading",
     "as_fraction",
     "melody_to_score_events",
     "percussion_to_score_events",
