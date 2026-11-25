@@ -249,3 +249,71 @@ def test_m18_score_control_templates_populate_reviewable_source_drafts():
     assert editor.period.value() == pytest.approx(16.0)
     assert editor.end_beat.value() == pytest.approx(64.0)
     editor.close()
+
+
+
+def test_m22_fx_editor_starts_with_role_auto_routing_and_exposes_send_taps():
+    _application()
+    from reawarp.ui.pages.fx_routing import FXRoutingEditor
+
+    editor = FXRoutingEditor()
+    editor.set_stems(
+        ("kick", "snare", "hats", "synthetic_break", "melody", "noise_texture", "ambience"),
+        48_000,
+    )
+    route = editor.routing()
+    assert route["schema_version"] == 2
+    assert route["routing_mode"] == "role_auto"
+    assert route["stems"]["kick"]["insert"]["kind"] == "bypass"
+    assert route["stems"]["kick"]["sends"] == {"space": 0.0, "echo": 0.0}
+    assert route["stems"]["melody"]["sends"]["space"] > 0.0
+
+    taps = []
+    editor.auditionRequested.connect(lambda stage, stem: taps.append((stage, stem)))
+    editor.send_taps["space"].setCurrentIndex(
+        editor.send_taps["space"].findData("pre_insert_pre_fader")
+    )
+    assert editor.routing()["stems"]["kick"]["send_taps"]["space"] == "pre_insert_pre_fader"
+    assert editor.routing()["routing_mode"] == "manual"
+
+    editor._apply_dry_routing()
+    assert editor.routing()["routing_mode"] == "manual"
+    assert all(
+        value == 0.0
+        for route in editor.routing()["stems"].values()
+        for value in route["sends"].values()
+    )
+    editor._apply_auto_routing()
+    assert editor.routing()["routing_mode"] == "role_auto"
+
+    editor.audition_stage.setCurrentIndex(editor.audition_stage.findData("master"))
+    editor._request_audition()
+    assert taps == [("master", "master")]
+    editor.set_meter_report({
+        "direct": {"kick": {"peak_dbfs": -20.0, "rms_dbfs": -30.0,
+                            "crest_factor_db": 10.0, "headroom_db": 20.0}},
+        "master": {"peak_dbfs": -8.0, "rms_dbfs": -18.0,
+                   "crest_factor_db": 10.0, "headroom_db": 8.0},
+    })
+    assert "MASTER" in editor.meter_report.text()
+    editor.close()
+
+
+def test_m22_cancellable_worker_emits_result_and_honours_cancel():
+    _application()
+    from reawarp.ui.workers import CancellableRenderWorker
+
+    completed = []
+    failed = []
+    worker = CancellableRenderWorker(lambda cancel: {"cancelled": cancel.is_set()})
+    worker.signals.finished.connect(completed.append)
+    worker.signals.error.connect(failed.append)
+    worker.run()
+    assert completed == [{"cancelled": False}]
+    assert failed == []
+
+    cancelled = CancellableRenderWorker(lambda cancel: "work")
+    cancelled.signals.error.connect(failed.append)
+    cancelled.cancel()
+    cancelled.run()
+    assert failed and failed[-1].startswith("CANCELLED:")
