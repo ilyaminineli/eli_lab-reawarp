@@ -8,8 +8,10 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
+from reawarp.score.model import Score
 from reawarp.ui.main_window import MainWindow
 from reawarp.ui.navigation import WorkspaceNavigator
+from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 
 
 _APP = None
@@ -77,3 +79,42 @@ def test_main_window_navigation_keeps_workspace_stack_and_transport_in_sync():
     assert window.workspace_stack.currentIndex() == 4
     window.close()
     app.processEvents()
+
+
+
+def test_m18_score_automation_editor_builds_scoped_source_connections():
+    _application()
+    editor = ScoreAutomationEditor()
+    score = Score(title="UI automation fixture")
+    editor.set_score(score)
+    editor.target.setCurrentIndex(editor.target.findData("synth.pitch"))
+    editor.source_kind.setCurrentIndex(editor.source_kind.findData("lfo"))
+    editor.scope.setCurrentIndex(editor.scope.findData("role"))
+    editor.scope_id.setText("melody")
+    editor.retrigger.setCurrentIndex(editor.retrigger.findData("event"))
+    editor.amount.setValue(3.0)
+
+    editor._add_control()
+    updated = editor.updated_score(score)
+
+    assert len(updated.automation_sources) == 1
+    assert len(updated.modulations) == 1
+    assert updated.modulations[0].destination_target_id == "synth.pitch"
+    assert updated.modulations[0].scope == "role"
+    assert updated.modulations[0].scope_id == "melody"
+    assert updated.modulations[0].retrigger == "event"
+    assert editor.apply_button.isEnabled()
+    assert len(editor.preview._values) > 2
+
+    editor._remove_control()
+    assert editor.updated_score(score).automation_sources == ()
+    assert editor.updated_score(score).modulations == ()
+
+
+def test_mixer_includes_separate_fx_and_score_control_editors():
+    _application()
+    window = MainWindow()
+    assert window.fx_workspace_tabs.count() == 3
+    assert window.fx_workspace_tabs.tabText(1) == "FX AUTOMATION"
+    assert window.fx_workspace_tabs.tabText(2) == "SCORE CONTROL"
+    window.close()
