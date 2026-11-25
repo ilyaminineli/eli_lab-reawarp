@@ -724,7 +724,7 @@ def test_role_articulation_control_changes_note_gate_without_changing_symbolic_s
 
     assert scheduled.event.articulation == "staccato"
     assert scheduled.event.parameters["gate_duration_beats"] == "11/20"
-    assert "gate_duration_beats" not in event.parameters
+    assert event.parameters["gate_duration_beats"] == "1"
 
 
 @pytest.mark.parametrize(
@@ -807,3 +807,41 @@ def test_extended_synth_destinations_change_their_matching_voice(
     np.testing.assert_array_equal(
         controlled.stems["melody"], repeated.stems["melody"]
     )
+
+
+def test_shared_score_control_bus_preserves_context_for_downstream_fx_consumers():
+    from reawarp.score import build_score_control_bus
+    from reawarp.fx_automation import fx_automation_registry
+
+    events = (
+        MusicalEvent(
+            "lead-a", "lead", Fraction(0), Fraction(1), frequency_hz=440.0,
+            parameters={"section_id": "A"},
+        ),
+        MusicalEvent(
+            "bass-a", "bass", Fraction(2), Fraction(1), frequency_hz=110.0,
+            parameters={"section_id": "B"},
+        ),
+    )
+    source = AutomationSource(
+        "shared-lfo", "lfo", Fraction(0), Fraction(4),
+        parameters={
+            "period_beats": 4, "phase_cycles": 0.25,
+            "center": 0.5, "depth": 0.5, "sample_count": 9,
+        },
+    )
+    modulation = AutomationModulation(
+        "shared-lfo", "stem.kick.insert_wet", amount=0.5,
+        polarity="unipolar", mode="add", base_value=0.0,
+    )
+    score = Score(events=events, automation_sources=(source,), modulations=(modulation,))
+    bus = build_score_control_bus(
+        score, 48_000,
+        automation_registry=fx_automation_registry(["kick"]),
+    )
+
+    assert bus.timeline.sample_rate == 48_000
+    assert bus.value_at_frame(
+        "stem.kick.insert_wet", bus.timeline.beat_to_frame(Fraction(0)),
+        default_value=0.0,
+    ) == pytest.approx(0.5)

@@ -5,7 +5,9 @@ from reawarp.score.automation import (
     AutomationControlBus, AutomationModulation, AutomationSamples, AutomationSource,
     AutomationTarget, AutomationTargetRegistry, DEFAULT_AUTOMATION_TARGETS,
 )
-from reawarp.score.render import ScheduledScoreEvent, ScoreRenderResult, ScoreRenderer
+from reawarp.score.render import (
+    ScheduledScoreEvent, ScoreRenderResult, ScoreRenderer, build_score_control_bus,
+)
 from reawarp.score.timeline import RenderTimeline
 from reawarp.score.model import Score
 from reawarp.score.planner import (
@@ -45,6 +47,7 @@ __all__ = [
     "Score",
     "ScoreRenderResult",
     "ScoreRenderer",
+    "build_score_control_bus",
     "TempoMap",
     "TempoPoint",
     "TuningSystem",

@@ -23,7 +23,10 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import render_fx_routing, render_master_with_returns, save_fx_routing
-from reawarp.fx_automation import save_fx_automation
+from reawarp.fx_automation import (
+    attach_fx_automation_to_score, fx_automation_registry, save_fx_automation,
+)
+from reawarp.score.render import build_score_control_bus
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
     classify_sample_role, default_sample_for_role, discover_bundled_samples,
@@ -1542,9 +1545,18 @@ class MainWindow(QMainWindow):
 
     def _routing_signature(self) -> str:
         import hashlib
+        score = self.project.to_score() if self.project is not None else None
         payload = {
             "routing": self.fx_routing_editor.routing(),
             "automation": self.fx_automation_editor.automation(),
+            "score_automation": (
+                {
+                    "lanes": [lane.to_dict() for lane in score.automation],
+                    "sources": [source.to_dict() for source in score.automation_sources],
+                    "modulations": [item.to_dict() for item in score.modulations],
+                }
+                if score is not None else None
+            ),
             "bpm": float(self.project.config.bpm) if self.project is not None else 120.0,
         }
         encoded = json.dumps(payload, sort_keys=True, default=str)
@@ -1557,13 +1569,34 @@ class MainWindow(QMainWindow):
         if self._fx_routing_metadata.get("_routing_signature") == signature:
             return
         try:
-            processed, metadata = render_fx_routing(
-                self.project.stems,
-                self.project.sample_rate,
-                self.fx_routing_editor.routing(),
-                bpm=float(self.project.config.bpm),
-                automation=self.fx_automation_editor.automation(),
-            )
+            score = self.project.to_score()
+            legacy_automation = self.fx_automation_editor.automation()
+            if score.automation or score.automation_sources or score.modulations:
+                stem_names = tuple(self.project.stems)
+                if legacy_automation:
+                    score = attach_fx_automation_to_score(
+                        score, legacy_automation, stem_names
+                    )
+                controls = build_score_control_bus(
+                    score,
+                    self.project.sample_rate,
+                    automation_registry=fx_automation_registry(stem_names),
+                )
+                processed, metadata = render_fx_routing(
+                    self.project.stems,
+                    self.project.sample_rate,
+                    self.fx_routing_editor.routing(),
+                    bpm=float(self.project.config.bpm),
+                    controls=controls,
+                )
+            else:
+                processed, metadata = render_fx_routing(
+                    self.project.stems,
+                    self.project.sample_rate,
+                    self.fx_routing_editor.routing(),
+                    bpm=float(self.project.config.bpm),
+                    automation=legacy_automation,
+                )
         except Exception as exc:
             self._fx_processed_stems = {
                 name: audio.copy() for name, audio in self.project.stems.items()

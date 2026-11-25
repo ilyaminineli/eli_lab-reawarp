@@ -259,3 +259,66 @@ def test_fx_target_registry_is_typed_and_rejects_out_of_range_values():
     )
     with pytest.raises(ValueError, match="exceeds target maximum"):
         registry.validate_lane(lane)
+
+
+def test_score_control_bus_from_m18_sources_drives_insert_send_and_return_wet(monkeypatch):
+    from reawarp import AutomationModulation, AutomationSource, ScoreRenderer
+
+    source = AutomationSource(
+        "route-open", "phrase_curve", Fraction(0), Fraction(4),
+        parameters={"values": [1.0, 1.0]},
+    )
+    score = Score(
+        events=(
+            MusicalEvent(
+                "kick-hit", "kick", Fraction(0), Fraction(1, 4),
+                kind="hit", parameters={"source_kind": "kick"},
+            ),
+        ),
+        automation_sources=(source,),
+        modulations=(
+            AutomationModulation(
+                "route-open", "stem.kick.insert_wet", amount=1.0,
+                polarity="unipolar", mode="add", minimum=0.0, maximum=1.0,
+                base_value=0.0,
+            ),
+            AutomationModulation(
+                "route-open", "stem.kick.send.space", amount=0.7,
+                polarity="unipolar", mode="add", minimum=0.0, maximum=1.0,
+                base_value=0.0,
+            ),
+            AutomationModulation(
+                "route-open", "bus.space.wet", amount=0.6,
+                polarity="unipolar", mode="add", minimum=0.0, maximum=1.0,
+                base_value=0.0,
+            ),
+        ),
+    )
+    registry = fx_automation_registry(["kick"])
+    controls = ScoreRenderer().render(
+        score, 1_000, automation_registry=registry
+    ).controls
+    audio = np.full((1000, 2), 0.2, dtype=np.float32)
+    routing = default_fx_routing(["kick"])
+    routing["stems"]["kick"]["insert"] = {
+        "kind": "preset", "preset": "restrained_space",
+        "wet": 0.0, "tail_seconds": 0.0,
+    }
+    routing["stems"]["kick"]["sends"]["space"] = 0.0
+    routing["buses"]["space"]["wet"] = 0.0
+    calls = []
+
+    def pass_through(signal, sample_rate, **kwargs):
+        calls.append(np.asarray(signal).copy())
+        return np.asarray(signal, dtype=np.float32).copy()
+
+    monkeypatch.setattr(fx_routing, "render_pyo_fx", pass_through)
+    processed, metadata = render_fx_routing(
+        {"kick": audio}, 1_000, routing, controls=controls,
+    )
+
+    assert metadata["automation_source"] == "score-control-bus"
+    assert "space" in metadata["bus_returns_audio"]
+    assert metadata["active_send_stems_by_bus"]["space"] == ["kick"]
+    assert processed["kick"].shape == audio.shape
+    assert len(calls) >= 2

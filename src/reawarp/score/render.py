@@ -22,6 +22,65 @@ from reawarp.score.timeline import RenderTimeline
 SCORE_RENDERER_VERSION = "1.0.0"
 
 
+def build_score_control_bus(
+    score: Score,
+    sample_rate: int,
+    *,
+    automation_registry: AutomationTargetRegistry | None = None,
+    allow_custom_automation_targets: bool = True,
+) -> AutomationControlBus:
+    """Build the canonical Score control bus for render voices or downstream FX routing."""
+    if not isinstance(score, Score):
+        raise TypeError("score must be a reawarp Score")
+    if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
+        raise ValueError("sample_rate must be a positive integer")
+    rate = int(sample_rate)
+    timeline = RenderTimeline(rate, score.tempo_map, score.meter_map)
+    source_sample_rate = int(score.metadata.get("sample_rate", rate) or rate)
+    if source_sample_rate <= 0:
+        raise ValueError("score metadata sample_rate must be positive")
+
+    role_origins: dict[str, int] = {}
+    section_origins: dict[str, int] = {}
+    event_rows: list[tuple[MusicalEvent, int, str | None]] = []
+    for event in score.events:
+        onset_frame = timeline.beat_to_frame(event.onset_beats)
+        section_value = event.parameters.get(
+            "section_id", event.parameters.get("section_name")
+        )
+        section_id = None if section_value is None else str(section_value)
+        role_origins[event.voice_id] = min(
+            onset_frame, role_origins.get(event.voice_id, onset_frame)
+        )
+        if section_id is not None:
+            section_origins[section_id] = min(
+                onset_frame, section_origins.get(section_id, onset_frame)
+            )
+        event_rows.append((event, onset_frame, section_id))
+    event_contexts = {
+        event.event_id: {
+            "role_id": event.voice_id,
+            "section_id": section_id,
+            "event_onset_frame": onset_frame,
+            "role_onset_frame": role_origins[event.voice_id],
+            "section_onset_frame": (
+                section_origins[section_id] if section_id is not None else onset_frame
+            ),
+        }
+        for event, onset_frame, section_id in event_rows
+    }
+    return AutomationControlBus(
+        score.automation,
+        timeline,
+        source_sample_rate=source_sample_rate,
+        registry=automation_registry or DEFAULT_AUTOMATION_TARGETS,
+        allow_custom_targets=allow_custom_automation_targets,
+        sources=score.automation_sources,
+        modulations=score.modulations,
+        event_contexts=event_contexts,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ScheduledScoreEvent:
     """A score event resolved onto the renderer's absolute frame clock."""
@@ -271,49 +330,14 @@ class ScoreRenderer:
         if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
             raise ValueError("sample_rate must be a positive integer")
         sample_rate = int(sample_rate)
-        timeline = RenderTimeline(sample_rate, score.tempo_map, score.meter_map)
-        source_sample_rate = int(score.metadata.get("sample_rate", sample_rate) or sample_rate)
-        if source_sample_rate <= 0:
-            raise ValueError("score metadata sample_rate must be positive")
-        role_origins: dict[str, int] = {}
-        section_origins: dict[str, int] = {}
-        event_rows: list[tuple[MusicalEvent, int, str | None]] = []
-        for event in score.events:
-            onset_frame = timeline.beat_to_frame(event.onset_beats)
-            section_value = event.parameters.get(
-                "section_id", event.parameters.get("section_name")
-            )
-            section_id = None if section_value is None else str(section_value)
-            role_origins[event.voice_id] = min(
-                onset_frame, role_origins.get(event.voice_id, onset_frame)
-            )
-            if section_id is not None:
-                section_origins[section_id] = min(
-                    onset_frame, section_origins.get(section_id, onset_frame)
-                )
-            event_rows.append((event, onset_frame, section_id))
-        event_contexts = {
-            event.event_id: {
-                "role_id": event.voice_id,
-                "section_id": section_id,
-                "event_onset_frame": onset_frame,
-                "role_onset_frame": role_origins[event.voice_id],
-                "section_onset_frame": (
-                    section_origins[section_id] if section_id is not None else onset_frame
-                ),
-            }
-            for event, onset_frame, section_id in event_rows
-        }
-        controls = AutomationControlBus(
-            score.automation,
-            timeline,
-            source_sample_rate=source_sample_rate,
-            registry=automation_registry or DEFAULT_AUTOMATION_TARGETS,
-            allow_custom_targets=allow_custom_automation_targets,
-            sources=score.automation_sources,
-            modulations=score.modulations,
-            event_contexts=event_contexts,
+        controls = build_score_control_bus(
+            score,
+            sample_rate,
+            automation_registry=automation_registry,
+            allow_custom_automation_targets=allow_custom_automation_targets,
         )
+        timeline = controls.timeline
+        source_sample_rate = int(score.metadata.get("sample_rate", sample_rate) or sample_rate)
 
         if frame_count is None:
             inferred = 0
