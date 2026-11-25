@@ -508,10 +508,11 @@ class AutomationModulation:
 
 @dataclass(frozen=True, slots=True)
 class AutomationSamples:
-    """Control-rate samples whose positions are absolute frames on the render clock."""
+    """Control-rate samples and active-state mask on the absolute frame clock."""
 
     frames: np.ndarray
     values: np.ndarray
+    active: np.ndarray | None = None
 
 
 class AutomationControlBus:
@@ -630,8 +631,9 @@ class AutomationControlBus:
         *,
         default_value: float | None,
         context: Mapping[str, Any],
-    ) -> float | None:
+    ) -> tuple[float | None, bool]:
         value = None if default_value is None else float(default_value)
+        active = False
         role_id = context.get("role_id")
         section_id = context.get("section_id")
         event_id = context.get("event_id")
@@ -646,17 +648,20 @@ class AutomationControlBus:
                 matches = event_id is not None and str(event_id) == lane.scope_id
             if not matches:
                 continue
-            lane_value = lane.evaluate(
-                self._lane_position(lane, frame),
-                before_first=value,
-            )
+            position = self._lane_position(lane, frame)
+            if lane.loop_length is not None:
+                position %= lane.loop_length
+            if position < lane.points[0].at:
+                continue
+            active = True
+            lane_value = lane.evaluate(position, before_first=value)
             if lane.value_mode == "relative":
                 value = (0.0 if value is None else value) + lane_value
             else:
                 value = lane_value
-        return value
+        return value, active
 
-    def value_for_context(
+    def value_and_active_for_context(
         self,
         target_id: str,
         frame: int,
@@ -664,15 +669,15 @@ class AutomationControlBus:
         event_id: str | None = None,
         default_value: float | None = None,
         context: Mapping[str, Any] | None = None,
-    ) -> float:
-        """Resolve global/section/role/event precedence and then apply modulations."""
+    ) -> tuple[float, bool]:
+        """Return the resolved value and whether a matching control is active now."""
         if isinstance(frame, bool) or int(frame) != frame or int(frame) < 0:
             raise ValueError("frame must be a non-negative integer")
         if target_id not in self._lanes and target_id not in self._modulations:
             raise KeyError(f"automation lane not found: {target_id}")
         resolved_context = self._context(event_id, context)
         resolved_context["event_id"] = event_id or resolved_context.get("event_id")
-        value = self._value_before_modulation(
+        value, active = self._value_before_modulation(
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
         destination_modulations = tuple(
@@ -689,6 +694,7 @@ class AutomationControlBus:
             )
             if explicit_base is not None:
                 value = float(explicit_base)
+                active = True
         for modulation in destination_modulations:
             source_lane = self._source_lanes[modulation.source_id]
             origin_key = {
@@ -705,6 +711,7 @@ class AutomationControlBus:
             source_definition = self._sources[modulation.source_id]
             if not source_definition.start <= source_position <= source_definition.end:
                 continue
+            active = True
             source_value = source_lane.evaluate(source_position)
             signal = (
                 2.0 * source_value - 1.0
@@ -723,12 +730,29 @@ class AutomationControlBus:
         if value is None:
             value = 0.0
         target = self._targets.get(target_id)
-        if target is not None:
+        if active and target is not None:
             if target.minimum is not None:
                 value = max(target.minimum, value)
             if target.maximum is not None:
                 value = min(target.maximum, value)
-        return float(value)
+        return float(value), active
+
+    def value_for_context(
+        self,
+        target_id: str,
+        frame: int,
+        *,
+        event_id: str | None = None,
+        default_value: float | None = None,
+        context: Mapping[str, Any] | None = None,
+    ) -> float:
+        return self.value_and_active_for_context(
+            target_id,
+            frame,
+            event_id=event_id,
+            default_value=default_value,
+            context=context,
+        )[0]
 
     def value_at_frame(
         self,
@@ -793,29 +817,30 @@ class AutomationControlBus:
             if start_frame == end_frame
             else np.arange(start_frame, end_frame, step_frames, dtype=np.int64)
         )
-        values = np.fromiter(
-            (
-                self.value_for_context(
-                    target_id,
-                    int(frame),
-                    event_id=event_id,
-                    default_value=default_value,
-                    context=context,
-                )
-                for frame in frames
-            ),
-            dtype=np.float64,
-            count=len(frames),
-        )
+        resolved = [
+            self.value_and_active_for_context(
+                target_id,
+                int(frame),
+                event_id=event_id,
+                default_value=default_value,
+                context=context,
+            )
+            for frame in frames
+        ]
+        values = np.asarray([item[0] for item in resolved], dtype=np.float64)
+        active = np.asarray([item[1] for item in resolved], dtype=bool)
         if len(values):
             smoothing, hysteresis, continuous = self._smoothing_parameters(
                 target_id, event_id, context
             )
             if continuous and hysteresis > 0.0:
-                held = float(values[0])
-                for index in range(1, len(values)):
+                held: float | None = None
+                for index in range(len(values)):
+                    if not active[index]:
+                        held = None
+                        continue
                     candidate = float(values[index])
-                    if abs(candidate - held) < hysteresis:
+                    if held is not None and abs(candidate - held) < hysteresis:
                         values[index] = held
                     else:
                         held = candidate
@@ -823,11 +848,21 @@ class AutomationControlBus:
                 alpha = 1.0 - math.exp(
                     -float(step_frames) / (float(self.timeline.sample_rate) * smoothing)
                 )
-                for index in range(1, len(values)):
-                    values[index] = values[index - 1] + alpha * (
-                        values[index] - values[index - 1]
-                    )
-        return AutomationSamples(frames=frames, values=values.astype(np.float32))
+                previous: int | None = None
+                for index in range(len(values)):
+                    if not active[index]:
+                        previous = None
+                        continue
+                    if previous is not None:
+                        values[index] = values[previous] + alpha * (
+                            values[index] - values[previous]
+                        )
+                    previous = index
+        return AutomationSamples(
+            frames=frames,
+            values=values.astype(np.float32),
+            active=active,
+        )
 
 
 __all__ = [
