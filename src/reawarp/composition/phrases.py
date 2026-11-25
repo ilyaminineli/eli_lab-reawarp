@@ -801,9 +801,17 @@ def build_phrase_candidate_batch(
         )
     source_ids = set(phrase.event_ids)
     source_events = tuple(item for item in score.events if item.event_id in source_ids)
+    source_provenance = score.metadata.get("m28_phrase_freezes", {}).get(phrase_id)
+    if source_provenance:
+        prior = source_provenance.get("transformation", {})
+        parent_candidate_id = source_provenance.get("candidate_id")
+    else:
+        prior = {}
+        parent_candidate_id = None
     base_phrase_fingerprint = _fingerprint({
         "phrase": phrase.to_dict(),
         "events": [item.to_dict() for item in source_events],
+        "parent_candidate_id": parent_candidate_id,
     })
     base_score_fingerprint = _score_fingerprint(score)
     resolved_batch_id = batch_id or _fingerprint({
@@ -836,6 +844,13 @@ def build_phrase_candidate_batch(
             events=outside + transformed,
         )
         candidate_id = f"phrase-candidate-{index:02d}-{_fingerprint([base_phrase_fingerprint, seed_name, operation])[:10]}"
+        if prior:
+            transformation = replace(
+                transformation,
+                source_version=int(prior.get("transformation", {}).get("target_version", 2)),
+                target_version=int(prior.get("transformation", {}).get("target_version", 2)) + 1,
+                notes=f"branched from {parent_candidate_id}",
+            )
         candidates.append(PhraseCandidate(
             candidate_id=candidate_id,
             phrase_id=phrase_id,
