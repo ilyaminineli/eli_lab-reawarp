@@ -220,6 +220,8 @@ class PitchField:
         tension_weights = self.tension_weights or {}
         stability = float(stability_weights.get(key, stability_weights.get(pitch_class_key, 0.0)))
         tension = float(tension_weights.get(key, tension_weights.get(pitch_class_key, 0.0)))
+        if self.mode == "centred" and self.centre_pitch is not None:
+            stability += self.centre_weight / (1.0 + abs(pitch - self.centre_pitch))
         return PitchCandidate(
             pitch=pitch,
             frequency_hz=tuning.frequency_for_pitch(pitch),
