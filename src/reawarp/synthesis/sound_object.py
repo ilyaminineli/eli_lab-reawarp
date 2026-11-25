@@ -570,6 +570,12 @@ class HybridVoiceRenderer:
                 source = source[:, 0]
             if source.ndim not in {1, 2} or (source.ndim == 2 and source.shape[1] != 2):
                 raise ValueError("source audio must have shape (frames,) or (frames, 2)")
+            actual_channels = 1 if source.ndim == 1 else 2
+            if actual_channels != source_spec.channels:
+                raise ValueError(
+                    f"source {layer.source_id!r} declares {source_spec.channels} channels "
+                    f"but supplied audio has {actual_channels}"
+                )
             if not np.isfinite(source).all():
                 raise ValueError("source audio must contain only finite samples")
             length = layer.frame_count
