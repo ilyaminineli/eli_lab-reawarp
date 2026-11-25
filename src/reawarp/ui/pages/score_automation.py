@@ -273,7 +273,10 @@ class ScoreAutomationEditor(QGroupBox):
     def _refresh_scope_ids(self) -> None:
         """Suggest exact scope IDs from the loaded Score while retaining free-form entry."""
         scope = str(self.scope.currentData() or "global")
-        if self._score is None or scope == "global":
+        if scope == "global":
+            return
+        if self._score is None:
+            self.scope_id.clear()
             return
         previous = self.scope_id.currentText().strip()
         if scope == "role":
@@ -282,8 +285,9 @@ class ScoreAutomationEditor(QGroupBox):
             identifiers = {
                 str(value)
                 for event in self._score.events
-                if (value := event.parameters.get(
-                    "section_id", event.parameters.get("section_name")
+                if (value := (
+                    event.parameters.get("section_id")
+                    or event.parameters.get("section_name")
                 )) is not None and str(value).strip()
             }
         else:

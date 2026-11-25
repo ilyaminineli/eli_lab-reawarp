@@ -1,4 +1,5 @@
 import os
+from fractions import Fraction
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -8,6 +9,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
+from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.ui.main_window import MainWindow
 from reawarp.ui.navigation import WorkspaceNavigator
@@ -85,12 +87,34 @@ def test_main_window_navigation_keeps_workspace_stack_and_transport_in_sync():
 def test_m18_score_automation_editor_builds_scoped_source_connections():
     _application()
     editor = ScoreAutomationEditor()
-    score = Score(title="UI automation fixture")
+    score = Score(
+        title="UI automation fixture",
+        events=(
+            MusicalEvent(
+                "event-001", "melody", Fraction(0), Fraction(1),
+                frequency_hz=440.0, parameters={"section_id": "development"},
+            ),
+            MusicalEvent(
+                "event-002", "bass", Fraction(1), Fraction(1),
+                frequency_hz=110.0, parameters={"section_id": "verse"},
+            ),
+        ),
+    )
     editor.set_score(score)
+    editor.scope.setCurrentIndex(editor.scope.findData("role"))
+    assert [editor.scope_id.itemText(i) for i in range(editor.scope_id.count())] == [
+        "bass", "melody"
+    ]
+    editor.scope.setCurrentIndex(editor.scope.findData("section"))
+    assert [editor.scope_id.itemText(i) for i in range(editor.scope_id.count())] == [
+        "development", "verse"
+    ]
+    editor.scope.setCurrentIndex(editor.scope.findData("event"))
+    assert editor.scope_id.count() == 2
     editor.target.setCurrentIndex(editor.target.findData("synth.pitch"))
     editor.source_kind.setCurrentIndex(editor.source_kind.findData("lfo"))
     editor.scope.setCurrentIndex(editor.scope.findData("role"))
-    editor.scope_id.setText("melody")
+    editor.scope_id.setCurrentText("melody")
     editor.retrigger.setCurrentIndex(editor.retrigger.findData("event"))
     editor.amount.setValue(3.0)
 
