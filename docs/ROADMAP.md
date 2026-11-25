@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M18 is closed and M19.1–M19.5 are implemented on `main`. M19 includes optional pitch fields, tuning-aware sonorities, sequence-level voice-leading, six independent bass-role grammars, motif identity contracts, and exact Reawarp pitch metadata in MIDI. M14 hardware profiling and matched-level/Pyo listening remain separate experimental sign-offs.
+**Current implementation baseline:** M21 and M22 are implemented and closed on `main`. M19 includes optional pitch fields, tuning-aware sonorities, sequence-level voice-leading, six independent bass-role grammars, motif identity contracts, and exact Reawarp pitch metadata in MIDI. M14 hardware profiling and matched-level/Pyo listening remain separate experimental sign-offs.
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -28,7 +28,7 @@ M17.5 completed the canonical Score-first cutover for event-backed roles: `gener
 | Score and MIDI interchange | Implemented | M17.5 makes rational-beat Score authoritative for event-backed rendering; project events remain a compatibility projection; MIDI 1.0 limitations are documented |
 | Local sample/stem library | Implemented | SQLite indexing, descriptors, search, collections and genealogy |
 | FX Lab and editable serial chains | Implemented | Optional Pyo offline backend and portable JSON |
-| Role-aware inserts and shared returns | Implemented | Two fixed buses, dry-by-default routing |
+| Role-aware inserts and shared returns | Implemented | Fixed SPACE/ECHO buses; role-aware effects are the default; explicit dry mode remains for A/B |
 | Beat-based FX automation | Implemented | Static-BPM lanes for insert wet, sends and return wet |
 | GUI / CLI workflow | Implemented | Grouped Compose / Produce / Assets navigation, shared project context and transport, responsive splitters, and a project-aware Stem Mixer empty state; controller extraction remains planned |
 | Regression testing | Implemented baseline; M18 CI passed | Latest M18 matrix: 129 tests passed on Linux Python 3.10, 3.11 and 3.12 and Windows Python 3.11; desktop and CLI/benchmark smoke checks passed |
@@ -277,3 +277,12 @@ M14 target-machine validation remains a cross-cutting gate and should be complet
 - **Planned:** specification only; no claim of implementation.
 
 Historical M1–M13 documents remain the development record. This consolidated roadmap is the current post-M17.5 plan.
+
+
+## M21–M22 close-out (2026-11-25)
+
+M21 is closed: versioned sound-object patches, hybrid transient/body/tail rendering, modal/additive voice families, typed Score controls, editor-facing model and library lineage are implemented.
+
+M22 is closed: the Stem Mixer and core render API apply effects automatically from musical stem roles; no per-stem effect marking is required. Inserts live on each source path before the master, while wet-only SPACE/ECHO returns create shared relationships. Routing schema v3 includes inspectable roles and migrates v1/v2 authored routes without losing values. The existing cancellable worker/cache, stage audition, signal meters and matched-level audition remain in place.
+
+Outstanding Pyo-enabled listening and target-machine performance are experimental sign-offs; they are not claims of verified sound quality or timing. The following active milestone is M23.

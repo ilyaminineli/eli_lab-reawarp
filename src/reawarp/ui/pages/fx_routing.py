@@ -23,18 +23,19 @@ class FXRoutingEditor(QGroupBox):
     mixerStateRequested = Signal(dict)
 
     def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__("ROLE-AWARE FX ROUTING", parent)
-        self.setToolTip("Per-stem inserts and shared post-insert send/return buses.")
+        super().__init__("AUTOMATIC ROLE FX · INSERTS + SHARED RETURNS", parent)
+        self.setToolTip("Effects are assigned by musical role and processed on each source path before the master.")
         self._stem_names: tuple[str, ...] = ()
-        self._routing: dict[str, Any] = default_fx_routing()
+        self._routing: dict[str, Any] = role_aware_fx_routing()
         self.send_taps: dict[str, QComboBox] = {}
         self._loading = False
         root = QVBoxLayout(self)
         intro = QLabel(
-            "Role-aware routing is applied automatically: kick/sub stays dry, "
-            "while transient, melodic and texture roles receive restrained inserts "
-            "and shared SPACE/ECHO sends. Adjust per-role overrides below; dry routing "
-            "remains available for A/B. Original stems stay immutable."
+            "Effects are part of each sound's role path, not a post-master effect. "
+            "Assignments happen automatically from the generated stem role: "
+            "kick/sub stays dry; percussion, melody and textures receive restrained "
+            "inserts and shared SPACE/ECHO contributions. Edit only exceptions; "
+            "RESET DRY is available for comparison. Source stems remain immutable."
         )
         intro.setWordWrap(True)
         intro.setObjectName("muted")
@@ -176,8 +177,8 @@ class FXRoutingEditor(QGroupBox):
         self._load_buses_into_widgets()
         self._loading = False
         self.status.setText(
-            f"{len(names)} stems · automatic role routing · kick/sub protected · "
-            "manual overrides available"
+            f"{len(names)} stems · effects assigned automatically by role · "
+            "no per-stem effect tagging required · kick/sub protected"
         )
         self.changed.emit()
 

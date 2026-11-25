@@ -286,3 +286,50 @@ def test_editor_exports_visible_mixer_values_in_portable_routing_state():
     assert state["melody"]["mute"] is True
     assert state["kick"]["solo"] is True
     editor.close()
+
+
+
+def test_v3_schema_defaults_missing_stem_routes_from_role_map():
+    route = normalise_fx_routing(
+        {"schema_version": 3, "routing_mode": "role_auto", "stems": {}, "buses": {}},
+        ("kick", "snare", "melody", "unknown"),
+        48_000,
+    )
+    assert route["schema_version"] == 3
+    assert route["stems"]["kick"]["role"] == "kick"
+    assert route["stems"]["snare"]["insert"]["kind"] == "preset"
+    assert route["stems"]["melody"]["sends"]["space"] > 0
+    assert route["stems"]["unknown"]["sends"] == {"space": 0.0, "echo": 0.0}
+
+
+def test_renderer_uses_automatic_role_routing_when_file_is_omitted(monkeypatch):
+    def passthrough(audio, sample_rate, **kwargs):
+        return np.asarray(audio, dtype=np.float32).copy()
+
+    monkeypatch.setattr(fx, "render_pyo_fx", passthrough)
+    stems = {
+        "kick": np.full((32, 2), 0.1, dtype=np.float32),
+        "snare": np.full((32, 2), 0.1, dtype=np.float32),
+    }
+    _, meta = render_fx_routing(stems, 8_000)
+    assert meta["routing_mode"] == "role_auto"
+    assert meta["stems"]["kick"]["insert"]["kind"] == "bypass"
+    assert meta["stems"]["snare"]["insert"]["kind"] == "preset"
+    assert meta["stems"]["snare"]["sends"]["space"] > 0
+
+
+def test_master_sum_preserves_mono_and_applies_master_gain_before_guard():
+    mono = {"one": np.full(12, 0.2, dtype=np.float32)}
+    mixed = render_master_with_returns(mono, {}, master_wet=0.5)
+    assert mixed.shape == (12, 1)
+    assert mixed[0, 0] == pytest.approx(0.1)
+
+
+def test_v2_manual_routing_migrates_without_role_defaults_overwriting_it():
+    old = default_fx_routing(("kick", "melody"))
+    old["schema_version"] = 2
+    old["stems"]["melody"]["sends"]["space"] = 0.123
+    normalized = normalise_fx_routing(old, ("kick", "melody"), 48_000)
+    assert normalized["schema_version"] == 3
+    assert normalized["routing_mode"] == "manual"
+    assert normalized["stems"]["melody"]["sends"]["space"] == pytest.approx(0.123)

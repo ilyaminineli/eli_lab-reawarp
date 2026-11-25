@@ -18,8 +18,9 @@ from reawarp.fx import FX_PRESETS, normalise_fx_stages, render_pyo_fx
 from reawarp.fx_automation import automation_envelope, normalise_fx_automation
 from reawarp.score.automation import AutomationControlBus
 
-FX_ROUTING_SCHEMA_VERSION = 2
+FX_ROUTING_SCHEMA_VERSION = 3
 LEGACY_FX_ROUTING_SCHEMA_VERSION = 1
+PREVIOUS_FX_ROUTING_SCHEMA_VERSION = 2
 FX_BUSES = ("space", "echo")
 SEND_TAP_POINTS = (
     "pre_insert_pre_fader",
@@ -131,8 +132,29 @@ def _base_routing(stem_names: Sequence[str], *, routing_mode: str) -> dict[str, 
 
 
 def default_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
-    """Manual, fully dry routing. Kept as the reference A/B baseline."""
+    """Explicit manual, fully dry routing for intentional A/B and reset."""
     return _base_routing(stem_names, routing_mode="manual")
+
+
+def routing_defaults_for_project(stem_names: Sequence[str] = ()) -> dict[str, Any]:
+    """Return the automatic role-aware routing used for new projects/renders."""
+    return role_aware_fx_routing(stem_names)
+
+
+def role_effect_profile(stem_name: str) -> dict[str, Any]:
+    """Inspectable default effect assignment for a generated stem identifier."""
+    role = classify_fx_role(stem_name)
+    profiles = {
+        "kick": {"insert": None, "space": 0.0, "echo": 0.0, "description": "dry low-end anchor"},
+        "snare": {"insert": "restrained_space", "space": 0.05, "echo": 0.015, "description": "short room and restrained punctuation"},
+        "hats": {"insert": "digital_fracture", "space": 0.055, "echo": 0.02, "description": "light texture and small rhythmic reflections"},
+        "break": {"insert": "digital_fracture", "space": 0.04, "echo": 0.02, "description": "blend the loop while retaining its attack"},
+        "melody": {"insert": "metallic_machine", "space": 0.075, "echo": 0.035, "description": "foreground separation and sparse replies"},
+        "texture": {"insert": "restrained_space", "space": 0.10, "echo": 0.01, "description": "place continuous material behind foreground"},
+        "ambience": {"insert": None, "space": 0.035, "echo": 0.0, "description": "a little shared room without extra echo"},
+        "other": {"insert": None, "space": 0.0, "echo": 0.0, "description": "unknown role; left dry rather than guessed"},
+    }
+    return {"role": role, **profiles[role]}
 
 
 def role_aware_fx_routing(stem_names: Sequence[str] = ()) -> dict[str, Any]:
@@ -229,23 +251,21 @@ def normalise_fx_routing(
     if not isinstance(payload, Mapping):
         raise ValueError("FX routing must be a JSON object")
     version = payload.get("schema_version")
-    if version not in {LEGACY_FX_ROUTING_SCHEMA_VERSION, FX_ROUTING_SCHEMA_VERSION}:
-        raise ValueError(
-            f"FX routing schema_version must be {LEGACY_FX_ROUTING_SCHEMA_VERSION} or {FX_ROUTING_SCHEMA_VERSION}"
-        )
+    if version not in {LEGACY_FX_ROUTING_SCHEMA_VERSION, PREVIOUS_FX_ROUTING_SCHEMA_VERSION, FX_ROUTING_SCHEMA_VERSION}:
+        raise ValueError("FX routing schema_version must be 1, 2 or 3")
     mode = str(payload.get("routing_mode", "manual"))
     if mode not in {"manual", "role_auto", "percussion_focus", "melody_foreground",
                     "ambience_background", "combined_roles"}:
         raise ValueError(f"unsupported routing_mode: {mode}")
-    if version == LEGACY_FX_ROUTING_SCHEMA_VERSION:
+    # v1/v2 are historical authored sessions: keep their manual values.
+    if version in {LEGACY_FX_ROUTING_SCHEMA_VERSION, PREVIOUS_FX_ROUTING_SCHEMA_VERSION} and mode == "manual":
         defaults = default_fx_routing(stem_names)
-        mode = "manual"
     elif mode in {"percussion_focus", "melody_foreground", "ambience_background", "combined_roles"}:
         defaults = build_role_audition_matrix(stem_names)[mode]
     elif mode == "role_auto":
         defaults = role_aware_fx_routing(stem_names)
     else:
-        defaults = default_fx_routing(stem_names)
+        defaults = role_aware_fx_routing(stem_names) if version == FX_ROUTING_SCHEMA_VERSION else default_fx_routing(stem_names)
 
     source_stems = payload.get("stems", {})
     source_buses = payload.get("buses", {})
@@ -280,7 +300,9 @@ def normalise_fx_routing(
         for boolean_name in ("mute", "solo"):
             if boolean_name in raw and not isinstance(raw[boolean_name], bool):
                 raise ValueError(f"{name}.{boolean_name} must be a boolean")
+        profile = role_effect_profile(name)
         stems[name] = {
+            "role": profile["role"],
             "insert": _chain_record(insert, sample_rate),
             "sends": {
                 bus: _finite(sends.get(bus, 0.0), f"{name}.{bus} send", 0.0, 1.0)
@@ -516,7 +538,7 @@ def match_audition_level(
 def render_fx_routing(
     dry_stems: Mapping[str, np.ndarray],
     sample_rate: int,
-    routing: Mapping[str, Any],
+    routing: Mapping[str, Any] | None = None,
     *,
     bpm: float = 120.0,
     automation: Mapping[str, Any] | None = None,
@@ -558,7 +580,10 @@ def render_fx_routing(
     else:
         raise ValueError("dry stems must be mono or stereo")
     frames = len(first_stereo)
-    config = normalise_fx_routing(routing, names, int(sample_rate))
+    config = normalise_fx_routing(
+        routing if routing is not None else routing_defaults_for_project(names),
+        names, int(sample_rate),
+    )
     lanes = (
         normalise_fx_automation(automation, names)
         if controls is None else {"schema_version": 1, "lanes": {}}
@@ -830,13 +855,19 @@ def render_master_with_returns(
     all_buffers = [*processed_stems.values(), *bus_returns.values()]
     if frames is None:
         frames = max((len(item) for item in all_buffers), default=0)
-    master = np.zeros((frames, 2), dtype=np.float32)
+    first = np.asarray(all_buffers[0]) if all_buffers else np.zeros((0, 2), dtype=np.float32)
+    channels = 1 if first.ndim == 1 else int(first.shape[1])
+    if channels not in {1, 2}:
+        raise ValueError("master inputs must be mono or stereo")
+    master = np.zeros((frames, channels), dtype=np.float32)
     for audio in all_buffers:
-        value = _stereo(np.asarray(audio), 2)
+        value = _stereo(np.asarray(audio), channels)
         count = min(frames, len(value))
         master[:count] += value[:count]
+    # Master gain precedes the output guard; retain mono/stereo channel count.
+    master *= wet
     peak = float(np.max(np.abs(master))) if master.size else 0.0
     ceiling = 10.0 ** (-1.0 / 20.0)
     if peak > ceiling:
         master *= ceiling / peak
-    return np.clip(master * wet, -1.0, 1.0).astype(np.float32, copy=False)
+    return np.ascontiguousarray(master, dtype=np.float32)
