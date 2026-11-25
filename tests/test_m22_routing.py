@@ -241,3 +241,27 @@ def test_matched_level_audition_is_peak_safe_and_never_mutates_mix_audio():
     silence, silent_report = fx.match_audition_level(np.zeros((16, 2), dtype=np.float32))
     assert np.count_nonzero(silence) == 0
     assert silent_report["linear_gain"] == 1.0
+
+
+
+def test_portable_route_mixer_state_controls_direct_output_without_gui():
+    stems = {
+        "melody": np.full((16, 2), 0.1, dtype=np.float32),
+        "texture": np.full((16, 2), 0.2, dtype=np.float32),
+    }
+    route = default_fx_routing(tuple(stems))
+    route["stems"]["melody"].update({
+        "gain_db": -6.020599913,
+        "pan": 1.0,
+    })
+    route["stems"]["texture"].update({"mute": True})
+
+    processed, _ = render_fx_routing(stems, 8_000, route)
+    assert processed["melody"][0, 0] == pytest.approx(0.0, abs=1e-6)
+    assert processed["melody"][0, 1] == pytest.approx(0.05, abs=1e-6)
+    assert np.count_nonzero(processed["texture"]) == 0
+
+    route["stems"]["melody"]["solo"] = True
+    processed, _ = render_fx_routing(stems, 8_000, route)
+    assert np.count_nonzero(processed["texture"]) == 0
+    assert processed["melody"][0, 1] == pytest.approx(0.05, abs=1e-6)
