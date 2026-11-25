@@ -48,7 +48,7 @@ from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
-from reawarp.ui.workers import RenderWorker
+from reawarp.ui.workers import CancellableRenderWorker, RenderWorker
 
 
 class MainWindow(QMainWindow):
@@ -70,6 +70,10 @@ class MainWindow(QMainWindow):
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
         self._fx_routing_metadata: dict[str, Any] = {}
+        self._fx_audition_audio: dict[str, Any] = {}
+        self._fx_worker: CancellableRenderWorker | None = None
+        self._fx_pending_signature: str | None = None
+        self._fx_queued_signature: str | None = None
         self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
         self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
@@ -928,8 +932,9 @@ class MainWindow(QMainWindow):
         mixer_layout.addWidget(self.mixer_scroll, 1)
 
         note = QLabel(
-            "Gain and pan shape the project audition and exported master. Dry stem files remain "
-            "the original aligned render buffers; inserts and shared returns are a separate pass."
+            "Effects follow musical roles automatically: low-end anchors stay dry while "
+            "snare, hats, breaks, melody and texture receive restrained inserts and shared sends. "
+            "Dry stem files remain immutable; the same cached routing render feeds preview and export."
         )
         note.setObjectName("muted")
         note.setWordWrap(True)
@@ -937,6 +942,7 @@ class MainWindow(QMainWindow):
         self.fx_workspace_tabs = QTabWidget()
         self.fx_routing_editor = FXRoutingEditor()
         self.fx_routing_editor.changed.connect(self._refresh_routing)
+        self.fx_routing_editor.auditionRequested.connect(self._audition_fx_component)
         routing_scroll = QScrollArea()
         routing_scroll.setWidgetResizable(True)
         routing_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -1387,9 +1393,15 @@ class MainWindow(QMainWindow):
         self._playback_stopped()
         self.project = result
         self.score_automation_editor.set_score(result.to_score())
-        self._fx_processed_stems = {};
+        if self._fx_worker is not None:
+            self._fx_worker.cancel()
+        self._fx_worker = None
+        self._fx_pending_signature = None
+        self._fx_queued_signature = None
+        self._fx_processed_stems = {}
         self._fx_bus_returns = {}
         self._fx_routing_metadata = {}
+        self._fx_audition_audio = {}
         self._rebuild_mixer()
         self.mixer_stack.setCurrentIndex(1)
         self._update_project_context()
@@ -1545,10 +1557,21 @@ class MainWindow(QMainWindow):
 
     def _routing_signature(self) -> str:
         import hashlib
+
         score = self.project.to_score() if self.project is not None else None
+        mixer_state = {
+            name: {
+                "gain": row.gain.value() / 100.0,
+                "pan": row.pan.value() / 100.0,
+                "mute": row.mute.isChecked(),
+                "solo": row.solo.isChecked(),
+            }
+            for name, row in self._mix_rows.items()
+        }
         payload = {
             "routing": self.fx_routing_editor.routing(),
             "automation": self.fx_automation_editor.automation(),
+            "mixer": mixer_state,
             "score_automation": (
                 {
                     "lanes": [lane.to_dict() for lane in score.automation],
@@ -1562,60 +1585,179 @@ class MainWindow(QMainWindow):
         encoded = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
-    def _ensure_routing_render(self) -> None:
+    def _ensure_routing_render(self) -> bool:
+        """Start or confirm the cancellable FX cache render for the current snapshot."""
         if self.project is None:
-            return
+            return False
         signature = self._routing_signature()
         if self._fx_routing_metadata.get("_routing_signature") == signature:
+            return True
+        if self._fx_worker is not None:
+            if self._fx_pending_signature != signature:
+                self._fx_queued_signature = signature
+                self._fx_worker.cancel()
+            return False
+
+        score = self.project.to_score()
+        legacy_automation = self.fx_automation_editor.automation()
+        stem_names = tuple(self.project.stems)
+        controls = None
+        if score.automation or score.automation_sources or score.modulations:
+            if legacy_automation:
+                score = attach_fx_automation_to_score(
+                    score, legacy_automation, stem_names
+                )
+            controls = build_score_control_bus(
+                score,
+                self.project.sample_rate,
+                automation_registry=fx_automation_registry(stem_names),
+            )
+
+        dry_stems = {
+            name: np.asarray(audio, dtype=np.float32).copy()
+            for name, audio in self.project.stems.items()
+        }
+        routing = self.fx_routing_editor.routing()
+        mix_controls = {
+            name: {
+                "gain": row.gain.value() / 100.0,
+                "pan": row.pan.value() / 100.0,
+                "mute": row.mute.isChecked(),
+                "solo": row.solo.isChecked(),
+            }
+            for name, row in self._mix_rows.items()
+        }
+        sample_rate = int(self.project.sample_rate)
+        bpm = float(self.project.config.bpm)
+
+        def operation(cancel_event):
+            processed, metadata = render_fx_routing(
+                dry_stems,
+                sample_rate,
+                routing,
+                bpm=bpm,
+                automation=legacy_automation if controls is None else None,
+                controls=controls,
+                mix_controls=mix_controls,
+                include_audition_audio=True,
+                cancel_event=cancel_event,
+            )
+            return {
+                "signature": signature,
+                "processed": processed,
+                "metadata": metadata,
+            }
+
+        worker = CancellableRenderWorker(operation)
+        self._fx_worker = worker
+        self._fx_pending_signature = signature
+        self._fx_queued_signature = None
+        worker.signals.finished.connect(self._fx_render_finished)
+        worker.signals.error.connect(
+            lambda message, requested=signature: self._fx_render_failed(
+                requested, message
+            )
+        )
+        QThreadPool.globalInstance().start(worker)
+        self.statusBar().showMessage("Rendering role-aware FX routing in background…")
+        return False
+
+    def _fx_render_finished(self, result: object) -> None:
+        self._fx_worker = None
+        self._fx_pending_signature = None
+        if not isinstance(result, dict):
+            self._fx_render_failed("", "FX worker returned an invalid result.")
             return
-        try:
-            score = self.project.to_score()
-            legacy_automation = self.fx_automation_editor.automation()
-            if score.automation or score.automation_sources or score.modulations:
-                stem_names = tuple(self.project.stems)
-                if legacy_automation:
-                    score = attach_fx_automation_to_score(
-                        score, legacy_automation, stem_names
-                    )
-                controls = build_score_control_bus(
-                    score,
-                    self.project.sample_rate,
-                    automation_registry=fx_automation_registry(stem_names),
-                )
-                processed, metadata = render_fx_routing(
-                    self.project.stems,
-                    self.project.sample_rate,
-                    self.fx_routing_editor.routing(),
-                    bpm=float(self.project.config.bpm),
-                    controls=controls,
-                )
-            else:
-                processed, metadata = render_fx_routing(
-                    self.project.stems,
-                    self.project.sample_rate,
-                    self.fx_routing_editor.routing(),
-                    bpm=float(self.project.config.bpm),
-                    automation=legacy_automation,
-                )
-        except Exception as exc:
+        signature = str(result.get("signature", ""))
+        if signature == self._routing_signature():
+            metadata = dict(result["metadata"])
+            self._fx_bus_returns = {
+                name: np.asarray(audio, dtype=np.float32).copy()
+                for name, audio in metadata.pop("bus_returns_audio", {}).items()
+            }
+            self._fx_audition_audio = metadata.pop("audition_audio", {})
             self._fx_processed_stems = {
-                name: audio.copy() for name, audio in self.project.stems.items()
+                name: np.asarray(audio, dtype=np.float32).copy()
+                for name, audio in result["processed"].items()
+            }
+            metadata["_routing_signature"] = signature
+            self._fx_routing_metadata = metadata
+            self.statusBar().showMessage(
+                "Role-aware inserts and SPACE/ECHO returns are ready.", 5000
+            )
+        queued = self._fx_queued_signature
+        self._fx_queued_signature = None
+        if queued is not None or signature != self._routing_signature():
+            self._refresh_preview()
+            return
+        self._refresh_preview()
+
+    def _fx_render_failed(self, signature: str, message: str) -> None:
+        self._fx_worker = None
+        self._fx_pending_signature = None
+        cancelled = str(message).startswith("CANCELLED:")
+        current_signature = self._routing_signature() if self.project is not None else ""
+        if not cancelled and signature == current_signature and self.project is not None:
+            self._fx_processed_stems = {
+                name: np.asarray(audio, dtype=np.float32).copy()
+                for name, audio in self.project.stems.items()
             }
             self._fx_bus_returns = {}
-            self._fx_routing_metadata = {"_routing_signature": signature, "error": str(exc)}
+            self._fx_audition_audio = {}
+            self._fx_routing_metadata = {
+                "_routing_signature": signature,
+                "error": str(message),
+                "fallback": "dry_source_stems",
+            }
             self.statusBar().showMessage(
-                f"FX routing was bypassed: {exc}", 10000
+                f"FX render failed; dry sources retained: {message}", 10000
             )
+        self._fx_queued_signature = None
+        self._refresh_preview()
+
+    def _audition_fx_component(self, stage: str, stem: str) -> None:
+        """Audition direct/insert/send/return/master stages from the cached routing pass."""
+        if self.project is None:
             return
-        self._fx_bus_returns = metadata.pop("bus_returns_audio", {})
-        self._fx_processed_stems = processed
-        metadata["_routing_signature"] = signature
-        self._fx_routing_metadata = metadata
+        if not self._ensure_routing_render():
+            self.statusBar().showMessage("FX audition will be available when routing finishes.", 5000)
+            return
+        audio = None
+        if stage == "master":
+            audio = self._render_mix()
+        elif stage == "return.space":
+            audio = self._fx_bus_returns.get("space")
+        elif stage == "return.echo":
+            audio = self._fx_bus_returns.get("echo")
+        elif stage == "direct":
+            audio = self._fx_audition_audio.get("direct", {}).get(stem)
+        elif stage == "insert":
+            audio = self._fx_audition_audio.get("insert", {}).get(stem)
+        elif stage.startswith("send."):
+            bus = stage.split(".", 1)[1]
+            audio = self._fx_audition_audio.get("sends", {}).get(stem, {}).get(bus)
+        if audio is None or not len(audio):
+            self.statusBar().showMessage("This route has no rendered contribution to audition.", 5000)
+            return
+        try:
+            self.player.stop()
+            self.player.start(
+                np.asarray(audio, dtype=np.float32),
+                self.project.sample_rate,
+                device=self.output_device.currentData(),
+            )
+            self.play_button.setText("PAUSE")
+            self.preview_source.setCurrentIndex(0)
+            self.statusBar().showMessage(f"Auditioning {stage.upper()} · {stem}", 5000)
+        except Exception as exc:
+            self._show_error(f"FX audition failed: {exc}")
 
     def _processed_stem(self, name: str) -> np.ndarray:
         assert self.project is not None
-        self._ensure_routing_render()
-        audio = self._fx_processed_stems.get(name, self.project.stems[name])
+        if not self._ensure_routing_render():
+            audio = self.project.stems[name]
+        else:
+            audio = self._fx_processed_stems.get(name, self.project.stems[name])
         row = self._mix_rows.get(name)
         if row is None:
             return audio
@@ -1638,7 +1780,8 @@ class MainWindow(QMainWindow):
     def _render_mix(self) -> np.ndarray | None:
         if self.project is None:
             return None
-        self._ensure_routing_render()
+        if not self._ensure_routing_render():
+            return None
         mixed = {name: self._processed_stem(name) for name in self.project.stems}
         routing = self.fx_routing_editor.routing()
         active_sends = self._fx_routing_metadata.get("active_send_stems_by_bus", {})
@@ -1671,6 +1814,9 @@ class MainWindow(QMainWindow):
 
     def _apply_preview_refresh(self) -> None:
         audio = self._current_preview_audio()
+        if audio is None and self.project is not None and self._fx_worker is not None:
+            self.statusBar().showMessage("FX routing is rendering; current playback is retained.", 3000)
+            return
         self.preview.set_audio(audio, self.project.sample_rate if self.project else 48_000)
         if self.player.is_playing:
             if audio is None or not self.player.replace_audio(audio):
@@ -1699,7 +1845,9 @@ class MainWindow(QMainWindow):
             return
         audio = self._current_preview_audio()
         if audio is None or self.project is None:
-            self.statusBar().showMessage("Generate a loop before auditioning audio.")
+            self.statusBar().showMessage(
+                "Generate a loop or wait for the role-aware FX render before auditioning."
+            )
             return
         try:
             self.player.start(
@@ -1742,11 +1890,20 @@ class MainWindow(QMainWindow):
         )
         if not directory:
             return
+        if not self._ensure_routing_render():
+            self.statusBar().showMessage(
+                "FX routing is being rendered in the background. Export again when it is ready.",
+                8000,
+            )
+            return
         try:
             output = self.project.export(
                 directory, bit_depth=24, include_stems=True, include_master=True
             )
             master = self._render_mix()
+            if master is None:
+                self.statusBar().showMessage("FX master is not ready; export cancelled.", 8000)
+                return
             if master is not None:
                 write_wav(output / "master.wav", master, self.project.sample_rate, 24)
             self._ensure_routing_render()
