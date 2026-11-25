@@ -66,6 +66,16 @@ def _tempo_samples(score: Score, resolution: Fraction) -> list[tuple[Fraction, f
     return sorted(values.items(), key=lambda item: item[0])
 
 
+def _midi_compatible_text(value: Any) -> str:
+    """Return a Latin-1-safe label for MIDI text meta events.
+
+    Reawarp's complete Unicode title and event data are stored in ASCII-escaped
+    JSON text events. Human-facing MIDI track names use replacement only for
+    characters that the Standard MIDI text encoding cannot represent.
+    """
+    return str(value).encode("latin-1", errors="replace").decode("latin-1")
+
+
 def _drum_note(event: MusicalEvent) -> int | None:
     lane = event.voice_id.lower()
     source_kind = str(event.parameters.get("source_kind", "")).lower()
@@ -153,7 +163,7 @@ def score_to_midi(
     conductor_items: list[tuple[int, int, int, Any]] = []
     conductor_items.append((
         0, -20, 0,
-        mido.MetaMessage("track_name", name=score.title, time=0),
+        mido.MetaMessage("track_name", name=_midi_compatible_text(score.title), time=0),
     ))
     score_meta = {
         "title": score.title,
@@ -175,7 +185,7 @@ def score_to_midi(
         mido.MetaMessage(
             "text",
             text="REAWARP_SCORE:" + json.dumps(
-                score_meta, ensure_ascii=False, separators=(",", ":"), allow_nan=False
+                score_meta, ensure_ascii=True, separators=(",", ":"), allow_nan=False
             ),
             time=0,
         ),
@@ -199,7 +209,7 @@ def score_to_midi(
 
     def make_track(name: str, items: list[tuple[int, int, int, Any]]) -> None:
         track = mido.MidiTrack()
-        track.append(mido.MetaMessage("track_name", name=name, time=0))
+        track.append(mido.MetaMessage("track_name", name=_midi_compatible_text(name), time=0))
         previous_tick = 0
         for tick, _priority, _sequence, message in sorted(
                 items, key=lambda item: (item[0], item[1], item[2])
