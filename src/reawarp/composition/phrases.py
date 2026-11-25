@@ -664,12 +664,24 @@ def _transform_events(
             + span - (event.onset_beats - phrase.start_beats) - event.duration_beats,
         ) for event in reversed(source)]
     elif operation == "augmentation":
-        # Expand phrase positions from the first half into the complete span.
-        output = [replace(
-            event,
-            onset_beats=phrase.start_beats + 2 * (event.onset_beats - phrase.start_beats),
-            duration_beats=2 * event.duration_beats,
-        ) for event in source]
+        # Expand the phrase's inter-onset distances to use its full span. The
+        # last onset anchors the phrase end; note lengths are capped at that
+        # boundary so the following phrase is never overwritten.
+        offsets = [event.onset_beats - phrase.start_beats for event in source]
+        last_offset = max(offsets, default=Fraction(0))
+        scale = (
+            phrase.duration_beats / last_offset
+            if last_offset > 0 else Fraction(1)
+        )
+        output = []
+        for event, offset in zip(source, offsets, strict=True):
+            onset = phrase.start_beats + offset * scale
+            room = phrase.end_beats - onset
+            output.append(replace(
+                event,
+                onset_beats=onset,
+                duration_beats=min(event.duration_beats * scale, room),
+            ))
     elif operation == "diminution":
         # Compress phrase material into its first half.
         output = [replace(
@@ -682,12 +694,14 @@ def _transform_events(
     elif operation == "extension":
         output = list(source)
         for event in source:
-            output.append(replace(
-                event,
-                event_id=_event_id(event.event_id, seed, "extension"),
-                onset_beats=event.onset_beats + span / 2,
-                parameters={**event.parameters, "m28_derived_from": event.event_id},
-            ))
+            onset = event.onset_beats + span / 2
+            if onset + event.duration_beats <= phrase.end_beats:
+                output.append(replace(
+                    event,
+                    event_id=_event_id(event.event_id, seed, "extension"),
+                    onset_beats=onset,
+                    parameters={**event.parameters, "m28_derived_from": event.event_id},
+                ))
     elif operation == "truncation":
         midpoint = phrase.start_beats + span / 2
         output = [
