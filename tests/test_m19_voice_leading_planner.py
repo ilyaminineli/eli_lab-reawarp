@@ -303,3 +303,30 @@ def test_boundary_order_and_voice_count_are_validated():
             ),
             EqualTemperamentTuning(),
         )
+
+def test_explicit_boundary_sonorities_cannot_bypass_a_hard_pitch_field():
+    from reawarp.score import PitchField
+
+    field = PitchField(
+        mode="modal",
+        pitch_collection=(0.0, 2.0, 4.0),
+        hard_constraint=True,
+    )
+    boundary = SonorityBoundary(
+        "explicit-invalid", "0", "1",
+        pitches=(60.0, 61.0), voice_count=2,
+    )
+    with pytest.raises(ValueError, match="explicit sonority.*hard pitch-field"):
+        plan_sonority_sequence(
+            (boundary,), EqualTemperamentTuning(), pitch_field=field,
+        )
+
+
+def test_microtonal_voice_crossing_detection_uses_order_signs_not_gap_product():
+    from reawarp.score.voice_leading import _crossed_voice_pairs
+
+    assert _crossed_voice_pairs(
+        (60.0, 60.00001),
+        (60.00001, 60.0),
+        ("micro-low", "micro-high"),
+    ) == (("micro-low", "micro-high"),)

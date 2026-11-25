@@ -172,13 +172,17 @@ def test_voice_leading_hard_constraints_and_order_preservation():
         allow_crossing=False,
         weights=VoiceLeadingWeights(crossing=10),
     )
-    assert tuple(item[1] for item in no_cross.assignments) == (0, 1)
+    assert tuple(item[1] for item in no_cross.assignments) == (1, 0)
+    assert no_cross.crossed_pairs == ()
 
     crossed = assign_voice_leading(
         (60, 67), (72, 55),
         allow_crossing=True,
-        weights=VoiceLeadingWeights(motion=0.0, crossing=0.0),
+        weights=VoiceLeadingWeights(
+            motion=0.0, leap=0.0, common_tone_bonus=0.0, crossing=0.0,
+        ),
     )
+    assert tuple(item[1] for item in crossed.assignments) == (0, 1)
     assert crossed.crossed_pairs == ((0, 1),)
 
 
@@ -187,3 +191,43 @@ def test_voice_leading_rejects_unsupported_voice_counts():
         assign_voice_leading((60, 64), (62,))
     with pytest.raises(ValueError, match="eight"):
         assign_voice_leading(range(9), range(9))
+
+def test_modal_and_intervallic_pitch_fields_are_explicit_and_round_trip():
+    tuning = EqualTemperamentTuning()
+    modal = PitchField(
+        mode="modal",
+        pitch_collection=(0, 2, 3, 5, 7, 9, 10),
+        hard_constraint=True,
+    )
+    assert modal.evaluate(62, tuning).allowed is True
+    assert modal.evaluate(64, tuning).allowed is False
+
+    intervallic = PitchField(
+        mode="intervallic",
+        centre_pitch=60.0,
+        allowed_intervals=(0.0, 3.5, 7.0),
+        hard_constraint=True,
+    )
+    assert intervallic.evaluate(63.5, tuning).allowed is True
+    assert intervallic.evaluate(75.0, tuning).allowed is True
+    assert intervallic.evaluate(64.0, tuning).allowed is False
+
+    with pytest.raises(ValueError, match="requires centre_pitch and allowed_intervals"):
+        PitchField(mode="intervallic", allowed_intervals=(0.0, 7.0))
+
+    score = Score(harmonic_context={
+        "mode": "modal",
+        "pitch_collection": [0.0, 2.0, 3.0, 5.0, 7.0, 9.0, 10.0],
+        "hard_constraint": True,
+    })
+    restored = Score.from_dict(score.to_dict())
+    assert restored.to_dict() == score.to_dict()
+
+
+def test_explicit_interval_constraints_without_a_centre_are_rejected():
+    with pytest.raises(ValueError, match="allowed_intervals require centre_pitch"):
+        Score(harmonic_context={
+            "mode": "spectral",
+            "allowed_intervals": [0.0, 7.0],
+            "hard_constraint": True,
+        })

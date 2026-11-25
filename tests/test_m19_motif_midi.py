@@ -284,3 +284,19 @@ def test_generic_midi_import_maps_standard_semitones_into_score_tuning(tmp_path)
     assert event.pitch == pytest.approx(tuning.pitch_for_frequency(midi_frequency))
     assert event.pitch != pytest.approx(60.0)
     assert tuning.frequency_for_pitch(event.pitch) == pytest.approx(midi_frequency)
+
+def test_midi_note_rounding_is_stable_on_both_sides_of_every_semitone_midpoint():
+    from reawarp.score.midi import _midi_note_from_frequency
+
+    for lower_note in range(127):
+        midpoint_hz = 440.0 * (2.0 ** ((lower_note + 0.5 - 69.0) / 12.0))
+        just_below = math.nextafter(midpoint_hz, 0.0)
+        just_above = math.nextafter(midpoint_hz, math.inf)
+        assert _midi_note_from_frequency(just_below) == lower_note
+        assert _midi_note_from_frequency(midpoint_hz) == lower_note + 1
+        assert _midi_note_from_frequency(just_above) == lower_note + 1
+
+    assert _midi_note_from_frequency(1e-200) == 0
+    assert _midi_note_from_frequency(1e200) == 127
+    with pytest.raises(ValueError, match="positive and finite"):
+        _midi_note_from_frequency(0.0)

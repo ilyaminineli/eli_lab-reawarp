@@ -7,6 +7,7 @@ from reawarp.score import (
     BassRolePlan,
     EqualTemperamentTuning,
     MusicalEvent,
+    PitchField,
     Score,
     SonorityBoundary,
     VoiceLeadingPlanConfig,
@@ -388,3 +389,26 @@ def test_bass_planner_rejects_invalid_boundaries_modes_and_kick_relations():
         item.onset_beats < 2 or item.parameters["boundary_id"] == "b"
         for item in clipped.events
     )
+
+def test_hard_pitch_field_never_emits_out_of_field_independent_bass_notes():
+    boundary = SonorityBoundary(
+        "fixed-register", "0", "4",
+        pitches=(60.0, 60.0), bass_pitch=60.0, voice_count=2,
+    )
+    field = PitchField(
+        mode="centred",
+        centre_pitch=60.0,
+        minimum_pitch=60.0,
+        maximum_pitch=60.0,
+        hard_constraint=True,
+    )
+    with pytest.raises(ValueError, match="bass pitch.*hard pitch-field"):
+        plan_bass_role(
+            (boundary,), EqualTemperamentTuning(),
+            config=BassRoleConfig(
+                mode="independent_cycle", density=1.0,
+                cycle_beats="1", cycle_pulses=3,
+                movement_range=6,
+            ),
+            pitch_field=field,
+        )

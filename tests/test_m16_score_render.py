@@ -282,3 +282,44 @@ def test_engine_exposes_score_native_render_entrypoint_and_project_score_provena
     assert project_record["renderer_version"] == "reawarp-score-renderer/1.0.0"
     assert score.metadata["score_origin"] == "score_first_generation"
     assert project_record["render_provenance"]["frame_count"] == project.frame_count
+
+def test_legacy_chromatic_score_without_harmonic_context_renders_unchanged_after_load():
+    source = Score(
+        title="Legacy chromatic score",
+        events=(
+            MusicalEvent(
+                event_id="legacy-a4",
+                voice_id="lead",
+                onset_beats=Fraction(0),
+                duration_beats=Fraction(1),
+                kind="note",
+                frequency_hz=440.0,
+                velocity=0.5,
+            ),
+        ),
+    )
+    legacy_payload = source.to_dict()
+    legacy_payload.pop("harmonic_context", None)
+    legacy_payload.pop("sonorities", None)
+    legacy_payload.pop("sonority_plan", None)
+    legacy_payload.pop("bass_plan", None)
+    legacy_payload["tuning"].pop("period_ratio", None)
+    legacy = Score.from_dict(legacy_payload)
+    assert legacy.harmonic_context is None
+    assert legacy.sonorities == ()
+
+    def deterministic_voice(scheduled, sample_rate, controls):
+        return np.full(
+            scheduled.duration_frames,
+            0.1 * scheduled.event.velocity,
+            dtype=np.float32,
+        )
+
+    rendered = ScoreRenderer().render(
+        legacy, 22_050, voice_renderers={"lead": deterministic_voice},
+    ).render_master()
+    restored = Score.from_dict(legacy.to_dict())
+    rendered_after_load = ScoreRenderer().render(
+        restored, 22_050, voice_renderers={"lead": deterministic_voice},
+    ).render_master()
+    np.testing.assert_array_equal(rendered_after_load, rendered)

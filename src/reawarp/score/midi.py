@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from bisect import bisect_right
 import re
 from collections import defaultdict, deque
 from fractions import Fraction
@@ -93,13 +94,23 @@ def _event_frequency(event: MusicalEvent, score: Score) -> float | None:
     return None
 
 
+_MIDI_NOTE_THRESHOLDS = tuple(
+    440.0 * (2.0 ** ((note + 0.5 - 69.0) / 12.0))
+    for note in range(127)
+)
+
+
 def _midi_note_from_frequency(frequency_hz: float) -> int:
-    """Resolve Hz to the nearest standard MIDI semitone (A4 = 440 Hz)."""
+    """Resolve Hz to the nearest standard MIDI semitone (ties round upward).
+
+    Comparing against geometric midpoint frequencies avoids losing the side of
+    a half-semitone boundary when a logarithm rounds adjacent float frequencies
+    to the same semitone coordinate.
+    """
     frequency = float(frequency_hz)
     if not math.isfinite(frequency) or frequency <= 0:
         raise ValueError("MIDI note frequency must be positive and finite")
-    semitone = 69.0 + 12.0 * math.log2(frequency / 440.0)
-    return int(min(127, max(0, math.floor(semitone + 0.5))))
+    return bisect_right(_MIDI_NOTE_THRESHOLDS, frequency)
 
 
 def _event_note(event: MusicalEvent, score: Score) -> int | None:

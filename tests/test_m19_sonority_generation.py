@@ -221,3 +221,20 @@ def test_sonority_transform_validation_rejects_non_finite_parameters():
             "bad-params", "0", "1", (60.0,),
             transform_parameters={"factor": math.nan},
         )
+
+def test_hard_pitch_field_rejects_disallowed_bass_reference():
+    field = PitchField(
+        mode="collection",
+        pitch_collection=(0.0,),
+        hard_constraint=True,
+    )
+    with pytest.raises(ValueError, match="bass_pitch violates hard pitch-field"):
+        generate_sonority(
+            field, EqualTemperamentTuning(),
+            sonority_id="bad-bass-reference",
+            voice_count=1,
+            minimum_pitch=60,
+            maximum_pitch=60,
+            bass_pitch=61,
+            temperature=0,
+        )
