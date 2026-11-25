@@ -1,0 +1,313 @@
+from fractions import Fraction
+
+import numpy as np
+import pytest
+
+from reawarp import (
+    AutomationLane,
+    AutomationModulation,
+    AutomationPoint,
+    AutomationSource,
+    MeterMap,
+    MusicalEvent,
+    Score,
+    ScoreRenderer,
+    TempoMap,
+    TempoPoint,
+)
+from reawarp.score.automation import AutomationControlBus
+from reawarp.score.timeline import RenderTimeline
+
+
+def _timeline(sample_rate=48_000):
+    return RenderTimeline(
+        sample_rate,
+        TempoMap((TempoPoint(Fraction(0), 120.0, "step"),)),
+        MeterMap(),
+    )
+
+
+def test_scope_precedence_absolute_then_relative_and_legacy_global_lookup():
+    lanes = (
+        AutomationLane(
+            "synth.pitch",
+            (AutomationPoint(Fraction(0), 2.0),),
+            unit="semitones",
+        ),
+        AutomationLane(
+            "synth.pitch",
+            (AutomationPoint(Fraction(0), 3.0),),
+            unit="semitones",
+            scope="section",
+            scope_id="development",
+        ),
+        AutomationLane(
+            "synth.pitch",
+            (AutomationPoint(Fraction(0), 1.0),),
+            unit="semitones",
+            scope="role",
+            scope_id="lead",
+            value_mode="relative",
+        ),
+        AutomationLane(
+            "synth.pitch",
+            (AutomationPoint(Fraction(0), 2.0),),
+            unit="semitones",
+            scope="event",
+            scope_id="note-a",
+            value_mode="relative",
+        ),
+    )
+    bus = AutomationControlBus(
+        lanes,
+        _timeline(),
+        event_contexts={
+            "note-a": {
+                "role_id": "lead",
+                "section_id": "development",
+                "event_onset_frame": 0,
+            }
+        },
+    )
+
+    assert bus.value_at_frame("synth.pitch", 0) == pytest.approx(2.0)
+    assert bus.value_for_context(
+        "synth.pitch", 0, event_id="note-a"
+    ) == pytest.approx(8.0)
+    assert bus.value_for_context(
+        "synth.pitch", 0, context={"role_id": "lead", "section_id": "other"}
+    ) == pytest.approx(3.0)
+
+
+def test_scoped_lane_requires_an_id_and_global_lane_forbids_one():
+    with pytest.raises(ValueError, match="require a scope_id"):
+        AutomationLane(
+            "synth.gain",
+            (AutomationPoint(Fraction(0), 0.5),),
+            scope="role",
+        )
+    with pytest.raises(ValueError, match="cannot have a scope_id"):
+        AutomationLane(
+            "synth.gain",
+            (AutomationPoint(Fraction(0), 0.5),),
+            scope_id="lead",
+        )
+
+
+def test_deterministic_source_generators_are_bounded_and_reproducible():
+    definitions = (
+        AutomationSource(
+            "lfo-a", "lfo", Fraction(0), Fraction(8),
+            parameters={"period_beats": 2, "waveform": "triangle", "sample_count": 17},
+            minimum=0.1, maximum=0.9,
+        ),
+        AutomationSource(
+            "env-a", "envelope", Fraction(0), Fraction(8),
+            parameters={"shape": [[0, 0], [0.2, 1], [1, 0.25]]},
+        ),
+        AutomationSource(
+            "steps-a", "stepped", Fraction(0), Fraction(8),
+            parameters={"values": [0.1, 0.8, 0.35], "step_beats": "1/2"},
+        ),
+        AutomationSource(
+            "walk-a", "random_walk", Fraction(0), Fraction(8),
+            parameters={"step_beats": "1/2", "step_size": 0.18, "initial": 0.5},
+            seed=214,
+        ),
+        AutomationSource(
+            "phrase-a", "phrase_curve", Fraction(0), Fraction(8),
+            parameters={"values": [0.0, 0.8, 0.3, 1.0]},
+        ),
+    )
+    for source in definitions:
+        first = source.to_lane()
+        second = source.to_lane()
+        assert first.to_dict() == second.to_dict()
+        assert all(source.minimum <= point.value <= source.maximum for point in first.points)
+        assert first.points[0].at == source.start
+        assert first.points[-1].at == source.end
+
+    walk = definitions[3]
+    other_identity = AutomationSource(
+        "walk-b", "random_walk", Fraction(0), Fraction(8),
+        parameters=walk.parameters, seed=walk.seed,
+    )
+    assert [p.value for p in walk.to_lane().points] != [
+        p.value for p in other_identity.to_lane().points
+    ]
+
+
+def test_lfo_modulation_supports_explicit_event_retrigger_phase():
+    source = AutomationSource(
+        "slow-pulse",
+        "lfo",
+        Fraction(0),
+        Fraction(4),
+        parameters={
+            "period_beats": 4,
+            "phase_cycles": 0.25,
+            "center": 0.5,
+            "depth": 0.5,
+            "sample_count": 9,
+        },
+    )
+    lane = AutomationLane(
+        "synth.pitch",
+        (AutomationPoint(Fraction(0), 0.0),),
+        unit="semitones",
+    )
+    modulation = AutomationModulation(
+        source_id="slow-pulse",
+        destination_target_id="synth.pitch",
+        amount=6.0,
+        polarity="bipolar",
+        retrigger="event",
+    )
+    bus = AutomationControlBus(
+        (lane,),
+        _timeline(),
+        sources=(source,),
+        modulations=(modulation,),
+        event_contexts={"note-a": {"event_onset_frame": 48_000}},
+    )
+
+    assert bus.value_for_context(
+        "synth.pitch", 48_000, event_id="note-a"
+    ) == pytest.approx(6.0)
+    assert bus.value_at_frame("synth.pitch", 48_000) == pytest.approx(-6.0)
+
+
+def test_control_rate_smoothing_and_hysteresis_reduce_small_steps():
+    lane = AutomationLane(
+        "synth.gain",
+        (
+            AutomationPoint(Fraction(0), 0.0),
+            AutomationPoint(Fraction(1), 0.6),
+        ),
+        unit="normalized",
+        smoothing_seconds=0.25,
+        hysteresis=0.05,
+    )
+    bus = AutomationControlBus((lane,), _timeline())
+    samples = bus.sample(
+        "synth.gain", 0, 36_001, step_frames=12_000
+    )
+
+    assert samples.frames.tolist() == [0, 12_000, 24_000, 36_000]
+    assert samples.values[0] == pytest.approx(0.0)
+    assert samples.values[1] < 0.3
+    assert samples.values[2] > samples.values[1]
+    assert samples.values[2] < 0.6
+
+
+def test_score_round_trip_preserves_scopes_sources_and_modulation():
+    score = Score(
+        title="M18 serialisation fixture",
+        automation=(
+            AutomationLane(
+                "synth.cutoff",
+                (
+                    AutomationPoint(Fraction(0), 500.0),
+                    AutomationPoint(Fraction(8), 4_000.0),
+                ),
+                unit="Hz",
+                scope="role",
+                scope_id="melody",
+                value_mode="relative",
+                smoothing_seconds=0.04,
+                hysteresis=1.5,
+            ),
+        ),
+        automation_sources=(
+            AutomationSource(
+                "breathing", "lfo", Fraction(0), Fraction(8),
+                parameters={"period_beats": 8, "depth": 0.2},
+                seed=23,
+            ),
+        ),
+        modulations=(
+            AutomationModulation(
+                "breathing", "synth.cutoff", amount=800.0,
+                retrigger="section", smoothing_seconds=0.03,
+            ),
+        ),
+    )
+
+    restored = Score.from_dict(score.to_dict())
+    assert restored.to_dict() == score.to_dict()
+
+
+def test_old_score_json_without_m18_fields_remains_readable():
+    old_record = {
+        "format": "eli_lab_reawarp_score",
+        "schema_version": 1,
+        "title": "Legacy M17 score",
+        "ppq": 960,
+        "events": [],
+        "automation": [{
+            "target_id": "synth.gain",
+            "points": [{"at": "0", "value": 0.5}],
+            "unit": "normalized",
+        }],
+    }
+    score = Score.from_dict(old_record)
+    assert score.automation[0].scope == "global"
+    assert score.automation[0].value_mode == "absolute"
+    assert score.automation_sources == ()
+    assert score.modulations == ()
+
+
+def test_score_renderer_installs_generated_sources_and_event_phase_context():
+    score = Score(
+        events=(
+            MusicalEvent(
+                event_id="lead-note",
+                voice_id="lead",
+                onset_beats=Fraction(2),
+                duration_beats=Fraction(1),
+                kind="note",
+                frequency_hz=440.0,
+                parameters={"section_id": "B"},
+            ),
+        ),
+        automation_sources=(
+            AutomationSource(
+                "pulse", "lfo", Fraction(0), Fraction(4),
+                parameters={"period_beats": 4, "phase_cycles": 0.25, "sample_count": 9},
+            ),
+        ),
+        modulations=(
+            AutomationModulation(
+                "pulse", "synth.pitch", amount=6.0, retrigger="event"
+            ),
+        ),
+    )
+    result = ScoreRenderer().render(score, 48_000)
+
+    assert "source.pulse" in result.controls.target_ids
+    assert result.controls.value_for_context(
+        "synth.pitch",
+        result.schedule[0].start_frame,
+        event_id="lead-note",
+    ) == pytest.approx(6.0)
+    assert np.isfinite(result.stems["lead"]).all()
+
+
+def test_source_time_stays_beat_addressed_through_tempo_ramps():
+    tempo = TempoMap((
+        TempoPoint(Fraction(0), 120.0, "linear"),
+        TempoPoint(Fraction(8), 60.0, "step"),
+    ))
+    timeline = RenderTimeline(48_000, tempo, MeterMap())
+    source = AutomationSource(
+        "ramp-pulse", "phrase_curve", Fraction(0), Fraction(8),
+        parameters={"values": [0.0, 1.0]},
+    )
+    bus = AutomationControlBus(
+        (), timeline, sources=(source,)
+    )
+
+    middle = timeline.beat_to_frame(Fraction(4))
+    end = timeline.beat_to_frame(Fraction(8))
+    assert bus.value_at_frame("source.ramp-pulse", middle) == pytest.approx(0.5, abs=0.002)
+    assert bus.value_at_frame("source.ramp-pulse", end) == pytest.approx(1.0)
