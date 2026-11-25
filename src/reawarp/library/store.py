@@ -191,6 +191,36 @@ class SampleLibrary:
             );
             CREATE INDEX IF NOT EXISTS idx_projects_family
                 ON projects(family_id);
+
+            CREATE TABLE IF NOT EXISTS sound_objects (
+                patch_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                source_identity_id TEXT NOT NULL,
+                processing_identity_id TEXT NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                tags_json TEXT NOT NULL,
+                patch_json TEXT NOT NULL,
+                indexed_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_sound_objects_name
+                ON sound_objects(name COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_sound_objects_identity
+                ON sound_objects(source_identity_id, processing_identity_id);
+
+            CREATE TABLE IF NOT EXISTS sound_object_variants (
+                variant_id TEXT PRIMARY KEY,
+                patch_id TEXT NOT NULL REFERENCES sound_objects(patch_id)
+                    ON DELETE CASCADE,
+                asset_id TEXT NOT NULL REFERENCES assets(asset_id)
+                    ON DELETE CASCADE,
+                seed INTEGER NOT NULL,
+                source_hashes_json TEXT NOT NULL,
+                transformations_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(patch_id, asset_id, seed, transformations_json)
+            );
+            CREATE INDEX IF NOT EXISTS idx_sound_object_variants_patch
+                ON sound_object_variants(patch_id);
             """
         )
         self._connection.commit()
@@ -653,3 +683,183 @@ class SampleLibrary:
         return hashlib.sha256(
             _canonical_json(record.get("config") or {}).encode("utf-8")
         ).hexdigest()[:24]
+
+
+    def save_sound_object(self, patch: Any, *, tags: Iterable[str] = ()) -> str:
+        """Persist one validated patch, retaining source and processing identities."""
+        from reawarp.synthesis.sound_object import SoundObjectPatch
+
+        value = patch if isinstance(patch, SoundObjectPatch) else SoundObjectPatch.from_dict(patch)
+        for source in value.sources:
+            if source.asset_id:
+                asset = self.get_asset(source.asset_id)
+                if asset is None:
+                    raise KeyError(f"sound-object source asset not found: {source.asset_id}")
+                if asset.sha256.casefold() != str(source.asset_sha256).casefold():
+                    raise ValueError(
+                        f"sound-object source hash does not match indexed asset: {source.asset_id}"
+                    )
+        canonical = _canonical_json(value.to_dict())
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+        normalized_tags = set(self._normalize_tags(tags))
+        normalized_tags.update({
+            "sound-object", value.name.casefold(), value.patch_id.casefold(),
+            value.source_identity_id.casefold(), value.processing_identity_id.casefold(),
+        })
+        indexed_at = datetime.now(timezone.utc).isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO sound_objects (
+                patch_id, name, source_identity_id, processing_identity_id,
+                content_sha256, tags_json, patch_json, indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(patch_id) DO UPDATE SET
+                name=excluded.name,
+                source_identity_id=excluded.source_identity_id,
+                processing_identity_id=excluded.processing_identity_id,
+                content_sha256=excluded.content_sha256,
+                tags_json=excluded.tags_json,
+                patch_json=excluded.patch_json,
+                indexed_at=excluded.indexed_at
+            """,
+            (
+                value.patch_id, value.name, value.source_identity_id,
+                value.processing_identity_id, digest,
+                _canonical_json(sorted(normalized_tags)), canonical, indexed_at,
+            ),
+        )
+        self._connection.commit()
+        return digest
+
+    def get_sound_object(self, patch_id: str):
+        """Load and validate one patch from the sound-object catalogue."""
+        from reawarp.synthesis.sound_object import SoundObjectPatch
+
+        row = self._connection.execute(
+            "SELECT patch_json FROM sound_objects WHERE patch_id = ?",
+            (str(patch_id),),
+        ).fetchone()
+        return None if row is None else SoundObjectPatch.from_dict(json.loads(row["patch_json"]))
+
+    def search_sound_objects(
+        self, *, query: str | None = None, tags: Iterable[str] = (),
+        source_identity_id: str | None = None,
+        processing_identity_id: str | None = None, limit: int = 20,
+    ):
+        """Search sound-object patches by name, identity and tags."""
+        from reawarp.synthesis.sound_object import SoundObjectPatch
+
+        if limit < 1:
+            raise ValueError("limit must be positive")
+        needle = (query or "").strip().casefold()
+        required = set(self._normalize_tags(tags))
+        rows = self._connection.execute(
+            "SELECT patch_json, tags_json FROM sound_objects "
+            "ORDER BY name COLLATE NOCASE, patch_id"
+        ).fetchall()
+        result = []
+        for row in rows:
+            patch = SoundObjectPatch.from_dict(json.loads(row["patch_json"]))
+            row_tags = set(json.loads(row["tags_json"]))
+            if required and not required.issubset(row_tags):
+                continue
+            if source_identity_id and patch.source_identity_id != source_identity_id:
+                continue
+            if processing_identity_id and patch.processing_identity_id != processing_identity_id:
+                continue
+            searchable = " ".join((
+                patch.name, patch.patch_id, patch.source_identity_id,
+                patch.processing_identity_id, " ".join(sorted(row_tags)),
+            )).casefold()
+            if needle and needle not in searchable:
+                continue
+            result.append(patch)
+            if len(result) >= limit:
+                break
+        return result
+
+    def record_sound_object_variant(
+        self, patch_id: str, asset_id: str, *, seed: int,
+        source_hashes: Iterable[str] | None = None,
+        transformations: Iterable[Any] = (),
+    ) -> str:
+        """Attach one rendered audio asset with deterministic lineage metadata."""
+        from reawarp.synthesis.sound_object import TransformationRecord
+
+        patch = self.get_sound_object(patch_id)
+        if patch is None:
+            raise KeyError(f"sound-object patch not found: {patch_id}")
+        asset = self.get_asset(asset_id)
+        if asset is None:
+            raise KeyError(f"sound-object variant asset not found: {asset_id}")
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ValueError("variant seed must be an integer")
+        hashes = tuple(sorted(
+            str(item).casefold() for item in (
+                source_hashes if source_hashes is not None else patch.source_hashes
+            )
+        ))
+        if any(
+            len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value)
+            for value in hashes
+        ):
+            raise ValueError("variant source_hashes must contain SHA-256 digests")
+        records = []
+        for item in transformations:
+            record = (
+                item if isinstance(item, TransformationRecord)
+                else TransformationRecord.from_dict(item)
+            )
+            records.append(record.to_dict())
+        transforms_json = _canonical_json(records)
+        hashes_json = _canonical_json(list(hashes))
+        variant_id = hashlib.sha256(
+            f"{patch.patch_id}|{asset.asset_id}|{seed}|{transforms_json}".encode("utf-8")
+        ).hexdigest()[:24]
+        created_at = datetime.now(timezone.utc).isoformat()
+        self._connection.execute(
+            """
+            INSERT INTO sound_object_variants (
+                variant_id, patch_id, asset_id, seed,
+                source_hashes_json, transformations_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(patch_id, asset_id, seed, transformations_json) DO UPDATE SET
+                source_hashes_json=excluded.source_hashes_json,
+                created_at=excluded.created_at
+            """,
+            (
+                variant_id, patch.patch_id, asset.asset_id, int(seed),
+                hashes_json, transforms_json, created_at,
+            ),
+        )
+        self._connection.commit()
+        return variant_id
+
+    def sound_object_variants(self, patch_id: str) -> list[dict[str, Any]]:
+        """List a patch's audio variants with indexed descriptors and lineage."""
+        if self.get_sound_object(patch_id) is None:
+            raise KeyError(f"sound-object patch not found: {patch_id}")
+        rows = self._connection.execute(
+            """
+            SELECT v.variant_id, v.patch_id, v.asset_id, v.seed,
+                   v.source_hashes_json, v.transformations_json, v.created_at,
+                   a.path, a.sha256, a.feature_json
+            FROM sound_object_variants v
+            JOIN assets a ON a.asset_id = v.asset_id
+            WHERE v.patch_id = ?
+            ORDER BY v.created_at, v.variant_id
+            """,
+            (str(patch_id),),
+        ).fetchall()
+        return [{
+            "variant_id": str(row["variant_id"]),
+            "patch_id": str(row["patch_id"]),
+            "asset_id": str(row["asset_id"]),
+            "seed": int(row["seed"]),
+            "source_hashes": json.loads(row["source_hashes_json"]),
+            "transformations": json.loads(row["transformations_json"]),
+            "created_at": str(row["created_at"]),
+            "path": str(row["path"]),
+            "asset_sha256": str(row["sha256"]),
+            "features": json.loads(row["feature_json"]),
+        } for row in rows]

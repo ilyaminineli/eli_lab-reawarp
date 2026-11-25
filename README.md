@@ -254,6 +254,10 @@ M16 adds the score-native offline renderer, tempo-map-aware frame scheduling, me
 
 The Score API can carry inspectable arrangement intent: asymmetric rational-beat phrases, independently phased cycles, pairwise role grammars, foreground/midground/background/absence spans, explicit hand-offs and per-domain mutation permissions. Plans round-trip through Score JSON and Reawarp MIDI metadata without changing playback scheduling. Register/spectral overlap inspection emits heuristic warnings only, never a quality score. See [M20](docs/M20.md).
 
+### Sound-object and hybrid instrument architecture (M21 foundation)
+
+The M21 API provides versioned sound-object patches with separate source/processing identity, transient/body/tail layers, envelopes, spectral and pitch metadata, coherent modulation, spatial intent and transformation lineage. A NumPy hybrid renderer returns exact-frame layer solos, a summed stereo render and phase/mono/headroom diagnostics, and can be registered as a normal Score voice with typed automation. The editor-facing model publishes field units/ranges/choices. Opt-in modal-resonator and additive-partial voices are included; existing voice defaults are unchanged. Patch-scoped automation targets and SQLite searchable patch/rendered-variant lineage are available. See [M21](docs/M21.md) and run `python scripts/benchmark_sound_objects.py` to measure voice-family and hybrid render costs on the target machine.
+
 ## Determinism
 
 The root seed is split into named NumPy random streams using a stable hash. Pattern, synthesis, profile-selection, and break-processing streams are independent. Regenerating one lane therefore does not change unrelated generated lanes. Repeated renders with the same application version, configuration, seed, and dependency environment produce identical floating-point stems.
