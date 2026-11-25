@@ -672,7 +672,10 @@ class AutomationControlBus:
             }[modulation.retrigger]
             origin = resolved_context.get(origin_key) if origin_key else None
             source_frame = max(0, int(frame) - int(origin)) if origin is not None else int(frame)
-            source_value = source_lane.evaluate(self._lane_position(source_lane, source_frame))
+            source_position = self._lane_position(source_lane, source_frame)
+            if origin is not None:
+                source_position += self._sources[modulation.source_id].start
+            source_value = source_lane.evaluate(source_position)
             signal = (
                 2.0 * source_value - 1.0
                 if modulation.polarity == "bipolar"
