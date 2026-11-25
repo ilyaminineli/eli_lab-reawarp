@@ -183,14 +183,22 @@ class PitchField:
                                 abs_tol=1e-7) for value in self.pitch_collection)
         )
         allowed_intervals = (
-            not self.allowed_intervals or self.centre_pitch is None
-            or any(math.isclose(abs(pitch - self.centre_pitch), value, abs_tol=1e-7)
-                   for value in self.allowed_intervals)
+            not self.allowed_intervals
+            or self.centre_pitch is None
+            or any(
+                math.isclose(
+                    abs(pitch - self.centre_pitch), value, abs_tol=1e-7
+                )
+                for value in self.allowed_intervals
+            )
         )
         allowed = in_range and allowed_collection and allowed_intervals
         key = f"{pitch:g}"
-        stability = float((self.stability_weights or {}).get(key, 0.0))
-        tension = float((self.tension_weights or {}).get(key, 0.0))
+        pitch_class_key = f"{pitch % tuning.divisions_per_period:g}"
+        stability_weights = self.stability_weights or {}
+        tension_weights = self.tension_weights or {}
+        stability = float(stability_weights.get(key, stability_weights.get(pitch_class_key, 0.0)))
+        tension = float(tension_weights.get(key, tension_weights.get(pitch_class_key, 0.0)))
         return PitchCandidate(
             pitch=pitch,
             frequency_hz=tuning.frequency_for_pitch(pitch),
