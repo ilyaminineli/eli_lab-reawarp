@@ -2946,6 +2946,14 @@ class MainWindow(QMainWindow):
             )
         self._fx_queued_signature = None
         self._refresh_preview()
+        pending_export = self._pending_export_destination
+        if (
+            pending_export is not None
+            and signature == self._routing_signature()
+            and self._fx_routing_metadata.get("_routing_signature") == signature
+        ):
+            self._pending_export_destination = None
+            self._start_delivery_export(pending_export)
 
     def _fx_render_failed(self, signature: str, message: str) -> None:
         if self._fx_pending_signature != signature:
@@ -2981,6 +2989,22 @@ class MainWindow(QMainWindow):
             )
         self._fx_queued_signature = None
         self._refresh_preview()
+        pending_export = self._pending_export_destination
+        if cancelled and pending_export is not None:
+            self._pending_export_destination = None
+            self.export_button.setEnabled(self.project is not None)
+            self.statusBar().showMessage(
+                "FX rendering was cancelled; the queued delivery export was cancelled too.",
+                10000,
+            )
+        elif (
+            pending_export is not None
+            and signature == self._routing_signature()
+            and self._fx_routing_metadata.get("_routing_signature") == signature
+            and self._fx_routing_metadata.get("fallback") == "dry_source_stems"
+        ):
+            self._pending_export_destination = None
+            self._start_delivery_export(pending_export)
 
     def _audition_fx_component(self, stage: str, stem: str) -> None:
         """Audition direct/insert/send/return/master stages from the cached routing pass."""
