@@ -31,7 +31,7 @@ class StemRow(QFrame):
 
         layout.addWidget(QLabel("GAIN"))
         self.gain = QSlider(Qt.Orientation.Horizontal)
-        self.gain.setRange(0, 150)
+        self.gain.setRange(0, 400)
         self.gain.setValue(100)
         self.gain.setFixedWidth(100)
         self.gain.valueChanged.connect(self.changed.emit)
