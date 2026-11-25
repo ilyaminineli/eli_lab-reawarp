@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
         self._fx_worker: CancellableRenderWorker | None = None
         self._fx_pending_signature: str | None = None
         self._fx_queued_signature: str | None = None
+        self._fx_project_revision = 0
         self._tray_available = QSystemTrayIcon.isSystemTrayAvailable()
         self._tray_icon: QSystemTrayIcon | None = None
         self.player = AudioPlayer(self)
@@ -1394,6 +1395,7 @@ class MainWindow(QMainWindow):
         self.player.stop()
         self._playback_stopped()
         self.project = result
+        self._fx_project_revision += 1
         self.score_automation_editor.set_score(result.to_score())
         if self._fx_worker is not None:
             self._fx_worker.cancel()
@@ -1572,6 +1574,7 @@ class MainWindow(QMainWindow):
             for name, row in self._mix_rows.items()
         }
         payload = {
+            "project_revision": self._fx_project_revision,
             "routing": self.fx_routing_editor.routing(),
             "automation": self.fx_automation_editor.automation(),
             "mixer": mixer_state,
