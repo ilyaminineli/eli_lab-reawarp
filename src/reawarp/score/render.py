@@ -75,6 +75,19 @@ def _stable_event_seed(event: MusicalEvent) -> int:
     return int.from_bytes(digest, "little", signed=False)
 
 
+def _stable_event_probability_seed(event: MusicalEvent) -> int:
+    """Use the parent hit's identity for generated sample/break trigger events."""
+    if event.seed is not None:
+        return int(event.seed)
+    event_id = event.event_id
+    for prefix in ("sample-trigger-", "sample-break-"):
+        if event_id.startswith(prefix):
+            event_id = event_id[len(prefix):]
+            break
+    digest = hashlib.blake2b(event_id.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "little", signed=False)
+
+
 def _default_voice_renderer(
     scheduled: ScheduledScoreEvent,
     sample_rate: int,
@@ -267,8 +280,8 @@ class ScoreRenderer:
                     "event.probability", scheduled.start_frame,
                     event_id=event.event_id, default_value=1.0,
                 ), 0.0, 1.0))
-                draw = _stable_event_seed(event) / float(2**64)
-                if draw >= probability:
+                threshold = int(probability * (1 << 64))
+                if _stable_event_probability_seed(event) >= threshold:
                     continue
             if event_gain <= 0.0:
                 continue
@@ -294,9 +307,9 @@ class ScoreRenderer:
             if rendered.ndim == 1:
                 pan = float(event.parameters.get("pan", 0.0))
                 if "spatial.pan" in controls.target_ids:
-                    pan += controls.value_for_context(
+                    pan = controls.value_for_context(
                         "spatial.pan", scheduled.start_frame,
-                        event_id=event.event_id, default_value=0.0,
+                        event_id=event.event_id, default_value=pan,
                     )
                 if not math.isfinite(pan):
                     raise ValueError(f"event {event.event_id!r} has a non-finite pan value")
