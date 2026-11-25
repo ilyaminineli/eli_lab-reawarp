@@ -212,8 +212,6 @@ class PitchField:
             )
         )
         allowed = in_range and allowed_collection and allowed_intervals
-        if self.mode == "centred" and self.centre_pitch is not None:
-            stability += self.centre_weight / (1.0 + abs(pitch - self.centre_pitch))
         key = f"{pitch:g}"
         pitch_class_key = f"{pitch % tuning.divisions_per_period:g}"
         stability_weights = self.stability_weights or {}
