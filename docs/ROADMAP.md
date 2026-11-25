@@ -119,7 +119,7 @@ Target-Windows performance profiling and critical listening remain cross-cutting
 - Repeated rendering of the same score is deterministic within the documented environment contract.
 - Synthesis and FX callbacks can evaluate typed control lanes on the same absolute frame clock.
 - Existing project exports remain readable and new exports contain renderer and generation provenance.
-- The legacy Generator no longer maintains a parallel seconds-based event timeline; this final criterion remains open.
+- M17.5 completed the event-scheduling criterion: the production `generate()` path plans and renders from rational-beat Score data, with `generate_legacy()` retained only for controlled compatibility comparisons.
 
 See M16.md for implementation details and the score-render API.
 ## M17: Canonical score-native composition pipeline
