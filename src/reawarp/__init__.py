@@ -14,7 +14,9 @@ from reawarp.synthesis.score_voices import build_production_voice_renderers
 from reawarp.score import (
     AutomationControlBus,
     AutomationLane,
+    AutomationModulation,
     AutomationSamples,
+    AutomationSource,
     AutomationTarget,
     AutomationTargetRegistry,
     DEFAULT_AUTOMATION_TARGETS,
@@ -36,7 +38,9 @@ from reawarp.score import (
 __all__ = [
     "AutomationControlBus",
     "AutomationLane",
+    "AutomationModulation",
     "AutomationSamples",
+    "AutomationSource",
     "AutomationTarget",
     "AutomationTargetRegistry",
     "DEFAULT_AUTOMATION_TARGETS",
