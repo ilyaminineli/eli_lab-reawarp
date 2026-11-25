@@ -1,7 +1,7 @@
 # Reawarp roadmap — consolidated status and next milestones
 
 **Updated:** 2026-11-25  
-**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; its accepted CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18 now includes typed automation/source models, scoped ScoreRenderer consumers, per-note envelope/vibrato control across five melodic palettes, and Score-aware scope suggestions; its cross-platform CI matrix passes 129 tests on Linux Python 3.10–3.12 and Windows Python 3.11. Planner/FX expansion, M18 critical listening and M14 target-machine profiling/Pyo listening remain pending  
+**Current implementation baseline:** M17.5 canonical Score-first generation is implemented on `main`; its accepted CI matrix passed 107 tests on Linux Python 3.10–3.12 and Windows Python 3.11. M18 now includes typed automation/source models, scoped ScoreRenderer consumers, per-note envelope/vibrato control across five melodic palettes, Score-aware scope suggestions, selectable LFO waveforms and editable normalized source points; its cross-platform CI matrix passes 129 tests on Linux Python 3.10–3.12 and Windows Python 3.11. Planner/FX expansion, M18 critical listening and M14 target-machine profiling/Pyo listening remain pending  
 **Roadmap policy:** milestone documents describe implementation status and acceptance criteria. Proposed features must be labelled planned; they must not be presented as implemented.
 
 ## Product direction
@@ -159,7 +159,7 @@ See [M16 — Score-driven render core](M16.md) for the timing/render foundation 
 
 ## M18: Musical automation and control performance
 
-**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers, per-note ADSR/vibrato across five melodic palettes, and Score-aware scope suggestions are landed. Cross-platform CI passes (129 tests per job). Planner authoring, remaining synthesis/FX destinations and critical listening remain open.
+**Status:** Partially implemented on `main`. Scoped lane semantics, typed target validation, deterministic source generators, source-to-target modulation, ScoreRenderer consumers, per-note ADSR/vibrato across five melodic palettes, Score-aware scope suggestions, selectable LFO waveforms and editable normalized source points are landed. Cross-platform CI passes (129 tests per job). Planner authoring, remaining synthesis/FX destinations and critical listening remain open.
 
 **Goal:** Turn the typed control bus into a compositional instrument. Add inspectable and editable score trajectories for synthesis, role behaviour, spatial motion and selected FX parameters.
 
