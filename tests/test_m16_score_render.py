@@ -279,7 +279,7 @@ def test_engine_exposes_score_native_render_entrypoint_and_project_score_provena
 
     exported = project.export(tmp_path / "m16-export")
     project_record = json.loads((exported / "project.json").read_text(encoding="utf-8"))
-    assert project_record["renderer_version"] == "reawarp-score-renderer/1.0.0"
+    assert project_record["renderer_version"] == "reawarp-score-renderer/1.1.0"
     assert score.metadata["score_origin"] == "score_first_generation"
     assert project_record["render_provenance"]["frame_count"] == project.frame_count
 
