@@ -219,8 +219,19 @@ def test_phrase_workbench_shows_motif_invariants_and_exposes_context_audition():
 
 def test_main_window_phrase_workbench_freeze_and_restore_preserve_project_score():
     _application()
+    import threading
+    from dataclasses import replace
+
     window = MainWindow()
     window.project = _project()
+    # Keep this lifecycle test deterministic and focused on project/Score
+    # handoff; CI separately covers the actual Score render pipeline.
+    window._render_score_automation_project = (
+        lambda base, score, cancel_event=None: replace(base, score=score)
+    )
+    window._run_render = lambda operation, _message: setattr(
+        window, "project", operation(threading.Event())
+    )
     initial = window.project.to_score()
     window.phrase_workbench.set_score(initial)
 
