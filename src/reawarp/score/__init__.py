@@ -13,7 +13,7 @@ from reawarp.score.model import Score
 from reawarp.score.orchestration_intent import (
     AttentionSpan, CycleSpec, MutationPolicy, OrchestrationPlan, PhraseSpan,
     RoleRelationship, TransitionSpan, build_orchestration_plan,
-    inspect_attention_conflicts, inspect_event_onset_conflicts,
+    inspect_attention_conflicts, inspect_attention_handoffs, inspect_event_onset_conflicts,
 )
 from reawarp.score.planner import (
     melody_to_score_events,
@@ -60,7 +60,7 @@ from reawarp.score.time import (
 __all__ = [
     "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
-    "inspect_attention_conflicts", "inspect_event_onset_conflicts",
+    "inspect_attention_conflicts", "inspect_attention_handoffs", "inspect_event_onset_conflicts",
     "AutomationControlBus",
     "AutomationLane",
     "AutomationModulation",

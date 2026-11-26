@@ -40,6 +40,10 @@ from reawarp.fx_automation import (
     attach_fx_automation_to_score, fx_automation_registry,
 )
 from reawarp.score.render import build_score_control_bus
+from reawarp.score.orchestration_intent import OrchestrationPlan
+from reawarp.score.attention import (
+    build_attention_translation_check, record_attention_review,
+)
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
     classify_sample_role, default_sample_for_role, discover_bundled_samples,
@@ -59,6 +63,7 @@ from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.pages.variations import VariationBrowserPage
 from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
+from reawarp.ui.pages.attention_map import AttentionMapPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -204,13 +209,20 @@ class MainWindow(QMainWindow):
             self._phrase_comparison_audition_requested
         )
 
+        self.attention_map_page = AttentionMapPage(self)
+        self.attention_map_page.planChanged.connect(self._attention_plan_changed)
+        self.attention_map_page.reviewRequested.connect(self._attention_review_requested)
+        self.attention_map_page.translationCheckRequested.connect(
+            self._attention_translation_check_requested
+        )
+
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
         # code/tests that query the number of workspace pages.
         self.tabs = self.workspace_stack
         for workspace in (
             generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
-            self.variation_page, self.phrase_workbench,
+            self.variation_page, self.phrase_workbench, self.attention_map_page,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -222,6 +234,7 @@ class MainWindow(QMainWindow):
             ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
             ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
             ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
+            ("ATTENTION MAP", "Shape figure/ground roles, inspect overlaps and test mono/low-volume translation."),
         ]
         self.navigator = WorkspaceNavigator(
             [
@@ -230,6 +243,7 @@ class MainWindow(QMainWindow):
                     ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
                     ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
                     ("Phrase Workbench", "Develop phrase grammar, motif lineage and contextual candidates.", 6),
+                    ("Attention Map", "Assign foreground, midground, background and semantic orchestral roles.", 7),
                 ]),
                 ("PRODUCE", [
                     ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
@@ -287,7 +301,7 @@ class MainWindow(QMainWindow):
         title, description = self._workspace_info[index]
         self.workspace_title.setText(title)
         self.workspace_description.setText(description)
-        self.transport_bar.setVisible(index in (0, 2, 5))
+        self.transport_bar.setVisible(index in (0, 2, 5, 7))
 
     def _update_project_context(self) -> None:
         if self.project is None:
@@ -2189,6 +2203,92 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.phrase_workbench.set_error(f"Audio output unavailable: {exc}")
 
+
+    def _attention_plan_changed(self, payload: dict[str, Any]) -> None:
+        if self.project is None:
+            self.attention_map_page.set_error("Generate or load a composition before editing attention.")
+            return
+        try:
+            plan = OrchestrationPlan.from_dict(payload)
+            score = self.project.to_score()
+            metadata = copy.deepcopy(score.metadata)
+            metadata["perceptual_orchestration"] = plan.to_dict()
+            metadata["m29_attention_map"] = {
+                "schema_version": 1,
+                "updated_from": "attention_map_workbench",
+            }
+            updated = replace(
+                score,
+                orchestration_plan=plan.to_dict(),
+                metadata=metadata,
+            )
+            self.project.score = updated
+            self.project.metadata = {
+                **self.project.metadata,
+                "perceptual_orchestration": plan.to_dict(),
+                "m29_attention_map": metadata["m29_attention_map"],
+            }
+        except Exception as exc:
+            self.attention_map_page.set_error(f"Could not save attention map: {exc}")
+            return
+        self.attention_map_page.set_score(updated)
+        self.statusBar().showMessage(
+            "Attention intent saved to Score · project stems and mix are unchanged.",
+            6000,
+        )
+
+    def _attention_review_requested(self, payload: dict[str, Any]) -> None:
+        if self.project is None:
+            return
+        try:
+            score = self.project.to_score()
+            updated = record_attention_review(
+                score,
+                payload["warning"],
+                disposition=str(payload["disposition"]),
+                notes=str(payload.get("notes", "")),
+            )
+            self.project.score = updated
+            self.project.metadata = {
+                **self.project.metadata,
+                "m29_attention_reviews": copy.deepcopy(
+                    updated.metadata.get("m29_attention_reviews", {})
+                ),
+            }
+        except Exception as exc:
+            self.attention_map_page.set_error(f"Could not record attention review: {exc}")
+            return
+        self.attention_map_page.set_score(updated)
+        self.statusBar().showMessage(
+            f"Attention review recorded · {payload['disposition']}.",
+            6000,
+        )
+
+    def _attention_translation_check_requested(self, mode: str) -> None:
+        if self.project is None:
+            self.attention_map_page.set_error("Generate or load a composition before translation checks.")
+            return
+        try:
+            source = self.project.render_master()
+            audio = build_attention_translation_check(source, mode)
+            self.attention_map_page.set_translation_audio(
+                audio,
+                self.project.sample_rate,
+                (
+                    "Mono fold-down audition copy · project audio was not changed."
+                    if mode == "mono"
+                    else "−20 dB audition copy · project gain, stems and routing were not changed."
+                ),
+            )
+            self.player.stop()
+            self.player.start(
+                audio,
+                self.project.sample_rate,
+                device=self.output_device.currentData(),
+            )
+        except Exception as exc:
+            self.attention_map_page.set_error(f"Translation check failed: {exc}")
+
     def _clear_variation_session(self) -> None:
         self._variation_session_epoch += 1
         if hasattr(self, "variation_page"):
@@ -2985,6 +3085,7 @@ class MainWindow(QMainWindow):
         self._fx_project_revision += 1
         self.score_automation_editor.set_score(result.to_score())
         self.phrase_workbench.set_score(result.to_score())
+        self.attention_map_page.set_score(result.to_score())
         self._phrase_candidates.clear()
         if self._phrase_batch_worker is not None:
             self._phrase_batch_worker.cancel()

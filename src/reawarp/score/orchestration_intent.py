@@ -12,7 +12,7 @@ from typing import Any, Iterable, Sequence
 from reawarp.score.time import Beat, as_fraction
 
 PLAN_FORMAT = "eli_lab_reawarp_orchestration_plan"
-PLAN_SCHEMA_VERSION = 2
+PLAN_SCHEMA_VERSION = 3
 
 PHRASE_FUNCTIONS = frozenset({
     "proposition", "establishment", "development", "contrast", "suspension",
@@ -23,6 +23,11 @@ RELATION_KINDS = frozenset({
     "call_response", "antiphonal", "counterpoint", "convergence",
 })
 ATTENTION_DEPTHS = frozenset({"foreground", "midground", "background", "absence"})
+ATTENTION_ROLES = frozenset({
+    "unassigned", "anchor", "low_frequency_foundation", "primary_rhythm",
+    "counter_rhythm", "motif", "harmonic_field", "texture", "transition",
+    "spatial_bed",
+})
 TRANSITION_GESTURES = frozenset({
     "pickup", "fill", "riser", "subtraction", "hard_cut", "reverse_swell",
     "register_shift", "echo_handoff", "rhythmic_collapse", "silence_gate",
@@ -254,6 +259,13 @@ class AttentionSpan:
     register_high: float | None = None
     spectral_band: str | None = None
     reserved_silence: bool = False
+    attention_role: str = "unassigned"
+    onset_density: float | None = None
+    transient_strength: float | None = None
+    sustain: float | None = None
+    spatial_position: float | None = None
+    prominence: float | None = None
+    intentional_overlap_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "role", _text(self.role, "attention role"))
@@ -283,6 +295,30 @@ class AttentionSpan:
             raise ValueError("register_high must be >= register_low")
         if self.spectral_band is not None:
             object.__setattr__(self, "spectral_band", _text(self.spectral_band, "spectral_band"))
+        if self.attention_role not in ATTENTION_ROLES:
+            raise ValueError(f"unsupported semantic attention role: {self.attention_role}")
+        if self.intentional_overlap_id is not None:
+            object.__setattr__(
+                self, "intentional_overlap_id",
+                _text(self.intentional_overlap_id, "intentional_overlap_id"),
+            )
+        for name in ("onset_density", "transient_strength", "sustain",
+                     "spatial_position", "prominence"):
+            value = getattr(self, name)
+            if value is None:
+                continue
+            value = float(value)
+            if not (-float("inf") < value < float("inf")):
+                raise ValueError(f"{name} must be finite")
+            if name == "onset_density":
+                if value < 0.0:
+                    raise ValueError("onset_density cannot be negative")
+            elif name == "spatial_position":
+                if not -1.0 <= value <= 1.0:
+                    raise ValueError("spatial_position must be between -1 and 1")
+            elif not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be between zero and one")
+            object.__setattr__(self, name, value)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -295,6 +331,13 @@ class AttentionSpan:
             "register_high": self.register_high,
             "spectral_band": self.spectral_band,
             "reserved_silence": self.reserved_silence,
+            "attention_role": self.attention_role,
+            "onset_density": self.onset_density,
+            "transient_strength": self.transient_strength,
+            "sustain": self.sustain,
+            "spatial_position": self.spatial_position,
+            "prominence": self.prominence,
+            "intentional_overlap_id": self.intentional_overlap_id,
         }
 
     @classmethod
@@ -541,7 +584,7 @@ class OrchestrationPlan:
         if data.get("format") != PLAN_FORMAT:
             raise ValueError("unsupported orchestration plan format")
         version = int(data.get("schema_version", 0))
-        if version not in {1, PLAN_SCHEMA_VERSION}:
+        if version not in {1, 2, PLAN_SCHEMA_VERSION}:
             raise ValueError(f"unsupported orchestration plan schema version: {version}")
         return cls(
             phrases=tuple(PhraseSpan.from_dict(item) for item in data.get("phrases", ())),
@@ -588,8 +631,55 @@ def build_orchestration_plan(
     )
 
 
+def inspect_attention_handoffs(plan: OrchestrationPlan) -> tuple[dict[str, Any], ...]:
+    """Report incomplete or non-atomic foreground hand-offs at exact beat boundaries."""
+    grouped: dict[str, list[AttentionSpan]] = {}
+    for span in plan.attention:
+        if span.handoff_id:
+            grouped.setdefault(span.handoff_id, []).append(span)
+    warnings: list[dict[str, Any]] = []
+    for handoff_id, spans in sorted(grouped.items()):
+        reason = None
+        boundary = None
+        if len(spans) != 2:
+            reason = f"expected exactly two sides, found {len(spans)}"
+        elif spans[0].role == spans[1].role:
+            reason = "source and target roles must differ"
+        else:
+            shared = {
+                spans[0].end_beats if spans[0].end_beats == spans[1].start_beats else None,
+                spans[1].end_beats if spans[1].end_beats == spans[0].start_beats else None,
+            } - {None}
+            if len(shared) != 1:
+                reason = "handoff sides must meet at one exact beat boundary without a gap or overlap"
+            else:
+                boundary = str(next(iter(shared)))
+        if reason:
+            warnings.append({
+                "kind": "non_atomic_handoff",
+                "handoff_id": handoff_id,
+                "roles": sorted(span.role for span in spans),
+                "reason": reason,
+                "heuristic_only": False,
+            })
+        else:
+            warnings.append({
+                "kind": "atomic_handoff",
+                "handoff_id": handoff_id,
+                "roles": [span.role for span in spans],
+                "boundary_beats": boundary,
+                "valid": True,
+                "heuristic_only": False,
+            })
+    return tuple(warnings)
+
+
 def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any], ...]:
-    """Return optional interval/register/spectral warnings, never a quality score."""
+    """Return evidence-led competition prompts, never a numerical quality ranking.
+
+    Only overlapping spans with at least one explicit descriptor conflict are
+    reported. Matching intentional_overlap_id values identify a designed merge.
+    """
     warnings: list[dict[str, Any]] = []
     spans = sorted(
         plan.attention, key=lambda item: (item.start_beats, item.role, item.end_beats)
@@ -599,6 +689,11 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
             if right.start_beats >= left.end_beats:
                 break
             if left.role == right.role:
+                continue
+            if (
+                left.intentional_overlap_id is not None
+                and left.intentional_overlap_id == right.intentional_overlap_id
+            ):
                 continue
             register_overlap = (
                 left.register_low is not None and left.register_high is not None
@@ -610,15 +705,57 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
                 left.spectral_band is not None
                 and left.spectral_band == right.spectral_band
             )
-            if register_overlap or spectral_overlap:
+            transient_competition = (
+                left.transient_strength is not None
+                and right.transient_strength is not None
+                and left.transient_strength >= 0.70
+                and right.transient_strength >= 0.70
+            )
+            density_competition = (
+                left.onset_density is not None
+                and right.onset_density is not None
+                and left.onset_density >= 0.75
+                and right.onset_density >= 0.75
+            )
+            stereo_proximity = (
+                left.spatial_position is not None
+                and right.spatial_position is not None
+                and abs(left.spatial_position - right.spatial_position) <= 0.25
+            )
+            sustain_overlap = (
+                left.sustain is not None and right.sustain is not None
+                and left.sustain >= 0.70 and right.sustain >= 0.70
+                and (register_overlap or spectral_overlap)
+            )
+            evidence = []
+            if register_overlap:
+                evidence.append("overlapping register ranges")
+            if spectral_overlap:
+                evidence.append(f"shared spectral zone: {left.spectral_band}")
+            if transient_competition:
+                evidence.append("both roles have strong transient descriptors")
+            if density_competition:
+                evidence.append("both roles have high onset density (>= 0.75 events/beat)")
+            if stereo_proximity:
+                evidence.append("stereo positions are close (within 0.25 of normalized width)")
+            if sustain_overlap:
+                evidence.append("both roles have sustained energy in an overlapping zone")
+            if evidence:
                 warnings.append({
-                    "kind": "occupancy_overlap",
+                    "kind": "attention_competition",
                     "roles": [left.role, right.role],
+                    "semantic_roles": [left.attention_role, right.attention_role],
                     "start_beats": str(max(left.start_beats, right.start_beats)),
                     "end_beats": str(min(left.end_beats, right.end_beats)),
+                    "evidence": evidence,
                     "register_overlap": register_overlap,
                     "spectral_overlap": spectral_overlap,
+                    "transient_competition": transient_competition,
+                    "density_competition": density_competition,
+                    "stereo_proximity": stereo_proximity,
+                    "sustain_overlap": sustain_overlap,
                     "heuristic_only": True,
+                    "review_state": "unreviewed",
                 })
     return tuple(warnings)
 

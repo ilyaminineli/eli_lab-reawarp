@@ -68,7 +68,7 @@ def test_main_window_navigation_keeps_workspace_stack_and_transport_in_sync():
     window = MainWindow()
     expected_titles = [
         "GENERATOR", "BREAK LAB", "STEM MIXER", "FX LAB", "LIBRARY",
-        "VARIATION BROWSER", "PHRASE WORKBENCH",
+        "VARIATION BROWSER", "PHRASE WORKBENCH", "ATTENTION MAP",
     ]
 
     for index, expected_title in enumerate(expected_titles):
@@ -76,7 +76,7 @@ def test_main_window_navigation_keeps_workspace_stack_and_transport_in_sync():
         assert window.workspace_stack.currentIndex() == index
         assert window.workspace_title.text() == expected_title
         assert window.navigator.currentItem() is window.navigator._workspace_items[index]
-        assert window.transport_bar.isHidden() is (index not in (0, 2, 5))
+        assert window.transport_bar.isHidden() is (index not in (0, 2, 5, 7))
 
     window.navigator.itemClicked.emit(window.navigator._workspace_items[4], 0)
     assert window.workspace_stack.currentIndex() == 4
