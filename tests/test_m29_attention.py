@@ -316,7 +316,8 @@ def test_score_renderer_executes_attention_gesture_on_render_copy_only():
     assert result.schedule[0].event.pitch == pytest.approx(62)
     assert result.schedule[0].event.parameters["m29_attention_gesture_id"]
     assert np.max(np.abs(result.stems["melody"])) == pytest.approx(0.8 * 0.82)
-    assert source.events[0].pitch == 60
+    source_note = next(event for event in source.events if event.event_id == "lead-note")
+    assert source_note.pitch == 60
     assert "m29_attention_gestures" not in source.metadata
 
 
