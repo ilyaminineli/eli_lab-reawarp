@@ -1,8 +1,8 @@
 # Reawarp — M27–M34 development roadmap
 
 **Agent-facing technical roadmap · 26 November 2026**  
-**Status:** Planned; no M27–M34 implementation is claimed by this document.  
-**Current baseline:** M26 on main. The implemented baseline and open acceptance work are recorded in [MILESTONES.md](MILESTONES.md).
+**Status:** M27 and M28 are implemented with acceptance work open; M29 is in progress with the first Attention Map vertical slice.  
+**Current baseline:** M28 plus M29 attention-map work in progress. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -127,7 +127,7 @@ Move the centre of generation from isolated patterns and fixed bar-based section
 ## M29 — Perceptual Orchestration, Figure/Ground and Attention Map
 
 **Priority:** P1  
-**Status:** Planned  
+**Status:** In progress — Score-native attention descriptors, Attention Map workspace, evidence-led conflict diagnostics, human review provenance and non-destructive translation checks implemented; render-facing focus/recede operations and full listening acceptance remain open  
 **Depends on:** M27, M28; builds on M18, M20, M21, M22  
 **Primary guide basis:** Advanced Appendix §§1, 7, 18; Field Guide §§5, 23; Sound Design Guide §1.
 
@@ -138,6 +138,8 @@ Make orchestration decisions about what the listener notices, follows and rememb
 ### Scope
 
 - Add an arrangement-level attention map with foreground, midground, background, anchor, counter-rhythm, motif, harmonic field, transition and absence roles.
+- Persist semantic orchestration roles separately from depth and store optional onset-density, transient-strength, sustain, spatial-position, register and prominence descriptors. Score-derived estimates are symbolic proxies, not audio measurements.
+- Validate hand-off identity against exact rational-beat boundaries; incomplete hand-offs remain explicitly visible.
 - Allow role changes over phrase/section boundaries with explicit hand-offs and return identities.
 - Track spectral zone, register, onset density, transient strength, sustain, spatial position and intended prominence as descriptors—not rigid mix rules.
 - Add a masking/conflict inspector that reports possible competition in time, register, transient or stereo space and explains the evidence.
@@ -150,9 +152,10 @@ Make orchestration decisions about what the listener notices, follows and rememb
 
 - An arrangement can show which roles are intended to be perceptually dominant at any phrase.
 - A hand-off is atomic at a declared musical boundary; no partial intermediate scene is audible.
-- Warnings identify affected roles, time range and descriptor basis, and can be dismissed as intentional with provenance.
+- Warnings identify affected roles, time range and descriptor basis, and can be reviewed as useful, masked or unresolved with project/plan provenance. Matching intentional-merge IDs suppress expected overlap warnings.
 - “Foreground” can change without requiring master gain automation.
 - Mono/low-volume checks operate on analysis/audition copies and never rewrite production audio.
+- Focus/recede changes are explicit and reversible; when applied to sound they act through presence, register, articulation, density and space before gain. The current Attention Map slice edits declared depth/prominence only; render-facing operations remain follow-on work.
 - Human review can mark a conflict as useful, masked, or unresolved.
 
 ### Non-goals
