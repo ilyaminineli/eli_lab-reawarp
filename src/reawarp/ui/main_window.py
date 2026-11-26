@@ -79,6 +79,7 @@ from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
 from reawarp.ui.pages.attention_map import AttentionMapPage
 from reawarp.ui.pages.sound_object_editor import SoundObjectEditorPage
 from reawarp.ui.pages.arrangement_editor import ArrangementEditorPage
+from reawarp.ui.pages.composition_intent import CompositionIntentEditor
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -502,6 +503,11 @@ class MainWindow(QMainWindow):
         seed_widget.setLayout(seed_row)
         form.addRow("Random seed", seed_widget)
         form_layout.addWidget(global_group)
+        self.composition_intent_editor = CompositionIntentEditor()
+        self.composition_intent_editor.applyRequested.connect(
+            self._intent_apply_to_project
+        )
+        form_layout.addWidget(self.composition_intent_editor)
 
         axes_group = QGroupBox("COMPOSITION AXES")
         axes_form = QFormLayout(axes_group)
@@ -1494,7 +1500,10 @@ class MainWindow(QMainWindow):
         )
 
     def _apply_config_to_controls(self, config: GenerationConfig) -> None:
-        """Reflect a randomised GenerationConfig in the visible Generator controls."""
+        """Reflect a GenerationConfig in the visible Generator controls."""
+        self.bpm.setValue(config.bpm)
+        self.duration.setValue(config.duration)
+        self.seed.setText(str(config.seed))
         self.structure.setCurrentText(config.structure)
         self.composition_flow.setCurrentText(config.composition_flow)
         self.pattern_family.setCurrentText(config.pattern_family)
@@ -1564,14 +1573,87 @@ class MainWindow(QMainWindow):
     def _generate(self) -> None:
         try:
             config = self._read_config()
+            brief = None
+            bounded_exploration = False
+            if self.composition_intent_editor.has_user_content():
+                brief = self.composition_intent_editor.build_brief(config)
+                bounded_exploration = self.composition_intent_editor.exploration_enabled()
         except Exception as exc:
-            self._show_error(str(exc))
+            self._show_error(f"Could not compile composition intent: {exc}")
             return
         self._clear_variation_session()
         self._run_render(
-            lambda cancel_event: ReawarpEngine().generate(config, cancel_event=cancel_event),
-            "Generating full loop…",
+            lambda cancel_event: ReawarpEngine().generate(
+                config,
+                composition_brief=brief,
+                bounded_exploration=bounded_exploration,
+                cancel_event=cancel_event,
+            ),
+            "Resolving intent and generating full composition…",
         )
+
+    def _intent_apply_to_project(self) -> None:
+        """Attach the current authored brief to a loaded project without rerendering it."""
+        if self.project is None:
+            self.composition_intent_editor.set_status(
+                "Generate or load a project before applying a brief to project provenance."
+            )
+            return
+        try:
+            brief = self.composition_intent_editor.build_brief(self.project.config)
+            if not self.composition_intent_editor.has_user_content():
+                raise ValueError("Enter an artistic question, material, anchor, ending or mutation permission first.")
+            from reawarp.composition.brief import resolve_composition_brief
+
+            resolved = resolve_composition_brief(brief, self.project.config)
+            metadata = copy.deepcopy(self.project.metadata)
+            metadata.update({
+                "m27_composition_brief": brief.to_dict(),
+                "m27_resolved_intent": resolved.to_dict(),
+                "m27_bounded_exploration": None,
+                "m27_bounded_exploration_enabled": False,
+            })
+            self.project.metadata = metadata
+            self.composition_intent_editor.set_status(
+                "Brief and mutation permissions attached to the current project. "
+                "Audio is unchanged; bounded mutations take effect on the next generation."
+            )
+            self.statusBar().showMessage(
+                "M27 brief saved in project provenance · no audio was rerendered.", 8000
+            )
+        except Exception as exc:
+            self.composition_intent_editor.set_status(f"Cannot apply brief: {exc}")
+
+    def _restore_m27_generator_context(self, project: ReawarpProject) -> None:
+        """Restore visible generator values and the saved brief after project load/render."""
+        self._apply_config_to_controls(project.config)
+        for role, selector in self.sample_selectors.items():
+            selected_path = project.config.sample_paths.get(role)
+            if not selected_path:
+                continue
+            selected_path = str(selected_path)
+            index = selector.findData(selected_path)
+            if index < 0:
+                selector.addItem(Path(selected_path).name, selected_path)
+                index = selector.count() - 1
+            selector.setCurrentIndex(index)
+        self._break_path = project.config.sample_paths.get("break")
+        saved = project.metadata.get("m27_composition_brief")
+        if isinstance(saved, dict):
+            from reawarp.composition.brief import CompositionBrief
+
+            brief = CompositionBrief.from_dict(saved)
+            self.composition_intent_editor.set_brief(
+                brief,
+                exploration_enabled=bool(
+                    project.metadata.get("m27_bounded_exploration_enabled", False)
+                ),
+            )
+            self.composition_intent_editor.set_status(
+                "Restored saved M27 intent. Source choices and actual generated values are shown in Generator."
+            )
+        else:
+            self.composition_intent_editor.clear()
 
     def _apply_score_automation(self) -> None:
         """Apply the staged M18 score controls without mutating the source project."""
@@ -4043,6 +4125,7 @@ class MainWindow(QMainWindow):
         self.player.stop()
         self._playback_stopped()
         self.project = result
+        self._restore_m27_generator_context(result)
         asset_audit = result.metadata.get("project_asset_validation")
         file_audit = result.metadata.get("project_file_validation")
         audit_warnings = []
