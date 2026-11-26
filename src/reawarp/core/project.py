@@ -408,17 +408,85 @@ class ReawarpProject:
             resolved_intent = metadata.get("m27_resolved_intent")
             if not isinstance(resolved_intent, dict):
                 raise ValueError("project M27 brief is missing its resolved-intent provenance")
+            if resolved_intent.get("schema_version") != 1:
+                raise ValueError("unsupported project M27 resolved-intent schema")
             if resolved_intent.get("brief_fingerprint") != brief.fingerprint:
                 raise ValueError("project M27 brief fingerprint does not match its provenance")
             if resolved_intent.get("brief_id") != brief.brief_id:
                 raise ValueError("project M27 brief ID does not match its provenance")
             if resolved_intent.get("generation_seed") != config.seed:
                 raise ValueError("project M27 generation seed does not match its configuration")
+            if not isinstance(resolved_intent.get("source_families"), list):
+                raise ValueError("project M27 resolved source-family provenance is invalid")
+
             exploration = metadata.get("m27_bounded_exploration")
-            if exploration is not None and (
-                not isinstance(exploration, dict) or exploration.get("schema_version") != 1
-            ):
-                raise ValueError("project M27 bounded-exploration provenance is invalid")
+            exploration_enabled = metadata.get(
+                "m27_bounded_exploration_enabled", exploration is not None
+            )
+            if not isinstance(exploration_enabled, bool):
+                raise ValueError("project M27 exploration-enabled flag must be boolean")
+            if exploration_enabled != (exploration is not None):
+                raise ValueError("project M27 exploration flag and audit record disagree")
+            if exploration is not None:
+                if not isinstance(exploration, dict) or exploration.get("schema_version") != 1:
+                    raise ValueError("project M27 bounded-exploration provenance is invalid")
+                changes = exploration.get("field_changes")
+                seeds = exploration.get("seed_lineage")
+                preserved = exploration.get("preserved_fields")
+                applied = exploration.get("applied_contract_ids")
+                if (
+                    not isinstance(changes, dict) or not changes
+                    or not isinstance(seeds, dict)
+                    or not isinstance(preserved, list)
+                    or not isinstance(applied, list)
+                ):
+                    raise ValueError("project M27 exploration audit fields are malformed")
+                contracts = {item.contract_id: item for item in brief.mutation_contracts}
+                field_contracts: dict[str, Any] = {}
+                for contract in brief.mutation_contracts:
+                    for field_name in contract.mutable_fields:
+                        if field_name in field_contracts:
+                            raise ValueError(
+                                f"project M27 field {field_name!r} is permitted by multiple contracts"
+                            )
+                        field_contracts[field_name] = contract
+                if not set(changes) <= set(field_contracts):
+                    raise ValueError("project M27 exploration changed a field outside its contracts")
+                expected_seeds: dict[str, int] = {}
+                changed_contract_ids: set[str] = set()
+                config_values = config.to_dict()
+                from reawarp.core.random_streams import derive_seed
+
+                for field_name, change in changes.items():
+                    if not isinstance(change, dict) or not {"before", "after", "contract_id"} <= set(change):
+                        raise ValueError(f"project M27 change record for {field_name!r} is malformed")
+                    contract = field_contracts[field_name]
+                    if change["contract_id"] != contract.contract_id:
+                        raise ValueError(f"project M27 change for {field_name!r} names the wrong contract")
+                    changed_contract_ids.add(contract.contract_id)
+                    seed_name = (
+                        f"composition-brief:v{brief.schema_version}:"
+                        f"{brief.brief_id}:{contract.contract_id}:{contract.scale}:{field_name}"
+                    )
+                    expected_seeds[seed_name] = derive_seed(config.seed, seed_name)
+                    current_value = config_values.get(field_name)
+                    if json.dumps(current_value, sort_keys=True) != json.dumps(
+                        change["after"], sort_keys=True
+                    ):
+                        raise ValueError(
+                            f"project M27 final config does not match the recorded {field_name!r} mutation"
+                        )
+                if set(seeds) != set(expected_seeds):
+                    raise ValueError("project M27 seed lineage does not match changed fields")
+                for seed_name, expected_seed in expected_seeds.items():
+                    if seeds.get(seed_name) != expected_seed:
+                        raise ValueError(f"project M27 seed lineage is invalid for {seed_name!r}")
+                if set(applied) != changed_contract_ids or not set(applied) <= set(contracts):
+                    raise ValueError("project M27 applied contract IDs do not match changed fields")
+                if not set(preserved) >= {
+                    "seed", "sample_rate", "sample_paths", "sample_metadata", "sample_banks"
+                } or set(preserved) & set(changes):
+                    raise ValueError("project M27 preserved-field audit violates source/clock invariants")
         score_name = str(record.get("score_file", "score.json"))
         score_path = (root / score_name).resolve()
         if not score_path.is_relative_to(root) or not score_path.is_file():

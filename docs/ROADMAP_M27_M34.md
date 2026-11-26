@@ -48,7 +48,7 @@ These principles are the acceptance lens for every milestone below.
 ## M27 — Artistic Intent, Material Vocabulary and Mutation Contracts
 
 **Priority:** P0  
-**Status:** Partial — the versioned CompositionBrief/contract models exist in `composition/brief.py`, but current main-branch search found no source consumer, Generator Intent UI, project-level integration, brief resolver/execution path or dedicated M27 regression test. End-to-end integration remains unimplemented.  
+**Status:** Implemented for the Generator / GenerationConfig path. The existing versioned model is now connected to a Generator Intent editor, exact source-family resolution, deterministic bounded configuration exploration, project metadata persistence and project-load provenance validation. The current executable adapter applies each permitted GenerationConfig field once per generation; event-/pattern-/phrase-/section-local scheduling inside an arrangement remains a separate follow-on, not a claimed delivered behaviour.  
 **Depends on:** M15, M18, M20, M21, M23  
 **Primary guide basis:** Field Guide §§9, 12, 14, 17; Composition Atlas §§1–3; Advanced Appendix §§10.2, 13, 16–17.
 
@@ -487,32 +487,34 @@ The following paths are recommended service boundaries. Confirm current package 
 
 ### M27 implementation map — intent and mutation contracts
 
-**Likely modules**
-- src/reawarp/composition/brief.py — immutable CompositionBrief model, validation, serialization and defaults for legacy projects.
-- src/reawarp/composition/mutation.py — MutationContract, invariant checks, allowed-field application and mutation audit.
-- src/reawarp/composition/brief_compiler.py — deterministic resolution from brief + GenerationConfig + available assets into a validated composition request.
-- src/reawarp/ui/pages/composition_intent.py (or a Generator subpanel) — concise controls for the brief; no renderer code in the widget.
-- tests/test_composition_brief.py, tests/test_mutation_contracts.py — schema, compile, invariant and property tests.
+**Delivered implementation**
+- `src/reawarp/composition/brief.py` — versioned brief, source family and mutation contract models; strict validation; source identity resolver; independent deterministic field streams; bounded GenerationConfig adapter; explicit tempo/form policy.
+- `src/reawarp/ui/pages/composition_intent.py` — Generator intent editor; no renderer logic or project mutation in the widget.
+- `src/reawarp/ui/main_window.py` — compiles the authored brief against the current selected source/config snapshot before generation; applies a brief to an existing project without rerendering audio; restores the saved intent and effective GenerationConfig after project load/render.
+- `src/reawarp/core/engine.py` — resolves source identities and optional mutations before composition planning/rendering; records the brief, resolved source snapshot and field/seed audit in project metadata.
+- `src/reawarp/core/project.py` — validates the brief fingerprint, generation seed, resolved-intent version, mutation permissions, resulting config values and deterministic seed lineage when reopening an exported project.
+- `src/reawarp/composition/__init__.py` — exposes the supported M27 models and functions through the composition package API.
+- Tests: `tests/test_composition_brief.py`, `tests/test_mutation_contracts.py`, `tests/test_m27_integration.py`.
 
-**Suggested public concepts**
-- CompositionBrief: schema_version, artistic_question, listening_mode, anchor, materials, contrast_targets, pitch_world, ending_intent, source_asset_ids, notes.
-- MaterialIdentity: stable ID, role, source identity, perceptual signature/descriptor references and optional motif reference.
-- MutationContract: stable target ID, allowed fields, preserved fields, lower/upper bounds, scale, cadence, allowed boundaries, mutation policy, stop condition.
-- ResolvedCompositionIntent: immutable result showing selected materials, explicit invariants, mutable dimensions and unresolved source references.
+**Executable boundary**
+- Only fields listed in explicit MutationContracts are sampled. Each permitted field gets a stable independent seed derived from root seed, brief ID, contract ID, scale and field.
+- Root seed, sample rate, selected source paths, source metadata and sample banks are always immutable. BPM/duration/form are immutable unless their dedicated TempoFormPolicy explicitly permits exploration.
+- The GenerationConfig adapter currently applies at most one value per permitted field per generation request. Contract scale, cadence, decision boundary and stop condition remain validated intent/provenance; they do not yet schedule repeated event-/pattern-/phrase-/section-level changes during a piece.
+- The UI's **Apply Brief to Current Project** action changes provenance only; it does not rewrite rendered audio or Score events. Bounded exploration is separately opt-in for the next generation.
 
-**Design decisions to settle**
-- Whether a brief stores literal sample paths or logical asset IDs. Prefer IDs plus hashes; resolve paths through existing sample/project asset services.
-- Whether contracts target semantic role IDs, Score voice IDs or sound-object IDs. Avoid mixing these identity domains.
-- How global constraints intersect local contracts. Explicit conflicts should fail validation or require a visible resolution; never silently override one contract with another.
-- Whether legacy projects have an empty/legacy brief or an inferred read-only preview. Do not persist inferred intent as if the user authored it.
+**Design boundary retained**
+- The brief does not replace GenerationConfig, Score, phrase plans or sample identity. It compiles to validated GenerationConfig changes and a resolved-intent record; no second scheduler or hidden mutation loop is introduced.
+- Source references are verified by asset ID/hash where available and by exact role/path identity otherwise. Missing/changed references fail rather than selecting a substitute.
+- Legacy project loading returns a read-only legacy-unstructured brief view. It is not persisted unless the user authors and applies a new brief.
 
-**Minimum tests**
-- Stable serialization and schema version rejection.
-- Same brief/config/seed yields same resolved intent.
-- Changing one named local RNG stream leaves unrelated streams and structure unchanged.
-- A field outside may_change is rejected; a field inside must_preserve remains exact.
-- Missing asset IDs/hashes are reported without substitute sample selection.
-- Legacy projects load without an implicit brief write-back.
+**Minimum tests delivered**
+- Schema round-trip and unknown-field/version rejection.
+- Same brief/config/seed reproduces the same field selections and independent seed lineage.
+- Unpermitted fields, source/clock invariants, cross-contract invariant conflicts and unsupported execution cadence are rejected.
+- Source mismatch fails without substitution.
+- Project export/reopen preserves brief and mutation provenance; tampered fingerprints are rejected.
+- Generator UI round-trips materials, pitch intent, permissions and opt-in exploration.
+
 
 ### M28 implementation map — phrase grammar and frozen candidates
 

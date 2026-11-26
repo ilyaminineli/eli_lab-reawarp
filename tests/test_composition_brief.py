@@ -147,3 +147,24 @@ def test_pitch_world_exports_through_public_composition_api():
 
     assert PublicCompositionBrief is CompositionBrief
     assert callable(public_resolve)
+
+
+
+def test_pitch_world_only_counts_as_authored_when_nondefault_or_explicit():
+    from reawarp.composition.brief import PitchWorld
+
+    implicit_default = CompositionBrief(brief_id="no-pitch-intent")
+    assert implicit_default.has_user_content is False
+
+    authored_pitch = CompositionBrief(
+        brief_id="pitch-world-only",
+        pitch_world=PitchWorld(scale="whole_tone", root=5),
+    )
+    assert authored_pitch.has_user_content is True
+
+    explicit_default = CompositionBrief(
+        brief_id="explicit-chromatic-world",
+        pitch_world=PitchWorld(),
+        pitch_world_explicit=True,
+    )
+    assert explicit_default.has_user_content is True

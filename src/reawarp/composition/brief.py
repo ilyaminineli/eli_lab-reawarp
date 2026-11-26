@@ -857,7 +857,7 @@ class CompositionBrief:
         return bool(
             self.artistic_question or self.listening_mode or self.materials
             or self.anchor.kind != "none" or self.target_contrasts
-            or self.pitch_world_explicit
+            or self.pitch_world_explicit or self.pitch_world != PitchWorld()
             or self.ending_intent.mode != "unspecified"
             or self.mutation_contracts or self.notes
         )

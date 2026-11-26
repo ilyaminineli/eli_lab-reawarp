@@ -218,6 +218,7 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 ## Documentation
 
 - [Milestone history and current status](docs/MILESTONES.md) — delivered milestone ledger.
+- [M27 Artistic Intent and Mutation Contracts](docs/M27_ARTISTIC_INTENT.md) — Generator intent authoring, explicit mutation permissions, source identity and project provenance.
 - [M30 Ending Director design note](docs/M30_ENDING_DIRECTOR.md) — ending strategies, transition actuation and mutation boundaries.
 - [M32 Critical Listening design note](docs/M32_CRITICAL_LISTENING.md) — contextual audition, reversible subtraction, diagnostics and exportable human report.
 - [M33 Arrangement Editor design note](docs/M33_ARRANGEMENT_EDITOR.md) — manual Score-native arrangement, reversible edits, transition/ending cues, dry print-to-WAV and export lineage.

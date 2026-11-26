@@ -121,3 +121,25 @@ def test_generator_intent_editor_round_trips_materials_permissions_and_pitch_wor
     editor.close()
     restored.close()
     app.processEvents()
+
+
+
+def test_project_loader_rejects_tampered_m27_brief_fingerprint(tmp_path):
+    import json
+    import pytest
+
+    brief = CompositionBrief(
+        brief_id="tamper-check",
+        artistic_question="Preserve the pulse.",
+    )
+    project = ReawarpEngine().generate(
+        _config(), composition_brief=brief,
+    )
+    output = project.export(tmp_path / "tampered-m27-project", bit_depth=24)
+    record_path = output / "project.json"
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    record["metadata"]["m27_resolved_intent"]["brief_fingerprint"] = "0" * 64
+    record_path.write_text(json.dumps(record), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="fingerprint"):
+        ReawarpProject.load(output)
