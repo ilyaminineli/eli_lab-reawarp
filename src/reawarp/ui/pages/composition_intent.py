@@ -173,6 +173,10 @@ class CompositionIntentEditor(QGroupBox):
             "Stored as intent metadata. The current GenerationConfig renderer maps scale and root only."
         )
         pitch_form.addRow("Tuning identity", self.tuning_id)
+        self._pitch_world_explicit = False
+        self.pitch_scale.currentTextChanged.connect(self._mark_pitch_world_explicit)
+        self.pitch_root.currentIndexChanged.connect(self._mark_pitch_world_explicit)
+        self.tuning_id.textChanged.connect(self._mark_pitch_world_explicit)
         root.addWidget(pitch_group)
 
         policy_group = QGroupBox("TEMPO / FORM POLICY")
@@ -268,6 +272,9 @@ class CompositionIntentEditor(QGroupBox):
                 combo.addItem(role.title(), role)
         return combo
 
+    def _mark_pitch_world_explicit(self, *_args: Any) -> None:
+        self._pitch_world_explicit = True
+
     def selected_mutation_fields(self) -> tuple[str, ...]:
         return tuple(
             field_name for field_name, checkbox in self.mutation_checks.items()
@@ -284,6 +291,7 @@ class CompositionIntentEditor(QGroupBox):
             or any(field.text().strip() for field in self.material_labels.values())
             or self.anchor_kind.currentData() != "none"
             or self.contrast_label.text().strip()
+            or self._pitch_world_explicit
             or self.ending_mode.currentData() != "unspecified"
             or self.notes.text().strip()
             or self.selected_mutation_fields()
@@ -361,8 +369,14 @@ class CompositionIntentEditor(QGroupBox):
             form_mode=(
                 "explore" if {"structure", "composition_flow"} & selected else "preserve"
             ),
-            bpm_bounds=(self.bpm_min.value(), self.bpm_max.value()),
-            duration_bounds=(self.duration_min.value(), self.duration_max.value()),
+            bpm_bounds=(
+                (self.bpm_min.value(), self.bpm_max.value())
+                if "bpm" in selected else (60.0, 220.0)
+            ),
+            duration_bounds=(
+                (self.duration_min.value(), self.duration_max.value())
+                if "duration" in selected else (5.0, 180.0)
+            ),
         )
         scale = str(self.pitch_scale.currentText())
         root = int(self.pitch_root.currentData())
@@ -373,8 +387,11 @@ class CompositionIntentEditor(QGroupBox):
             materials=tuple(materials),
             anchor=anchor,
             pitch_world=PitchWorld(
-                scale=scale, root=root, tuning_id=self.tuning_id.text().strip() or "12tet",
+                scale=scale if self._pitch_world_explicit else config.melody_scale,
+                root=root if self._pitch_world_explicit else config.melody_root,
+                tuning_id=(self.tuning_id.text().strip() or "12tet"),
             ),
+            pitch_world_explicit=self._pitch_world_explicit,
             source_families=source_families,
             target_contrasts=contrasts,
             ending_intent=ending,
@@ -425,6 +442,7 @@ class CompositionIntentEditor(QGroupBox):
             max(0, self.pitch_root.findData(brief.pitch_world.root))
         )
         self.tuning_id.setText(brief.pitch_world.tuning_id)
+        self._pitch_world_explicit = brief.pitch_world_explicit
         for checkbox in self.mutation_checks.values():
             checkbox.setChecked(False)
         fields = {

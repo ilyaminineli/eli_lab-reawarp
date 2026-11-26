@@ -679,6 +679,7 @@ class CompositionBrief:
     materials: tuple[MaterialIdentity, ...] = ()
     anchor: AnchorSpec = AnchorSpec()
     pitch_world: PitchWorld = PitchWorld()
+    pitch_world_explicit: bool = False
     source_families: tuple[SourceFamily, ...] = ()
     target_contrasts: tuple[ContrastTarget, ...] = ()
     ending_intent: EndingIntent = EndingIntent()
@@ -712,6 +713,8 @@ class CompositionBrief:
         object.__setattr__(self, "anchor", anchor)
 
         pitch = self.pitch_world if isinstance(self.pitch_world, PitchWorld) else PitchWorld.from_dict(self.pitch_world)
+        if not isinstance(self.pitch_world_explicit, bool):
+            raise ValueError("pitch_world_explicit must be a boolean")
         object.__setattr__(self, "pitch_world", pitch)
         families = tuple(
             item if isinstance(item, SourceFamily) else SourceFamily.from_dict(item)
@@ -800,6 +803,7 @@ class CompositionBrief:
             "materials": [item.to_dict() for item in self.materials],
             "anchor": self.anchor.to_dict(),
             "pitch_world": self.pitch_world.to_dict(),
+            "pitch_world_explicit": self.pitch_world_explicit,
             "source_families": [item.to_dict() for item in self.source_families],
             "target_contrasts": [item.to_dict() for item in self.target_contrasts],
             "ending_intent": self.ending_intent.to_dict(),
@@ -820,7 +824,7 @@ class CompositionBrief:
         allowed = {
             "schema_version", "brief_id", "authorship", "structured",
             "artistic_question", "listening_mode", "materials", "anchor",
-            "pitch_world", "source_families", "target_contrasts",
+            "pitch_world", "pitch_world_explicit", "source_families", "target_contrasts",
             "ending_intent", "mutation_contracts", "tempo_form_policy", "notes",
         }
         unknown = set(record) - allowed
@@ -853,6 +857,7 @@ class CompositionBrief:
         return bool(
             self.artistic_question or self.listening_mode or self.materials
             or self.anchor.kind != "none" or self.target_contrasts
+            or self.pitch_world_explicit or self.pitch_world != PitchWorld()
             or self.ending_intent.mode != "unspecified"
             or self.mutation_contracts or self.notes
         )
@@ -1307,11 +1312,15 @@ def resolve_and_explore(
     # The pitch world is part of artistic intent and becomes the initial
     # generation vocabulary. Explicit mutation contracts may deliberately alter
     # it later; that difference remains visible in the exploration record.
-    config = replace(
-        config,
-        melody_scale=brief.pitch_world.scale,
-        melody_root=brief.pitch_world.root,
-    )
+    # Keep the GenerationConfig pitch settings unless the brief explicitly
+    # declares a pitch world. A default-valued PitchWorld must not silently
+    # reset a generator configuration that already selected another scale.
+    if brief.pitch_world_explicit or brief.pitch_world != PitchWorld():
+        config = replace(
+            config,
+            melody_scale=brief.pitch_world.scale,
+            melody_root=brief.pitch_world.root,
+        )
     resolved = resolve_composition_brief(brief, config)
     result = bounded_explore_generation_config(config, brief) if bounded_exploration else None
     selected = result.config if result is not None else config
