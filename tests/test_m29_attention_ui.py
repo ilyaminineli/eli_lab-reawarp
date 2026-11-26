@@ -151,6 +151,62 @@ def test_attention_map_estimates_symbolic_descriptors_and_exposes_translation_ch
     page.close()
 
 
+
+def test_main_window_applies_and_resets_render_gestures_through_project_score():
+    _application()
+    from reawarp.ui.main_window import MainWindow
+
+    base_score = Score(events=(
+        MusicalEvent(
+            "melody-note", "melody", 0, 1, kind="note",
+            pitch=60, velocity=0.75,
+        ),
+    ), orchestration_plan=OrchestrationPlan(attention=(
+        AttentionSpan("melody", 0, 4, "midground", attention_role="motif"),
+    )).to_dict())
+
+    class Project:
+        def __init__(self, score):
+            self.score = score
+            self.metadata = {}
+
+        def to_score(self):
+            return self.score
+
+    window = MainWindow()
+    window.project = Project(base_score)
+    rendered_scores = []
+
+    def render_stub(project, score, cancel_event=None):
+        del cancel_event
+        project.score = score
+        rendered_scores.append(score)
+        return project
+
+    window._render_score_automation_project = render_stub
+    window._run_render = lambda operation, _message: operation(None)
+
+    request = {
+        "role": "melody",
+        "start_beats": "0",
+        "end_beats": "4",
+        "action": "focus",
+        "register_shift_semitones": 2,
+    }
+    window._attention_gesture_requested(request)
+    assert len(rendered_scores) == 1
+    assert rendered_scores[-1].metadata["m29_attention_gestures"][0]["action"] == "focus"
+    assert rendered_scores[-1].events == base_score.events
+
+    window._attention_gesture_remove_requested({
+        "role": "melody", "start_beats": "0", "end_beats": "4",
+    })
+    assert len(rendered_scores) == 2
+    assert "m29_attention_gestures" not in rendered_scores[-1].metadata
+    assert rendered_scores[-1].events == base_score.events
+    window.close()
+
+
 def test_main_window_persists_attention_plan_and_review_without_rerendering():
     _application()
     from reawarp.ui.main_window import MainWindow
