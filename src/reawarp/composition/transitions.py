@@ -499,6 +499,15 @@ def transition_plans_from_score(score: Score) -> tuple[TransitionPlan, ...]:
     expected = score.metadata.get(_TRANSITION_FINGERPRINT_KEY)
     if expected and expected != _fingerprint([item.to_dict() for item in plans]):
         raise ValueError("M30 transition plan fingerprint does not match its contents")
+    by_id = {event.event_id: event for event in score.events}
+    for plan in plans:
+        for expected_marker in transition_marker_events(plan):
+            actual_marker = by_id.get(expected_marker.event_id)
+            if actual_marker != expected_marker:
+                raise ValueError(
+                    "M30 transition marker is missing or does not match its plan: "
+                    f"{plan.transition_id}/{expected_marker.tags[-1]}"
+                )
     return plans
 
 
