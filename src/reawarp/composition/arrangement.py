@@ -495,20 +495,25 @@ def move_clip(score: Score, clip_id: str, start_beats: Any) -> Score:
     if delta == 0:
         return score
     new_start, new_end = target, target + clip.duration_beats
+    phrase_plan, phrases = _phrase_map(score)
     selected_event_ids = set(clip.event_ids)
     events = tuple(
         replace(event, onset_beats=event.onset_beats + delta)
         if event.event_id in selected_event_ids else event
         for event in score.events
     )
-    phrase = _phrase_map(score)[1][clip.phrase_id]
+    phrase = phrases[clip.phrase_id]
     shifted_phrase = replace(
         phrase,
         start_beats=new_start,
         end_beats=new_end,
         boundaries=tuple(replace(item, at_beats=item.at_beats + delta) for item in phrase.boundaries),
     )
-    updated = _replace_phrases(replace(score, events=events), {clip.phrase_id: shifted_phrase})
+    phrases[clip.phrase_id] = shifted_phrase
+    updated_plan = PhrasePlan(
+        phrases=tuple(phrases.values()), motif_families=phrase_plan.motif_families
+    )
+    updated = updated_plan.attach_to_score(replace(score, events=events))
     updated = _shift_transition_plans(updated, clip.phrase_id, delta)
     last_end = max((item.end_beats for item in clips), default=clip.end_beats)
     if clip.end_beats == last_end:
@@ -604,6 +609,7 @@ def trim_clip(score: Score, clip_id: str, start_beats: Any, end_beats: Any) -> S
     start, end = _beat(start_beats, "trim start"), _beat(end_beats, "trim end")
     if start < clip.start_beats or end > clip.end_beats or end <= start:
         raise ValueError("trim bounds must be a positive sub-span of the selected clip")
+    phrase_plan, phrases = _phrase_map(score)
     by_id = {event.event_id: event for event in score.events}
     kept: list[MusicalEvent] = []
     removed = set()
@@ -623,20 +629,21 @@ def trim_clip(score: Score, clip_id: str, start_beats: Any, end_beats: Any) -> S
         kept.append(replace(
             event, onset_beats=clipped_start, duration_beats=clipped_end - clipped_start
         ))
-    phrase = _phrase_map(score)[1][clip.phrase_id]
+    phrase = phrases[clip.phrase_id]
     updated_phrase = replace(
         phrase, start_beats=start, end_beats=end,
         event_ids=tuple(event.event_id for event in kept),
         boundaries=tuple(item for item in phrase.boundaries if start <= item.at_beats <= end),
     )
-    # Update phrase references while every original Score event is still present;
-    # only then remove the cropped-out events from the canonical Score.
-    updated = _replace_phrases(score, {clip.phrase_id: updated_phrase})
+    phrases[clip.phrase_id] = updated_phrase
+    updated_plan = PhrasePlan(
+        phrases=tuple(phrases.values()), motif_families=phrase_plan.motif_families
+    )
     events = tuple(
-        event for event in updated.events
+        event for event in score.events
         if event.event_id not in removed and event.event_id not in set(clip.event_ids)
     ) + tuple(kept)
-    updated = replace(updated, events=events)
+    updated = updated_plan.attach_to_score(replace(score, events=events))
     source_start = clip.source_start_beats + (start - clip.start_beats)
     source_end = clip.source_end_beats - (clip.end_beats - end)
     updated_clip = replace(
@@ -848,7 +855,6 @@ def replace_clip_with_candidate(score: Score, clip_id: str, candidate: Any) -> S
         event, event_id=id_map[event.event_id], onset_beats=event.onset_beats + shift
     ) for event in source_events)
     old_ids = set(clip.event_ids)
-    events = tuple(event for event in score.events if event.event_id not in old_ids) + replacements
     new_end = clip.start_beats + duration
     new_phrase = replace(
         candidate_phrase,
@@ -860,7 +866,16 @@ def replace_clip_with_candidate(score: Score, clip_id: str, candidate: Any) -> S
             item, at_beats=item.at_beats + shift
         ) for item in candidate_phrase.boundaries),
     )
-    updated = _replace_phrases(replace(score, events=events), {clip.phrase_id: new_phrase})
+    # Make the candidate events available while the replacement PhrasePlan is
+    # attached and validated; remove the superseded event IDs only afterwards.
+    with_replacements = replace(score, events=tuple((*score.events, *replacements)))
+    with_phrase = _replace_phrases(
+        with_replacements, {clip.phrase_id: new_phrase}
+    )
+    updated = replace(
+        with_phrase,
+        events=tuple(event for event in with_phrase.events if event.event_id not in old_ids),
+    )
     new_clip = replace(
         clip,
         end_beats=new_end,
