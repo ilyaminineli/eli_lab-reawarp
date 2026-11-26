@@ -438,7 +438,7 @@ def test_m22_fx_editor_starts_with_role_auto_routing_and_exposes_send_taps():
         48_000,
     )
     route = editor.routing()
-    assert route["schema_version"] == 3
+    assert route["schema_version"] == 4
     assert route["routing_mode"] == "role_auto"
     assert route["stems"]["kick"]["insert"]["kind"] == "bypass"
     assert route["stems"]["kick"]["sends"] == {"space": 0.0, "echo": 0.0}

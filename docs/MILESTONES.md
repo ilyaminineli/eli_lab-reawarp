@@ -70,7 +70,7 @@ Status terms:
 | **M12 — Role-aware FX routing** | Implemented; refined by M22 | Per-stem inserts and fixed shared SPACE/ECHO returns. Dry stems remain intact; returns are wet-only; routed exports can extend with effect tails. |
 | **M13 — Musical FX automation** | Implemented | Beat-based insert wet, per-stem send and return wet automation; hold/linear/smooth curves; tempo-synchronised delay divisions. Schema v1 remains supported. |
 
-The production routing model is intentionally bounded: each role has a serial insert path and can feed two shared auxiliary returns. It is not an arbitrary routing graph, a feedback network or a live plug-in host.
+The production routing model is intentionally bounded: each role has a serial insert path and can feed two shared auxiliary returns; M24.5 adds only explicit one-way detector-to-target gain envelopes before the target insert. It is not an arbitrary routing graph, a feedback network or a live plug-in host.
 
 ### Reliability and Score-first rendering (M14–M17)
 

@@ -86,7 +86,7 @@ def test_export_embeds_source_asset_hash_and_reopens_with_resolved_relative_path
     assert resolved.is_file()
     assert reopened.metadata["project_asset_validation"]["ok"] is True
     assert reopened.metadata["project_file_validation"]["ok"] is True
-    assert reopened.metadata["project_fx_routing"]["schema_version"] == 3
+    assert reopened.metadata["project_fx_routing"]["schema_version"] == 4
     assert reopened.metadata["project_fx_automation"]["schema_version"] == 1
     assert manifest["schemas"]["project"] == 1
     assert manifest["schemas"]["score"] == 1
@@ -199,7 +199,7 @@ def test_archived_schema_fixtures_load_or_migrate_with_explicit_current_versions
 
     for key in ("fx_routing_v1", "fx_routing_v2"):
         migrated = normalise_fx_routing(fixture[key], ("kick",), 22_050)
-        assert migrated["schema_version"] == 3
+        assert migrated["schema_version"] == 4
         assert migrated["routing_mode"] == "manual"
         assert migrated["stems"]["kick"]["sends"]["space"] > 0.0
 

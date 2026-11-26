@@ -879,9 +879,7 @@ def render_fx_routing(
     # Sidechain detectors read the immutable source stem pre-insert/pre-fader.
     # Multiple routes to one target are combined by taking the strongest
     # requested reduction, avoiding surprise cumulative attenuation.
-    sidechain_gains = {
-        name: np.ones(frames, dtype=np.float32) for name in names
-    }
+    sidechain_gains: dict[str, np.ndarray] = {}
     sidechain_summaries: list[dict[str, Any]] = []
     for sidechain in config["sidechains"]:
         _check_cancel(cancel_event)
@@ -906,9 +904,11 @@ def render_fx_routing(
             )
         except InterruptedError as exc:
             raise FXRenderCancelledError("FX render cancelled") from exc
-        sidechain_gains[sidechain["target_stem"]] = np.minimum(
-            sidechain_gains[sidechain["target_stem"]], gain_curve
-        ).astype(np.float32, copy=False)
+        prior_gain = sidechain_gains.get(sidechain["target_stem"])
+        sidechain_gains[sidechain["target_stem"]] = (
+            gain_curve if prior_gain is None
+            else np.minimum(prior_gain, gain_curve).astype(np.float32, copy=False)
+        )
         sidechain_summaries.append({**sidechain, **summary, "bypassed": False})
 
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
@@ -931,7 +931,9 @@ def render_fx_routing(
         if not np.isfinite(dry).all():
             raise ValueError(f"dry stem {name!r} contains non-finite samples")
         dry = dry.copy()
-        dry *= sidechain_gains[name][:, None]
+        sidechain_gain = sidechain_gains.get(name)
+        if sidechain_gain is not None:
+            dry *= sidechain_gain[:, None]
         direct_audio[name] = dry.copy()
         route = config["stems"][name]
         insert = route["insert"]

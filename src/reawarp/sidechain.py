@@ -217,11 +217,14 @@ def render_sidechain_gain_envelope(
 
     control_frames = np.arange(block_count, dtype=np.float64) * float(hop)
     control_gain = np.power(10.0, -reduction.astype(np.float64) / 20.0)
-    gain = np.interp(
-        np.arange(frames, dtype=np.float64),
-        control_frames,
-        control_gain,
-    ).astype(np.float32)
+    # Bound temporary interpolation memory on long 48 kHz stems. The output
+    # is the only full-length gain buffer; positions are chunk-local float64.
+    gain = np.empty(frames, dtype=np.float32)
+    interpolation_chunk = 131_072
+    for start in range(0, frames, interpolation_chunk):
+        end = min(frames, start + interpolation_chunk)
+        positions = np.arange(start, end, dtype=np.float64)
+        gain[start:end] = np.interp(positions, control_frames, control_gain)
     summary = {
         "route_id": route.route_id,
         "source_stem": route.source_stem,
