@@ -210,26 +210,9 @@ def score_to_midi(
         pan_cc_value = None
         midi_width = None
         if rendered_event.parameters.get("m29_attention_gesture_id"):
-            try:
-                source_pan = float(rendered_event.parameters.get("pan", 0.0))
-            except (TypeError, ValueError):
-                source_pan = 0.0
             frame = gesture_controls.timeline.beat_to_frame(
                 source_event.onset_beats
             ) if gesture_controls is not None else 0
-            if (
-                gesture_controls is not None
-                and "spatial.pan" in gesture_controls.target_ids
-            ):
-                source_pan = gesture_controls.value_for_context(
-                    "spatial.pan", frame,
-                    event_id=source_event.event_id,
-                    default_value=source_pan,
-                )
-            midi_pan = max(-1.0, min(1.0,
-                source_pan * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
-                + float(rendered_event.parameters.get("m29_pan_offset", 0.0))
-            ))
             source_width = 1.0
             if (
                 gesture_controls is not None
@@ -245,19 +228,40 @@ def score_to_midi(
                     "m29_spatial_width_factor", 1.0
                 ))
             ))
-            pan_cc_value = max(0, min(
-                127, int(round((midi_pan + 1.0) * 63.5))
-            ))
-            channel = source_event.channel if source_event.channel is not None else _default_channel(
-                source_event, voice_order
-            )
-            pan_cc_events.append({
-                "voice_id": source_event.voice_id,
-                "channel": channel,
-                "tick": _to_tick(source_event.onset_beats, ppq),
-                "control": 10,
-                "value": pan_cc_value,
-            })
+            if (
+                "m29_pan_factor" in rendered_event.parameters
+                or "m29_pan_offset" in rendered_event.parameters
+            ):
+                try:
+                    source_pan = float(rendered_event.parameters.get("pan", 0.0))
+                except (TypeError, ValueError):
+                    source_pan = 0.0
+                if (
+                    gesture_controls is not None
+                    and "spatial.pan" in gesture_controls.target_ids
+                ):
+                    source_pan = gesture_controls.value_for_context(
+                        "spatial.pan", frame,
+                        event_id=source_event.event_id,
+                        default_value=source_pan,
+                    )
+                midi_pan = max(-1.0, min(1.0,
+                    source_pan * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
+                    + float(rendered_event.parameters.get("m29_pan_offset", 0.0))
+                ))
+                pan_cc_value = max(0, min(
+                    127, int(round((midi_pan + 1.0) * 63.5))
+                ))
+                channel = source_event.channel if source_event.channel is not None else _default_channel(
+                    source_event, voice_order
+                )
+                pan_cc_events.append({
+                    "voice_id": source_event.voice_id,
+                    "channel": channel,
+                    "tick": _to_tick(source_event.onset_beats, ppq),
+                    "control": 10,
+                    "value": pan_cc_value,
+                })
         export_rows.append((
             source_event, rendered_event, note, midi_duration,
             pan_cc_value, midi_width,
@@ -355,7 +359,10 @@ def score_to_midi(
             payload["m29_midi_action"] = str(
                 rendered_event.parameters.get("m29_attention_action", "")
             )
-            midi_pan = -1.0 + 2.0 * float(pan_cc_value) / 127.0
+            midi_pan = (
+                None if pan_cc_value is None
+                else -1.0 + 2.0 * float(pan_cc_value) / 127.0
+            )
             payload["m29_midi_rendered"] = {
                 "pitch": rendered_event.pitch,
                 "frequency_hz": rendered_event.frequency_hz,
@@ -364,17 +371,18 @@ def score_to_midi(
                 "pan": midi_pan,
                 "spatial_width_factor": midi_width,
             }
-            sequence += 1
-            voice_items[event.voice_id].append((
-                start_tick, 0, sequence,
-                mido.Message(
-                    "control_change",
-                    channel=channel,
-                    control=10,
-                    value=int(pan_cc_value),
-                    time=0,
-                ),
-            ))
+            if pan_cc_value is not None:
+                sequence += 1
+                voice_items[event.voice_id].append((
+                    start_tick, 0, sequence,
+                    mido.Message(
+                        "control_change",
+                        channel=channel,
+                        control=10,
+                        value=int(pan_cc_value),
+                        time=0,
+                    ),
+                ))
         sequence += 1
         voice_items[event.voice_id].append((
             start_tick, 1, sequence,
