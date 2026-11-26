@@ -235,13 +235,15 @@ class PhraseWorkbenchPage(QWidget):
 
         self._refresh_controls()
 
-    def set_score(self, score: Any | None) -> None:
+    def set_score(
+        self, score: Any | None, *, selected_phrase_id: str | None = None,
+    ) -> None:
         self._score = score
         try:
             self._plan = PhrasePlan.from_score(score) if score is not None else PhrasePlan(())
         except ValueError:
             self._plan = PhrasePlan(())
-        self._refresh_phrases()
+        self._refresh_phrases(selected_phrase_id)
         self._refresh_controls()
 
     def _refresh_phrases(self, selected_id: str | None = None) -> None:
@@ -483,7 +485,7 @@ class PhraseWorkbenchPage(QWidget):
         frozen = bool(
             self._selected_phrase_id and self._selected_phrase_id in freezes
         )
-        self.save_phrase_button.setEnabled(has_score)
+        self.save_phrase_button.setEnabled(has_score and not frozen)
         self.delete_phrase_button.setEnabled(has_phrase and not frozen)
         self.generate_button.setEnabled(has_phrase and not frozen and not self._busy)
         self.freeze_button.setEnabled(candidate is not None and not frozen and not self._busy)
