@@ -80,9 +80,9 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         "sample_rate": int(project.sample_rate),
         "frame_count": int(project.frame_count),
         "duration_seconds": float(project.duration),
-        "renderer_version": "reawarp-score-renderer/1.0.0",
+        "renderer_version": "reawarp-score-renderer/1.1.0",
         "render_provenance": {
-            "score_renderer_version": "1.0.0",
+            "score_renderer_version": "1.1.0",
             "engine_algorithm_version": project.metadata.get("algorithm_version"),
             "event_source": "ReawarpProject.events",
             "event_timebase": "seconds converted to rational beats at the project BPM",
