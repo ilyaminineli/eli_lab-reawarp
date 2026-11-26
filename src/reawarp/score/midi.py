@@ -11,6 +11,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
+from reawarp.score.attention import apply_attention_gesture_to_event
 from reawarp.score.events import AutomationLane, AutomationPoint, MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.pitch import EqualTemperamentTuning, tuning_from_score
@@ -149,6 +150,9 @@ def score_to_midi(
     Fractional pitches are rounded to the nearest MIDI 1.0 note for playback.
     Exact pitch, frequency, event identity, and Reawarp metadata are embedded
     in text meta events so a Reawarp-to-Reawarp round trip remains lossless.
+    M29 Focus/Recede gestures are resolved into MIDI note pitch, population and
+    gate length while the canonical source events and gesture provenance remain
+    recoverable when the file is imported back into Reawarp.
     Linear tempo ramps are approximated by discrete tempo events.
     """
     mido = _mido()
@@ -165,6 +169,38 @@ def score_to_midi(
         0, -20, 0,
         mido.MetaMessage("track_name", name=_midi_compatible_text(score.title), time=0),
     ))
+    gestures = score.metadata.get("m29_attention_gestures", ())
+    gesture_export_enabled = bool(gestures)
+    export_rows: list[tuple[MusicalEvent, MusicalEvent, int, Fraction]] = []
+    omitted_gesture_events: list[dict[str, Any]] = []
+    for source_event in score.events:
+        rendered_event = (
+            apply_attention_gesture_to_event(source_event, gestures)
+            if gesture_export_enabled else source_event
+        )
+        if rendered_event is None:
+            if _event_note(source_event, score) is not None:
+                omitted_gesture_events.append(source_event.to_dict())
+            continue
+        note = _event_note(rendered_event, score)
+        if note is None:
+            continue
+        midi_duration = rendered_event.duration_beats
+        if (
+            gesture_export_enabled
+            and rendered_event.parameters.get("m29_attention_gesture_id")
+            and rendered_event.kind == "note"
+        ):
+            midi_duration = as_fraction(str(
+                rendered_event.parameters.get(
+                    "gate_duration_beats", rendered_event.duration_beats
+                )
+            ))
+            midi_duration = max(Fraction(1, 64), min(
+                rendered_event.duration_beats, midi_duration
+            ))
+        export_rows.append((source_event, rendered_event, note, midi_duration))
+
     score_meta = {
         "title": score.title,
         "tuning": {
@@ -180,6 +216,11 @@ def score_to_midi(
         "orchestration_plan": score.orchestration_plan,
         "metadata": score.metadata,
     }
+    if gesture_export_enabled:
+        score_meta["m29_midi_render_export"] = {
+            "schema_version": 1,
+            "omitted_events": omitted_gesture_events,
+        }
     conductor_items.append((
         0, -10, 1,
         mido.MetaMessage(
@@ -227,15 +268,13 @@ def score_to_midi(
         voice: [] for voice in voices
     }
     sequence = 0
-    for event in score.events:
-        note = _event_note(event, score)
-        if note is None:
-            continue
+    for source_event, rendered_event, note, midi_duration in export_rows:
+        event = source_event
         channel = event.channel if event.channel is not None else _default_channel(
             event, voice_order
         )
         start_tick = _to_tick(event.onset_beats, ppq)
-        length_tick = max(1, _to_tick(event.duration_beats, ppq))
+        length_tick = max(1, _to_tick(midi_duration, ppq))
         end_tick = start_tick + length_tick
         velocity = max(1, min(127, int(round(event.velocity * 127.0))))
         payload = event.to_dict()
@@ -248,6 +287,22 @@ def score_to_midi(
             "reawarp_tuning_id": score.tuning_id,
             "reawarp_tuning_period_ratio": score.tuning_period_ratio,
         })
+        if rendered_event.parameters.get("m29_attention_gesture_id"):
+            payload["m29_midi_gesture_id"] = str(
+                rendered_event.parameters["m29_attention_gesture_id"]
+            )
+            payload["m29_midi_action"] = str(
+                rendered_event.parameters.get("m29_attention_action", "")
+            )
+            payload["m29_midi_rendered"] = {
+                "pitch": rendered_event.pitch,
+                "frequency_hz": rendered_event.frequency_hz,
+                "duration_beats": str(midi_duration),
+                "pan": rendered_event.parameters.get("pan"),
+                "spatial_width_factor": rendered_event.parameters.get(
+                    "m29_spatial_width_factor", 1.0
+                ),
+            }
         sequence += 1
         voice_items[event.voice_id].append((
             start_tick, 1, sequence,
