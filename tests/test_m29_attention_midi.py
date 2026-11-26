@@ -188,6 +188,13 @@ def test_m29_midi_pan_and_width_gestures_compose_with_score_automation(tmp_path)
                 minimum=0.0,
                 maximum=2.0,
             ),
+            AutomationLane(
+                target_id="midi.cc.0.10",
+                points=(AutomationPoint(Fraction(1), 0.5),),
+                unit="normalized",
+                minimum=0.0,
+                maximum=1.0,
+            ),
         ),
     )
     focused = apply_attention_gesture(
