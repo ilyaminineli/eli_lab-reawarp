@@ -384,9 +384,14 @@ def build_invariance_probe(
 
 def _phrase_plan(project: ReawarpProject):
     from reawarp.composition.phrases import PhrasePlan
-    plan = PhrasePlan.from_score(project.to_score())
+    try:
+        plan = PhrasePlan.from_score(project.to_score())
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "the project Score has no M28 phrase spans for contextual audition"
+        ) from exc
     if not plan.phrases:
-        raise ValueError("the project Score has no phrase spans for contextual audition")
+        raise ValueError("the project Score has no M28 phrase spans for contextual audition")
     return plan
 
 
@@ -623,23 +628,29 @@ def build_contextual_audition_set(
 
 def _spectral_occupancy(audio: np.ndarray, sample_rate: int) -> dict[str, Any]:
     value = np.asarray(audio, dtype=np.float64)
-    mono = np.mean(value, axis=1) if value.ndim == 2 else value
-    if len(mono) == 0 or not np.any(mono):
+    if value.ndim == 1:
+        channels = value[:, None]
+    else:
+        channels = value
+    if len(channels) == 0 or not np.any(channels):
         return {
             "window_frames": ANALYSIS_WINDOW_FRAMES,
             "hop_frames": ANALYSIS_HOP_FRAMES,
             "bands": {"low": 0.0, "mid": 0.0, "high": 0.0},
             "note": "silent input; occupancy is undefined and shown as zero",
         }
-    frame = min(ANALYSIS_WINDOW_FRAMES, len(mono))
+    frame = min(ANALYSIS_WINDOW_FRAMES, len(channels))
     hop = min(ANALYSIS_HOP_FRAMES, max(1, frame // 2))
-    window = np.hanning(frame)
+    window = np.hanning(frame)[:, None]
     spectra = []
-    for start in range(0, max(1, len(mono) - frame + 1), hop):
-        segment = mono[start:start + frame]
+    for start in range(0, max(1, len(channels) - frame + 1), hop):
+        segment = channels[start:start + frame]
         if len(segment) < frame:
-            segment = np.pad(segment, (0, frame - len(segment)))
-        spectra.append(np.square(np.abs(np.fft.rfft(segment * window))))
+            segment = np.pad(segment, ((0, frame - len(segment)), (0, 0)))
+        # Average channel power, not channel waveforms: an anti-phase stereo
+        # signal must not disappear from the spectral diagnostic after mono fold.
+        channel_power = np.square(np.abs(np.fft.rfft(segment * window, axis=0)))
+        spectra.append(np.mean(channel_power, axis=1))
     power = np.mean(np.stack(spectra), axis=0)
     power_db = 10.0 * np.log10(np.maximum(power, 1e-24))
     peak_db = float(np.max(power_db))

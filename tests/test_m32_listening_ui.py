@@ -6,6 +6,7 @@ import pytest
 
 pytest.importorskip("PySide6")
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from reawarp.ui.pages.variations import VariationBrowserPage
@@ -30,7 +31,7 @@ def test_m32_variation_page_emits_context_decisions_and_human_report():
     page.set_phrase_choices([("phrase-a", "phrase-a · PRESENTATION")])
     page.m32_context.setCurrentIndex(page.m32_context.findData("reduced_density"))
     page.m32_subtraction_percent.setValue(40)
-    page.m32_roles.item(0).setCheckState(2)
+    page.m32_roles.item(0).setCheckState(Qt.CheckState.Checked)
     requested, decisions, notes = [], [], []
     page.m32ContextRequested.connect(requested.append)
     page.m32DecisionRequested.connect(decisions.append)
