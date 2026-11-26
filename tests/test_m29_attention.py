@@ -45,7 +45,7 @@ def test_attention_descriptors_are_versioned_and_legacy_plans_remain_readable():
             role="melody", start_beats=0, end_beats=4, depth="foreground",
             spatial_position=1.2,
         )
-    with pytest.raises(ValueError, match="attention_role"):
+    with pytest.raises(ValueError, match="semantic attention role"):
         AttentionSpan(
             role="melody", start_beats=0, end_beats=4, depth="foreground",
             attention_role="lead-is-the-only-role",
