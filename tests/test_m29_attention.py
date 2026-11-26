@@ -178,7 +178,7 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
     source = Score(
         events=(
             MusicalEvent(
-                "melody-note", "melody", 0, 1, kind="note",
+                "melody-note", "melody", Fraction(1, 4), 1, kind="note",
                 pitch=60, velocity=0.8,
                 parameters={"gate_duration_beats": "1/2", "pan": 0.6},
             ),
