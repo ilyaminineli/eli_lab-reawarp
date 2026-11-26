@@ -26,6 +26,8 @@ class PhraseWorkbenchPage(QWidget):
     branchRequested = Signal(str, str)
     restoreRequested = Signal(str)
     auditionRequested = Signal(str, str)
+    compareRequested = Signal(str, str)
+    compareAuditionRequested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -37,6 +39,8 @@ class PhraseWorkbenchPage(QWidget):
         self._busy = False
         self._batch_busy = False
         self._loading_phrase = False
+        self._comparison_buffers: dict[str, Any] = {}
+        self._comparison_sample_rate = 48_000
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -204,7 +208,7 @@ class PhraseWorkbenchPage(QWidget):
         candidate_splitter.setSizes([280, 460])
         right_layout.addWidget(candidate_splitter, 1)
 
-        audition_group = QGroupBox("CONTEXTUAL AUDITION")
+        audition_group = QGroupBox("CONTEXTUAL AUDITION / CANDIDATE COMPARISON")
         audition_layout = QVBoxLayout(audition_group)
         audition_controls = QHBoxLayout()
         self.audition_target = QComboBox()
@@ -216,18 +220,74 @@ class PhraseWorkbenchPage(QWidget):
         self.audition_context.addItem("BEFORE SUCCESSOR", "before_successor")
         self.render_audition_button = QPushButton("RENDER & PLAY")
         self.render_audition_button.clicked.connect(self._request_audition)
+        self.compare_button = QPushButton("MATCHED A/B + DIFFERENCE")
+        self.compare_button.clicked.connect(self._request_comparison)
         audition_controls.addWidget(self.audition_target, 1)
         audition_controls.addWidget(self.audition_context, 1)
         audition_controls.addWidget(self.render_audition_button)
+        audition_controls.addWidget(self.compare_button)
         audition_layout.addLayout(audition_controls)
+
+        self.audition_tabs = QTabWidget()
+        audition_tab = QWidget()
+        audition_tab_layout = QVBoxLayout(audition_tab)
         self.audition_status = QLabel(
             "Audition renders only the selected phrase/context window. The project stems are not changed."
         )
         self.audition_status.setObjectName("muted")
         self.audition_status.setWordWrap(True)
-        audition_layout.addWidget(self.audition_status)
+        audition_tab_layout.addWidget(self.audition_status)
         self.audition_preview = AudioPreview()
-        audition_layout.addWidget(self.audition_preview, 1)
+        audition_tab_layout.addWidget(self.audition_preview, 1)
+        self.audition_tabs.addTab(audition_tab, "PHRASE AUDITION")
+
+        comparison_tab = QWidget()
+        comparison_layout = QVBoxLayout(comparison_tab)
+        self.compare_status = QLabel(
+            "Select a candidate and render a matched-level comparison in the same phrase context."
+        )
+        self.compare_status.setObjectName("muted")
+        self.compare_status.setWordWrap(True)
+        comparison_layout.addWidget(self.compare_status)
+        compare_playback = QHBoxLayout()
+        self.play_reference_button = QPushButton("PLAY A · SOURCE")
+        self.play_candidate_button = QPushButton("PLAY B · CANDIDATE")
+        self.play_difference_button = QPushButton("PLAY Δ · DIFFERENCE")
+        self.play_reference_button.clicked.connect(
+            lambda: self._request_comparison_audition("reference")
+        )
+        self.play_candidate_button.clicked.connect(
+            lambda: self._request_comparison_audition("candidate")
+        )
+        self.play_difference_button.clicked.connect(
+            lambda: self._request_comparison_audition("difference")
+        )
+        compare_playback.addWidget(self.play_reference_button)
+        compare_playback.addWidget(self.play_candidate_button)
+        compare_playback.addWidget(self.play_difference_button)
+        comparison_layout.addLayout(compare_playback)
+
+        compare_previews = QSplitter(Qt.Orientation.Horizontal)
+        self.reference_preview = AudioPreview()
+        self.candidate_preview = AudioPreview()
+        self.difference_preview = AudioPreview()
+        for title, preview in (
+            ("A · SOURCE", self.reference_preview),
+            ("B · CANDIDATE", self.candidate_preview),
+            ("Δ · DIFFERENCE", self.difference_preview),
+        ):
+            panel = QWidget()
+            panel_layout = QVBoxLayout(panel)
+            panel_layout.setContentsMargins(2, 2, 2, 2)
+            label = QLabel(title)
+            label.setObjectName("muted")
+            panel_layout.addWidget(label)
+            panel_layout.addWidget(preview, 1)
+            compare_previews.addWidget(panel)
+        compare_previews.setSizes([1, 1, 1])
+        comparison_layout.addWidget(compare_previews, 1)
+        self.audition_tabs.addTab(comparison_tab, "MATCHED A/B")
+        audition_layout.addWidget(self.audition_tabs, 1)
         right_layout.addWidget(audition_group, 1)
 
         splitter.addWidget(right)
@@ -239,6 +299,7 @@ class PhraseWorkbenchPage(QWidget):
     def set_score(
         self, score: Any | None, *, selected_phrase_id: str | None = None,
     ) -> None:
+        self.clear_comparison()
         self._score = score
         try:
             self._plan = PhrasePlan.from_score(score) if score is not None else PhrasePlan(())
@@ -282,9 +343,12 @@ class PhraseWorkbenchPage(QWidget):
     def _phrase_selected(
         self, item: QListWidgetItem | None, _previous: QListWidgetItem | None,
     ) -> None:
-        self._selected_phrase_id = (
+        selected_phrase_id = (
             str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
         )
+        if selected_phrase_id != self._selected_phrase_id:
+            self.clear_comparison()
+        self._selected_phrase_id = selected_phrase_id
         phrase = self._selected_phrase()
         if phrase is None:
             self.phrase_summary.setText("No phrase selected.")
@@ -408,6 +472,8 @@ class PhraseWorkbenchPage(QWidget):
             self._refresh_controls()
             return
         candidate_id = str(item.data(Qt.ItemDataRole.UserRole))
+        if candidate_id != self._selected_candidate_id:
+            self.clear_comparison()
         self._selected_candidate_id = candidate_id
         candidate = self._candidates.get(candidate_id)
         if candidate is None:
@@ -453,6 +519,23 @@ class PhraseWorkbenchPage(QWidget):
             target, str(self.audition_context.currentData())
         )
 
+    def _request_comparison(self) -> None:
+        candidate = self._selected_candidate()
+        if self._score is None or not self._selected_phrase_id:
+            self.compare_status.setText("Select a phrase and load a project first.")
+            return
+        if candidate is None:
+            self.compare_status.setText("Generate and select a candidate before comparing.")
+            return
+        self.audition_tabs.setCurrentIndex(1)
+        self.compareRequested.emit(
+            candidate.candidate_id, str(self.audition_context.currentData())
+        )
+
+    def _request_comparison_audition(self, key: str) -> None:
+        if key in self._comparison_buffers:
+            self.compareAuditionRequested.emit(key)
+
     def set_audition_busy(self, busy: bool, message: str = "") -> None:
         self._busy = bool(busy)
         self.render_audition_button.setEnabled(not busy)
@@ -466,6 +549,51 @@ class PhraseWorkbenchPage(QWidget):
         self.audition_preview.set_audio(audio, sample_rate)
         if message:
             self.audition_status.setText(message)
+
+    def set_comparison_busy(self, busy: bool, message: str = "") -> None:
+        self._busy = bool(busy)
+        self.compare_button.setText("RENDERING A/B…" if busy else "MATCHED A/B + DIFFERENCE")
+        if message:
+            self.compare_status.setText(message)
+        self._refresh_controls()
+
+    def set_comparison(
+        self, reference: Any, candidate: Any, difference: Any, sample_rate: int,
+        *, message: str = "",
+    ) -> None:
+        self._comparison_buffers = {
+            "reference": reference,
+            "candidate": candidate,
+            "difference": difference,
+        }
+        self._comparison_sample_rate = int(sample_rate)
+        self.reference_preview.set_audio(reference, sample_rate)
+        self.candidate_preview.set_audio(candidate, sample_rate)
+        self.difference_preview.set_audio(difference, sample_rate)
+        if message:
+            self.compare_status.setText(message)
+        self.audition_tabs.setCurrentIndex(1)
+
+    def clear_comparison(self) -> None:
+        self._comparison_buffers = {}
+        for preview in (
+            getattr(self, "reference_preview", None),
+            getattr(self, "candidate_preview", None),
+            getattr(self, "difference_preview", None),
+        ):
+            if preview is not None:
+                preview.set_audio(None)
+        if hasattr(self, "compare_status"):
+            self.compare_status.setText(
+                "Select a candidate and render a matched-level comparison in the same phrase context."
+            )
+
+    def comparison_audio(self, key: str) -> Any | None:
+        return self._comparison_buffers.get(key)
+
+    @property
+    def comparison_sample_rate(self) -> int:
+        return self._comparison_sample_rate
 
     def set_batch_busy(self, busy: bool) -> None:
         self._batch_busy = bool(busy)
@@ -499,6 +627,13 @@ class PhraseWorkbenchPage(QWidget):
         self.render_audition_button.setEnabled(
             has_phrase and not self._busy
         )
+        self.compare_button.setEnabled(
+            candidate is not None and has_phrase and not self._busy and not self._batch_busy
+        )
+        comparison_ready = bool(self._comparison_buffers)
+        self.play_reference_button.setEnabled(comparison_ready and not self._busy)
+        self.play_candidate_button.setEnabled(comparison_ready and not self._busy)
+        self.play_difference_button.setEnabled(comparison_ready and not self._busy)
 
     @property
     def selected_phrase_id(self) -> str | None:
@@ -514,6 +649,7 @@ class PhraseWorkbenchPage(QWidget):
 
     def closeEvent(self, event) -> None:
         self.audition_preview.set_audio(None)
+        self.clear_comparison()
         super().closeEvent(event)
 
 
