@@ -21,7 +21,7 @@ from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.timeline import RenderTimeline
 
-SCORE_RENDERER_VERSION = "1.0.0"
+SCORE_RENDERER_VERSION = "1.1.0"
 
 
 def build_score_control_bus(
