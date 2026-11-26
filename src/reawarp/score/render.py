@@ -493,6 +493,10 @@ class ScoreRenderer:
                         "spatial.pan", scheduled.start_frame,
                         event_id=event.event_id, default_value=pan,
                     )
+                pan = (
+                    pan * float(event.parameters.get("m29_pan_factor", 1.0))
+                    + float(event.parameters.get("m29_pan_offset", 0.0))
+                )
                 if not math.isfinite(pan):
                     raise ValueError(f"event {event.event_id!r} has a non-finite pan value")
                 pan = float(np.clip(pan, -1.0, 1.0))
