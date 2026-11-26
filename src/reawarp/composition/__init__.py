@@ -25,6 +25,10 @@ from reawarp.composition.phrases import (
     phrase_context_events,
 )
 from reawarp.composition.perceptual import build_perceptual_orchestration_plan
+from reawarp.composition.transitions import (
+    TransitionPhase, TransitionPlan, compile_transition_plans,
+    transition_marker_events, transition_plans_from_score,
+)
 from reawarp.composition.orchestration import (
     ROLE_NAMES,
     RoleIntent,
@@ -53,6 +57,11 @@ __all__ = [
     "branch_phrase_candidate",
     "continue_evolving",
     "phrase_context_events",
+    "TransitionPhase",
+    "TransitionPlan",
+    "compile_transition_plans",
+    "transition_marker_events",
+    "transition_plans_from_score",
     "STRUCTURES",
     "CompositionPlan",
     "SectionPlan",
