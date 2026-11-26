@@ -6,7 +6,7 @@ from typing import Any
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton,
+    QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
     QSpinBox, QSplitter, QVBoxLayout, QWidget,
 )
 
@@ -163,9 +163,9 @@ class PhraseWorkbenchPage(QWidget):
         candidate_left_layout = QVBoxLayout(candidate_left)
         candidate_left_layout.setContentsMargins(0, 0, 0, 0)
         candidate_left_layout.addWidget(QLabel("CANDIDATES"))
-        self.candidates = QListWidget()
-        self.candidates.currentItemChanged.connect(self._candidate_selected)
-        candidate_left_layout.addWidget(self.candidates, 1)
+        self.candidate_list = QListWidget()
+        self.candidate_list.currentItemChanged.connect(self._candidate_selected)
+        candidate_left_layout.addWidget(self.candidate_list, 1)
         candidate_actions = QHBoxLayout()
         self.freeze_button = QPushButton("FREEZE SELECTED")
         self.branch_button = QPushButton("BRANCH FROZEN")
@@ -374,20 +374,20 @@ class PhraseWorkbenchPage(QWidget):
 
     def set_candidates(self, candidates: list[Any], selected_id: str | None = None) -> None:
         self._candidates = {str(item.candidate_id): item for item in candidates}
-        self.candidates.blockSignals(True)
-        self.candidates.clear()
+        self.candidate_list.blockSignals(True)
+        self.candidate_list.clear()
         for candidate in candidates:
             item = QListWidgetItem(
                 f"CANDIDATE {candidate.index:02d}  ·  {candidate.operation.replace('_', ' ').upper()}"
             )
             item.setData(Qt.ItemDataRole.UserRole, candidate.candidate_id)
-            self.candidates.addItem(item)
+            self.candidate_list.addItem(item)
             if candidate.candidate_id == selected_id:
-                self.candidates.setCurrentItem(item)
-        self.candidates.blockSignals(False)
-        if self.candidates.currentItem() is None and self.candidates.count():
-            self.candidates.setCurrentRow(0)
-        self._candidate_selected(self.candidates.currentItem(), None)
+                self.candidate_list.setCurrentItem(item)
+        self.candidate_list.blockSignals(False)
+        if self.candidate_list.currentItem() is None and self.candidate_list.count():
+            self.candidate_list.setCurrentRow(0)
+        self._candidate_selected(self.candidate_list.currentItem(), None)
         self._refresh_controls()
 
     def _candidate_selected(
@@ -502,7 +502,7 @@ class PhraseWorkbenchPage(QWidget):
         return self._selected_candidate_id
 
     @property
-    def candidates(self) -> dict[str, Any]:
+    def candidate_records(self) -> dict[str, Any]:
         return dict(self._candidates)
 
     def closeEvent(self, event) -> None:
