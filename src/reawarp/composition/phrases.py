@@ -919,9 +919,13 @@ def freeze_phrase_candidate(
     parent_candidate_id: str | None = None,
 ) -> tuple[Score, dict[str, Any]]:
     """Freeze candidate events in the Score and retain reversible source lineage."""
-    existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
-    if existing_freeze:
-        raise ValueError("phrase is already frozen; restore its base before replacing it")
+    prior_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
+    if prior_freeze:
+        prior_ids = set(prior_freeze.get("frozen_event_ids", ()))
+        if set(candidate.source_event_ids) != prior_ids:
+            raise ValueError(
+                "branch candidate does not originate from the currently frozen phrase"
+            )
     if _score_fingerprint(base_score) != candidate.base_score_fingerprint:
         raise ValueError("candidate base Score is stale; regenerate against the current Score")
     source_ids = set(candidate.source_event_ids)
@@ -940,28 +944,44 @@ def freeze_phrase_candidate(
     if base_unrelated != candidate_unrelated:
         raise ValueError("candidate modified events outside its frozen phrase")
     freezes = copy.deepcopy(base_score.metadata.get("m28_phrase_freezes", {}))
-    prior = freezes.get(candidate.phrase_id)
-    if prior:
-        raise ValueError("phrase is already frozen; restore its base before replacing it")
     new_events = tuple(item for item in base_score.events if item.event_id not in source_ids) + target_events
+    current_phrase = next(
+        item for item in PhrasePlan.from_score(base_score).phrases
+        if item.phrase_id == candidate.phrase_id
+    )
+    root_source_events = (
+        list(prior_freeze.get("source_events", ()))
+        if prior_freeze else [
+            item.to_dict() for item in base_score.events if item.event_id in source_ids
+        ]
+    )
+    root_phrase_start = (
+        prior_freeze.get("phrase_start_beats", str(current_phrase.start_beats))
+        if prior_freeze else str(current_phrase.start_beats)
+    )
+    root_phrase_end = (
+        prior_freeze.get("phrase_end_beats", str(current_phrase.end_beats))
+        if prior_freeze else str(current_phrase.end_beats)
+    )
+    resolved_parent_candidate = (
+        prior_freeze.get("candidate_id") if prior_freeze else parent_candidate_id
+    )
+    root_base_fingerprint = (
+        prior_freeze.get("root_base_score_fingerprint")
+        or prior_freeze.get("base_score_fingerprint")
+        if prior_freeze else candidate.base_score_fingerprint
+    )
     record = {
         "schema_version": 1,
         "phrase_id": candidate.phrase_id,
         "candidate_id": candidate.candidate_id,
-        "parent_candidate_id": parent_candidate_id,
+        "parent_candidate_id": resolved_parent_candidate,
         "base_score_fingerprint": candidate.base_score_fingerprint,
+        "root_base_score_fingerprint": root_base_fingerprint,
         "frozen_event_ids": list(candidate.target_event_ids),
-        "phrase_start_beats": str(
-            next(item.start_beats for item in PhrasePlan.from_score(base_score).phrases
-                 if item.phrase_id == candidate.phrase_id)
-        ),
-        "phrase_end_beats": str(
-            next(item.end_beats for item in PhrasePlan.from_score(base_score).phrases
-                 if item.phrase_id == candidate.phrase_id)
-        ),
-        "source_events": [
-            item.to_dict() for item in base_score.events if item.event_id in source_ids
-        ],
+        "phrase_start_beats": root_phrase_start,
+        "phrase_end_beats": root_phrase_end,
+        "source_events": root_source_events,
         "selection_note": str(selection_note).strip(),
         "generator_version": candidate.generator_version,
         "seed_name": candidate.seed_name,
