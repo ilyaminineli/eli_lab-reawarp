@@ -405,16 +405,18 @@ def apply_attention_gesture_to_event(
             pan = 0.0
         pan = float(np.clip(pan, -1.0, 1.0))
         if action == "focus":
-            pan *= 0.45
+            parameters["m29_pan_factor"] = 0.45
             parameters["m29_spatial_width_factor"] = 0.82
         else:
             material = f"reawarp:m29-space:{gesture_id}:{event.event_id}".encode("utf-8")
             side = -1.0 if (
                 int.from_bytes(hashlib.blake2b(material, digest_size=1).digest(), "little") & 1
             ) == 0 else 1.0
-            pan = side * 0.18 if abs(pan) < 0.08 else float(np.clip(pan * 1.25, -1.0, 1.0))
+            if abs(pan) < 0.08:
+                parameters["m29_pan_offset"] = side * 0.18
+            else:
+                parameters["m29_pan_factor"] = 1.25
             parameters["m29_spatial_width_factor"] = 1.18
-        parameters["pan"] = pan
     parameters["m29_attention_gesture_id"] = gesture_id
     parameters["m29_attention_action"] = action
     return replace(event, **changes)
