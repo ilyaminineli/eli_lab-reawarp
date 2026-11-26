@@ -270,6 +270,15 @@ def build_perceptual_orchestration_plan(
             if role == "melody" and intent is not None:
                 centre = pitch_center + float(intent.register_semitones)
                 register_low, register_high = centre - 12.0, centre + 12.0
+            semantic_role = {
+                "kick": "anchor",
+                "snare": "counter_rhythm",
+                "hat": "counter_rhythm",
+                "break": "counter_rhythm",
+                "melody": "motif",
+                "texture": "texture",
+                "ambience": "harmonic_field",
+            }[role]
             attention.append(AttentionSpan(
                 role=role,
                 start_beats=phrase.start_beats,
@@ -280,6 +289,11 @@ def build_perceptual_orchestration_plan(
                 register_high=register_high,
                 spectral_band=spectral_band,
                 reserved_silence=depth == "absence",
+                attention_role=semantic_role,
+                prominence=(
+                    0.0 if depth == "absence"
+                    else float(intent.activity) if intent is not None else None
+                ),
             ))
 
     mutations: list[MutationPolicy] = []
