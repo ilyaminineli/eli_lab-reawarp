@@ -269,6 +269,19 @@ def apply_attention_gesture(
     shift = float(register_shift_semitones)
     if not np.isfinite(shift) or not -24.0 <= shift <= 24.0:
         raise ValueError("register_shift_semitones must be finite and within -24..24")
+    aliases = {"hats": "hat", "synthetic_break": "break"}
+    canonical_role = aliases.get(role, role)
+    has_event_material = any(
+        aliases.get(str(event.voice_id), str(event.voice_id)) == canonical_role
+        and start <= event.onset_beats < end
+        and event.kind not in {"control", "marker"}
+        for event in score.events
+    )
+    if not has_event_material:
+        raise ValueError(
+            f"no event-backed Score material for role {role!r} in "
+            f"the selected beat span; whole-field layers are not part of this render slice"
+        )
 
     metadata = copy.deepcopy(score.metadata)
     records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
