@@ -853,9 +853,29 @@ def build_phrase_candidate_batch(
         collision = transformed_ids & {item.event_id for item in outside}
         if collision:
             raise ValueError("candidate event IDs collide with unrelated Score events")
+        # Candidate Scores must carry their own phrase membership. Without
+        # this update, contextual audition would resolve the original source
+        # event IDs and silently audition the wrong material.
+        phrase_plan = PhrasePlan.from_score(score)
+        candidate_phrases = tuple(
+            replace(item, event_ids=tuple(item.event_ids))
+            if item.phrase_id != phrase_id
+            else replace(item, event_ids=tuple(event.event_id for event in transformed))
+            for item in phrase_plan.phrases
+        )
+        candidate_plan = PhrasePlan(
+            phrases=candidate_phrases,
+            motif_families=phrase_plan.motif_families,
+        )
+        candidate_metadata = copy.deepcopy(score.metadata)
+        candidate_metadata["m28_phrase_plan"] = candidate_plan.to_dict()
+        candidate_metadata["m28_phrase_plan_fingerprint"] = _fingerprint(
+            candidate_plan.to_dict()
+        )
         candidate_score = replace(
             score,
             events=outside + transformed,
+            metadata=candidate_metadata,
         )
         candidate_id = f"phrase-candidate-{index:02d}-{_fingerprint([base_phrase_fingerprint, seed_name, operation])[:10]}"
         if prior:
@@ -899,9 +919,6 @@ def freeze_phrase_candidate(
     parent_candidate_id: str | None = None,
 ) -> tuple[Score, dict[str, Any]]:
     """Freeze candidate events in the Score and retain reversible source lineage."""
-    existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
-    if existing_freeze:
-        raise ValueError("phrase is already frozen; restore its base before replacing it")
     existing_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
     if existing_freeze:
         raise ValueError("phrase is already frozen; restore its base before replacing it")
@@ -954,9 +971,6 @@ def freeze_phrase_candidate(
     }
     metadata = copy.deepcopy(base_score.metadata)
     phrase_plan = PhrasePlan.from_score(base_score)
-    replaced_phrase = next(
-        item for item in phrase_plan.phrases if item.phrase_id == candidate.phrase_id
-    )
     updated_phrases = tuple(
         replace(item, event_ids=tuple(candidate.target_event_ids))
         if item.phrase_id == candidate.phrase_id else item
