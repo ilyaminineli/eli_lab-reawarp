@@ -445,24 +445,24 @@ def _shift_transition_plans(score: Score, phrase_id: str, delta: Fraction) -> Sc
     from reawarp.composition.transitions import (
         compile_transition_plans, transition_plans_from_score,
     )
-    plans = transition_plans_from_score(score)
-    shifted = []
-    for plan in plans:
-        if phrase_id not in {plan.source_phrase_id, plan.target_phrase_id}:
-            continue
-        phases = tuple(replace(
-            phase, start_beats=phase.start_beats + delta,
-            end_beats=phase.end_beats + delta,
-        ) for phase in plan.phases)
-        shifted.append(replace(plan, phases=phases))
-    if not shifted:
-        return score
     try:
+        plans = transition_plans_from_score(score)
+        shifted = []
+        for plan in plans:
+            if phrase_id not in {plan.source_phrase_id, plan.target_phrase_id}:
+                continue
+            phases = tuple(replace(
+                phase, start_beats=phase.start_beats + delta,
+                end_beats=phase.end_beats + delta,
+            ) for phase in plan.phases)
+            shifted.append(replace(plan, phases=phases))
+        if not shifted:
+            return score
         return compile_transition_plans(score, shifted)
     except ValueError:
-        # Moving a single phrase can temporarily detach a transition from the
-        # phrase boundary it was authored for. Keep the original silent cue
-        # and let the composer reposition it explicitly in the M33 cue editor.
+        # A shift may detach a cue from its new phrase boundary or place an
+        # early phase before beat zero. Keep the original silent cue and let
+        # the composer reposition or relink it explicitly in the M33 editor.
         return score
 
 
@@ -472,15 +472,20 @@ def _shift_ending_plans_after(score: Score, boundary: Fraction, delta: Fraction)
     from reawarp.composition.endings import (
         compile_ending_plans, ending_plans_from_score,
     )
-    plans = ending_plans_from_score(score)
-    shifted = []
-    for plan in plans:
-        if plan.start_beats >= boundary:
-            shifted.append(replace(
-                plan, start_beats=plan.start_beats + delta,
-                end_beats=plan.end_beats + delta,
-            ))
-    return compile_ending_plans(score, shifted) if shifted else score
+    try:
+        plans = ending_plans_from_score(score)
+        shifted = []
+        for plan in plans:
+            if plan.start_beats >= boundary:
+                shifted.append(replace(
+                    plan, start_beats=plan.start_beats + delta,
+                    end_beats=plan.end_beats + delta,
+                ))
+        return compile_ending_plans(score, shifted) if shifted else score
+    except ValueError:
+        # A phrase move can take a dependent ending outside the valid score
+        # range. Retain the explicit cue so the composer can reposition it.
+        return score
 
 
 def move_clip(score: Score, clip_id: str, start_beats: Any) -> Score:

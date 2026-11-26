@@ -311,6 +311,9 @@ def test_reordered_m30_transition_can_be_relinked_and_ending_stays_at_track_end(
     score = create_arrangement(_with_cues(_score()))
     clips = _clips(score)
     reordered = reorder_clip(score, clips["phrase-b"].clip_id, 0)
+    # An automatic cue shift that would move preparation before beat zero is
+    # retained as authored until the composer explicitly relinks it.
+    assert transition_plans_from_score(reordered)[0].start_beats == Fraction(2)
     ending = ending_plans_from_score(reordered)[0]
     assert ending.start_beats == Fraction(8)
     assert ending.end_beats == Fraction(10)
