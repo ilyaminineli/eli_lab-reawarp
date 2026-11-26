@@ -171,7 +171,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 ## M30 — Transition Grammar, Section Memory and Ending Director
 
 **Priority:** P1  
-**Status:** Planned  
+**Status:** In progress — first typed TransitionPlan / three-phase Score-marker compiler implemented; SectionMemory and EndingDirector remain open  
 **Depends on:** M28, M29; builds on M7, M15, M20  
 **Primary guide basis:** Field Guide §§8–9; Composition Atlas §§13–14; Advanced Appendix §§5–6, 12, 17, 20.
 
@@ -181,8 +181,8 @@ Make transitions and endings first-class compositional events. Long-form work ne
 
 ### Scope
 
-- Create typed transition objects: additive, subtractive, filtered/registral, rhythmic displacement, metric reinterpretation, fragmentation, overlap, silence, false return and motif-as-bridge.
-- Give each transition a preparation, change and consequence/arrival phase.
+- Create typed transition objects: additive, subtractive, filtered/registral, rhythmic displacement, metric reinterpretation, fragmentation, overlap, silence, false return and motif-as-bridge. The first implementation models these as immutable, versioned plans with source/target phrase identity, source/target state, changed/preserved dimensions, participating roles, optional motif bridge and named seed lineage.
+- Give each transition exact rational-beat preparation, change and consequence/arrival phases. Compile the three phase starts and completion into non-audio canonical Score marker events; the change phase is one atomic scene-commit marker carrying the complete target state. Do not create a parallel scheduler or apply implicit audio mutations yet.
 - Track section memory: recent materials, last use, transformation history, energy/density trajectory, unresolved expectation and return opportunities.
 - Add delayed return, transformed reprise, interrupted cadence, residue, dissolve and hard-stop ending strategies.
 - Allow an ending to preserve a residual A/B/C identity without introducing new section-level randomness.
@@ -191,8 +191,9 @@ Make transitions and endings first-class compositional events. Long-form work ne
 
 ### Acceptance criteria
 
-- Transition plans specify source state, target state, changed dimensions, preserved identity and boundary.
-- Every transition has deterministic timing and can be inspected/reproduced.
+- Transition plans specify source state, target state, changed dimensions, preserved identity, participating roles, seed lineage and exact preparation/change/arrival regions.
+- Every transition has deterministic timing and can be inspected/reproduced. Compiled Score markers preserve the phase boundaries; one marker carries the whole target scene at the atomic change beat.
+- Existing M20 phrase spans and M28 phrase plans are valid references; compilation is idempotent and leaves unrelated Score events unchanged.
 - Ending plans are present in the Score and do not depend on an arbitrary audio fade alone.
 - A frozen or selected section cannot be modified by an unrelated later section mutation.
 - Tests cover asymmetrical phrases, no-transition repetition, abrupt rupture, silence, false return and multiple ending types.
@@ -558,8 +559,8 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tempo maps must distinguish step changes from continuous ramps and keep beat-to-second conversion mathematically defined.
 
 **Minimum tests**
-- Transitions preserve requested invariants and use permitted mutation domains.
-- Scene updates are atomic at the declared beat/frame boundary.
+- Transition plans preserve declared dimensions, validate phrase identity and use permitted transition types.
+- Scene updates are represented by one atomic target-state marker at the declared beat/frame boundary; renderer execution remains a later slice.
 - Ending director cannot schedule a new section-level mutation after the exit state is committed.
 - Tests include repetition without change, hard rupture, silence, false return, residue and deliberate early termination.
 - Tempo conversion round-trips beat/time/frame values within defined sample tolerance.
