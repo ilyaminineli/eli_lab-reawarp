@@ -327,7 +327,7 @@ class AttentionMapPage(QWidget):
                 self.register_low, self.register_high, self.onset_density,
                 self.transient_strength, self.sustain, self.spatial_position,
                 self.prominence, self.spectral_band, self.handoff_id,
-                self.intentional_overlap_id,
+                self.intentional_overlap_id, self.register_shift,
             ):
                 field.clear()
             self._refresh_controls()
