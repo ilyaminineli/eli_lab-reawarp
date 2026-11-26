@@ -50,7 +50,7 @@ def test_generate_uses_score_renderer_and_projects_legacy_events_from_score():
     assert project.score is not None
     assert project.to_score() is project.score
     assert project.score.metadata["score_origin"] == "score_first_generation"
-    assert project.score.metadata["renderer_version"] == "reawarp-score-renderer/1.0.0"
+    assert project.score.metadata["renderer_version"] == "reawarp-score-renderer/1.1.0"
     assert project.score.metadata["render_provenance"]["event_source"] == "Score.events"
     assert project.score.metadata["render_provenance"]["event_timebase"].startswith(
         "rational quarter-note beats"
@@ -100,7 +100,7 @@ def test_score_first_project_roundtrip_keeps_the_canonical_score(tmp_path):
     assert reopened.score is not None
     assert reopened.to_score().to_dict() == project.to_score().to_dict()
     assert reopened.events == project.events
-    assert reopened.metadata["renderer_version"] == "reawarp-score-renderer/1.0.0"
+    assert reopened.metadata["renderer_version"] == "reawarp-score-renderer/1.1.0"
 
 
 def test_legacy_generator_remains_available_as_a_migration_comparison():
