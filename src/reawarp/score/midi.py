@@ -320,14 +320,12 @@ def score_to_midi(
             payload["m29_midi_action"] = str(
                 rendered_event.parameters.get("m29_attention_action", "")
             )
-            source_pan = float(rendered_event.parameters.get(
-                "pan", rendered_event.parameters.get("spatial_position", 0.0)
-            ))
             midi_pan = -1.0 + 2.0 * float(pan_cc_value) / 127.0
             payload["m29_midi_rendered"] = {
                 "pitch": rendered_event.pitch,
                 "frequency_hz": rendered_event.frequency_hz,
                 "duration_beats": str(midi_duration),
+                "articulation": rendered_event.articulation,
                 "pan": midi_pan,
                 "spatial_width_factor": rendered_event.parameters.get(
                     "m29_spatial_width_factor", 1.0
