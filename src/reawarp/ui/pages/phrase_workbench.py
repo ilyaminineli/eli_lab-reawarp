@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
-    QSpinBox, QSplitter, QVBoxLayout, QWidget,
+    QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from reawarp.composition.phrases import (
@@ -607,6 +607,7 @@ class PhraseWorkbenchPage(QWidget):
 
     def set_error(self, message: str) -> None:
         self.audition_status.setText(message)
+        self.compare_status.setText(message)
 
     def _refresh_controls(self) -> None:
         has_score = self._score is not None
