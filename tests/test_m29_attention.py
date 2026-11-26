@@ -279,8 +279,15 @@ def test_attention_recede_event_thinning_is_deterministic_and_never_drops_anchor
     ] == [
         None if event is None else event.event_id for event in repeated
     ]
-    assert outcomes[-1] is not None
-    assert outcomes[-1].event_id == "kick-anchor"
+    kick_gesture = apply_attention_gesture(
+        source, role="kick", start_beats=0, end_beats=2, action="recede"
+    )
+    kick = next(event for event in source.events if event.event_id == "kick-anchor")
+    protected_kick = apply_attention_gesture_to_event(
+        kick, kick_gesture.metadata["m29_attention_gestures"]
+    )
+    assert protected_kick is not None
+    assert protected_kick.voice_id == "kick"
 
 
 def test_score_renderer_executes_attention_gesture_on_render_copy_only():
@@ -309,7 +316,7 @@ def test_score_renderer_executes_attention_gesture_on_render_copy_only():
     assert result.schedule[0].event.pitch == pytest.approx(62)
     assert result.schedule[0].event.parameters["m29_attention_gesture_id"]
     assert np.max(np.abs(result.stems["melody"])) == pytest.approx(0.8 * 0.82)
-    assert source_by_id["melody-note"].pitch == 60
+    assert source.events[0].pitch == 60
     assert "m29_attention_gestures" not in source.metadata
 
 
