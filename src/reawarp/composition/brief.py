@@ -581,6 +581,13 @@ class MutationContract:
                 + ", ".join(sorted(conflict))
             )
         object.__setattr__(self, "mutable_fields", mutable)
+        known_config_fields = set(GenerationConfig.__dataclass_fields__)
+        unknown_invariants = set(invariants) - known_config_fields
+        if unknown_invariants:
+            raise ValueError(
+                f"contract {self.contract_id!r} has unknown invariant fields: "
+                + ", ".join(sorted(unknown_invariants))
+            )
         object.__setattr__(self, "invariants", invariants)
         object.__setattr__(self, "cadence", _text(self.cadence, "mutation cadence"))
         object.__setattr__(self, "decision_boundaries", tuple(
@@ -620,6 +627,8 @@ class MutationContract:
         for key, values in dict(self.allowed_values or {}).items():
             if key not in mutable:
                 raise ValueError(f"allowed_values supplied for non-mutable field {key!r}")
+            if key in bounds:
+                raise ValueError(f"{key!r} cannot have both numeric bounds and allowed_values")
             options = tuple(_json_copy(list(values), f"allowed values for {key}"))
             if not options:
                 raise ValueError(f"allowed_values for {key!r} cannot be empty")
@@ -987,6 +996,11 @@ def resolve_composition_brief(
     missing: list[str] = []
     for family in brief.source_families:
         current = available.get(family.family_id)
+        if current is not None and current.role != family.role:
+            raise ValueError(
+                f"CompositionBrief source family {family.family_id!r} changed role "
+                f"from {family.role!r} to {current.role!r}"
+            )
         if current is None:
             if family.assets:
                 missing.extend(
@@ -1132,6 +1146,12 @@ def _draw_mutated_value(
         options = tuple(contract.allowed_values.get(field_name, BREAK_TRANSFORMS))
         if not options:
             raise ValueError("break_transforms has no allowed transform operations")
+        invalid = set(options) - set(BREAK_TRANSFORMS)
+        if invalid:
+            raise ValueError(
+                "break_transforms choices must be implemented transform names: "
+                + ", ".join(sorted(str(item) for item in invalid))
+            )
         size = int(rng.integers(1, len(options) + 1))
         indices = rng.choice(len(options), size=size, replace=False)
         return tuple(str(options[int(index)]) for index in sorted(indices))
@@ -1199,9 +1219,37 @@ def bounded_explore_generation_config(
     used_fields: set[str] = set()
     material_roles = {item.material_id: item.role for item in brief.materials if item.role}
 
+    declared_invariants = set(HARD_INVARIANTS)
+    for contract in brief.mutation_contracts:
+        declared_invariants.update(contract.invariants)
+    all_requested_fields = {
+        field_name
+        for contract in brief.mutation_contracts
+        for field_name in contract.mutable_fields
+    }
+    conflicts = all_requested_fields & declared_invariants
+    if conflicts:
+        raise ValueError(
+            "mutation contracts attempt to change fields declared invariant: "
+            + ", ".join(sorted(conflicts))
+        )
+
     for contract in brief.mutation_contracts:
         if not contract.mutable_fields:
             continue
+        if contract.cadence != "once_per_generation":
+            raise ValueError(
+                f"contract {contract.contract_id!r} uses unsupported GenerationConfig cadence "
+                f"{contract.cadence!r}; only 'once_per_generation' is currently executable"
+            )
+        unsupported_stops = set(contract.stop_conditions) - {
+            "manual_freeze", "one_generation_request"
+        }
+        if unsupported_stops:
+            raise ValueError(
+                f"contract {contract.contract_id!r} has unsupported stop conditions: "
+                + ", ".join(sorted(unsupported_stops))
+            )
         mutable_fields = contract.mutable_fields
         if contract.max_mutations is not None:
             mutable_fields = mutable_fields[:contract.max_mutations]

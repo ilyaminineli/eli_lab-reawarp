@@ -179,6 +179,8 @@ class ReawarpEngine:
             regenerate: str | None = None,
             variation: int = 1,
             cancel_event: Any | None = None,
+            composition_brief: Any | None = None,
+            bounded_exploration: bool = False,
             **overrides: Any,
     ) -> ReawarpProject:
         """Generate from a canonical Score, then render its scheduled events."""
@@ -188,6 +190,18 @@ class ReawarpEngine:
             raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
         if variation < 1:
             raise ValueError("variation must be a positive integer")
+
+        m27_resolved_intent = None
+        m27_exploration = None
+        if composition_brief is None and bounded_exploration:
+            raise ValueError("bounded exploration requires a CompositionBrief")
+        if composition_brief is not None:
+            from reawarp.composition.brief import resolve_and_explore
+
+            config, m27_resolved_intent, m27_exploration = resolve_and_explore(
+                composition_brief, config,
+                bounded_exploration=bool(bounded_exploration),
+            )
 
         from reawarp.core.score_generation import (
             build_score_generation_plan,
@@ -405,7 +419,7 @@ class ReawarpEngine:
         })
         project_score = replace(project_score, metadata=score_metadata)
 
-        return ReawarpProject(
+        project = ReawarpProject(
             config=config,
             sample_rate=sample_rate,
             stems=stems,
@@ -413,6 +427,16 @@ class ReawarpEngine:
             metadata=metadata,
             score=project_score,
         )
+        if composition_brief is not None and m27_resolved_intent is not None:
+            project.metadata.update({
+                "m27_composition_brief": composition_brief.to_dict(),
+                "m27_resolved_intent": m27_resolved_intent.to_dict(),
+                "m27_bounded_exploration": (
+                    m27_exploration.to_dict() if m27_exploration is not None else None
+                ),
+                "m27_bounded_exploration_enabled": bool(bounded_exploration),
+            })
+        return project
 
     def generate_legacy(
             self,

@@ -45,6 +45,14 @@ class ReawarpProject:
     def duration(self) -> float:
         return self.frame_count / float(self.sample_rate)
 
+    @property
+    def composition_brief(self):
+        """Return the saved M27 brief, or a read-only legacy view without write-back."""
+        from reawarp.composition.brief import CompositionBrief
+
+        saved = self.metadata.get("m27_composition_brief")
+        return CompositionBrief.from_dict(saved) if isinstance(saved, dict) else CompositionBrief.legacy()
+
     def to_score(self, *, title: str | None = None):
         """Return the canonical score, or adapt a legacy project when absent."""
         if self.score is not None:
@@ -392,6 +400,25 @@ class ReawarpProject:
         metadata = record.get("metadata", {})
         if not isinstance(metadata, dict):
             raise ValueError("project metadata must be a JSON object")
+        brief_record = metadata.get("m27_composition_brief")
+        if brief_record is not None:
+            from reawarp.composition.brief import CompositionBrief
+
+            brief = CompositionBrief.from_dict(brief_record)
+            resolved_intent = metadata.get("m27_resolved_intent")
+            if not isinstance(resolved_intent, dict):
+                raise ValueError("project M27 brief is missing its resolved-intent provenance")
+            if resolved_intent.get("brief_fingerprint") != brief.fingerprint:
+                raise ValueError("project M27 brief fingerprint does not match its provenance")
+            if resolved_intent.get("brief_id") != brief.brief_id:
+                raise ValueError("project M27 brief ID does not match its provenance")
+            if resolved_intent.get("generation_seed") != config.seed:
+                raise ValueError("project M27 generation seed does not match its configuration")
+            exploration = metadata.get("m27_bounded_exploration")
+            if exploration is not None and (
+                not isinstance(exploration, dict) or exploration.get("schema_version") != 1
+            ):
+                raise ValueError("project M27 bounded-exploration provenance is invalid")
         score_name = str(record.get("score_file", "score.json"))
         score_path = (root / score_name).resolve()
         if not score_path.is_relative_to(root) or not score_path.is_file():
