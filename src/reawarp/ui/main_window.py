@@ -2911,8 +2911,14 @@ class MainWindow(QMainWindow):
                 if cancel_event.is_set():
                     raise RuntimeError("variation comparison cancelled")
                 score = project.to_score()
+                attention_gestures = tuple(
+                    score.metadata.get("m29_attention_gestures", ())
+                )
                 controls = None
-                if score.automation or score.automation_sources or score.modulations:
+                if (
+                    score.automation or score.automation_sources or score.modulations
+                    or attention_gestures
+                ):
                     if legacy_automation:
                         score = attach_fx_automation_to_score(
                             score, legacy_automation, tuple(project.stems)
@@ -2930,6 +2936,7 @@ class MainWindow(QMainWindow):
                     bpm=project.config.bpm,
                     automation=legacy_automation if controls is None else None,
                     controls=controls,
+                    attention_gestures=attention_gestures,
                     mix_controls=mix_controls,
                     include_audition_audio=True,
                     cancel_event=cancel_event,
@@ -3480,8 +3487,14 @@ class MainWindow(QMainWindow):
         score = project.to_score()
         legacy_automation = copy.deepcopy(self.fx_automation_editor.automation())
         stem_names = tuple(project.stems)
+        attention_gestures = tuple(
+            score.metadata.get("m29_attention_gestures", ())
+        )
         controls = None
-        if score.automation or score.automation_sources or score.modulations:
+        if (
+            score.automation or score.automation_sources or score.modulations
+            or attention_gestures
+        ):
             if legacy_automation:
                 score = attach_fx_automation_to_score(score, legacy_automation, stem_names)
             controls = build_score_control_bus(
@@ -3527,6 +3540,7 @@ class MainWindow(QMainWindow):
                     bpm=bpm,
                     automation=legacy_automation if controls is None else None,
                     controls=controls,
+                    attention_gestures=attention_gestures,
                     include_audition_audio=False,
                     cancel_event=cancel_event,
                 )
@@ -3711,8 +3725,14 @@ class MainWindow(QMainWindow):
         score = self.project.to_score()
         legacy_automation = self.fx_automation_editor.automation()
         stem_names = tuple(self.project.stems)
+        attention_gestures = tuple(
+            score.metadata.get("m29_attention_gestures", ())
+        )
         controls = None
-        if score.automation or score.automation_sources or score.modulations:
+        if (
+            score.automation or score.automation_sources or score.modulations
+            or attention_gestures
+        ):
             if legacy_automation:
                 score = attach_fx_automation_to_score(
                     score, legacy_automation, stem_names
@@ -3750,6 +3770,7 @@ class MainWindow(QMainWindow):
                 bpm=bpm,
                 automation=legacy_automation if controls is None else None,
                 controls=controls,
+                attention_gestures=attention_gestures,
                 mix_controls=mix_controls,
                 include_audition_audio=True,
                 cancel_event=cancel_event,
