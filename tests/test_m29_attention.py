@@ -199,7 +199,8 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
         register_shift_semitones=3,
     )
     assert source.metadata == {"keep": True}
-    assert source.events[0].pitch == 60
+    source_by_id = {event.event_id: event for event in source.events}
+    assert source_by_id["melody-note"].pitch == 60
     records = focused.metadata["m29_attention_gestures"]
     assert len(records) == 1
     assert records[0]["start_beats"] == "1/4"
@@ -209,7 +210,7 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
     from reawarp.score.attention import apply_attention_gesture_to_event
 
     transformed = apply_attention_gesture_to_event(
-        source.events[0], records
+        source_by_id["melody-note"], records
     )
     assert transformed.pitch == pytest.approx(63)
     assert transformed.articulation == "legato"
@@ -218,10 +219,10 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
     assert transformed.parameters["m29_spatial_width_factor"] == pytest.approx(0.82)
     assert transformed.parameters["m29_attention_action"] == "focus"
 
-    outside = apply_attention_gesture_to_event(source.events[1], records)
-    assert outside is source.events[1]
+    outside = apply_attention_gesture_to_event(source_by_id["melody-outside"], records)
+    assert outside is source_by_id["melody-outside"]
     protected = apply_attention_gesture_to_event(
-        source.events[2],
+        source_by_id["kick-anchor"],
         apply_attention_gesture(
             source, role="kick", start_beats=0, end_beats=2,
             action="recede",
@@ -308,7 +309,7 @@ def test_score_renderer_executes_attention_gesture_on_render_copy_only():
     assert result.schedule[0].event.pitch == pytest.approx(62)
     assert result.schedule[0].event.parameters["m29_attention_gesture_id"]
     assert np.max(np.abs(result.stems["melody"])) == pytest.approx(0.8 * 0.82)
-    assert source.events[0].pitch == 60
+    assert source_by_id["melody-note"].pitch == 60
     assert "m29_attention_gestures" not in source.metadata
 
 
