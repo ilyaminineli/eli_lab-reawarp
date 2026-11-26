@@ -279,6 +279,12 @@ def test_attention_recede_event_thinning_is_deterministic_and_never_drops_anchor
     ] == [
         None if event is None else event.event_id for event in repeated
     ]
+    hat_results = [
+        outcome for event, outcome in zip(source.events, outcomes)
+        if event.voice_id == "hat"
+    ]
+    assert any(outcome is None for outcome in hat_results)
+    assert any(outcome is not None for outcome in hat_results)
     kick_gesture = apply_attention_gesture(
         source, role="kick", start_beats=0, end_beats=2, action="recede"
     )
