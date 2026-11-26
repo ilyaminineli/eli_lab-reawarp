@@ -513,12 +513,21 @@ def score_from_midi(path: str | Path) -> Score:
         payload = details["payload"]
         if payload is not None:
             original = dict(payload)
+            m29_rendered = bool(original.get("m29_midi_gesture_id"))
             event_id = str(original.get("event_id", f"midi-event-{record_index:06d}"))
             if event_id in used_ids:
                 event_id = f"{event_id}-{record_index}"
             used_ids.add(event_id)
-            onset = Fraction(start_tick, ppq)
-            duration = Fraction(end_tick - start_tick, ppq)
+            onset = (
+                as_fraction(str(original.get("onset_beats", Fraction(start_tick, ppq))))
+                if m29_rendered else Fraction(start_tick, ppq)
+            )
+            duration = (
+                as_fraction(str(original.get(
+                    "duration_beats", Fraction(end_tick - start_tick, ppq)
+                )))
+                if m29_rendered else Fraction(end_tick - start_tick, ppq)
+            )
             events.append(MusicalEvent(
                 event_id=event_id,
                 voice_id=str(original.get("voice_id", track_name)),
@@ -532,13 +541,18 @@ def score_from_midi(path: str | Path) -> Score:
                     None if original.get("frequency_hz") is None
                     else float(original["frequency_hz"])
                 ),
-                velocity=float(velocity) / 127.0,
+                velocity=(
+                    float(original.get("velocity", float(velocity) / 127.0))
+                    if m29_rendered else float(velocity) / 127.0
+                ),
                 articulation=str(original.get("articulation", "default")),
                 parameters=dict(original.get("parameters", {})),
                 tags=tuple(original.get("tags", ())),
                 source_id=original.get("source_id"),
                 seed=original.get("seed"),
-                channel=channel,
+                channel=(
+                    None if original.get("channel") is None else int(original["channel"])
+                ) if m29_rendered else channel,
                 tuning_id=str(original.get("tuning_id", tuning_id)),
             ))
         else:
@@ -555,6 +569,26 @@ def score_from_midi(path: str | Path) -> Score:
                 channel=channel,
                 tuning_id=tuning_id,
             ))
+
+    midi_render_export = (
+        custom_score.get("m29_midi_render_export", {}) if custom_score else {}
+    )
+    if (
+        isinstance(midi_render_export, dict)
+        and midi_render_export.get("schema_version") == 1
+        and isinstance(midi_render_export.get("omitted_events", []), list)
+    ):
+        for raw_event in midi_render_export.get("omitted_events", []):
+            if not isinstance(raw_event, dict):
+                continue
+            try:
+                source_event = MusicalEvent.from_dict(raw_event)
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                continue
+            if source_event.event_id in used_ids:
+                continue
+            used_ids.add(source_event.event_id)
+            events.append(source_event)
 
     automation_by_target = {lane.target_id: lane for lane in custom_automation}
     for target, point_values in cc_points.items():
