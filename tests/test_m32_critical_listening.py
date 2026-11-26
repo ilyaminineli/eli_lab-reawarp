@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 
 import numpy as np
 import pytest
@@ -31,7 +32,7 @@ from reawarp.score.time import TempoMap
 
 def _project():
     config = GenerationConfig(
-        duration=5.0, sample_rate=8_000, seed="m32-listening-fixture",
+        duration=5.0, sample_rate=22_050, seed="m32-listening-fixture",
         include_melody=False, include_texture=False, include_ambience=False,
     )
     frames = config.frame_count
@@ -110,9 +111,9 @@ def test_phrase_contexts_use_exact_score_beats_and_role_scoped_buffers():
     solo_audio = next(iter(solo.values())).audio
     before_audio = next(iter(before.values())).audio
     after_audio = next(iter(after.values())).audio
-    assert len(solo_audio) == 8_000
-    assert len(before_audio) == 16_000
-    assert len(after_audio) == 16_000
+    assert len(solo_audio) == 22_050
+    assert len(before_audio) == 44_100
+    assert len(after_audio) == 44_100
     assert next(iter(solo.values())).transform.parameters["roles"] == ["melody"]
 
 

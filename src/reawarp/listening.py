@@ -511,6 +511,7 @@ def build_contextual_audition_set(
     candidate_id: str | None = None,
     analysis_enabled: bool = True,
     cancel_event: Any | None = None,
+    identity_label: str | None = None,
 ) -> dict[str, AuditionResult]:
     """Return disposable listening contexts derived from an unchanged project."""
     from reawarp.variations import project_fingerprint
@@ -596,7 +597,10 @@ def build_contextual_audition_set(
         anchors = tuple(name for name in project.stems if name not in set(roles))
         result = build_invariance_probe(
             project, anchor_roles=anchors, removed_roles=roles,
-            identity_label=" / ".join(anchors) or "declared project identity",
+            identity_label=(
+                str(identity_label).strip() if identity_label and str(identity_label).strip()
+                else " / ".join(anchors) or "declared project identity"
+            ),
             candidate_id=candidate_id, analysis_enabled=analysis_enabled,
         )
         return {result.label: result}
@@ -781,6 +785,18 @@ def analyse_project(project: ReawarpProject, *, enabled: bool = True) -> dict[st
         for name, audio in sorted(project.stems.items())
     }
     overlap, warnings = [], list(master_result["warnings"])
+    for role, result in stem_results.items():
+        for warning in result["warnings"]:
+            warnings.append({
+                **warning,
+                "signal_boundary": "stem",
+                "role": role,
+                "evidence": {
+                    **dict(warning.get("evidence", {})),
+                    "role": role,
+                    "sample_rate": project.sample_rate,
+                },
+            })
     names = sorted(transient)
     for index, left_name in enumerate(names):
         for right_name in names[index + 1:]:

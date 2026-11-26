@@ -2,7 +2,7 @@
 
 **Agent-facing technical roadmap · 26 November 2026**  
 **Status:** M27 is implemented; M28 and M29 remain in progress with human listening acceptance open; M30 implementation is complete with formal listening sign-off still open.  
-**Current baseline:** M30 transition/ending grammar and M31 sound-object editing/print lineage are implemented; M32 — Critical Listening Workbench and Contextual Evaluation — is the next planned priority. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
+**Current baseline:** M30 transition/ending grammar, M31 sound-object editing/print lineage and the M32 critical-listening core are implemented; M33 is the next planned priority. M32 human listening acceptance remains open. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -258,7 +258,7 @@ Make the existing sound-object and hybrid-instrument architecture directly usabl
 ## M32 — Critical Listening Workbench and Contextual Evaluation
 
 **Priority:** P3  
-**Status:** Planned  
+**Status:** Core implementation delivered; human listening acceptance open. Full-FX candidate A/B, deeper role-aware spectral diagnostics and extended invariance mutations remain follow-on work.  
 **Depends on:** M28–M31; builds on M22, M23, M25  
 **Primary guide basis:** Advanced Appendix §§15, 18; Field Guide §§9, 23–24, 26; Composition Atlas §§18 onward.
 
@@ -269,12 +269,12 @@ Make the guide's subtraction, invariance and context tests executable as repeata
 ### Scope
 
 - Extend M23's candidate comparison into composition-level listening sessions.
-- Add contextual audition sets: solo phrase; predecessor→candidate; candidate→successor; full section; full track; reduced-density and altered-register versions.
-- Add guided subtraction passes by role group and by selected percentage; support restore/keep decisions and maintain a reversible edit history.
-- Add invariance sessions: identify the anchor/motif/tuning/sound family, temporarily remove or transform other material, then record whether identity survives.
-- Add technical diagnostics: peak/RMS/headroom, tail and silence, clipping, phase/mono compatibility, transient overlap, spectral occupancy, and loudness at more than one playback level where practical.
+- Add contextual audition sets: solo phrase; predecessor→candidate; candidate→successor; full parent section; full track; opening/middle/ending; reduced-density and altered-register versions. These are disposable render/audio copies.
+- Add percentage-based role subtraction with explicit restore/keep decisions and undo/redo history over disposable buffers.
+- Add invariance removal probes: name anchor/identity and removed roles, temporarily remove other material, and record the human verdict (survives / does not survive / ambiguous / not reviewed). The human outcome is never inferred by the system.
+- Add technical diagnostics: peak/RMS/headroom, tail and silence, clipping, channel correlation/phase and mono compatibility, transient overlap, spectral occupancy, and playback-level ladders. Warnings include severity and evidence.
 - Show analysis window/parameter choices; do not imply a spectrogram or one metric is “the truth”.
-- Add a human-authored listening report with identity, continuity, contrast, legibility, motif development, orchestration, pacing, surprise, emotional coherence and technical integrity prompts.
+- Add a human-authored listening report with identity, continuity, contrast, legibility, motif development, orchestration, pacing, surprise, emotional coherence and technical integrity prompts. Export readable Markdown and provenance JSON with the project archive.
 - Keep blind/matched-level audition and avoid automatic “best candidate” selection.
 
 ### Acceptance criteria

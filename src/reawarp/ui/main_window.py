@@ -3295,6 +3295,7 @@ class MainWindow(QMainWindow):
         from reawarp.listening import (
             analyse_audio, analyse_project, apply_playback_level,
             build_contextual_audition_set, record_session_event,
+            audio_fingerprint,
         )
 
         project, candidate_id = self._m32_active_project()
@@ -3339,6 +3340,7 @@ class MainWindow(QMainWindow):
                 candidate_id=candidate_id,
                 analysis_enabled=analysis_enabled,
                 cancel_event=cancel_event,
+                identity_label=str(payload.get("identity_label", "")).strip() or None,
             )
             if cancel_event.is_set():
                 raise RuntimeError("critical listening audition cancelled")
@@ -3395,7 +3397,10 @@ class MainWindow(QMainWindow):
                     session_value, "invariance_trials",
                     {
                         **audition.transform.to_dict(),
-                        "human_identity_survives": None,
+                        "human_identity_survives": payload.get("identity_survives"),
+                        "identity_label": result["result"].transform.parameters.get("identity_label"),
+                        "anchor_roles": result["result"].transform.parameters.get("anchor_roles", []),
+                        "removed_roles": result["result"].transform.parameters.get("removed_roles", []),
                     },
                 )
             session_value["technical_analysis"] = result["project_analysis"]
@@ -3436,7 +3441,9 @@ class MainWindow(QMainWindow):
 
     def _m32_decision_requested(self, decision: str) -> None:
         from dataclasses import replace as dataclass_replace
-        from reawarp.listening import record_session_event
+        from reawarp.listening import (
+            apply_playback_level, audio_fingerprint, record_session_event,
+        )
 
         if self._m32_current_result is None or self._m32_session is None:
             self.variation_page.set_m32_status("Build an audition pass before keeping or restoring it.")
@@ -3451,9 +3458,14 @@ class MainWindow(QMainWindow):
                     record = self._m32_history.keep_current()
                 except (IndexError, ValueError):
                     pass
-            session = record_session_event(
-                self._m32_session, "subtraction_history", record
+            collection = (
+                "subtraction_history"
+                if self._m32_current_result.transform.operation in {
+                    "role_subtraction", "invariance_removal_probe"
+                }
+                else "audition_transforms"
             )
+            session = record_session_event(self._m32_session, collection, record)
             self._m32_persist_session(session)
             self.variation_page.set_m32_status(
                 "Pass kept in the reversible listening history. The production project is unchanged."
@@ -3463,7 +3475,13 @@ class MainWindow(QMainWindow):
             project, _candidate_id = self._m32_active_project()
             if project is None:
                 return
-            if self._m32_history is not None and self._m32_history.can_undo:
+            reversible_operation = self._m32_current_result.transform.operation in {
+                "role_subtraction", "invariance_removal_probe"
+            }
+            if (
+                reversible_operation and self._m32_history is not None
+                and self._m32_history.can_undo
+            ):
                 restored = self._m32_history.undo()
             else:
                 restored = project.render_master()

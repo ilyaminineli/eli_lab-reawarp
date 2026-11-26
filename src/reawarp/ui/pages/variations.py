@@ -254,6 +254,12 @@ class VariationBrowserPage(QWidget):
         self.m32_identity_label = QLineEdit()
         self.m32_identity_label.setPlaceholderText("Invariance anchor / material identity")
         parameter_panel.addWidget(self.m32_identity_label)
+        self.m32_identity_result = QComboBox()
+        self.m32_identity_result.addItem("NOT REVIEWED", None)
+        self.m32_identity_result.addItem("IDENTITY SURVIVES", True)
+        self.m32_identity_result.addItem("IDENTITY DOES NOT SURVIVE", False)
+        self.m32_identity_result.addItem("AMBIGUOUS", "ambiguous")
+        parameter_panel.addWidget(self.m32_identity_result)
         roles_row.addLayout(parameter_panel, 2)
         evaluation_layout.addLayout(roles_row)
 
@@ -356,6 +362,7 @@ class VariationBrowserPage(QWidget):
             "playback_level_dbfs": int(self.m32_playback_level.currentData()),
             "analysis_enabled": self.m32_analysis_enabled.isChecked(),
             "identity_label": self.m32_identity_label.text().strip(),
+            "identity_survives": self.m32_identity_result.currentData(),
         }
         self.m32ContextRequested.emit(payload)
 
