@@ -99,17 +99,14 @@ def test_transition_plan_roundtrip_preserves_exact_rational_phase_boundaries():
 
 
 def test_transition_phase_order_contiguity_and_dimensions_are_validated():
+    broken = _plan().to_dict()
+    broken["phases"] = [
+        {"phase": "preparation", "start_beats": "6", "end_beats": "8"},
+        {"phase": "change", "start_beats": "17/2", "end_beats": "9"},
+        {"phase": "arrival", "start_beats": "9", "end_beats": "11"},
+    ]
     with pytest.raises(ValueError, match="meet at one exact beat"):
-        TransitionPlan(
-            **{
-                **_plan().to_dict(),
-                "phases": [
-                    {"phase": "preparation", "start_beats": "6", "end_beats": "8"},
-                    {"phase": "change", "start_beats": "17/2", "end_beats": "9"},
-                    {"phase": "arrival", "start_beats": "9", "end_beats": "11"},
-                ],
-            }
-        )
+        TransitionPlan.from_dict(broken)
 
     with pytest.raises(ValueError, match="cannot be both changed and preserved"):
         _plan(changed=("rhythm",), preserved=("rhythm",))
@@ -144,13 +141,10 @@ def test_transition_catalogue_covers_the_roadmap_types():
         "fragmentation", "overlap", "silence", "false_return",
         "motif_bridge",
     }
+    from dataclasses import replace
+
     with pytest.raises(ValueError, match="motif_bridge_id"):
-        _plan(transition_type="motif_bridge").__class__(
-            **{
-                **_plan(transition_type="motif_bridge").__dict__,
-                "motif_bridge_id": None,
-            }
-        )
+        replace(_plan(transition_type="motif_bridge"), motif_bridge_id=None)
 
 
 def test_compilation_attaches_four_markers_and_one_atomic_scene_change():
