@@ -9,6 +9,7 @@ import copy
 import hashlib
 import json
 from dataclasses import replace
+from fractions import Fraction
 from typing import Any, Iterable, Mapping
 
 import numpy as np
