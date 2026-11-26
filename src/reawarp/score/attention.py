@@ -486,6 +486,127 @@ def apply_attention_gesture_to_event(
     return replace(event, **changes)
 
 
+def build_attention_send_envelope(
+    gestures: Any,
+    *,
+    role: str,
+    bus: str,
+    timeline: Any,
+    frames: int,
+) -> np.ndarray:
+    """Build a phrase-shaped SPACE/ECHO send multiplier for one event-backed role.
+
+    The envelope composes with the stem's existing static/automated send level.
+    Edges use eased ramps over 18% of each gesture span and are mapped through
+    the Score tempo map. Nested instructions blend from their enclosing gesture
+    rather than introducing a discontinuity at the local phrase boundary.
+    """
+    from reawarp.score.time import as_fraction
+
+    if isinstance(frames, bool) or int(frames) != frames or int(frames) < 0:
+        raise ValueError("attention send envelope frames must be a non-negative integer")
+    frames = int(frames)
+    bus = str(bus).strip().casefold()
+    if bus not in {"space", "echo"}:
+        raise ValueError("attention send bus must be space or echo")
+    role = str(role).strip()
+    if not role:
+        raise ValueError("attention send role cannot be empty")
+    if not callable(getattr(timeline, "beat_to_frame", None)) or not callable(
+        getattr(timeline, "frame_to_beat", None)
+    ):
+        raise TypeError("attention send envelope requires a Score render timeline")
+
+    neutral = np.ones(frames, dtype=np.float32)
+    if frames == 0:
+        return neutral
+
+    aliases = {"hats": "hat", "synthetic_break": "break"}
+    canonical_role = aliases.get(role, role)
+    if canonical_role in _PROTECTED_ATTENTION_ROLES:
+        return neutral
+
+    records = _validated_attention_gestures(gestures)
+    selected = [
+        item for item in records
+        if aliases.get(item["role"], item["role"]) == canonical_role
+    ]
+    if not selected:
+        return neutral
+
+    target_factors = {
+        "focus": {"space": 0.62, "echo": 0.72},
+        "recede": {"space": 1.38, "echo": 1.20},
+    }
+    edge_fraction = Fraction(9, 50)
+    subdivisions = 16
+
+    def factor_at_beat(beat, excluded: frozenset[str] = frozenset()) -> float:
+        matching = []
+        for item in selected:
+            gesture_id = item["gesture_id"]
+            if gesture_id in excluded:
+                continue
+            start = as_fraction(item["start_beats"])
+            end = as_fraction(item["end_beats"])
+            if start <= beat < end:
+                matching.append((end - start, -start, gesture_id, item, start, end))
+        if not matching:
+            return 1.0
+
+        # Keep the event-renderer's locality rule: the narrowest active phrase wins.
+        _, _, gesture_id, item, start, end = min(
+            matching, key=lambda record: (record[0], record[1], record[2])
+        )
+        underlying = factor_at_beat(beat, excluded | {gesture_id})
+        phase = float((beat - start) / (end - start))
+        edge_progress = min(
+            1.0, phase / float(edge_fraction),
+            (1.0 - phase) / float(edge_fraction),
+        )
+        eased = edge_progress * edge_progress * (3.0 - 2.0 * edge_progress)
+        target = target_factors[item["action"]][bus]
+        return underlying + (target - underlying) * eased
+
+    key_beats = {
+        timeline.frame_to_beat(0),
+        timeline.frame_to_beat(frames - 1),
+    }
+    for item in selected:
+        start = as_fraction(item["start_beats"])
+        end = as_fraction(item["end_beats"])
+        ramp = (end - start) * edge_fraction
+        key_beats.update((start, end))
+        for index in range(subdivisions + 1):
+            offset = ramp * Fraction(index, subdivisions)
+            key_beats.add(start + offset)
+            key_beats.add(end - offset)
+
+    # Convert rational phrase positions using the Score's actual tempo map.
+    # If several positions quantise to one frame, retain the latest beat sample.
+    by_frame: dict[int, tuple[Any, float]] = {}
+    for beat in sorted(key_beats):
+        frame = int(timeline.beat_to_frame(beat))
+        if 0 <= frame < frames:
+            by_frame[frame] = (beat, factor_at_beat(beat))
+
+    for frame in (0, frames - 1):
+        if frame not in by_frame:
+            beat = timeline.frame_to_beat(frame)
+            by_frame[frame] = (beat, factor_at_beat(beat))
+
+    positions = np.asarray(sorted(by_frame), dtype=np.float64)
+    values = np.asarray(
+        [by_frame[int(frame)][1] for frame in positions], dtype=np.float64
+    )
+    if len(positions) == 1:
+        return np.full(frames, float(values[0]), dtype=np.float32)
+    return np.interp(
+        np.arange(frames, dtype=np.float64), positions, values,
+        left=float(values[0]), right=float(values[-1]),
+    ).astype(np.float32)
+
+
 __all__ = [
     "ATTENTION_GESTURE_ACTIONS",
     "ATTENTION_GESTURE_SCHEMA_VERSION",
@@ -493,6 +614,7 @@ __all__ = [
     "apply_attention_gesture",
     "apply_attention_gesture_to_event",
     "attention_conflict_id",
+    "build_attention_send_envelope",
     "build_attention_translation_check",
     "estimate_attention_descriptors",
     "record_attention_review",

@@ -11,8 +11,11 @@ import numpy as np
 
 from reawarp.export.wav import write_wav
 from reawarp.fx_automation import (
+    attach_fx_automation_to_score, fx_automation_registry,
     load_fx_automation, normalise_fx_automation, save_fx_automation,
 )
+from reawarp.score.model import Score
+from reawarp.score.render import build_score_control_bus
 from reawarp.fx_routing import (
     build_role_audition_matrix,
     role_aware_fx_routing,
@@ -175,6 +178,30 @@ def main() -> None:
     except ImportError as exc:
         raise SystemExit('SoundFile required: python -m pip install -e ".[pyo]"') from exc
 
+    attention_gestures = ()
+    controls = None
+    score_path = project_dir / "score.json"
+    if score_path.is_file():
+        try:
+            portable_score = Score.load(score_path)
+            attention_gestures = tuple(
+                portable_score.metadata.get("m29_attention_gestures", ())
+            )
+            if attention_gestures:
+                if automation["lanes"]:
+                    portable_score = attach_fx_automation_to_score(
+                        portable_score, automation, names
+                    )
+                controls = build_score_control_bus(
+                    portable_score,
+                    sample_rate,
+                    automation_registry=fx_automation_registry(tuple(names)),
+                )
+        except Exception as exc:
+            raise SystemExit(
+                f"Could not resolve Score attention/FX controls: {exc}"
+            ) from exc
+
     stems: dict[str, np.ndarray] = {}
     for name in names:
         path = project_dir / "stems" / f"{name}.wav"
@@ -194,7 +221,11 @@ def main() -> None:
     for profile_name, routing in routings.items():
         try:
             processed, metadata = render_fx_routing(
-                stems, sample_rate, routing, bpm=bpm, automation=automation
+                stems, sample_rate, routing,
+                bpm=bpm,
+                automation=automation if controls is None else None,
+                controls=controls,
+                attention_gestures=attention_gestures,
             )
         except Exception as exc:
             raise SystemExit(f"FX routing render failed for {profile_name}: {exc}") from exc
