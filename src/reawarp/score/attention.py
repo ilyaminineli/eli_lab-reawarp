@@ -5,6 +5,7 @@ disposable audio copies. Reversible gestures are resolved against render-time ev
 copies, leaving canonical Score events and source assets unchanged. Descriptor
 estimates are not psychoacoustic measurements or artistic quality scores.
 """
+
 from __future__ import annotations
 
 import copy
@@ -18,14 +19,17 @@ import numpy as np
 
 from reawarp.score.orchestration_intent import AttentionSpan
 
-
 ATTENTION_REVIEW_STATES = frozenset({"useful", "masked", "unresolved"})
 
 
 def _stable_json(value: Any) -> str:
     return json.dumps(
-        value, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
-        allow_nan=False, default=str,
+        value,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+        default=str,
     )
 
 
@@ -34,8 +38,15 @@ def attention_conflict_id(conflict: Mapping[str, Any]) -> str:
     payload = {
         key: conflict[key]
         for key in (
-            "kind", "roles", "semantic_roles", "start_beats", "end_beats",
-            "onset_beats", "event_ids", "evidence", "handoff_id",
+            "kind",
+            "roles",
+            "semantic_roles",
+            "start_beats",
+            "end_beats",
+            "onset_beats",
+            "event_ids",
+            "evidence",
+            "handoff_id",
         )
         if key in conflict
     }
@@ -61,9 +72,12 @@ def estimate_attention_descriptors(
     for span in spans:
         role = aliases.get(span.role, span.role)
         selected = [
-            event for event in event_list
-            if aliases.get(str(getattr(event, "voice_id", "")),
-                           str(getattr(event, "voice_id", ""))) == role
+            event
+            for event in event_list
+            if aliases.get(
+                str(getattr(event, "voice_id", "")), str(getattr(event, "voice_id", ""))
+            )
+            == role
             and span.start_beats <= event.onset_beats < span.end_beats
             and getattr(event, "kind", None) not in {"marker", "control"}
         ]
@@ -72,32 +86,36 @@ def estimate_attention_descriptors(
             event for event in selected if event.kind in {"hit", "trigger", "grain"}
         ]
         panned = [
-            float(event.parameters.get(
-                "spatial_position", event.parameters.get("pan")
-            ))
+            float(event.parameters.get("spatial_position", event.parameters.get("pan")))
             for event in selected
-            if event.parameters.get(
-                "spatial_position", event.parameters.get("pan")
-            ) is not None
+            if event.parameters.get("spatial_position", event.parameters.get("pan"))
+            is not None
         ]
         values: dict[str, float | None] = {
             "onset_density": len(selected) / duration if duration > 0.0 else None,
             "transient_strength": (
                 float(np.mean([event.velocity for event in transient_events]))
-                if transient_events else None
+                if transient_events
+                else None
             ),
             "sustain": (
-                min(1.0, sum(float(event.duration_beats) for event in selected) / duration)
-                if selected and duration > 0.0 else None
+                min(
+                    1.0,
+                    sum(float(event.duration_beats) for event in selected) / duration,
+                )
+                if selected and duration > 0.0
+                else None
             ),
             "spatial_position": float(np.mean(panned)) if panned else None,
             "prominence": (
                 float(np.mean([event.velocity for event in selected]))
-                if selected else None
+                if selected
+                else None
             ),
         }
         pitches = [
-            float(event.pitch) for event in selected
+            float(event.pitch)
+            for event in selected
             if getattr(event, "kind", None) == "note" and event.pitch is not None
         ]
         changes: dict[str, Any] = {}
@@ -132,9 +150,9 @@ def record_attention_review(
     metadata = copy.deepcopy(score.metadata)
     reviews = copy.deepcopy(metadata.get("m29_attention_reviews", {}))
     plan = score.orchestration_plan or {}
-    plan_fingerprint = hashlib.sha256(
-        _stable_json(plan).encode("utf-8")
-    ).hexdigest() if plan else None
+    plan_fingerprint = (
+        hashlib.sha256(_stable_json(plan).encode("utf-8")).hexdigest() if plan else None
+    )
     reviews[conflict_id] = {
         "schema_version": 1,
         "conflict_id": conflict_id,
@@ -156,7 +174,9 @@ def build_attention_translation_check(
     """Create a disposable mono-fold or low-level audition copy."""
     source = np.asarray(audio, dtype=np.float32)
     if source.ndim not in {1, 2}:
-        raise ValueError("translation-check audio must be mono or frame-major multichannel")
+        raise ValueError(
+            "translation-check audio must be mono or frame-major multichannel"
+        )
     if not np.all(np.isfinite(source)):
         raise ValueError("translation-check audio must contain only finite samples")
     if mode == "mono":
@@ -177,14 +197,18 @@ def build_attention_translation_check(
     raise ValueError(f"unsupported translation check: {mode}")
 
 
-
-
 ATTENTION_GESTURE_ACTIONS = frozenset({"focus", "recede"})
 ATTENTION_GESTURE_SCHEMA_VERSION = 1
 _RECEDE_EVENT_DROP_PROBABILITY = 0.14
-_PROTECTED_ATTENTION_ROLES = frozenset({
-    "kick", "bass", "sub", "sub_bass", "low_frequency",
-})
+_PROTECTED_ATTENTION_ROLES = frozenset(
+    {
+        "kick",
+        "bass",
+        "sub",
+        "sub_bass",
+        "low_frequency",
+    }
+)
 
 
 def _attention_gesture_key(role: str, start: Any, end: Any) -> str:
@@ -210,7 +234,9 @@ def _validated_attention_gestures(records: Any) -> tuple[dict[str, Any], ...]:
             raise ValueError(f"attention gesture {index} must be an object")
         item = dict(raw)
         if int(item.get("schema_version", 0)) != ATTENTION_GESTURE_SCHEMA_VERSION:
-            raise ValueError(f"attention gesture {index} has an unsupported schema version")
+            raise ValueError(
+                f"attention gesture {index} has an unsupported schema version"
+            )
         role = str(item.get("role", "")).strip()
         if not role:
             raise ValueError(f"attention gesture {index} requires a role")
@@ -229,15 +255,17 @@ def _validated_attention_gestures(records: Any) -> tuple[dict[str, Any], ...]:
         gesture_id = str(item.get("gesture_id", "")).strip()
         if not gesture_id:
             gesture_id = _attention_gesture_key(role, start, end)
-        result.append({
-            "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
-            "gesture_id": gesture_id,
-            "role": role,
-            "start_beats": str(start),
-            "end_beats": str(end),
-            "action": action,
-            "register_shift_semitones": shift,
-        })
+        result.append(
+            {
+                "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
+                "gesture_id": gesture_id,
+                "role": role,
+                "start_beats": str(start),
+                "end_beats": str(end),
+                "action": action,
+                "register_shift_semitones": shift,
+            }
+        )
     return tuple(result)
 
 
@@ -288,25 +316,26 @@ def apply_attention_gesture(
     metadata = copy.deepcopy(score.metadata)
     records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
     gesture_id = _attention_gesture_key(role, start, end)
-    updated = [
-        item for item in records
-        if item["gesture_id"] != gesture_id
-    ]
-    updated.append({
-        "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
-        "gesture_id": gesture_id,
-        "role": role,
-        "start_beats": str(start),
-        "end_beats": str(end),
-        "action": action,
-        "register_shift_semitones": shift,
-    })
-    updated.sort(key=lambda item: (
-        as_fraction(item["start_beats"]),
-        as_fraction(item["end_beats"]),
-        item["role"],
-        item["gesture_id"],
-    ))
+    updated = [item for item in records if item["gesture_id"] != gesture_id]
+    updated.append(
+        {
+            "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
+            "gesture_id": gesture_id,
+            "role": role,
+            "start_beats": str(start),
+            "end_beats": str(end),
+            "action": action,
+            "register_shift_semitones": shift,
+        }
+    )
+    updated.sort(
+        key=lambda item: (
+            as_fraction(item["start_beats"]),
+            as_fraction(item["end_beats"]),
+            item["role"],
+            item["gesture_id"],
+        )
+    )
     metadata["m29_attention_gestures"] = list(updated)
     return replace(score, metadata=metadata)
 
@@ -327,7 +356,9 @@ def remove_attention_gesture(
     role = str(role).strip()
     start, end = as_fraction(start_beats), as_fraction(end_beats)
     if not role or start < 0 or end <= start:
-        raise ValueError("attention gesture removal requires a role and 0 <= start < end")
+        raise ValueError(
+            "attention gesture removal requires a role and 0 <= start < end"
+        )
     gesture_id = _attention_gesture_key(role, start, end)
     metadata = copy.deepcopy(score.metadata)
     records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
@@ -360,16 +391,16 @@ def reconcile_attention_gestures(
         for span in attention_spans
     }
     metadata = copy.deepcopy(score.metadata)
-    records = _validated_attention_gestures(
-        metadata.get("m29_attention_gestures", [])
-    )
+    records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
     remaining = [
-        item for item in records
+        item
+        for item in records
         if (
             aliases.get(item["role"], item["role"]),
             item["start_beats"],
             item["end_beats"],
-        ) in valid
+        )
+        in valid
     ]
     removed = len(records) - len(remaining)
     if not removed:
@@ -453,9 +484,9 @@ def apply_attention_gesture_to_event(
                 if extended > duration:
                     changes["duration_beats"] = extended
                     duration = extended
-            base_gate = as_fraction(str(
-                parameters.get("gate_duration_beats", event.duration_beats)
-            ))
+            base_gate = as_fraction(
+                str(parameters.get("gate_duration_beats", event.duration_beats))
+            )
             gate_ratio = 1.08 if action == "focus" else 0.58
             floor = min(Fraction(1, 64), duration)
             gate = max(floor, min(duration, base_gate * Fraction(str(gate_ratio))))
@@ -472,10 +503,20 @@ def apply_attention_gesture_to_event(
             parameters["m29_pan_factor"] = 0.45
             parameters["m29_spatial_width_factor"] = 0.82
         else:
-            material = f"reawarp:m29-space:{gesture_id}:{event.event_id}".encode("utf-8")
-            side = -1.0 if (
-                int.from_bytes(hashlib.blake2b(material, digest_size=1).digest(), "little") & 1
-            ) == 0 else 1.0
+            material = f"reawarp:m29-space:{gesture_id}:{event.event_id}".encode(
+                "utf-8"
+            )
+            side = (
+                -1.0
+                if (
+                    int.from_bytes(
+                        hashlib.blake2b(material, digest_size=1).digest(), "little"
+                    )
+                    & 1
+                )
+                == 0
+                else 1.0
+            )
             if abs(pan) < 0.08:
                 parameters["m29_pan_offset"] = side * 0.18
             else:
@@ -504,7 +545,9 @@ def build_attention_send_envelope(
     from reawarp.score.time import as_fraction
 
     if isinstance(frames, bool) or int(frames) != frames or int(frames) < 0:
-        raise ValueError("attention send envelope frames must be a non-negative integer")
+        raise ValueError(
+            "attention send envelope frames must be a non-negative integer"
+        )
     frames = int(frames)
     bus = str(bus).strip().casefold()
     if bus not in {"space", "echo"}:
@@ -528,7 +571,8 @@ def build_attention_send_envelope(
 
     records = _validated_attention_gestures(gestures)
     selected = [
-        item for item in records
+        item
+        for item in records
         if aliases.get(item["role"], item["role"]) == canonical_role
     ]
     if not selected:
@@ -561,7 +605,8 @@ def build_attention_send_envelope(
         underlying = factor_at_beat(beat, excluded | {gesture_id})
         phase = float((beat - start) / (end - start))
         edge_progress = min(
-            1.0, phase / float(edge_fraction),
+            1.0,
+            phase / float(edge_fraction),
             (1.0 - phase) / float(edge_fraction),
         )
         eased = edge_progress * edge_progress * (3.0 - 2.0 * edge_progress)
@@ -602,8 +647,11 @@ def build_attention_send_envelope(
     if len(positions) == 1:
         return np.full(frames, float(values[0]), dtype=np.float32)
     return np.interp(
-        np.arange(frames, dtype=np.float64), positions, values,
-        left=float(values[0]), right=float(values[-1]),
+        np.arange(frames, dtype=np.float64),
+        positions,
+        values,
+        left=float(values[0]),
+        right=float(values[-1]),
     ).astype(np.float32)
 
 

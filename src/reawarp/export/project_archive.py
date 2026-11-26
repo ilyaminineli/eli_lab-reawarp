@@ -1,4 +1,5 @@
 """Project archive/export service separated from the desktop window."""
+
 from __future__ import annotations
 
 import json
@@ -51,18 +52,26 @@ def export_project_archive(
     """
     if not isinstance(project, ReawarpProject):
         raise TypeError("project must be a ReawarpProject")
-    if isinstance(bit_depth, bool) or not isinstance(bit_depth, int) or bit_depth not in {16, 24, 32}:
+    if (
+        isinstance(bit_depth, bool)
+        or not isinstance(bit_depth, int)
+        or bit_depth not in {16, 24, 32}
+    ):
         raise ValueError("bit_depth must be 16, 24 or 32")
     destination = Path(directory).expanduser()
     master = _audio_snapshot(master_audio, "master_audio")
     if len(master) < project.frame_count:
-        raise ValueError("master_audio cannot be shorter than the project stem duration")
+        raise ValueError(
+            "master_audio cannot be shorter than the project stem duration"
+        )
     if not project.stems:
         raise ValueError("project must contain at least one source stem")
     channel_counts = set()
     for name, audio in project.stems.items():
         value = np.asarray(audio)
-        if value.ndim not in {1, 2} or (value.ndim == 2 and value.shape[1] not in {1, 2}):
+        if value.ndim not in {1, 2} or (
+            value.ndim == 2 and value.shape[1] not in {1, 2}
+        ):
             raise ValueError(f"project stem {name!r} must be mono or stereo audio")
         channel_counts.add(1 if value.ndim == 1 else value.shape[1])
     if len(channel_counts) != 1:
@@ -79,9 +88,9 @@ def export_project_archive(
         return_snapshots[bus] = snapshot
 
     try:
-        mix_record = json.loads(json.dumps(
-            dict(mix_data or {}), ensure_ascii=False, allow_nan=False
-        ))
+        mix_record = json.loads(
+            json.dumps(dict(mix_data or {}), ensure_ascii=False, allow_nan=False)
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError("mix_data must be finite JSON-compatible data") from exc
 
@@ -104,7 +113,9 @@ def export_project_archive(
         return_directory.mkdir(parents=True, exist_ok=True)
     for bus, audio in return_snapshots.items():
         _check_cancelled(cancel_event, "project export")
-        write_wav(output / "returns" / f"{bus}.wav", audio, project.sample_rate, bit_depth)
+        write_wav(
+            output / "returns" / f"{bus}.wav", audio, project.sample_rate, bit_depth
+        )
     _check_cancelled(cancel_event, "project export")
     temporary = output / "mix.json.tmp"
     temporary.write_text(
@@ -116,8 +127,8 @@ def export_project_archive(
     midi_contents = (
         "- `midi/score.mid`: combined Standard MIDI 1.0 export with one track per voice.\n"
         "- `midi/voices/`: separate voice MIDI files for individual instrument/role import.\n"
-        if include_midi else
-        "- MIDI export was not requested for this folder.\n"
+        if include_midi
+        else "- MIDI export was not requested for this folder.\n"
     )
     package_readme = """# Reawarp project package
 
@@ -173,7 +184,11 @@ def export_project_package(
     """
     if not isinstance(project, ReawarpProject):
         raise TypeError("project must be a ReawarpProject")
-    if isinstance(bit_depth, bool) or not isinstance(bit_depth, int) or bit_depth not in {16, 24, 32}:
+    if (
+        isinstance(bit_depth, bool)
+        or not isinstance(bit_depth, int)
+        or bit_depth not in {16, 24, 32}
+    ):
         raise ValueError("bit_depth must be 16, 24 or 32")
     if fx_render_status not in {"rendered", "dry_fallback", "not_configured"}:
         raise ValueError("invalid FX render status")
@@ -186,7 +201,9 @@ def export_project_package(
         raise FileExistsError(f"delivery folder already exists: {destination}")
     master = _audio_snapshot(master_audio, "master_audio")
     if len(master) < project.frame_count:
-        raise ValueError("master_audio cannot be shorter than the project stem duration")
+        raise ValueError(
+            "master_audio cannot be shorter than the project stem duration"
+        )
     if not project.stems:
         raise ValueError("project must contain at least one source stem")
 
@@ -224,7 +241,9 @@ def export_project_package(
         stems_directory.mkdir()
         for name, audio in stem_snapshots.items():
             _check_cancelled(cancel_event, "delivery export")
-            write_wav(stems_directory / f"{name}.wav", audio, project.sample_rate, bit_depth)
+            write_wav(
+                stems_directory / f"{name}.wav", audio, project.sample_rate, bit_depth
+            )
 
         if include_midi:
             import hashlib
@@ -237,13 +256,18 @@ def export_project_package(
             _check_cancelled(cancel_event, "delivery MIDI export")
             combined_midi = midi_root / "score.mid"
             score.export_midi(combined_midi)
-            voice_ids = sorted({
-                event.voice_id for event in score.events
-                if event.kind not in {"control", "marker"}
-            })
+            voice_ids = sorted(
+                {
+                    event.voice_id
+                    for event in score.events
+                    if event.kind not in {"control", "marker"}
+                }
+            )
             for voice_id in voice_ids:
                 _check_cancelled(cancel_event, "delivery MIDI export")
-                events = tuple(event for event in score.events if event.voice_id == voice_id)
+                events = tuple(
+                    event for event in score.events if event.voice_id == voice_id
+                )
                 voice_score = replace(
                     score,
                     title=f"{score.title} — {voice_id}",
@@ -252,7 +276,9 @@ def export_project_package(
                     automation_sources=(),
                     modulations=(),
                 )
-                slug = re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                slug = (
+                    re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                )
                 digest = hashlib.sha256(str(voice_id).encode("utf-8")).hexdigest()[:8]
                 voice_path = voice_root / f"{slug[:48]}-{digest}.mid"
                 voice_score.export_midi(voice_path)
@@ -269,7 +295,8 @@ def export_project_package(
         midi_description = (
             "- midi/score.mid: combined Standard MIDI 1.0 file.\n"
             "- midi/voices/: separate MIDI file for each event-backed voice.\n"
-            if include_midi else "MIDI export was not requested.\n"
+            if include_midi
+            else "MIDI export was not requested.\n"
         )
         package_readme = f"""# {title}
 

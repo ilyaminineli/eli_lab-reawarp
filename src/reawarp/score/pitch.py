@@ -31,13 +31,20 @@ class EqualTemperamentTuning:
     identifier: str = "12tet"
 
     def __post_init__(self) -> None:
-        if isinstance(self.divisions_per_period, bool) or not isinstance(self.divisions_per_period, int) or self.divisions_per_period < 1:
+        if (
+            isinstance(self.divisions_per_period, bool)
+            or not isinstance(self.divisions_per_period, int)
+            or self.divisions_per_period < 1
+        ):
             raise ValueError("divisions_per_period must be a positive integer")
         if not math.isfinite(self.period_ratio) or self.period_ratio <= 1.0:
             raise ValueError("period_ratio must be finite and greater than one")
         if not math.isfinite(self.reference_pitch):
             raise ValueError("reference_pitch must be finite")
-        if not math.isfinite(self.reference_frequency_hz) or self.reference_frequency_hz <= 0:
+        if (
+            not math.isfinite(self.reference_frequency_hz)
+            or self.reference_frequency_hz <= 0
+        ):
             raise ValueError("reference_frequency_hz must be positive and finite")
         if not self.identifier.strip():
             raise ValueError("tuning identifier cannot be empty")
@@ -131,10 +138,18 @@ class PitchField:
     minimum_pitch: float | None = None
     maximum_pitch: float | None = None
 
-    MODES = frozenset({
-        "chromatic", "collection", "modal", "centred", "intervallic",
-        "spectral", "microtonal", "ambiguous",
-    })
+    MODES = frozenset(
+        {
+            "chromatic",
+            "collection",
+            "modal",
+            "centred",
+            "intervallic",
+            "spectral",
+            "microtonal",
+            "ambiguous",
+        }
+    )
 
     def __post_init__(self) -> None:
         if self.mode not in self.MODES:
@@ -143,7 +158,9 @@ class PitchField:
             raise ValueError("period_ratio must be finite and greater than one")
         if not math.isfinite(float(self.centre_weight)) or self.centre_weight < 0:
             raise ValueError("centre_weight must be finite and non-negative")
-        if self.centre_pitch is not None and not math.isfinite(float(self.centre_pitch)):
+        if self.centre_pitch is not None and not math.isfinite(
+            float(self.centre_pitch)
+        ):
             raise ValueError("centre_pitch must be finite")
         for name, values in (
             ("pitch_collection", self.pitch_collection),
@@ -161,12 +178,17 @@ class PitchField:
             )
         if self.allowed_intervals and self.centre_pitch is None:
             raise ValueError("allowed_intervals require centre_pitch")
-        if self.minimum_pitch is not None and not math.isfinite(float(self.minimum_pitch)):
+        if self.minimum_pitch is not None and not math.isfinite(
+            float(self.minimum_pitch)
+        ):
             raise ValueError("minimum_pitch must be finite")
-        if self.maximum_pitch is not None and not math.isfinite(float(self.maximum_pitch)):
+        if self.maximum_pitch is not None and not math.isfinite(
+            float(self.maximum_pitch)
+        ):
             raise ValueError("maximum_pitch must be finite")
         if (
-            self.minimum_pitch is not None and self.maximum_pitch is not None
+            self.minimum_pitch is not None
+            and self.maximum_pitch is not None
             and self.minimum_pitch > self.maximum_pitch
         ):
             raise ValueError("minimum_pitch cannot exceed maximum_pitch")
@@ -183,37 +205,49 @@ class PitchField:
             return cls()
         return cls(
             mode=str(context.get("mode", "chromatic")),
-            centre_pitch=None if context.get("centre_pitch") is None else float(context["centre_pitch"]),
-            pitch_collection=tuple(float(value) for value in context.get("pitch_collection", ())),
-            allowed_intervals=tuple(float(value) for value in context.get("allowed_intervals", ())),
+            centre_pitch=(
+                None
+                if context.get("centre_pitch") is None
+                else float(context["centre_pitch"])
+            ),
+            pitch_collection=tuple(
+                float(value) for value in context.get("pitch_collection", ())
+            ),
+            allowed_intervals=tuple(
+                float(value) for value in context.get("allowed_intervals", ())
+            ),
             period_ratio=float(context.get("period_ratio", 2.0)),
             stability_weights=dict(context.get("stability_weights", {})),
             tension_weights=dict(context.get("tension_weights", {})),
             hard_constraint=bool(context.get("hard_constraint", False)),
             centre_weight=float(context.get("centre_weight", 0.0)),
-            minimum_pitch=None if context.get("minimum_pitch") is None else float(context["minimum_pitch"]),
-            maximum_pitch=None if context.get("maximum_pitch") is None else float(context["maximum_pitch"]),
+            minimum_pitch=(
+                None
+                if context.get("minimum_pitch") is None
+                else float(context["minimum_pitch"])
+            ),
+            maximum_pitch=(
+                None
+                if context.get("maximum_pitch") is None
+                else float(context["maximum_pitch"])
+            ),
         )
 
     def evaluate(self, pitch: float, tuning: TuningSystem) -> PitchCandidate:
         pitch = float(pitch)
         if not math.isfinite(pitch):
             raise ValueError("candidate pitch must be finite")
-        in_range = (
-            (self.minimum_pitch is None or pitch >= self.minimum_pitch)
-            and (self.maximum_pitch is None or pitch <= self.maximum_pitch)
+        in_range = (self.minimum_pitch is None or pitch >= self.minimum_pitch) and (
+            self.maximum_pitch is None or pitch <= self.maximum_pitch
         )
-        in_collection = (
-            not self.pitch_collection
-            or any(
-                math.isclose(
-                    ((pitch - value) / tuning.divisions_per_period)
-                    - round((pitch - value) / tuning.divisions_per_period),
-                    0.0,
-                    abs_tol=1e-7,
-                )
-                for value in self.pitch_collection
+        in_collection = not self.pitch_collection or any(
+            math.isclose(
+                ((pitch - value) / tuning.divisions_per_period)
+                - round((pitch - value) / tuning.divisions_per_period),
+                0.0,
+                abs_tol=1e-7,
             )
+            for value in self.pitch_collection
         )
         interval = pitch - self.centre_pitch if self.centre_pitch is not None else None
         in_intervals = (
@@ -221,8 +255,10 @@ class PitchField:
             or interval is None
             or any(
                 math.isclose(
-                    interval - value
-                    - round(interval / tuning.divisions_per_period) * tuning.divisions_per_period,
+                    interval
+                    - value
+                    - round(interval / tuning.divisions_per_period)
+                    * tuning.divisions_per_period,
                     0.0,
                     abs_tol=1e-7,
                 )
@@ -234,8 +270,12 @@ class PitchField:
         pitch_class_key = f"{pitch % tuning.divisions_per_period:g}"
         stability_weights = self.stability_weights or {}
         tension_weights = self.tension_weights or {}
-        stability = float(stability_weights.get(key, stability_weights.get(pitch_class_key, 0.0)))
-        tension = float(tension_weights.get(key, tension_weights.get(pitch_class_key, 0.0)))
+        stability = float(
+            stability_weights.get(key, stability_weights.get(pitch_class_key, 0.0))
+        )
+        tension = float(
+            tension_weights.get(key, tension_weights.get(pitch_class_key, 0.0))
+        )
         if self.mode == "centred" and self.centre_pitch is not None:
             stability += self.centre_weight / (1.0 + abs(pitch - self.centre_pitch))
         return PitchCandidate(
@@ -249,10 +289,14 @@ class PitchField:
             in_register=in_range,
         )
 
-    def candidates(self, pitches: tuple[float, ...], tuning: TuningSystem) -> tuple[PitchCandidate, ...]:
+    def candidates(
+        self, pitches: tuple[float, ...], tuning: TuningSystem
+    ) -> tuple[PitchCandidate, ...]:
         return tuple(
-            candidate for candidate in (
-                self.evaluate(pitch, tuning) for pitch in sorted(set(map(float, pitches)))
+            candidate
+            for candidate in (
+                self.evaluate(pitch, tuning)
+                for pitch in sorted(set(map(float, pitches)))
             )
             if candidate.allowed
         )
@@ -286,7 +330,9 @@ class Sonority:
         onset = as_fraction(self.onset_beats)
         duration = as_fraction(self.duration_beats)
         if onset < 0 or duration <= 0:
-            raise ValueError("sonority requires non-negative onset and positive duration")
+            raise ValueError(
+                "sonority requires non-negative onset and positive duration"
+            )
         pitches = tuple(float(value) for value in self.pitches)
         if not pitches or any(not math.isfinite(value) for value in pitches):
             raise ValueError("sonority pitches must be non-empty and finite")
@@ -301,9 +347,11 @@ class Sonority:
             raise ValueError("source_sonority_id must be a non-empty string")
         if not isinstance(self.transform_parameters, Mapping):
             raise ValueError("transform_parameters must be an object")
-        parameters = json.loads(json.dumps(
-            dict(self.transform_parameters), ensure_ascii=False, allow_nan=False
-        ))
+        parameters = json.loads(
+            json.dumps(
+                dict(self.transform_parameters), ensure_ascii=False, allow_nan=False
+            )
+        )
         object.__setattr__(self, "onset_beats", str(onset))
         object.__setattr__(self, "duration_beats", str(duration))
         object.__setattr__(self, "pitches", pitches)
@@ -336,17 +384,20 @@ class Sonority:
             duration_beats=str(record.get("duration_beats", "1")),
             pitches=tuple(float(value) for value in record.get("pitches", ())),
             bass_pitch=(
-                None if record.get("bass_pitch") is None
+                None
+                if record.get("bass_pitch") is None
                 else float(record["bass_pitch"])
             ),
             tension=float(record.get("tension", 0.0)),
             transform=str(record.get("transform", "original")),
             source_sonority_id=(
-                None if record.get("source_sonority_id") is None
+                None
+                if record.get("source_sonority_id") is None
                 else str(record["source_sonority_id"])
             ),
             transform_parameters=dict(record.get("transform_parameters", {})),
         )
+
 
 def pitch_field_from_score(score) -> PitchField:
     """Construct the optional pitch field carried by a Score."""
@@ -361,7 +412,8 @@ def tuning_from_score(
     """Build the Score tuning adapter, including its persisted period ratio."""
     resolved_period_ratio = (
         float(getattr(score, "tuning_period_ratio", 2.0))
-        if period_ratio is None else float(period_ratio)
+        if period_ratio is None
+        else float(period_ratio)
     )
     return EqualTemperamentTuning(
         divisions_per_period=score.tuning_divisions_per_period,

@@ -1,10 +1,10 @@
 """Feature-guided, deterministic selection from role-specific sample banks."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-
 
 # Targets are perceptual intentions, not genre presets. Values are normalized
 # brightness, level, noisiness and transient density, respectively.
@@ -42,16 +42,13 @@ def _feature_vector(entry: Mapping[str, Any]) -> tuple[float, float, float, floa
 
     brightness = (
         _clamp01(np.log(max(100.0, float(centroid)) / 100.0) / np.log(160.0))
-        if centroid is not None else 0.5
+        if centroid is not None
+        else 0.5
     )
-    level = (
-        _clamp01((float(rms_dbfs) + 48.0) / 42.0)
-        if rms_dbfs is not None else 0.5
-    )
+    level = _clamp01((float(rms_dbfs) + 48.0) / 42.0) if rms_dbfs is not None else 0.5
     noisiness = _clamp01(float(flatness)) if flatness is not None else 0.5
     transient_density = (
-        _clamp01(float(onset_density) / 12.0)
-        if onset_density is not None else 0.5
+        _clamp01(float(onset_density) / 12.0) if onset_density is not None else 0.5
     )
     return brightness, level, noisiness, transient_density
 
@@ -102,6 +99,7 @@ def select_sample_variant(
     if phrase_function == "false_return":
         # A false return should resemble the anchor without duplicating it.
         reference = _feature_vector(bank[anchor])
+
         def anchor_distance(index: int) -> float:
             vector = _feature_vector(bank[index])
             return sum(
@@ -110,11 +108,14 @@ def select_sample_variant(
                     _FEATURE_WEIGHTS, vector, reference, strict=True
                 )
             )
+
         return min(candidates, key=lambda index: (anchor_distance(index), index))
 
     target = _PHRASE_TARGETS.get(phrase_function, _PHRASE_TARGETS["continuation"])
     if phrase_function == "contrast" and previous_index is not None:
-        previous_vector = _feature_vector(bank[int(np.clip(previous_index, 0, count - 1))])
+        previous_vector = _feature_vector(
+            bank[int(np.clip(previous_index, 0, count - 1))]
+        )
         target = (
             1.0 - previous_vector[0],
             0.5,

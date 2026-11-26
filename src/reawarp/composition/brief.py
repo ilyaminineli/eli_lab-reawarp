@@ -10,6 +10,7 @@ Contracts at event, pattern, phrase and section scales share the same versioned
 model and independent seed naming so later Score-native mutation services can
 reuse them without changing this schema.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -28,23 +29,51 @@ from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.core.random_streams import derive_seed
 from reawarp.mathematics.theory import SCALE_STEPS
 from reawarp.synthesis.profiles import (
-    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
+    HAT_PROFILES,
+    KICK_PROFILES,
+    MELODY_PROFILES,
+    SNARE_PROFILES,
+    SYNTH_PALETTES,
 )
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
 BRIEF_FORMAT = "eli_lab_reawarp_composition_brief"
 BRIEF_SCHEMA_VERSION = 1
-BRIEF_ROLES = frozenset({
-    "kick", "snare", "hat", "break", "melody", "texture", "ambience", "percussion",
-})
+BRIEF_ROLES = frozenset(
+    {
+        "kick",
+        "snare",
+        "hat",
+        "break",
+        "melody",
+        "texture",
+        "ambience",
+        "percussion",
+    }
+)
 MUTATION_SCALES = frozenset({"event", "pattern", "phrase", "section"})
-ANCHOR_KINDS = frozenset({
-    "none", "pulse", "motif", "sound_object", "role", "spatial_feature",
-})
-ENDING_MODES = frozenset({
-    "unspecified", "residue", "dissolve", "hard_cut", "silence",
-    "transformed_return", "open", "closed",
-})
+ANCHOR_KINDS = frozenset(
+    {
+        "none",
+        "pulse",
+        "motif",
+        "sound_object",
+        "role",
+        "spatial_feature",
+    }
+)
+ENDING_MODES = frozenset(
+    {
+        "unspecified",
+        "residue",
+        "dissolve",
+        "hard_cut",
+        "silence",
+        "transformed_return",
+        "open",
+        "closed",
+    }
+)
 DECISION_BOUNDARIES = {
     "event": frozenset({"event_onset", "event_end", "bar_boundary", "manual"}),
     "pattern": frozenset({"pattern_cycle", "bar_boundary", "manual"}),
@@ -217,9 +246,15 @@ ENUM_DOMAINS: dict[str, tuple[Any, ...]] = {
 
 # These inputs identify external material or the deterministic render clock.
 # They are always invariant, even if a malformed contract tries to mutate them.
-HARD_INVARIANTS = frozenset({
-    "seed", "sample_rate", "sample_paths", "sample_metadata", "sample_banks",
-})
+HARD_INVARIANTS = frozenset(
+    {
+        "seed",
+        "sample_rate",
+        "sample_paths",
+        "sample_metadata",
+        "sample_banks",
+    }
+)
 
 
 def _text(value: Any, field_name: str, *, allow_empty: bool = False) -> str:
@@ -266,16 +301,22 @@ class SourceAssetReference:
     selected: bool = False
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "reference_id", _text(self.reference_id, "source reference_id"))
+        object.__setattr__(
+            self, "reference_id", _text(self.reference_id, "source reference_id")
+        )
         role = _text(self.role, "source role")
         if role not in BRIEF_ROLES:
             raise ValueError(f"unsupported source role: {role}")
         object.__setattr__(self, "role", role)
         if self.asset_id is not None:
-            object.__setattr__(self, "asset_id", _text(self.asset_id, "source asset_id"))
+            object.__setattr__(
+                self, "asset_id", _text(self.asset_id, "source asset_id")
+            )
         if self.sha256 is not None:
             digest = _text(self.sha256, "source SHA-256").lower()
-            if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
+            if len(digest) != 64 or any(
+                char not in "0123456789abcdef" for char in digest
+            ):
                 raise ValueError("source SHA-256 must be 64 hexadecimal characters")
             object.__setattr__(self, "sha256", digest)
         if self.path is not None:
@@ -307,15 +348,22 @@ class SourceFamily:
         object.__setattr__(self, "role", role)
         object.__setattr__(self, "label", _text(self.label, "source family label"))
         assets = tuple(
-            item if isinstance(item, SourceAssetReference)
-            else SourceAssetReference.from_dict(item)
+            (
+                item
+                if isinstance(item, SourceAssetReference)
+                else SourceAssetReference.from_dict(item)
+            )
             for item in self.assets
         )
         ids = [item.reference_id for item in assets]
         if len(ids) != len(set(ids)):
-            raise ValueError(f"source family {self.family_id!r} contains duplicate references")
+            raise ValueError(
+                f"source family {self.family_id!r} contains duplicate references"
+            )
         if any(item.role != role for item in assets):
-            raise ValueError(f"source family {self.family_id!r} contains a different role")
+            raise ValueError(
+                f"source family {self.family_id!r} contains a different role"
+            )
         object.__setattr__(self, "assets", assets)
 
     def to_dict(self) -> dict[str, Any]:
@@ -329,7 +377,9 @@ class SourceFamily:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "SourceFamily":
         record = dict(data)
-        record["assets"] = tuple(SourceAssetReference.from_dict(item) for item in record.get("assets", ()))
+        record["assets"] = tuple(
+            SourceAssetReference.from_dict(item) for item in record.get("assets", ())
+        )
         return cls(**record)
 
 
@@ -353,16 +403,24 @@ class MaterialIdentity:
             raise ValueError(f"unsupported material role: {role}")
         object.__setattr__(self, "role", role)
         object.__setattr__(self, "description", str(self.description).strip())
-        sources = tuple(_text(item, "material source reference") for item in self.source_asset_ids)
+        sources = tuple(
+            _text(item, "material source reference") for item in self.source_asset_ids
+        )
         if len(sources) != len(set(sources)):
-            raise ValueError(f"material {self.material_id!r} contains duplicate source references")
+            raise ValueError(
+                f"material {self.material_id!r} contains duplicate source references"
+            )
         object.__setattr__(self, "source_asset_ids", sources)
-        object.__setattr__(self, "tags", tuple(_text(item, "material tag") for item in self.tags))
+        object.__setattr__(
+            self, "tags", tuple(_text(item, "material tag") for item in self.tags)
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "material_id": self.material_id, "label": self.label,
-            "function": self.function, "role": self.role,
+            "material_id": self.material_id,
+            "label": self.label,
+            "function": self.function,
+            "role": self.role,
             "description": self.description,
             "source_asset_ids": list(self.source_asset_ids),
             "tags": list(self.tags),
@@ -388,7 +446,9 @@ class AnchorSpec:
         if self.kind not in ANCHOR_KINDS:
             raise ValueError(f"unsupported anchor kind: {self.kind}")
         if self.material_id is not None:
-            object.__setattr__(self, "material_id", _text(self.material_id, "anchor material_id"))
+            object.__setattr__(
+                self, "material_id", _text(self.material_id, "anchor material_id")
+            )
         if self.role is not None:
             role = _text(self.role, "anchor role")
             if role not in BRIEF_ROLES:
@@ -399,7 +459,9 @@ class AnchorSpec:
         if not math.isfinite(stability) or not 0.0 <= stability <= 1.0:
             raise ValueError("anchor stability must be between zero and one")
         object.__setattr__(self, "stability", stability)
-        if self.kind == "none" and (self.material_id is not None or self.role is not None):
+        if self.kind == "none" and (
+            self.material_id is not None or self.role is not None
+        ):
             raise ValueError("a none anchor cannot target a material or role")
         if self.kind != "none" and not (
             self.material_id or self.role or self.description
@@ -437,13 +499,18 @@ class PitchWorld:
             raise ValueError("pitch-world reference pitch must be finite")
         if not math.isfinite(reference_hz) or reference_hz <= 0:
             raise ValueError("pitch-world reference frequency must be positive")
-        if isinstance(self.divisions_per_period, bool) or int(self.divisions_per_period) < 1:
+        if (
+            isinstance(self.divisions_per_period, bool)
+            or int(self.divisions_per_period) < 1
+        ):
             raise ValueError("pitch-world divisions_per_period must be positive")
         object.__setattr__(self, "reference_pitch", reference_pitch)
         object.__setattr__(self, "reference_frequency_hz", reference_hz)
         period_ratio = float(self.period_ratio)
         if not math.isfinite(period_ratio) or period_ratio <= 1.0:
-            raise ValueError("pitch-world period ratio must be finite and greater than one")
+            raise ValueError(
+                "pitch-world period ratio must be finite and greater than one"
+            )
         object.__setattr__(self, "divisions_per_period", int(self.divisions_per_period))
         object.__setattr__(self, "period_ratio", period_ratio)
 
@@ -464,14 +531,24 @@ class ContrastTarget:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "label", _text(self.label, "contrast label"))
-        object.__setattr__(self, "material_ids", tuple(_text(x, "contrast material_id") for x in self.material_ids))
-        object.__setattr__(self, "dimensions", tuple(_text(x, "contrast dimension") for x in self.dimensions))
+        object.__setattr__(
+            self,
+            "material_ids",
+            tuple(_text(x, "contrast material_id") for x in self.material_ids),
+        )
+        object.__setattr__(
+            self,
+            "dimensions",
+            tuple(_text(x, "contrast dimension") for x in self.dimensions),
+        )
         object.__setattr__(self, "description", str(self.description).strip())
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "label": self.label, "material_ids": list(self.material_ids),
-            "dimensions": list(self.dimensions), "description": self.description,
+            "label": self.label,
+            "material_ids": list(self.material_ids),
+            "dimensions": list(self.dimensions),
+            "description": self.description,
         }
 
     @classmethod
@@ -493,13 +570,17 @@ class EndingIntent:
             raise ValueError(f"unsupported ending intent: {self.mode}")
         object.__setattr__(self, "description", str(self.description).strip())
         object.__setattr__(
-            self, "preserve_material_ids",
-            tuple(_text(item, "ending material_id") for item in self.preserve_material_ids),
+            self,
+            "preserve_material_ids",
+            tuple(
+                _text(item, "ending material_id") for item in self.preserve_material_ids
+            ),
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "mode": self.mode, "description": self.description,
+            "mode": self.mode,
+            "description": self.description,
             "preserve_material_ids": list(self.preserve_material_ids),
         }
 
@@ -530,7 +611,9 @@ class TempoFormPolicy:
             if len(values) != 2 or not all(math.isfinite(value) for value in values):
                 raise ValueError(f"{name} must contain two finite values")
             if values[0] > values[1] or values[0] < lower or values[1] > upper:
-                raise ValueError(f"{name} must be within [{lower}, {upper}] and ordered")
+                raise ValueError(
+                    f"{name} must be within [{lower}, {upper}] and ordered"
+                )
             object.__setattr__(self, name, values)
 
     def to_dict(self) -> dict[str, Any]:
@@ -567,7 +650,9 @@ class MutationContract:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "contract_id", _text(self.contract_id, "contract_id"))
-        object.__setattr__(self, "target_id", _text(self.target_id, "contract target_id"))
+        object.__setattr__(
+            self, "target_id", _text(self.target_id, "contract target_id")
+        )
         if self.scale not in MUTATION_SCALES:
             raise ValueError(f"mutation scale must be one of {sorted(MUTATION_SCALES)}")
         mutable = tuple(_text(item, "mutable field") for item in self.mutable_fields)
@@ -590,14 +675,21 @@ class MutationContract:
             )
         object.__setattr__(self, "invariants", invariants)
         object.__setattr__(self, "cadence", _text(self.cadence, "mutation cadence"))
-        object.__setattr__(self, "decision_boundaries", tuple(
-            _text(item, "decision boundary") for item in self.decision_boundaries
-        ))
+        object.__setattr__(
+            self,
+            "decision_boundaries",
+            tuple(
+                _text(item, "decision boundary") for item in self.decision_boundaries
+            ),
+        )
         if mutable and not self.decision_boundaries:
             raise ValueError(
                 f"contract {self.contract_id!r} needs a decision boundary for {self.scale} scale"
             )
-        if any(item not in DECISION_BOUNDARIES[self.scale] for item in self.decision_boundaries):
+        if any(
+            item not in DECISION_BOUNDARIES[self.scale]
+            for item in self.decision_boundaries
+        ):
             raise ValueError(
                 f"contract {self.contract_id!r} has a decision boundary invalid for {self.scale} scale"
             )
@@ -626,9 +718,13 @@ class MutationContract:
         allowed: dict[str, tuple[Any, ...]] = {}
         for key, values in dict(self.allowed_values or {}).items():
             if key not in mutable:
-                raise ValueError(f"allowed_values supplied for non-mutable field {key!r}")
+                raise ValueError(
+                    f"allowed_values supplied for non-mutable field {key!r}"
+                )
             if key in bounds:
-                raise ValueError(f"{key!r} cannot have both numeric bounds and allowed_values")
+                raise ValueError(
+                    f"{key!r} cannot have both numeric bounds and allowed_values"
+                )
             options = tuple(_json_copy(list(values), f"allowed values for {key}"))
             if not options:
                 raise ValueError(f"allowed_values for {key!r} cannot be empty")
@@ -637,9 +733,13 @@ class MutationContract:
 
         for field_name in mutable:
             if field_name in HARD_INVARIANTS:
-                raise ValueError(f"{field_name!r} is a hard source/clock invariant and cannot be mutated")
+                raise ValueError(
+                    f"{field_name!r} is a hard source/clock invariant and cannot be mutated"
+                )
             if field_name not in FIELD_SCOPE:
-                raise ValueError(f"{field_name!r} is not an M27-supported GenerationConfig mutation field")
+                raise ValueError(
+                    f"{field_name!r} is not an M27-supported GenerationConfig mutation field"
+                )
             if FIELD_SCOPE[field_name] != self.scale:
                 raise ValueError(
                     f"{field_name!r} belongs to {FIELD_SCOPE[field_name]} scale, not {self.scale}"
@@ -653,7 +753,9 @@ class MutationContract:
             "mutable_fields": list(self.mutable_fields),
             "invariants": list(self.invariants),
             "bounds": {key: list(value) for key, value in self.bounds.items()},
-            "allowed_values": {key: list(value) for key, value in self.allowed_values.items()},
+            "allowed_values": {
+                key: list(value) for key, value in self.allowed_values.items()
+            },
             "cadence": self.cadence,
             "decision_boundaries": list(self.decision_boundaries),
             "stop_conditions": list(self.stop_conditions),
@@ -667,7 +769,9 @@ class MutationContract:
         record["mutable_fields"] = tuple(record.get("mutable_fields", ()))
         record["invariants"] = tuple(record.get("invariants", ()))
         record["decision_boundaries"] = tuple(record.get("decision_boundaries", ()))
-        record["stop_conditions"] = tuple(record.get("stop_conditions", ("manual_freeze",)))
+        record["stop_conditions"] = tuple(
+            record.get("stop_conditions", ("manual_freeze",))
+        )
         return cls(**record)
 
 
@@ -692,27 +796,47 @@ class CompositionBrief:
 
     def __post_init__(self) -> None:
         if self.schema_version != BRIEF_SCHEMA_VERSION:
-            raise ValueError(f"unsupported CompositionBrief schema version: {self.schema_version}")
+            raise ValueError(
+                f"unsupported CompositionBrief schema version: {self.schema_version}"
+            )
         object.__setattr__(self, "brief_id", _text(self.brief_id, "brief_id"))
         if self.authorship not in {"user", "imported", "legacy"}:
             raise ValueError("authorship must be user, imported, or legacy")
-        object.__setattr__(self, "artistic_question", str(self.artistic_question).strip())
+        object.__setattr__(
+            self, "artistic_question", str(self.artistic_question).strip()
+        )
         object.__setattr__(self, "listening_mode", str(self.listening_mode).strip())
         object.__setattr__(self, "notes", str(self.notes).strip())
         materials = tuple(
-            item if isinstance(item, MaterialIdentity) else MaterialIdentity.from_dict(item)
+            (
+                item
+                if isinstance(item, MaterialIdentity)
+                else MaterialIdentity.from_dict(item)
+            )
             for item in self.materials
         )
         material_ids = [item.material_id for item in materials]
         if len(material_ids) != len(set(material_ids)):
             raise ValueError("material IDs must be unique")
         object.__setattr__(self, "materials", materials)
-        anchor = self.anchor if isinstance(self.anchor, AnchorSpec) else AnchorSpec.from_dict(self.anchor)
-        if anchor.material_id is not None and anchor.material_id not in set(material_ids):
-            raise ValueError(f"anchor references unknown material {anchor.material_id!r}")
+        anchor = (
+            self.anchor
+            if isinstance(self.anchor, AnchorSpec)
+            else AnchorSpec.from_dict(self.anchor)
+        )
+        if anchor.material_id is not None and anchor.material_id not in set(
+            material_ids
+        ):
+            raise ValueError(
+                f"anchor references unknown material {anchor.material_id!r}"
+            )
         object.__setattr__(self, "anchor", anchor)
 
-        pitch = self.pitch_world if isinstance(self.pitch_world, PitchWorld) else PitchWorld.from_dict(self.pitch_world)
+        pitch = (
+            self.pitch_world
+            if isinstance(self.pitch_world, PitchWorld)
+            else PitchWorld.from_dict(self.pitch_world)
+        )
         if not isinstance(self.pitch_world_explicit, bool):
             raise ValueError("pitch_world_explicit must be a boolean")
         object.__setattr__(self, "pitch_world", pitch)
@@ -748,7 +872,8 @@ class CompositionBrief:
                 )
         object.__setattr__(self, "target_contrasts", contrasts)
         ending = (
-            self.ending_intent if isinstance(self.ending_intent, EndingIntent)
+            self.ending_intent
+            if isinstance(self.ending_intent, EndingIntent)
             else EndingIntent.from_dict(self.ending_intent)
         )
         unknown_ending = set(ending.preserve_material_ids) - set(material_ids)
@@ -757,22 +882,30 @@ class CompositionBrief:
         object.__setattr__(self, "ending_intent", ending)
 
         contracts = tuple(
-            item if isinstance(item, MutationContract) else MutationContract.from_dict(item)
+            (
+                item
+                if isinstance(item, MutationContract)
+                else MutationContract.from_dict(item)
+            )
             for item in self.mutation_contracts
         )
         contract_ids = [item.contract_id for item in contracts]
         if len(contract_ids) != len(set(contract_ids)):
             raise ValueError("mutation contract IDs must be unique")
-        known_targets = set(BRIEF_ROLES) | {"composition"} | set(material_ids) | set(family_ids)
+        known_targets = (
+            set(BRIEF_ROLES) | {"composition"} | set(material_ids) | set(family_ids)
+        )
         unknown_targets = {item.target_id for item in contracts} - known_targets
         if unknown_targets:
             raise ValueError(
-                "mutation contracts target unknown IDs: " + ", ".join(sorted(unknown_targets))
+                "mutation contracts target unknown IDs: "
+                + ", ".join(sorted(unknown_targets))
             )
         object.__setattr__(self, "mutation_contracts", contracts)
 
         policy = (
-            self.tempo_form_policy if isinstance(self.tempo_form_policy, TempoFormPolicy)
+            self.tempo_form_policy
+            if isinstance(self.tempo_form_policy, TempoFormPolicy)
             else TempoFormPolicy.from_dict(self.tempo_form_policy)
         )
         object.__setattr__(self, "tempo_form_policy", policy)
@@ -820,46 +953,84 @@ class CompositionBrief:
         if record.pop("format", None) != BRIEF_FORMAT:
             raise ValueError("not an eli_lab_reawarp_composition_brief document")
         if record.get("schema_version") != BRIEF_SCHEMA_VERSION:
-            raise ValueError(f"unsupported CompositionBrief schema version: {record.get('schema_version')!r}")
+            raise ValueError(
+                f"unsupported CompositionBrief schema version: {record.get('schema_version')!r}"
+            )
         allowed = {
-            "schema_version", "brief_id", "authorship", "structured",
-            "artistic_question", "listening_mode", "materials", "anchor",
-            "pitch_world", "pitch_world_explicit", "source_families", "target_contrasts",
-            "ending_intent", "mutation_contracts", "tempo_form_policy", "notes",
+            "schema_version",
+            "brief_id",
+            "authorship",
+            "structured",
+            "artistic_question",
+            "listening_mode",
+            "materials",
+            "anchor",
+            "pitch_world",
+            "pitch_world_explicit",
+            "source_families",
+            "target_contrasts",
+            "ending_intent",
+            "mutation_contracts",
+            "tempo_form_policy",
+            "notes",
         }
         unknown = set(record) - allowed
         if unknown:
-            raise ValueError("unknown CompositionBrief fields: " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unknown CompositionBrief fields: " + ", ".join(sorted(unknown))
+            )
         return cls(
             **{
                 **record,
-                "materials": tuple(MaterialIdentity.from_dict(x) for x in record.get("materials", ())),
+                "materials": tuple(
+                    MaterialIdentity.from_dict(x) for x in record.get("materials", ())
+                ),
                 "anchor": AnchorSpec.from_dict(record.get("anchor", {})),
                 "pitch_world": PitchWorld.from_dict(record.get("pitch_world", {})),
-                "source_families": tuple(SourceFamily.from_dict(x) for x in record.get("source_families", ())),
-                "target_contrasts": tuple(ContrastTarget.from_dict(x) for x in record.get("target_contrasts", ())),
-                "ending_intent": EndingIntent.from_dict(record.get("ending_intent", {})),
-                "mutation_contracts": tuple(MutationContract.from_dict(x) for x in record.get("mutation_contracts", ())),
-                "tempo_form_policy": TempoFormPolicy.from_dict(record.get("tempo_form_policy", {})),
+                "source_families": tuple(
+                    SourceFamily.from_dict(x) for x in record.get("source_families", ())
+                ),
+                "target_contrasts": tuple(
+                    ContrastTarget.from_dict(x)
+                    for x in record.get("target_contrasts", ())
+                ),
+                "ending_intent": EndingIntent.from_dict(
+                    record.get("ending_intent", {})
+                ),
+                "mutation_contracts": tuple(
+                    MutationContract.from_dict(x)
+                    for x in record.get("mutation_contracts", ())
+                ),
+                "tempo_form_policy": TempoFormPolicy.from_dict(
+                    record.get("tempo_form_policy", {})
+                ),
             }
         )
 
     @property
     def fingerprint(self) -> str:
         encoded = json.dumps(
-            self.to_dict(), sort_keys=True, ensure_ascii=False,
-            separators=(",", ":"), allow_nan=False,
+            self.to_dict(),
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
     @property
     def has_user_content(self) -> bool:
         return bool(
-            self.artistic_question or self.listening_mode or self.materials
-            or self.anchor.kind != "none" or self.target_contrasts
-            or self.pitch_world_explicit or self.pitch_world != PitchWorld()
+            self.artistic_question
+            or self.listening_mode
+            or self.materials
+            or self.anchor.kind != "none"
+            or self.target_contrasts
+            or self.pitch_world_explicit
+            or self.pitch_world != PitchWorld()
             or self.ending_intent.mode != "unspecified"
-            or self.mutation_contracts or self.notes
+            or self.mutation_contracts
+            or self.notes
         )
 
 
@@ -909,7 +1080,9 @@ class BoundedExplorationResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": 1,
-            "field_changes": _json_copy(dict(self.field_changes), "exploration field_changes"),
+            "field_changes": _json_copy(
+                dict(self.field_changes), "exploration field_changes"
+            ),
             "seed_lineage": dict(self.seed_lineage),
             "preserved_fields": list(self.preserved_fields),
             "applied_contract_ids": list(self.applied_contract_ids),
@@ -937,11 +1110,18 @@ def source_families_from_config(config: GenerationConfig) -> tuple[SourceFamily,
             if ref_id in seen:
                 continue
             seen.add(ref_id)
-            entries.append(SourceAssetReference(
-                reference_id=ref_id, role=role, asset_id=asset_id,
-                sha256=sha, path=path,
-                selected=bool(selected_path and _path_key(path) == _path_key(selected_path)),
-            ))
+            entries.append(
+                SourceAssetReference(
+                    reference_id=ref_id,
+                    role=role,
+                    asset_id=asset_id,
+                    sha256=sha,
+                    path=path,
+                    selected=bool(
+                        selected_path and _path_key(path) == _path_key(selected_path)
+                    ),
+                )
+            )
         if selected_path:
             path = str(selected_path)
             metadata = config.sample_metadata.get(role, {})
@@ -949,26 +1129,41 @@ def source_families_from_config(config: GenerationConfig) -> tuple[SourceFamily,
             sha = str(metadata.get("sha256", "")).strip() or None
             ref_id = _reference_id(asset_id, sha, path)
             if ref_id not in seen:
-                entries.insert(0, SourceAssetReference(
-                    reference_id=ref_id, role=role, asset_id=asset_id,
-                    sha256=sha, path=path, selected=True,
-                ))
+                entries.insert(
+                    0,
+                    SourceAssetReference(
+                        reference_id=ref_id,
+                        role=role,
+                        asset_id=asset_id,
+                        sha256=sha,
+                        path=path,
+                        selected=True,
+                    ),
+                )
             else:
                 entries = [
-                    replace(item, selected=True) if item.reference_id == ref_id else item
+                    (
+                        replace(item, selected=True)
+                        if item.reference_id == ref_id
+                        else item
+                    )
                     for item in entries
                 ]
         if entries:
-            families.append(SourceFamily(
-                family_id=f"source-family:{role}",
-                role=role,
-                label=f"{role.title()} source family",
-                assets=tuple(entries),
-            ))
+            families.append(
+                SourceFamily(
+                    family_id=f"source-family:{role}",
+                    role=role,
+                    label=f"{role.title()} source family",
+                    assets=tuple(entries),
+                )
+            )
     return tuple(families)
 
 
-def _source_matches(reference: SourceAssetReference, candidate: SourceAssetReference) -> bool:
+def _source_matches(
+    reference: SourceAssetReference, candidate: SourceAssetReference
+) -> bool:
     if reference.role != candidate.role:
         return False
     if reference.asset_id is not None and reference.asset_id != candidate.asset_id:
@@ -996,7 +1191,9 @@ def resolve_composition_brief(
         raise TypeError("brief must be a CompositionBrief")
     if not isinstance(config, GenerationConfig):
         raise TypeError("config must be a GenerationConfig")
-    available = {family.family_id: family for family in source_families_from_config(config)}
+    available = {
+        family.family_id: family for family in source_families_from_config(config)
+    }
     resolved: list[ResolvedSourceFamily] = []
     missing: list[str] = []
     for family in brief.source_families:
@@ -1009,7 +1206,8 @@ def resolve_composition_brief(
         if current is None:
             if family.assets:
                 missing.extend(
-                    f"{family.family_id}/{asset.reference_id}" for asset in family.assets
+                    f"{family.family_id}/{asset.reference_id}"
+                    for asset in family.assets
                 )
             continue
         matched: list[SourceAssetReference] = []
@@ -1022,9 +1220,11 @@ def resolve_composition_brief(
                 missing.append(f"{family.family_id}/{reference.reference_id}")
             else:
                 matched.append(candidate)
-        resolved.append(ResolvedSourceFamily(
-            family_id=family.family_id, role=family.role, assets=tuple(matched)
-        ))
+        resolved.append(
+            ResolvedSourceFamily(
+                family_id=family.family_id, role=family.role, assets=tuple(matched)
+            )
+        )
     if missing:
         raise ValueError(
             "CompositionBrief source references are missing or changed; no substitutions were made: "
@@ -1032,7 +1232,9 @@ def resolve_composition_brief(
         )
 
     source_ids = {
-        asset.reference_id for family in brief.source_families for asset in family.assets
+        asset.reference_id
+        for family in brief.source_families
+        for asset in family.assets
     }
     for material in brief.materials:
         unknown = set(material.source_asset_ids) - source_ids
@@ -1043,7 +1245,10 @@ def resolve_composition_brief(
             )
 
     warnings: list[str] = []
-    if brief.pitch_world.scale != config.melody_scale or brief.pitch_world.root != config.melody_root:
+    if (
+        brief.pitch_world.scale != config.melody_scale
+        or brief.pitch_world.root != config.melody_root
+    ):
         warnings.append(
             "Pitch-world scale/root differ from GenerationConfig; GenerationConfig remains the render input."
         )
@@ -1060,26 +1265,37 @@ def resolve_composition_brief(
 def _field_options(field_name: str) -> tuple[Any, ...] | None:
     if field_name in ENUM_DOMAINS:
         return ENUM_DOMAINS[field_name]
-    if field_name in {"pattern_follow_structure", "include_melody", "include_texture", "include_ambience"}:
+    if field_name in {
+        "pattern_follow_structure",
+        "include_melody",
+        "include_texture",
+        "include_ambience",
+    }:
         return (False, True)
     return None
 
 
-def _validate_target_field(brief: CompositionBrief, contract: MutationContract, field_name: str) -> None:
+def _validate_target_field(
+    brief: CompositionBrief, contract: MutationContract, field_name: str
+) -> None:
     expected_target = FIELD_TARGET.get(field_name, "composition")
     target = contract.target_id
     material_roles = {
         material.material_id: material.role
-        for material in brief.materials if material.role
+        for material in brief.materials
+        if material.role
     }
     resolved_target = material_roles.get(target, target)
-    family_roles = {
-        family.family_id: family.role for family in brief.source_families
-    }
+    family_roles = {family.family_id: family.role for family in brief.source_families}
     resolved_target = material_roles.get(target, family_roles.get(target, target))
     if resolved_target != "composition":
         matches = expected_target == resolved_target
-        if expected_target == "percussion" and resolved_target in {"kick", "snare", "hat", "break"}:
+        if expected_target == "percussion" and resolved_target in {
+            "kick",
+            "snare",
+            "hat",
+            "break",
+        }:
             matches = True
         if not matches:
             raise ValueError(
@@ -1088,13 +1304,20 @@ def _validate_target_field(brief: CompositionBrief, contract: MutationContract, 
             )
 
 
-def quick_mutation_contracts(fields_requested: Sequence[str]) -> tuple[MutationContract, ...]:
+def quick_mutation_contracts(
+    fields_requested: Sequence[str],
+) -> tuple[MutationContract, ...]:
     """Create explicit role/scale contracts for quick Generator bounded exploration."""
-    requested = tuple(dict.fromkeys(str(item).strip() for item in fields_requested if str(item).strip()))
+    requested = tuple(
+        dict.fromkeys(
+            str(item).strip() for item in fields_requested if str(item).strip()
+        )
+    )
     unknown = sorted(set(requested) - set(FIELD_SCOPE))
     if unknown:
         raise ValueError(
-            "unknown or unsupported mutable GenerationConfig fields: " + ", ".join(unknown)
+            "unknown or unsupported mutable GenerationConfig fields: "
+            + ", ".join(unknown)
         )
     grouped: dict[tuple[str, str], list[str]] = {}
     for name in requested:
@@ -1102,24 +1325,30 @@ def quick_mutation_contracts(fields_requested: Sequence[str]) -> tuple[MutationC
         grouped.setdefault((FIELD_SCOPE[name], target), []).append(name)
     contracts = []
     for (scale, target), mutable in sorted(grouped.items()):
-        contracts.append(MutationContract(
-            contract_id=f"quick:{target}:{scale}",
-            target_id=target,
-            scale=scale,
-            mutable_fields=tuple(mutable),
-            cadence="once_per_generation",
-            decision_boundaries=({
-                "event": "event_onset",
-                "pattern": "pattern_cycle",
-                "phrase": "phrase_start",
-                "section": "section_start",
-            }[scale],),
-            stop_conditions=("one_generation_request", "manual_freeze"),
-        ))
+        contracts.append(
+            MutationContract(
+                contract_id=f"quick:{target}:{scale}",
+                target_id=target,
+                scale=scale,
+                mutable_fields=tuple(mutable),
+                cadence="once_per_generation",
+                decision_boundaries=(
+                    {
+                        "event": "event_onset",
+                        "pattern": "pattern_cycle",
+                        "phrase": "phrase_start",
+                        "section": "section_start",
+                    }[scale],
+                ),
+                stop_conditions=("one_generation_request", "manual_freeze"),
+            )
+        )
     return tuple(contracts)
 
 
-def _sample_options(field_name: str, contract: MutationContract) -> tuple[Any, ...] | None:
+def _sample_options(
+    field_name: str, contract: MutationContract
+) -> tuple[Any, ...] | None:
     if field_name in contract.allowed_values:
         return tuple(contract.allowed_values[field_name])
     return _field_options(field_name)
@@ -1137,10 +1366,19 @@ def _draw_mutated_value(
     if field_name in {"bpm", "duration"}:
         mode = policy.bpm_mode if field_name == "bpm" else policy.duration_mode
         if mode != "explore":
-            raise ValueError(f"{field_name!r} is preserved by the CompositionBrief tempo/form policy")
-        default_bounds = policy.bpm_bounds if field_name == "bpm" else policy.duration_bounds
-    elif field_name in {"structure", "composition_flow"} and policy.form_mode != "explore":
-        raise ValueError(f"{field_name!r} is preserved by the CompositionBrief form policy")
+            raise ValueError(
+                f"{field_name!r} is preserved by the CompositionBrief tempo/form policy"
+            )
+        default_bounds = (
+            policy.bpm_bounds if field_name == "bpm" else policy.duration_bounds
+        )
+    elif (
+        field_name in {"structure", "composition_flow"}
+        and policy.form_mode != "explore"
+    ):
+        raise ValueError(
+            f"{field_name!r} is preserved by the CompositionBrief form policy"
+        )
     elif field_name in NUMERIC_DOMAINS:
         lower, upper, kind = NUMERIC_DOMAINS[field_name]
         default_bounds = (lower, upper)
@@ -1165,22 +1403,38 @@ def _draw_mutated_value(
     if options is not None:
         if not options:
             raise ValueError(f"field {field_name!r} has no mutation choices")
-        if field_name in ENUM_DOMAINS and any(item not in ENUM_DOMAINS[field_name] for item in options):
-            raise ValueError(f"contract {contract.contract_id!r} has invalid choices for {field_name!r}")
-        if field_name in {"pattern_follow_structure", "include_melody", "include_texture", "include_ambience"}:
+        if field_name in ENUM_DOMAINS and any(
+            item not in ENUM_DOMAINS[field_name] for item in options
+        ):
+            raise ValueError(
+                f"contract {contract.contract_id!r} has invalid choices for {field_name!r}"
+            )
+        if field_name in {
+            "pattern_follow_structure",
+            "include_melody",
+            "include_texture",
+            "include_ambience",
+        }:
             if any(not isinstance(item, bool) for item in options):
                 raise ValueError(f"allowed values for {field_name!r} must be booleans")
         if field_name in NUMERIC_DOMAINS:
             lower, upper, _kind = NUMERIC_DOMAINS[field_name]
             if any(
-                isinstance(item, bool) or not isinstance(item, (int, float))
+                isinstance(item, bool)
+                or not isinstance(item, (int, float))
                 or not math.isfinite(float(item))
                 or not lower <= float(item) <= upper
                 for item in options
             ):
-                raise ValueError(f"allowed values for {field_name!r} exceed its GenerationConfig domain")
-        if field_name == "break_transforms" and any(item not in BREAK_TRANSFORMS for item in options):
-            raise ValueError("break_transforms choices must be implemented transform names")
+                raise ValueError(
+                    f"allowed values for {field_name!r} exceed its GenerationConfig domain"
+                )
+        if field_name == "break_transforms" and any(
+            item not in BREAK_TRANSFORMS for item in options
+        ):
+            raise ValueError(
+                "break_transforms choices must be implemented transform names"
+            )
         return options[int(rng.integers(0, len(options)))]
 
     if default_bounds is not None:
@@ -1191,11 +1445,17 @@ def _draw_mutated_value(
                 f"contract bounds for {field_name!r} must remain inside "
                 f"[{domain_lower}, {domain_upper}]"
             )
-        kind = float if field_name in {"bpm", "duration"} else NUMERIC_DOMAINS[field_name][2]
+        kind = (
+            float
+            if field_name in {"bpm", "duration"}
+            else NUMERIC_DOMAINS[field_name][2]
+        )
         if kind is int:
             low_int, high_int = int(math.ceil(lower)), int(math.floor(upper))
             if low_int > high_int:
-                raise ValueError(f"bounds for integer field {field_name!r} contain no integer")
+                raise ValueError(
+                    f"bounds for integer field {field_name!r} contain no integer"
+                )
             return int(rng.integers(low_int, high_int + 1))
         if lower == upper:
             return float(lower)
@@ -1222,7 +1482,9 @@ def bounded_explore_generation_config(
     applied: list[str] = []
     updates: dict[str, Any] = {}
     used_fields: set[str] = set()
-    material_roles = {item.material_id: item.role for item in brief.materials if item.role}
+    material_roles = {
+        item.material_id: item.role for item in brief.materials if item.role
+    }
 
     declared_invariants = set(HARD_INVARIANTS)
     for contract in brief.mutation_contracts:
@@ -1248,7 +1510,8 @@ def bounded_explore_generation_config(
                 f"{contract.cadence!r}; only 'once_per_generation' is currently executable"
             )
         unsupported_stops = set(contract.stop_conditions) - {
-            "manual_freeze", "one_generation_request"
+            "manual_freeze",
+            "one_generation_request",
         }
         if unsupported_stops:
             raise ValueError(
@@ -1257,14 +1520,18 @@ def bounded_explore_generation_config(
             )
         mutable_fields = contract.mutable_fields
         if contract.max_mutations is not None:
-            mutable_fields = mutable_fields[:contract.max_mutations]
+            mutable_fields = mutable_fields[: contract.max_mutations]
         for field_name in mutable_fields:
             _validate_target_field(brief, contract, field_name)
             if field_name in used_fields:
-                raise ValueError(f"mutable field {field_name!r} appears in more than one contract")
+                raise ValueError(
+                    f"mutable field {field_name!r} appears in more than one contract"
+                )
             used_fields.add(field_name)
             if FIELD_SCOPE[field_name] != contract.scale:
-                raise ValueError(f"{field_name!r} is not valid at {contract.scale} scale")
+                raise ValueError(
+                    f"{field_name!r} is not valid at {contract.scale} scale"
+                )
             seed_name = (
                 f"composition-brief:v{BRIEF_SCHEMA_VERSION}:"
                 f"{brief.brief_id}:{contract.contract_id}:{contract.scale}:{field_name}"
@@ -1277,11 +1544,17 @@ def bounded_explore_generation_config(
                 config, field_name, contract, rng, brief.tempo_form_policy
             )
             updates[field_name] = after
-            changes[field_name] = {"before": before, "after": after, "contract_id": contract.contract_id}
+            changes[field_name] = {
+                "before": before,
+                "after": after,
+                "contract_id": contract.contract_id,
+            }
         applied.append(contract.contract_id)
 
     if not updates:
-        raise ValueError("bounded exploration is enabled but no mutation contract fields are active")
+        raise ValueError(
+            "bounded exploration is enabled but no mutation contract fields are active"
+        )
     # replace() re-runs GenerationConfig validation after all field choices.
     updated_config = replace(config, **updates)
     always_preserved = set(HARD_INVARIANTS)
@@ -1307,7 +1580,9 @@ def resolve_and_explore(
     config: GenerationConfig,
     *,
     bounded_exploration: bool = False,
-) -> tuple[GenerationConfig, ResolvedCompositionIntent, BoundedExplorationResult | None]:
+) -> tuple[
+    GenerationConfig, ResolvedCompositionIntent, BoundedExplorationResult | None
+]:
     """Validate source identity, apply optional bounded exploration, and re-resolve."""
     # The pitch world is part of artistic intent and becomes the initial
     # generation vocabulary. Explicit mutation contracts may deliberately alter
@@ -1322,7 +1597,11 @@ def resolve_and_explore(
             melody_root=brief.pitch_world.root,
         )
     resolved = resolve_composition_brief(brief, config)
-    result = bounded_explore_generation_config(config, brief) if bounded_exploration else None
+    result = (
+        bounded_explore_generation_config(config, brief)
+        if bounded_exploration
+        else None
+    )
     selected = result.config if result is not None else config
     resolved_after = resolve_composition_brief(brief, selected)
     return selected, resolved_after, result

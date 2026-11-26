@@ -8,7 +8,9 @@ from pathlib import Path
 import numpy as np
 
 
-def write_wav(path: str | Path, audio: np.ndarray, sample_rate: int, bit_depth: int = 24) -> Path:
+def write_wav(
+    path: str | Path, audio: np.ndarray, sample_rate: int, bit_depth: int = 24
+) -> Path:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     samples = np.asarray(audio, dtype=np.float32)
@@ -40,7 +42,6 @@ def write_wav(path: str | Path, audio: np.ndarray, sample_rate: int, bit_depth: 
         wav.setframerate(int(sample_rate))
         wav.writeframes(pcm)
     return destination
-
 
 
 def read_wav(path: str | Path) -> tuple[np.ndarray, int]:
@@ -81,4 +82,7 @@ def read_wav(path: str | Path) -> tuple[np.ndarray, int]:
     expected_values = frame_count * channels
     if values.size != expected_values:
         raise ValueError(f"malformed PCM frame data in {source}")
-    return values.reshape(frame_count, channels).astype(np.float32, copy=False), sample_rate
+    return (
+        values.reshape(frame_count, channels).astype(np.float32, copy=False),
+        sample_rate,
+    )

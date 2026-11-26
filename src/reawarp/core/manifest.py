@@ -1,4 +1,5 @@
 """Integrity manifest, source-asset packaging and portability diagnostics for projects."""
+
 from __future__ import annotations
 
 import hashlib
@@ -75,8 +76,7 @@ def prepare_project_assets(
     sample_paths = rewritten.get("sample_paths", {})
     if isinstance(sample_paths, dict):
         references.extend(
-            (f"sample_paths.{role}", str(path))
-            for role, path in sample_paths.items()
+            (f"sample_paths.{role}", str(path)) for role, path in sample_paths.items()
         )
     sample_banks = rewritten.get("sample_banks", {})
     if isinstance(sample_banks, dict):
@@ -85,7 +85,9 @@ def prepare_project_assets(
                 continue
             for index, entry in enumerate(entries):
                 if isinstance(entry, dict) and entry.get("path"):
-                    references.append((f"sample_banks.{role}.{index}", str(entry["path"])))
+                    references.append(
+                        (f"sample_banks.{role}.{index}", str(entry["path"]))
+                    )
 
     assets_by_source: dict[str, dict[str, Any]] = {}
     rewritten_paths: dict[str, str] = {}
@@ -116,19 +118,31 @@ def prepare_project_assets(
                 rewritten_path = source_key
             else:
                 digest = sha256_file(source, cancel_event=cancel_event)
-                base.update({
-                    "asset_id": "sha256:" + digest,
-                    "sha256": digest,
-                    "size_bytes": int(source.stat().st_size),
-                })
+                base.update(
+                    {
+                        "asset_id": "sha256:" + digest,
+                        "sha256": digest,
+                        "size_bytes": int(source.stat().st_size),
+                    }
+                )
                 if asset_policy == "copy":
-                    destination = root / "assets" / f"{digest[:16]}-{_safe_filename(source)}"
+                    destination = (
+                        root / "assets" / f"{digest[:16]}-{_safe_filename(source)}"
+                    )
                     destination.parent.mkdir(parents=True, exist_ok=True)
-                    if not destination.is_file() or sha256_file(destination, cancel_event=cancel_event) != digest:
+                    if (
+                        not destination.is_file()
+                        or sha256_file(destination, cancel_event=cancel_event) != digest
+                    ):
                         temporary = destination.with_suffix(destination.suffix + ".tmp")
                         try:
-                            with source.open("rb") as source_handle, temporary.open("wb") as destination_handle:
-                                for block in iter(lambda: source_handle.read(1024 * 1024), b""):
+                            with (
+                                source.open("rb") as source_handle,
+                                temporary.open("wb") as destination_handle,
+                            ):
+                                for block in iter(
+                                    lambda: source_handle.read(1024 * 1024), b""
+                                ):
                                     _check_cancelled(cancel_event, "asset packaging")
                                     destination_handle.write(block)
                             shutil.copystat(source, temporary)
@@ -137,7 +151,9 @@ def prepare_project_assets(
                             if temporary.exists():
                                 temporary.unlink()
                     if sha256_file(destination, cancel_event=cancel_event) != digest:
-                        raise IOError(f"copied asset hash verification failed: {source}")
+                        raise IOError(
+                            f"copied asset hash verification failed: {source}"
+                        )
                     relative = Path(os.path.relpath(destination, root)).as_posix()
                     asset = {**base, "project_path": relative, "status": "embedded"}
                     rewritten_path = relative
@@ -154,7 +170,9 @@ def prepare_project_assets(
         asset["references"].append(reference_id)
         rewritten_paths[reference_id] = rewritten_path
 
-    for role, path in (list(sample_paths.items()) if isinstance(sample_paths, dict) else []):
+    for role, path in (
+        list(sample_paths.items()) if isinstance(sample_paths, dict) else []
+    ):
         reference_id = f"sample_paths.{role}"
         if reference_id in rewritten_paths:
             rewritten["sample_paths"][role] = rewritten_paths[reference_id]
@@ -171,7 +189,9 @@ def prepare_project_assets(
     return assets, rewritten
 
 
-def resolve_project_asset_paths(config_data: dict[str, Any], project_directory: str | Path) -> dict[str, Any]:
+def resolve_project_asset_paths(
+    config_data: dict[str, Any], project_directory: str | Path
+) -> dict[str, Any]:
     """Resolve relative packaged sample references against the project folder."""
     root = Path(project_directory).expanduser().resolve()
     config = json.loads(json.dumps(config_data, ensure_ascii=False))
@@ -181,7 +201,9 @@ def resolve_project_asset_paths(config_data: dict[str, Any], project_directory: 
         if not path.is_absolute():
             resolved = (root / path).resolve()
             if not resolved.is_relative_to(root):
-                raise ValueError("project-relative asset path escapes the project directory")
+                raise ValueError(
+                    "project-relative asset path escapes the project directory"
+                )
             return str(resolved)
         return str(path.resolve())
 
@@ -212,7 +234,13 @@ def audit_project_assets(
     if source_assets is None:
         manifest_path = root / "manifest.json"
         if not manifest_path.is_file():
-            return {"manifest_available": False, "ok": True, "assets": [], "missing": [], "changed": []}
+            return {
+                "manifest_available": False,
+                "ok": True,
+                "assets": [],
+                "missing": [],
+                "changed": [],
+            }
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         source_assets = manifest.get("source_assets", [])
     if not isinstance(source_assets, list):
@@ -240,7 +268,11 @@ def audit_project_assets(
                 actual_path = str(actual)
                 if not actual.is_file():
                     result_status = "missing"
-                elif record.get("sha256") and sha256_file(actual, cancel_event=cancel_event) != record["sha256"]:
+                elif (
+                    record.get("sha256")
+                    and sha256_file(actual, cancel_event=cancel_event)
+                    != record["sha256"]
+                ):
                     result_status = "changed"
                 else:
                     result_status = "ok"
@@ -249,7 +281,10 @@ def audit_project_assets(
             actual_path = str(actual)
             if not actual.is_file():
                 result_status = "missing"
-            elif record.get("sha256") and sha256_file(actual, cancel_event=cancel_event) != record["sha256"]:
+            elif (
+                record.get("sha256")
+                and sha256_file(actual, cancel_event=cancel_event) != record["sha256"]
+            ):
                 result_status = "changed"
             else:
                 result_status = "external_available"
@@ -277,7 +312,6 @@ def audit_project_assets(
     }
 
 
-
 def audit_project_file_inventory(
     project_directory: str | Path,
     file_inventory: list[dict[str, Any]] | None = None,
@@ -289,7 +323,12 @@ def audit_project_file_inventory(
     if file_inventory is None:
         manifest_path = root / "manifest.json"
         if not manifest_path.is_file():
-            return {"ok": True, "manifest_available": False, "missing": [], "changed": []}
+            return {
+                "ok": True,
+                "manifest_available": False,
+                "missing": [],
+                "changed": [],
+            }
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         file_inventory = manifest.get("file_inventory", [])
     if not isinstance(file_inventory, list):
@@ -305,7 +344,10 @@ def audit_project_file_inventory(
         item = {"path": str(relative), "sha256": entry.get("sha256")}
         if not actual.is_relative_to(root) or not actual.is_file():
             missing.append({**item, "status": "missing_or_unsafe"})
-        elif entry.get("sha256") and sha256_file(actual, cancel_event=cancel_event) != entry["sha256"]:
+        elif (
+            entry.get("sha256")
+            and sha256_file(actual, cancel_event=cancel_event) != entry["sha256"]
+        ):
             changed.append({**item, "status": "changed"})
     return {
         "manifest_available": True,
@@ -318,6 +360,7 @@ def audit_project_file_inventory(
 def _environment_record() -> dict[str, Any]:
     try:
         import scipy
+
         scipy_version: str | None = str(scipy.__version__)
     except ImportError:
         scipy_version = None
@@ -366,7 +409,9 @@ def _environment_record() -> dict[str, Any]:
     }
 
 
-def _file_inventory(root: Path, *, cancel_event: Any | None = None) -> list[dict[str, Any]]:
+def _file_inventory(
+    root: Path, *, cancel_event: Any | None = None
+) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for path in sorted(root.rglob("*")):
         _check_cancelled(cancel_event, "manifest inventory")
@@ -374,14 +419,18 @@ def _file_inventory(root: Path, *, cancel_event: Any | None = None) -> list[dict
             continue
         resolved = path.resolve()
         if not resolved.is_relative_to(root):
-            raise ValueError(f"project file symlink escapes the project directory: {path}")
+            raise ValueError(
+                f"project file symlink escapes the project directory: {path}"
+            )
         relative = path.relative_to(root).as_posix()
         stat = resolved.stat()
-        entries.append({
-            "path": relative,
-            "size_bytes": int(stat.st_size),
-            "sha256": sha256_file(resolved, cancel_event=cancel_event),
-        })
+        entries.append(
+            {
+                "path": relative,
+                "size_bytes": int(stat.st_size),
+                "sha256": sha256_file(resolved, cancel_event=cancel_event),
+            }
+        )
     return entries
 
 
@@ -426,15 +475,24 @@ def write_project_manifest(
     if isinstance(variation_session, dict):
         for record in variation_session.get("candidate_records", []):
             if isinstance(record, dict):
-                candidate_ancestry.append({
-                    key: record.get(key) for key in (
-                        "candidate_id", "parent_candidate_id", "variation_seed",
-                        "mode", "selection_state", "targets",
-                    )
-                })
+                candidate_ancestry.append(
+                    {
+                        key: record.get(key)
+                        for key in (
+                            "candidate_id",
+                            "parent_candidate_id",
+                            "variation_seed",
+                            "mode",
+                            "selection_state",
+                            "targets",
+                        )
+                    }
+                )
     fx_files = {
         "routing": "fx_routing.json" if (root / "fx_routing.json").is_file() else None,
-        "automation": "fx_automation.json" if (root / "fx_automation.json").is_file() else None,
+        "automation": (
+            "fx_automation.json" if (root / "fx_automation.json").is_file() else None
+        ),
         "mix": "mix.json" if (root / "mix.json").is_file() else None,
     }
     listening_session = metadata.get("m32_listening_session", {})
@@ -443,31 +501,41 @@ def write_project_manifest(
     critical_listening = {
         "json_file": (
             "critical_listening_report.json"
-            if (root / "critical_listening_report.json").is_file() else None
+            if (root / "critical_listening_report.json").is_file()
+            else None
         ),
         "markdown_file": (
             "critical_listening_report.md"
-            if (root / "critical_listening_report.md").is_file() else None
+            if (root / "critical_listening_report.md").is_file()
+            else None
         ),
         "session_id": listening_session.get("session_id"),
         "project_fingerprint": listening_session.get("project_fingerprint"),
         "project_revision": listening_session.get("project_revision"),
         "candidate_ids": listening_session.get("candidate_ids", []),
         "analysis_enabled": listening_session.get("analysis_enabled"),
-        "audition_transform_count": len(listening_session.get("audition_transforms", [])),
+        "audition_transform_count": len(
+            listening_session.get("audition_transforms", [])
+        ),
     }
     report = {
         "format": MANIFEST_FORMAT,
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "application": {
             "id": str(project_record.get("application", "eli_lab-reawarp")),
-            "version": str(project_record.get("application_version", _application_version())),
+            "version": str(
+                project_record.get("application_version", _application_version())
+            ),
             "renderer_version": str(project_record.get("renderer_version", "unknown")),
         },
         "schemas": {
             "project": int(project_record.get("schema_version", 1)),
             "events": 1,
-            "score": int(project_record.get("score_schema_version", score_record.get("schema_version", 1))),
+            "score": int(
+                project_record.get(
+                    "score_schema_version", score_record.get("schema_version", 1)
+                )
+            ),
             "fx_routing": 3 if fx_files["routing"] else None,
             "fx_automation": 1 if fx_files["automation"] else None,
             "sound_object": 1,
@@ -478,14 +546,26 @@ def write_project_manifest(
             "frame_count": int(project_record.get("frame_count", 0)),
             "duration_seconds": float(project_record.get("duration_seconds", 0.0)),
             "stems": list(project_record.get("stems", [])),
-            "event_count": len(json.loads((root / "events.json").read_text(encoding="utf-8")).get("events", []))
-            if (root / "events.json").is_file() else None,
+            "event_count": (
+                len(
+                    json.loads((root / "events.json").read_text(encoding="utf-8")).get(
+                        "events", []
+                    )
+                )
+                if (root / "events.json").is_file()
+                else None
+            ),
         },
         "config": {
-            "sha256": hashlib.sha256(json.dumps(
-                project_record.get("config", {}), sort_keys=True, ensure_ascii=False,
-                separators=(",", ":"), allow_nan=False,
-            ).encode("utf-8")).hexdigest(),
+            "sha256": hashlib.sha256(
+                json.dumps(
+                    project_record.get("config", {}),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ).encode("utf-8")
+            ).hexdigest(),
             "root_seed": project_record.get("config", {}).get("seed"),
             "algorithm_version": metadata.get("algorithm_version"),
             "renderer_version": project_record.get("renderer_version"),
@@ -493,14 +573,20 @@ def write_project_manifest(
         "score": {
             "title": score_record.get("title"),
             "tuning": score_record.get("tuning"),
-            "generator_families": score_record.get("metadata", {}).get("generator_families", {}),
+            "generator_families": score_record.get("metadata", {}).get(
+                "generator_families", {}
+            ),
             "seed_streams": score_record.get("metadata", {}).get("seed_streams", {}),
-            "render_provenance": score_record.get("metadata", {}).get("render_provenance", render_provenance),
+            "render_provenance": score_record.get("metadata", {}).get(
+                "render_provenance", render_provenance
+            ),
         },
         "source_selection": {
             "sample_sources": metadata.get("sample_sources", {}),
             "sample_switch_summary": metadata.get("sample_switch_summary", {}),
-            "score_sample_schedule": score_record.get("metadata", {}).get("sample_schedule", {}),
+            "score_sample_schedule": score_record.get("metadata", {}).get(
+                "sample_schedule", {}
+            ),
         },
         "source_assets": list(assets or []),
         "candidate_ancestry": candidate_ancestry,

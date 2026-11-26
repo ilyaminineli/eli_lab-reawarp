@@ -36,8 +36,8 @@ def midi_to_frequency(note: float, reference: float = 440.0) -> float:
 
 
 def build_melody_events(
-        config: GenerationConfig,
-        rng: np.random.Generator,
+    config: GenerationConfig,
+    rng: np.random.Generator,
 ) -> list[MelodyEvent]:
     if not config.include_melody:
         return []
@@ -45,13 +45,17 @@ def build_melody_events(
     step_count = max(1, int(np.ceil(config.duration / step_seconds)))
     complexity = config.complexity
     count = max(10, int(config.duration * (1.8 + complexity * 1.6)))
-    x_values, y_values = lissajous(count, a=3, b=5, phase=math.pi / 3.0 + complexity * 0.4)
+    x_values, y_values = lissajous(
+        count, a=3, b=5, phase=math.pi / 3.0 + complexity * 0.4
+    )
     chaos = logistic_map(count, r=3.78 + 0.18 * complexity, x0=0.311)
     pitch_offsets = np.asarray([-12, -5, -1, 0, 2, 7, 11, 14, 19], dtype=int)
     events: list[MelodyEvent] = []
     base_note = 48 + int(round((complexity - 0.5) * 8.0))
     scale_notes = (
-        scale_midi_notes(60 + int(config.melody_root), config.melody_scale, octaves=(-2, -1, 0, 1))
+        scale_midi_notes(
+            60 + int(config.melody_root), config.melody_scale, octaves=(-2, -1, 0, 1)
+        )
         if config.melody_scale != "chromatic"
         else ()
     )
@@ -59,13 +63,26 @@ def build_melody_events(
     for index in range(count):
         normalized_time = index / max(1, count - 1)
         geometric_offset = int(round(x_values[index] * (1.0 + complexity * 2.0)))
-        step = int(np.clip(round(normalized_time * (step_count - 1)) + geometric_offset, 0, step_count - 1))
+        step = int(
+            np.clip(
+                round(normalized_time * (step_count - 1)) + geometric_offset,
+                0,
+                step_count - 1,
+            )
+        )
         if index > 0 and step <= events[-1].step:
             continue
-        if chaos[index] < (0.09 + (1.0 - complexity) * 0.10) and index not in (0, count - 1):
+        if chaos[index] < (0.09 + (1.0 - complexity) * 0.10) and index not in (
+            0,
+            count - 1,
+        ):
             continue
         pitch_index = int(
-            np.clip(round((x_values[index] + 1.0) * 0.5 * (len(pitch_offsets) - 1)), 0, len(pitch_offsets) - 1)
+            np.clip(
+                round((x_values[index] + 1.0) * 0.5 * (len(pitch_offsets) - 1)),
+                0,
+                len(pitch_offsets) - 1,
+            )
         )
         midi_note = int(base_note + pitch_offsets[pitch_index])
         if y_values[index] > 0.84 and rng.random() < complexity * 0.55:
@@ -79,12 +96,16 @@ def build_melody_events(
             distances = np.abs(np.asarray(scale_notes, dtype=np.int16) - midi_note)
             nearest = np.flatnonzero(distances == distances.min())
             midi_note = int(scale_notes[int(rng.choice(nearest))])
-        duration = float(np.clip(
-            0.12 + (y_values[index] + 1.0) * 0.5 * (0.42 + complexity * 0.28),
-            0.10,
-            0.88,
-        ))
-        velocity = float(np.clip(0.38 + 0.45 * chaos[index] + rng.uniform(-0.08, 0.08), 0.18, 0.95))
+        duration = float(
+            np.clip(
+                0.12 + (y_values[index] + 1.0) * 0.5 * (0.42 + complexity * 0.28),
+                0.10,
+                0.88,
+            )
+        )
+        velocity = float(
+            np.clip(0.38 + 0.45 * chaos[index] + rng.uniform(-0.08, 0.08), 0.18, 0.95)
+        )
         pan = float(np.clip(x_values[index] * 0.58, -0.75, 0.75))
         time = step * step_seconds
         if time >= config.duration:

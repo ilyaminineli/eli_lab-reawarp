@@ -41,12 +41,16 @@ from reawarp.synthesis.profiles import (
 )
 
 
-def _event_rng(event: MusicalEvent, fallback_seed: int | str, renderer_id: str) -> np.random.Generator:
+def _event_rng(
+    event: MusicalEvent, fallback_seed: int | str, renderer_id: str
+) -> np.random.Generator:
     """Derive a private deterministic stream from the score event identity."""
     root = event.seed if event.seed is not None else fallback_seed
-    payload = f'reawarp:score-voice:v1:{root}:{event.event_id}:{event.voice_id}:{renderer_id}'.encode('utf-8')
+    payload = f"reawarp:score-voice:v1:{root}:{event.event_id}:{event.voice_id}:{renderer_id}".encode(
+        "utf-8"
+    )
     digest = hashlib.blake2b(payload, digest_size=8).digest()
-    return np.random.default_rng(int.from_bytes(digest, 'little', signed=False))
+    return np.random.default_rng(int.from_bytes(digest, "little", signed=False))
 
 
 def _fit_frames(signal: np.ndarray, frames: int) -> np.ndarray:
@@ -57,7 +61,7 @@ def _fit_frames(signal: np.ndarray, frames: int) -> np.ndarray:
     if len(audio) > frames:
         return audio[:frames].copy()
     result = np.zeros(frames, dtype=np.float32)
-    result[:len(audio)] = audio
+    result[: len(audio)] = audio
     return result
 
 
@@ -86,13 +90,12 @@ def _control_curve(
     )
     if not len(sampled.frames):
         return None
-    frames = np.arange(
-        scheduled.start_frame, scheduled.end_frame, dtype=np.float64
-    )
+    frames = np.arange(scheduled.start_frame, scheduled.end_frame, dtype=np.float64)
     values = np.interp(frames, sampled.frames, sampled.values).astype(np.float32)
     active_samples = (
         np.ones(len(sampled.frames), dtype=bool)
-        if sampled.active is None else np.asarray(sampled.active, dtype=bool)
+        if sampled.active is None
+        else np.asarray(sampled.active, dtype=bool)
     )
     sample_indices = np.searchsorted(sampled.frames, frames, side="right") - 1
     sample_indices = np.clip(sample_indices, 0, len(active_samples) - 1)
@@ -128,7 +131,7 @@ def _apply_musical_controls(
     audio = np.asarray(signal, dtype=np.float32).reshape(-1).copy()
     if not len(audio):
         return audio
-    cutoff = _control_curve(controls, 'synth.cutoff', scheduled, sample_rate, 0.0)
+    cutoff = _control_curve(controls, "synth.cutoff", scheduled, sample_rate, 0.0)
     if cutoff is not None:
         cutoff_values, cutoff_active = cutoff
         if np.any(cutoff_active):
@@ -139,7 +142,7 @@ def _apply_musical_controls(
             filtered = _one_pole_lowpass(audio, sample_rate, safe_cutoff)
             filtered = np.where(cutoff_active, filtered, audio)
             resonance = _control_curve(
-                controls, 'synth.resonance', scheduled, sample_rate, 0.0
+                controls, "synth.resonance", scheduled, sample_rate, 0.0
             )
             if resonance is None:
                 audio = filtered
@@ -148,7 +151,7 @@ def _apply_musical_controls(
                 resonance_values = np.where(resonance_active, resonance_values, 0.0)
                 amount = np.clip(resonance_values, 0.0, 1.0)
                 audio = filtered + (audio - filtered) * amount
-    gain = _control_curve(controls, 'synth.gain', scheduled, sample_rate, 1.0)
+    gain = _control_curve(controls, "synth.gain", scheduled, sample_rate, 1.0)
     if gain is not None:
         gain_values, gain_active = gain
         audio *= np.where(gain_active, np.clip(gain_values, 0.0, 1.0), 1.0)
@@ -163,25 +166,28 @@ def _select_profile(
     role: str,
 ) -> str:
     """Resolve automatic profile choice once per role, not once per callback."""
-    if configured != 'auto':
+    if configured != "auto":
         if configured not in catalogue:
-            raise ValueError(f'unknown {role} synthesis profile: {configured}')
+            raise ValueError(f"unknown {role} synthesis profile: {configured}")
         return configured
-    rng = np.random.default_rng(derive_seed(root_seed, f'score-voice-profile:{role}'))
-    return select_profile_name('auto', catalogue, rng, auto_choices=automatic_choices)
+    rng = np.random.default_rng(derive_seed(root_seed, f"score-voice-profile:{role}"))
+    return select_profile_name("auto", catalogue, rng, auto_choices=automatic_choices)
 
 
 def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
-    if config.synth_palette == 'subtractive':
+    if config.synth_palette == "subtractive":
         catalogue = SUBTRACTIVE_VOICES
         choices = AUTO_MELODY_PROFILES
     else:
         catalogue = MELODY_PROFILES
-        choices = tuple(name for name in MELODY_PROFILES if name in {
-            'soft_keys', 'glass_bell', 'soft_pluck', 'reed_pad', 'wood_mallet'
-        })
+        choices = tuple(
+            name
+            for name in MELODY_PROFILES
+            if name
+            in {"soft_keys", "glass_bell", "soft_pluck", "reed_pad", "wood_mallet"}
+        )
     selected_profile = _select_profile(
-        config.melody_profile, catalogue, choices, config.seed, 'melody'
+        config.melody_profile, catalogue, choices, config.seed, "melody"
     )
 
     def render(
@@ -195,19 +201,24 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
         if frequency is None and event.pitch is not None:
             frequency = 440.0 * (2.0 ** ((float(event.pitch) - 69.0) / 12.0))
         if frequency is None or float(frequency) <= 0:
-            raise ValueError(f'melody event {event.event_id!r} needs a positive frequency')
+            raise ValueError(
+                f"melody event {event.event_id!r} needs a positive frequency"
+            )
         pitch_lane = (
             controls.value_for_context(
-                'synth.pitch',
+                "synth.pitch",
                 scheduled.start_frame,
                 event_id=event.event_id,
                 default_value=0.0,
             )
-            if 'synth.pitch' in controls.target_ids else 0.0
+            if "synth.pitch" in controls.target_ids
+            else 0.0
         )
-        register = float(parameters.get('register_semitones', config.melody_register_semitones))
+        register = float(
+            parameters.get("register_semitones", config.melody_register_semitones)
+        )
         frequency = float(frequency) * (2.0 ** ((register + pitch_lane) / 12.0))
-        gate_value = parameters.get('gate_duration_beats')
+        gate_value = parameters.get("gate_duration_beats")
         if gate_value is None:
             gate_frames = scheduled.duration_frames
         else:
@@ -221,21 +232,17 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
             except (TypeError, ValueError, ZeroDivisionError):
                 gate_frames = scheduled.duration_frames
         gate_seconds = gate_frames / float(sample_rate)
-        attack_seconds = _event_control_value(
-            controls, "synth.attack", scheduled
+        attack_seconds = _event_control_value(controls, "synth.attack", scheduled)
+        decay_seconds = _event_control_value(controls, "synth.decay", scheduled)
+        release_seconds = _event_control_value(controls, "synth.release", scheduled)
+        vibrato_depth = (
+            _event_control_value(controls, "synth.modulation.depth", scheduled, 0.0)
+            or 0.0
         )
-        decay_seconds = _event_control_value(
-            controls, "synth.decay", scheduled
+        vibrato_rate = (
+            _event_control_value(controls, "synth.modulation.rate", scheduled, 5.0)
+            or 0.0
         )
-        release_seconds = _event_control_value(
-            controls, "synth.release", scheduled
-        )
-        vibrato_depth = _event_control_value(
-            controls, "synth.modulation.depth", scheduled, 0.0
-        ) or 0.0
-        vibrato_rate = _event_control_value(
-            controls, "synth.modulation.rate", scheduled, 5.0
-        ) or 0.0
         vibrato_depth_semitones = float(np.clip(vibrato_depth, 0.0, 1.0)) * 0.5
         vibrato_rate_hz = float(np.clip(vibrato_rate, 0.0, 40.0))
         wavetable_position = _event_control_value(
@@ -244,44 +251,68 @@ def _melody_renderer(config: GenerationConfig) -> ScoreVoiceRenderer:
         partial_balance = _event_control_value(
             controls, "synth.partial.balance", scheduled
         )
-        grain_size_ms = _event_control_value(
-            controls, "synth.grain.size", scheduled
-        )
+        grain_size_ms = _event_control_value(controls, "synth.grain.size", scheduled)
         grain_position = _event_control_value(
             controls, "synth.grain.position", scheduled
         )
         grain_density_hz = _event_control_value(
             controls, "synth.grain.density", scheduled
         )
-        rng = _event_rng(event, config.seed, 'melody')
-        brightness = float(np.clip(parameters.get('brightness', config.tonal_brightness), 0.0, 1.0))
-        instability = float(np.clip(parameters.get('instability', config.arrangement_instability), 0.0, 1.0))
-        if config.synth_palette == 'subtractive':
-            profile = str(parameters.get('synthesis_profile') or selected_profile)
+        rng = _event_rng(event, config.seed, "melody")
+        brightness = float(
+            np.clip(parameters.get("brightness", config.tonal_brightness), 0.0, 1.0)
+        )
+        instability = float(
+            np.clip(
+                parameters.get("instability", config.arrangement_instability), 0.0, 1.0
+            )
+        )
+        if config.synth_palette == "subtractive":
+            profile = str(parameters.get("synthesis_profile") or selected_profile)
             audio = render_subtractive_note(
-                frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
-                profile=profile, brightness=brightness, instability=instability,
-                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                frequency,
+                sample_rate,
+                rng,
+                duration=gate_seconds,
+                velocity=1.0,
+                profile=profile,
+                brightness=brightness,
+                instability=instability,
+                attack_seconds=attack_seconds,
+                decay_seconds=decay_seconds,
                 release_seconds=release_seconds,
                 vibrato_depth_semitones=vibrato_depth_semitones,
                 vibrato_rate_hz=vibrato_rate_hz,
             )
-        elif config.synth_palette in {'hybrid', 'fm'}:
-            profile = str(parameters.get('synthesis_profile') or selected_profile)
+        elif config.synth_palette in {"hybrid", "fm"}:
+            profile = str(parameters.get("synthesis_profile") or selected_profile)
             audio = render_fm_note(
-                frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
-                profile=profile, brightness=brightness, instability=instability,
-                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                frequency,
+                sample_rate,
+                rng,
+                duration=gate_seconds,
+                velocity=1.0,
+                profile=profile,
+                brightness=brightness,
+                instability=instability,
+                attack_seconds=attack_seconds,
+                decay_seconds=decay_seconds,
                 release_seconds=release_seconds,
                 vibrato_depth_semitones=vibrato_depth_semitones,
                 vibrato_rate_hz=vibrato_rate_hz,
             )
         else:
             audio = render_extended_note(
-                frequency, sample_rate, rng, duration=gate_seconds, velocity=1.0,
-                palette=config.synth_palette, brightness=brightness,
+                frequency,
+                sample_rate,
+                rng,
+                duration=gate_seconds,
+                velocity=1.0,
+                palette=config.synth_palette,
+                brightness=brightness,
                 instability=instability,
-                attack_seconds=attack_seconds, decay_seconds=decay_seconds,
+                attack_seconds=attack_seconds,
+                decay_seconds=decay_seconds,
                 release_seconds=release_seconds,
                 vibrato_depth_semitones=vibrato_depth_semitones,
                 vibrato_rate_hz=vibrato_rate_hz,
@@ -322,35 +353,62 @@ def _percussion_renderer(
 
         rng = _event_rng(event, config.seed, f"percussion:{role}")
         if role == "break":
-            subrole = source_kind if source_kind in {"kick", "snare", "hat"} else "snare"
-            selected = selected_profile.get(subrole, "909_crack") if isinstance(selected_profile, dict) else selected_profile
+            subrole = (
+                source_kind if source_kind in {"kick", "snare", "hat"} else "snare"
+            )
+            selected = (
+                selected_profile.get(subrole, "909_crack")
+                if isinstance(selected_profile, dict)
+                else selected_profile
+            )
             profile = str(parameters.get("sound_profile") or selected)
             if subrole == "kick":
                 audio = render_kick(
-                    sample_rate, rng, 1.0, duration=duration, amp_decay=0.16,
+                    sample_rate,
+                    rng,
+                    1.0,
+                    duration=duration,
+                    amp_decay=0.16,
                     profile=profile if profile in KICK_PROFILES else "909_punch",
                 )
             elif subrole == "snare":
                 audio = render_snare(
-                    sample_rate, rng, 1.0, duration=duration,
+                    sample_rate,
+                    rng,
+                    1.0,
+                    duration=duration,
                     profile=profile if profile in SNARE_PROFILES else "909_crack",
                 )
             else:
                 audio = render_hat(
-                    sample_rate, rng, 1.0, duration=duration,
+                    sample_rate,
+                    rng,
+                    1.0,
+                    duration=duration,
                     profile=profile if profile in HAT_PROFILES else "closed",
                 )
         else:
             profile = str(parameters.get("sound_profile") or selected_profile)
-            synthetic = (
-                config.percussion_synthesis in {"minimal", "extended"}
-                or bool(parameters.get("synthesis_voice"))
+            synthetic = config.percussion_synthesis in {"minimal", "extended"} or bool(
+                parameters.get("synthesis_voice")
             )
             if synthetic:
                 defaults = {
-                    "kick": "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump",
-                    "snare": "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim",
-                    "hat": "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick",
+                    "kick": (
+                        "soft_kick"
+                        if config.percussion_synthesis == "minimal"
+                        else "dry_thump"
+                    ),
+                    "snare": (
+                        "paper_snare"
+                        if config.percussion_synthesis == "minimal"
+                        else "muted_rim"
+                    ),
+                    "hat": (
+                        "noise_hat"
+                        if config.percussion_synthesis == "minimal"
+                        else "metal_tick"
+                    ),
                 }
                 voice = str(parameters.get("synthesis_voice") or defaults[role])
                 pitch_hz = parameters.get("pitch_hz")
@@ -367,15 +425,25 @@ def _percussion_renderer(
                     )
                 synth_duration = {"kick": 0.19, "snare": 0.17, "hat": 0.085}[role]
                 audio = render_synthetic_percussion(
-                    voice, sample_rate, rng, duration=synth_duration, velocity=1.0,
+                    voice,
+                    sample_rate,
+                    rng,
+                    duration=synth_duration,
+                    velocity=1.0,
                     pitch_hz=None if pitch_hz is None else float(pitch_hz),
                 )
             elif role == "kick":
-                audio = render_kick(sample_rate, rng, 1.0, duration=duration, profile=profile)
+                audio = render_kick(
+                    sample_rate, rng, 1.0, duration=duration, profile=profile
+                )
             elif role == "snare":
-                audio = render_snare(sample_rate, rng, 1.0, duration=duration, profile=profile)
+                audio = render_snare(
+                    sample_rate, rng, 1.0, duration=duration, profile=profile
+                )
             else:
-                audio = render_hat(sample_rate, rng, 1.0, duration=duration, profile=profile)
+                audio = render_hat(
+                    sample_rate, rng, 1.0, duration=duration, profile=profile
+                )
 
         scale = float(parameters.get("synthesis_velocity_scale", 1.0))
         if role == "break":
@@ -388,7 +456,9 @@ def _percussion_renderer(
     return render
 
 
-def build_production_voice_renderers(config: GenerationConfig) -> dict[str, ScoreVoiceRenderer]:
+def build_production_voice_renderers(
+    config: GenerationConfig,
+) -> dict[str, ScoreVoiceRenderer]:
     """Build deterministic production callbacks for all event-backed score voices.
 
     Melodic callbacks retain the selected subtractive/FM/extended synthesis family.
@@ -398,18 +468,36 @@ def build_production_voice_renderers(config: GenerationConfig) -> dict[str, Scor
     """
     renderers: dict[str, ScoreVoiceRenderer] = {}
     if config.include_melody:
-        renderers['melody'] = _melody_renderer(config)
+        renderers["melody"] = _melody_renderer(config)
     for role, configured, catalogue, choices in (
-        ('kick', config.kick_profile, KICK_PROFILES, AUTO_KICK_PROFILES),
-        ('snare', config.snare_profile, SNARE_PROFILES, AUTO_SNARE_PROFILES),
-        ('hat', config.hat_profile, HAT_PROFILES, AUTO_HAT_PROFILES),
+        ("kick", config.kick_profile, KICK_PROFILES, AUTO_KICK_PROFILES),
+        ("snare", config.snare_profile, SNARE_PROFILES, AUTO_SNARE_PROFILES),
+        ("hat", config.hat_profile, HAT_PROFILES, AUTO_HAT_PROFILES),
     ):
         selected = _select_profile(configured, catalogue, choices, config.seed, role)
         renderers[role] = _percussion_renderer(role, config, selected)
     break_profiles = {
-        'kick': _select_profile(config.kick_profile, KICK_PROFILES, AUTO_KICK_PROFILES, config.seed, 'break_kick'),
-        'snare': _select_profile(config.snare_profile, SNARE_PROFILES, AUTO_SNARE_PROFILES, config.seed, 'break_snare'),
-        'hat': _select_profile(config.hat_profile, HAT_PROFILES, AUTO_HAT_PROFILES, config.seed, 'break_hat'),
+        "kick": _select_profile(
+            config.kick_profile,
+            KICK_PROFILES,
+            AUTO_KICK_PROFILES,
+            config.seed,
+            "break_kick",
+        ),
+        "snare": _select_profile(
+            config.snare_profile,
+            SNARE_PROFILES,
+            AUTO_SNARE_PROFILES,
+            config.seed,
+            "break_snare",
+        ),
+        "hat": _select_profile(
+            config.hat_profile,
+            HAT_PROFILES,
+            AUTO_HAT_PROFILES,
+            config.seed,
+            "break_hat",
+        ),
     }
-    renderers['break'] = _percussion_renderer('break', config, break_profiles)
+    renderers["break"] = _percussion_renderer("break", config, break_profiles)
     return renderers

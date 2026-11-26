@@ -11,7 +11,11 @@ from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.mathematics.theory import SCALE_STEPS
 from reawarp.synthesis.profiles import (
-    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
+    HAT_PROFILES,
+    KICK_PROFILES,
+    MELODY_PROFILES,
+    SNARE_PROFILES,
+    SYNTH_PALETTES,
 )
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
@@ -32,8 +36,11 @@ def random_generation_config(
         raise TypeError("base must be a GenerationConfig")
     actual_seed = base.seed if seed is None else seed
     rng = np.random.default_rng(
-        int(actual_seed) if str(actual_seed).lstrip("-+").isdigit()
-        else int.from_bytes(str(actual_seed).encode("utf-8")[:8].ljust(8, b"\0"), "little")
+        int(actual_seed)
+        if str(actual_seed).lstrip("-+").isdigit()
+        else int.from_bytes(
+            str(actual_seed).encode("utf-8")[:8].ljust(8, b"\0"), "little"
+        )
     )
 
     def unit(low: float = 0.05, high: float = 0.95) -> float:
@@ -45,7 +52,8 @@ def random_generation_config(
 
     transform_count = int(rng.integers(2, len(BREAK_TRANSFORMS) + 1))
     transforms = tuple(
-        str(item) for item in rng.choice(
+        str(item)
+        for item in rng.choice(
             np.asarray(BREAK_TRANSFORMS, dtype=object),
             size=transform_count,
             replace=False,
@@ -83,7 +91,9 @@ def random_generation_config(
         synth_palette=choose(SYNTH_PALETTES),
         percussion_synthesis=choose(("minimal", "extended", "samples")),
         percussion_source_mode=choose(("automatic", "synth", "sample", "hybrid")),
-        percussion_hybrid_architecture=choose(("transient_body", "layered", "feature_guided")),
+        percussion_hybrid_architecture=choose(
+            ("transient_body", "layered", "feature_guided")
+        ),
         percussion_sample_mix=unit(0.1, 0.9),
         hybrid_transient_ms=float(rng.uniform(5.0, 200.0)),
         melody_scale=choose(SCALE_STEPS),

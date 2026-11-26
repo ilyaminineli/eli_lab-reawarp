@@ -17,7 +17,9 @@ def derive_seed(root_seed: int | str, stream_name: str) -> int:
 class RandomStreams:
     """Provides one deterministic NumPy generator per named musical layer."""
 
-    def __init__(self, root_seed: int | str, seed_overrides: dict[str, int] | None = None) -> None:
+    def __init__(
+        self, root_seed: int | str, seed_overrides: dict[str, int] | None = None
+    ) -> None:
         self.root_seed = root_seed
         self.seed_overrides = dict(seed_overrides or {})
         self._generators: dict[str, np.random.Generator] = {}

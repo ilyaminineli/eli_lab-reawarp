@@ -5,6 +5,7 @@ remains the richer searchable/indexed library; this module only discovers the
 audio already shipped in samples/ so those sources can participate in generation
 without a manual file-browser round trip.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -18,8 +19,14 @@ _ROLE_TOKENS = {
     # Avoid a generic "bass" token so melodic bass loops are not classified
     # as kick samples by accident.
     "kick": (
-        "kick", "bass_drum", "bassdrum", "_bd", "bd_",
-        "808_bass", "synth_bass", "sub_bass",
+        "kick",
+        "bass_drum",
+        "bassdrum",
+        "_bd",
+        "bd_",
+        "808_bass",
+        "synth_bass",
+        "sub_bass",
     ),
     "snare": ("snare", "clap", "rim"),
     "hat": ("hihat", "hi_hat", "hat", "cymbal", "ride", "crash"),
@@ -68,7 +75,10 @@ def discover_bundled_samples(
         return []
     records: list[BundledSample] = []
     for path in sorted(sample_root.rglob("*")):
-        if not path.is_file() or path.suffix.casefold() not in SUPPORTED_SAMPLE_SUFFIXES:
+        if (
+            not path.is_file()
+            or path.suffix.casefold() not in SUPPORTED_SAMPLE_SUFFIXES
+        ):
             continue
         detected_role = classify_sample_role(path)
         if detected_role is None or detected_role == "break":
@@ -76,12 +86,14 @@ def discover_bundled_samples(
         if role is not None and detected_role != role:
             continue
         relative = path.relative_to(sample_root).as_posix()
-        records.append(BundledSample(
-            path=path,
-            role=detected_role,
-            label=f"{path.name}  ·  {path.parent.name}",
-            relative_path=relative,
-        ))
+        records.append(
+            BundledSample(
+                path=path,
+                role=detected_role,
+                label=f"{path.name}  ·  {path.parent.name}",
+                relative_path=relative,
+            )
+        )
     return records
 
 

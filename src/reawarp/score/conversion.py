@@ -32,22 +32,45 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         onset = Fraction(str(seconds * bpm / 60.0)).limit_denominator(15_360)
         voice = str(source.get("lane", "unknown"))
         source_kind = str(source.get("kind", "hit"))
-        is_note = source.get("midi_note") is not None or source.get("frequency") is not None
-        kind = "note" if is_note else (
-            "trigger" if source_kind == "sample_trigger" else
-            "grain" if source_kind in {"coloured_noise", "harmonic_ambient_bed"} else "hit"
+        is_note = (
+            source.get("midi_note") is not None or source.get("frequency") is not None
+        )
+        kind = (
+            "note"
+            if is_note
+            else (
+                "trigger"
+                if source_kind == "sample_trigger"
+                else (
+                    "grain"
+                    if source_kind in {"coloured_noise", "harmonic_ambient_bed"}
+                    else "hit"
+                )
+            )
         )
         duration_seconds = float(source.get("duration", 0.0))
         duration = (
             Fraction(str(duration_seconds * bpm / 60.0)).limit_denominator(15_360)
-            if duration_seconds > 0 else Fraction(1, 16)
+            if duration_seconds > 0
+            else Fraction(1, 16)
         )
         excluded = {
-            "lane", "step", "time", "duration", "midi_note", "frequency",
-            "frequency_hz", "velocity", "pan", "source_x", "source_y",
+            "lane",
+            "step",
+            "time",
+            "duration",
+            "midi_note",
+            "frequency",
+            "frequency_hz",
+            "velocity",
+            "pan",
+            "source_x",
+            "source_y",
         }
         parameters: dict[str, Any] = {
-            key: value for key, value in source.items() if key not in excluded | {"kind"}
+            key: value
+            for key, value in source.items()
+            if key not in excluded | {"kind"}
         }
         parameters["source_kind"] = source_kind
         parameters["source_step"] = source.get("step")
@@ -55,25 +78,28 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         seed = seed_streams.get(stream_name) if stream_name else None
         tags = (voice, source_kind)
         frequency = source.get("frequency_hz", source.get("frequency"))
-        events.append(MusicalEvent(
-            event_id=f"reawarp-event-{index:06d}",
-            voice_id=voice,
-            onset_beats=onset,
-            duration_beats=duration,
-            kind=kind,
-            pitch=(
-                float(source["midi_note"])
-                if source.get("midi_note") is not None else None
-            ),
-            frequency_hz=float(frequency) if frequency is not None else None,
-            velocity=float(source.get("velocity", 0.8)),
-            articulation="default",
-            parameters=parameters,
-            tags=tags,
-            source_id=source.get("source_id", source.get("source_lane")),
-            seed=int(seed) if seed is not None else None,
-            tuning_id="12tet",
-        ))
+        events.append(
+            MusicalEvent(
+                event_id=f"reawarp-event-{index:06d}",
+                voice_id=voice,
+                onset_beats=onset,
+                duration_beats=duration,
+                kind=kind,
+                pitch=(
+                    float(source["midi_note"])
+                    if source.get("midi_note") is not None
+                    else None
+                ),
+                frequency_hz=float(frequency) if frequency is not None else None,
+                velocity=float(source.get("velocity", 0.8)),
+                articulation="default",
+                parameters=parameters,
+                tags=tags,
+                source_id=source.get("source_id", source.get("source_lane")),
+                seed=int(seed) if seed is not None else None,
+                tuning_id="12tet",
+            )
+        )
 
     metadata = {
         "source_application": "eli_lab-reawarp",

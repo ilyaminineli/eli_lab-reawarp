@@ -5,22 +5,43 @@ engine. Directives can be consumed by percussion, motifs, sample selection,
 ambience, automation and transitions while all voices remain on the shared
 project beat clock.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
 
-
 PHRASE_FUNCTIONS = (
-    "introduction", "establishment", "continuation", "development",
-    "uplift", "arrival", "drop", "silence", "contrast", "return",
-    "false_return", "transition", "residue", "outro",
+    "introduction",
+    "establishment",
+    "continuation",
+    "development",
+    "uplift",
+    "arrival",
+    "drop",
+    "silence",
+    "contrast",
+    "return",
+    "false_return",
+    "transition",
+    "residue",
+    "outro",
 )
 
 TRANSITION_GESTURES = (
-    "none", "pickup", "fill", "riser", "subtraction", "hard_cut",
-    "reverse_swell", "register_shift", "echo_handoff", "rhythmic_collapse",
-    "silence_gate", "fragment_reassembly", "false_cadence",
+    "none",
+    "pickup",
+    "fill",
+    "riser",
+    "subtraction",
+    "hard_cut",
+    "reverse_swell",
+    "register_shift",
+    "echo_handoff",
+    "rhythmic_collapse",
+    "silence_gate",
+    "fragment_reassembly",
+    "false_cadence",
 )
 
 
@@ -60,21 +81,42 @@ def _function(name: str, motif_mode: str) -> str:
     token = name.upper()
     if "INTRO" in token or token in {"SIGNAL", "SEED_OBJECT", "ORIGIN"}:
         return "introduction"
-    if any(word in token for word in ("FOUNDATION", "ESTABLISH", "FRAME", "EXPOSITION", "SUBJECT_A")):
+    if any(
+        word in token
+        for word in ("FOUNDATION", "ESTABLISH", "FRAME", "EXPOSITION", "SUBJECT_A")
+    ):
         return "establishment"
-    if any(word in token for word in ("UPLIFT", "SURGE_IN", "PRE_COLLISION", "PICKUP", "RAMP")):
+    if any(
+        word in token
+        for word in ("UPLIFT", "SURGE_IN", "PRE_COLLISION", "PICKUP", "RAMP")
+    ):
         return "uplift"
-    if any(word in token for word in ("PEAK", "COLLISION", "OVERLOAD", "CLIMAX", "ARRIVAL")):
+    if any(
+        word in token for word in ("PEAK", "COLLISION", "OVERLOAD", "CLIMAX", "ARRIVAL")
+    ):
         return "arrival"
-    if any(word in token for word in ("DROP", "VOID", "NULL", "SILENCE", "OPEN_SPACE", "SUSPENSION")):
-        return "silence" if any(word in token for word in ("VOID", "NULL", "SILENCE")) else "drop"
+    if any(
+        word in token
+        for word in ("DROP", "VOID", "NULL", "SILENCE", "OPEN_SPACE", "SUSPENSION")
+    ):
+        return (
+            "silence"
+            if any(word in token for word in ("VOID", "NULL", "SILENCE"))
+            else "drop"
+        )
     if any(word in token for word in ("CONTRAST", "COUNTER")):
         return "contrast"
     if any(word in token for word in ("FALSE_RETURN", "FALSE_REPRISE")):
         return "false_return"
-    if any(word in token for word in ("RETURN", "REPRISE", "RECAP", "REASSEMBLY")) or motif_mode == "return":
+    if (
+        any(word in token for word in ("RETURN", "REPRISE", "RECAP", "REASSEMBLY"))
+        or motif_mode == "return"
+    ):
         return "return"
-    if any(word in token for word in ("RESIDUE", "AFTERIMAGE", "AFTERSHOCK", "UNRAVEL", "DISSOLVE")):
+    if any(
+        word in token
+        for word in ("RESIDUE", "AFTERIMAGE", "AFTERSHOCK", "UNRAVEL", "DISSOLVE")
+    ):
         return "residue"
     if "OUTRO" in token or "CODA" in token or "RELEASE" in token:
         return "outro"
@@ -105,7 +147,9 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
         elif function in {"drop", "silence"}:
             transition_in = "subtraction" if function == "drop" else "hard_cut"
         elif function in {"return", "false_return"}:
-            transition_in = "fragment_reassembly" if function == "return" else "false_cadence"
+            transition_in = (
+                "fragment_reassembly" if function == "return" else "false_cadence"
+            )
         elif function == "contrast":
             transition_in = "register_shift"
         elif function == "residue":
@@ -141,15 +185,35 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
 
         kick_activity = _clamp((0.82 * density + 0.18 * energy) * (1.0 - silence_ratio))
         if function in {"introduction", "drop", "silence", "residue", "outro"}:
-            kick_activity *= {"introduction": 0.28, "drop": 0.0, "silence": 0.0, "residue": 0.12, "outro": 0.0}[function]
-        snare_activity = _clamp((0.55 * density + 0.45 * energy) * (1.0 - silence_ratio))
+            kick_activity *= {
+                "introduction": 0.28,
+                "drop": 0.0,
+                "silence": 0.0,
+                "residue": 0.12,
+                "outro": 0.0,
+            }[function]
+        snare_activity = _clamp(
+            (0.55 * density + 0.45 * energy) * (1.0 - silence_ratio)
+        )
         if function in {"introduction", "drop", "silence", "residue", "outro"}:
-            snare_activity *= {"introduction": 0.20, "drop": 0.10, "silence": 0.0, "residue": 0.10, "outro": 0.0}[function]
-        high_activity = _clamp((0.42 * density + 0.58 * instability) * (1.0 - silence_ratio))
+            snare_activity *= {
+                "introduction": 0.20,
+                "drop": 0.10,
+                "silence": 0.0,
+                "residue": 0.10,
+                "outro": 0.0,
+            }[function]
+        high_activity = _clamp(
+            (0.42 * density + 0.58 * instability) * (1.0 - silence_ratio)
+        )
         if function == "drop":
             high_activity = max(high_activity, 0.22 * instability)
-        melody_activity = _clamp((0.55 * energy + 0.45 * (1.0 - density)) * (1.0 - silence_ratio))
-        texture_activity = _clamp((0.55 * energy + 0.45 * instability) * (1.0 - silence_ratio))
+        melody_activity = _clamp(
+            (0.55 * energy + 0.45 * (1.0 - density)) * (1.0 - silence_ratio)
+        )
+        texture_activity = _clamp(
+            (0.55 * energy + 0.45 * instability) * (1.0 - silence_ratio)
+        )
         if function == "drop":
             melody_activity = max(melody_activity, 0.12)
             texture_activity *= 0.18
@@ -170,13 +234,20 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
             kick_activity *= 0.55
 
         anchor = {
-            "introduction": 0.25, "establishment": 0.95,
-            "continuation": 0.70, "development": 0.58,
-            "uplift": 0.62, "arrival": 0.98,
-            "drop": 0.30, "silence": 0.08,
-            "contrast": 0.24, "return": 0.92,
-            "false_return": 0.46, "transition": 0.38,
-            "residue": 0.18, "outro": 0.12,
+            "introduction": 0.25,
+            "establishment": 0.95,
+            "continuation": 0.70,
+            "development": 0.58,
+            "uplift": 0.62,
+            "arrival": 0.98,
+            "drop": 0.30,
+            "silence": 0.08,
+            "contrast": 0.24,
+            "return": 0.92,
+            "false_return": 0.46,
+            "transition": 0.38,
+            "residue": 0.18,
+            "outro": 0.12,
         }[function]
 
         rhythm_mode = {
@@ -203,27 +274,29 @@ def build_phrase_directives(sections) -> tuple[PhraseDirective, ...]:
             event_activity = max(0.08, event_activity * 0.24)
         elif function == "silence":
             event_activity = 0.0
-        result.append(PhraseDirective(
-            index=index,
-            function=function,
-            start_bar=int(section.start_bar),
-            end_bar=int(section.end_bar),
-            anchor_strength=anchor,
-            motif_mode=section.motif_mode,
-            rhythm_mode=rhythm_mode,
-            density_scale=_clamp(section.density * (1.0 - silence_ratio)),
-            event_activity=event_activity,
-            kick_activity=kick_activity,
-            snare_activity=snare_activity,
-            high_activity=high_activity,
-            melody_activity=melody_activity,
-            texture_activity=texture_activity,
-            ambience_activity=ambience_activity,
-            space_intent=space,
-            silence_ratio=silence_ratio,
-            transition_in=transition_in,
-            transition_out=transition_out,
-            variation_budget=_clamp(0.15 + instability * 0.70),
-            memory_tag=f"{section.name.lower()}:{section.motif_mode}",
-        ))
+        result.append(
+            PhraseDirective(
+                index=index,
+                function=function,
+                start_bar=int(section.start_bar),
+                end_bar=int(section.end_bar),
+                anchor_strength=anchor,
+                motif_mode=section.motif_mode,
+                rhythm_mode=rhythm_mode,
+                density_scale=_clamp(section.density * (1.0 - silence_ratio)),
+                event_activity=event_activity,
+                kick_activity=kick_activity,
+                snare_activity=snare_activity,
+                high_activity=high_activity,
+                melody_activity=melody_activity,
+                texture_activity=texture_activity,
+                ambience_activity=ambience_activity,
+                space_intent=space,
+                silence_ratio=silence_ratio,
+                transition_in=transition_in,
+                transition_out=transition_out,
+                variation_budget=_clamp(0.15 + instability * 0.70),
+                memory_tag=f"{section.name.lower()}:{section.motif_mode}",
+            )
+        )
     return tuple(result)

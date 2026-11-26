@@ -144,7 +144,7 @@ def _stable_event_probability_seed(event: MusicalEvent) -> int:
     event_id = event.event_id
     for prefix in ("sample-trigger-", "sample-break-"):
         if event_id.startswith(prefix):
-            event_id = event_id[len(prefix):]
+            event_id = event_id[len(prefix) :]
             break
     digest = hashlib.blake2b(event_id.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "little", signed=False)
@@ -183,7 +183,9 @@ def _apply_score_performance_controls(
             return None
 
     if "role.syncopation" in controls.target_ids and event.voice_id in {
-        "snare", "hat", "break"
+        "snare",
+        "hat",
+        "break",
     }:
         syncopation, active = controls.value_and_active_for_context(
             "role.syncopation", start_frame, event_id=event_id, default_value=0.0
@@ -204,7 +206,8 @@ def _apply_score_performance_controls(
             and motif_relation not in {"shadow", "response"}
         )
         if (
-            active and eligible
+            active
+            and eligible
             and _stable_control_value(event, "m18-syncopation")
             < 0.5 * float(np.clip(syncopation, 0.0, 1.0))
         ):
@@ -241,13 +244,20 @@ def _apply_score_performance_controls(
                 "tenuto",
                 "legato",
             )
-            base_gate = Fraction(str(
-                event_gain.parameters.get("gate_duration_beats", event_gain.duration_beats)
-            ))
-            gate = max(Fraction(1, 64), min(
-                event_gain.duration_beats,
-                base_gate * Fraction(str(gate_ratios[index])),
-            ))
+            base_gate = Fraction(
+                str(
+                    event_gain.parameters.get(
+                        "gate_duration_beats", event_gain.duration_beats
+                    )
+                )
+            )
+            gate = max(
+                Fraction(1, 64),
+                min(
+                    event_gain.duration_beats,
+                    base_gate * Fraction(str(gate_ratios[index])),
+                ),
+            )
             parameters = dict(event_gain.parameters)
             parameters["gate_duration_beats"] = str(gate)
             parameters["m18_articulation_index"] = index
@@ -344,15 +354,22 @@ class ScoreRenderer:
         )
         control_bus_seconds = perf_counter() - control_started
         timeline = controls.timeline
-        source_sample_rate = int(score.metadata.get("sample_rate", sample_rate) or sample_rate)
+        source_sample_rate = int(
+            score.metadata.get("sample_rate", sample_rate) or sample_rate
+        )
 
         if frame_count is None:
             inferred = 0
             source_duration = score.metadata.get("duration_seconds")
             source_frames = int(score.metadata.get("frame_count", 0) or 0)
             if source_duration is not None:
-                if not math.isfinite(float(source_duration)) or float(source_duration) < 0.0:
-                    raise ValueError("score duration_seconds metadata must be finite and non-negative")
+                if (
+                    not math.isfinite(float(source_duration))
+                    or float(source_duration) < 0.0
+                ):
+                    raise ValueError(
+                        "score duration_seconds metadata must be finite and non-negative"
+                    )
                 inferred = timeline.seconds_to_frame(float(source_duration))
             elif source_frames > 0:
                 inferred = timeline.seconds_to_frame(
@@ -373,9 +390,7 @@ class ScoreRenderer:
                     end = timeline.seconds_to_frame(float(last) / source_sample_rate)
                 automation_end = max(automation_end, end)
             for source in score.automation_sources:
-                automation_end = max(
-                    automation_end, timeline.beat_to_frame(source.end)
-                )
+                automation_end = max(automation_end, timeline.beat_to_frame(source.end))
             frame_count = max(inferred, event_end, automation_end, 1)
         if isinstance(frame_count, bool) or int(frame_count) <= 0:
             raise ValueError("frame_count must be a positive integer")
@@ -406,13 +421,15 @@ class ScoreRenderer:
                 continue
             end = min(frame_count, max(start + 1, end))
             bar_number, beat_in_bar = timeline.bar_and_beat(event.onset_beats)
-            schedule.append(ScheduledScoreEvent(
-                event=event,
-                start_frame=start,
-                end_frame=end,
-                bar_number=bar_number,
-                beat_in_bar=beat_in_bar,
-            ))
+            schedule.append(
+                ScheduledScoreEvent(
+                    event=event,
+                    start_frame=start,
+                    end_frame=end,
+                    bar_number=bar_number,
+                    beat_in_bar=beat_in_bar,
+                )
+            )
 
         scheduling_seconds = perf_counter() - scheduling_started
         renderers = dict(voice_renderers or {})
@@ -435,19 +452,31 @@ class ScoreRenderer:
             event_gain = float(event.velocity)
             if "event.velocity_scale" in controls.target_ids:
                 event_gain *= controls.value_for_context(
-                    "event.velocity_scale", scheduled.start_frame,
-                    event_id=event.event_id, default_value=1.0,
+                    "event.velocity_scale",
+                    scheduled.start_frame,
+                    event_id=event.event_id,
+                    default_value=1.0,
                 )
             if "role.activity" in controls.target_ids:
                 event_gain *= controls.value_for_context(
-                    "role.activity", scheduled.start_frame,
-                    event_id=event.event_id, default_value=1.0,
+                    "role.activity",
+                    scheduled.start_frame,
+                    event_id=event.event_id,
+                    default_value=1.0,
                 )
             if "event.probability" in controls.target_ids:
-                probability = float(np.clip(controls.value_for_context(
-                    "event.probability", scheduled.start_frame,
-                    event_id=event.event_id, default_value=1.0,
-                ), 0.0, 1.0))
+                probability = float(
+                    np.clip(
+                        controls.value_for_context(
+                            "event.probability",
+                            scheduled.start_frame,
+                            event_id=event.event_id,
+                            default_value=1.0,
+                        ),
+                        0.0,
+                        1.0,
+                    )
+                )
                 threshold = int(probability * (1 << 64))
                 if _stable_event_probability_seed(event) >= threshold:
                     continue
@@ -457,15 +486,25 @@ class ScoreRenderer:
             if renderer is None:
                 renderer = _default_voice_renderer
             callback_started = perf_counter()
-            rendered = np.asarray(renderer(scheduled, sample_rate, controls), dtype=np.float32)
+            rendered = np.asarray(
+                renderer(scheduled, sample_rate, controls), dtype=np.float32
+            )
             callback_elapsed = perf_counter() - callback_started
             voice_id = str(event.voice_id)
             event_kind = str(event.kind)
             voice_callback_seconds += callback_elapsed
-            callback_seconds_by_voice[voice_id] = callback_seconds_by_voice.get(voice_id, 0.0) + callback_elapsed
-            callback_counts_by_voice[voice_id] = callback_counts_by_voice.get(voice_id, 0) + 1
-            callback_seconds_by_kind[event_kind] = callback_seconds_by_kind.get(event_kind, 0.0) + callback_elapsed
-            callback_counts_by_kind[event_kind] = callback_counts_by_kind.get(event_kind, 0) + 1
+            callback_seconds_by_voice[voice_id] = (
+                callback_seconds_by_voice.get(voice_id, 0.0) + callback_elapsed
+            )
+            callback_counts_by_voice[voice_id] = (
+                callback_counts_by_voice.get(voice_id, 0) + 1
+            )
+            callback_seconds_by_kind[event_kind] = (
+                callback_seconds_by_kind.get(event_kind, 0.0) + callback_elapsed
+            )
+            callback_counts_by_kind[event_kind] = (
+                callback_counts_by_kind.get(event_kind, 0) + 1
+            )
             rendered_event_count += 1
             if event_kind == "trigger":
                 sample_trigger_callback_seconds += callback_elapsed
@@ -485,38 +524,48 @@ class ScoreRenderer:
                     f"{scheduled.duration_frames} frames; received {len(rendered)}"
                 )
             if not np.isfinite(rendered).all():
-                raise ValueError(f"voice renderer for {event.voice_id!r} returned non-finite audio")
+                raise ValueError(
+                    f"voice renderer for {event.voice_id!r} returned non-finite audio"
+                )
             if rendered.ndim == 1:
                 pan = float(event.parameters.get("pan", 0.0))
                 if "spatial.pan" in controls.target_ids:
                     pan = controls.value_for_context(
-                        "spatial.pan", scheduled.start_frame,
-                        event_id=event.event_id, default_value=pan,
+                        "spatial.pan",
+                        scheduled.start_frame,
+                        event_id=event.event_id,
+                        default_value=pan,
                     )
-                pan = (
-                    pan * float(event.parameters.get("m29_pan_factor", 1.0))
-                    + float(event.parameters.get("m29_pan_offset", 0.0))
+                pan = pan * float(event.parameters.get("m29_pan_factor", 1.0)) + float(
+                    event.parameters.get("m29_pan_offset", 0.0)
                 )
                 if not math.isfinite(pan):
-                    raise ValueError(f"event {event.event_id!r} has a non-finite pan value")
+                    raise ValueError(
+                        f"event {event.event_id!r} has a non-finite pan value"
+                    )
                 pan = float(np.clip(pan, -1.0, 1.0))
                 angle = (pan + 1.0) * (math.pi / 4.0)
-                rendered_stereo = np.column_stack((
-                    rendered * math.cos(angle),
-                    rendered * math.sin(angle),
-                )).astype(np.float32, copy=False)
+                rendered_stereo = np.column_stack(
+                    (
+                        rendered * math.cos(angle),
+                        rendered * math.sin(angle),
+                    )
+                ).astype(np.float32, copy=False)
             else:
                 rendered_stereo = rendered.copy()
-                gesture_width = float(event.parameters.get(
-                    "m29_spatial_width_factor", 1.0
-                ))
+                gesture_width = float(
+                    event.parameters.get("m29_spatial_width_factor", 1.0)
+                )
                 if "spatial.width" in controls.target_ids or gesture_width != 1.0:
                     width = (
                         controls.value_for_context(
-                            "spatial.width", scheduled.start_frame,
-                            event_id=event.event_id, default_value=1.0,
+                            "spatial.width",
+                            scheduled.start_frame,
+                            event_id=event.event_id,
+                            default_value=1.0,
                         )
-                        if "spatial.width" in controls.target_ids else 1.0
+                        if "spatial.width" in controls.target_ids
+                        else 1.0
                     )
                     width = float(np.clip(width * gesture_width, 0.0, 2.0))
                     mid = 0.5 * (rendered_stereo[:, 0] + rendered_stereo[:, 1])
@@ -529,7 +578,7 @@ class ScoreRenderer:
                 event.voice_id, np.zeros((frame_count, 2), dtype=np.float32)
             )
             start = scheduled.start_frame
-            target[start:scheduled.end_frame] += rendered_stereo * event_gain
+            target[start : scheduled.end_frame] += rendered_stereo * event_gain
             event_accumulation_seconds += perf_counter() - accumulation_started
 
         performance = {

@@ -10,7 +10,11 @@ from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.composition.director import STRUCTURES
 from reawarp.mathematics.theory import SCALE_STEPS
 from reawarp.synthesis.profiles import (
-    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES, SYNTH_PALETTES,
+    HAT_PROFILES,
+    KICK_PROFILES,
+    MELODY_PROFILES,
+    SNARE_PROFILES,
+    SYNTH_PALETTES,
 )
 from reawarp.transforms.pipeline import BREAK_TRANSFORMS
 
@@ -88,21 +92,41 @@ class GenerationConfig:
         if self.pattern_family not in PATTERN_FAMILIES:
             raise ValueError(f"unknown pattern family: {self.pattern_family}")
         if self.pattern_relationship not in PATTERN_RELATIONSHIPS:
-            raise ValueError(f"unknown pattern relationship: {self.pattern_relationship}")
+            raise ValueError(
+                f"unknown pattern relationship: {self.pattern_relationship}"
+            )
         if self.synth_palette not in SYNTH_PALETTES:
             raise ValueError("unknown synth palette")
         if self.percussion_synthesis not in {"minimal", "extended", "samples"}:
-            raise ValueError("percussion_synthesis must be minimal, extended, or samples")
-        if self.percussion_source_mode not in {"automatic", "synth", "sample", "hybrid"}:
-            raise ValueError("percussion_source_mode must be automatic, synth, sample, or hybrid")
+            raise ValueError(
+                "percussion_synthesis must be minimal, extended, or samples"
+            )
+        if self.percussion_source_mode not in {
+            "automatic",
+            "synth",
+            "sample",
+            "hybrid",
+        }:
+            raise ValueError(
+                "percussion_source_mode must be automatic, synth, sample, or hybrid"
+            )
         if self.percussion_hybrid_architecture not in {
-            "transient_body", "layered", "feature_guided"
+            "transient_body",
+            "layered",
+            "feature_guided",
         }:
             raise ValueError(
                 "percussion_hybrid_architecture must be transient_body, layered, or feature_guided"
             )
-        if self.drum_sample_automation not in {"fixed", "section", "cycle", "automatic"}:
-            raise ValueError("drum_sample_automation must be fixed, section, cycle, or automatic")
+        if self.drum_sample_automation not in {
+            "fixed",
+            "section",
+            "cycle",
+            "automatic",
+        }:
+            raise ValueError(
+                "drum_sample_automation must be fixed, section, cycle, or automatic"
+            )
         if not 0.0 <= float(self.percussion_sample_mix) <= 1.0:
             raise ValueError("percussion_sample_mix must be between 0 and 1")
         if not 5.0 <= float(self.hybrid_transient_ms) <= 200.0:
@@ -120,14 +144,20 @@ class GenerationConfig:
         if not 0.0 <= float(self.composition_variation) <= 1.0:
             raise ValueError("composition_variation must be between 0 and 1")
         for name in (
-            "arrangement_density", "rhythmic_syncopation", "arrangement_instability",
-            "melodic_activity", "tonal_brightness", "spatial_intent",
+            "arrangement_density",
+            "rhythmic_syncopation",
+            "arrangement_instability",
+            "melodic_activity",
+            "tonal_brightness",
+            "spatial_intent",
         ):
             if not 0.0 <= float(getattr(self, name)) <= 1.0:
                 raise ValueError(f"{name} must be between 0 and 1")
         if not -24 <= int(self.melody_register_semitones) <= 24:
             raise ValueError("melody_register_semitones must be between -24 and 24")
-        object.__setattr__(self, "melody_register_semitones", int(self.melody_register_semitones))
+        object.__setattr__(
+            self, "melody_register_semitones", int(self.melody_register_semitones)
+        )
         if not 0.0 <= float(self.complexity) <= 1.0:
             raise ValueError("complexity must be between 0.0 and 1.0")
         allowed_roles = {"kick", "snare", "hat", "break"}
@@ -150,16 +180,22 @@ class GenerationConfig:
         normalized_banks: dict[str, tuple[dict[str, Any], ...]] = {}
         unknown_banks = set(self.sample_banks) - {"kick", "snare", "hat"}
         if unknown_banks:
-            raise ValueError(f"unsupported sample-bank roles: {', '.join(sorted(unknown_banks))}")
+            raise ValueError(
+                f"unsupported sample-bank roles: {', '.join(sorted(unknown_banks))}"
+            )
         for role, entries in self.sample_banks.items():
             normalized_entries: list[dict[str, Any]] = []
             seen_paths: set[str] = set()
             for entry in entries:
                 if not isinstance(entry, dict):
-                    raise ValueError(f"sample bank entry for {role} must be a JSON object")
+                    raise ValueError(
+                        f"sample bank entry for {role} must be a JSON object"
+                    )
                 path = str(entry.get("path", "")).strip()
                 if not path:
-                    raise ValueError(f"sample bank entry for {role} needs a non-empty path")
+                    raise ValueError(
+                        f"sample bank entry for {role} needs a non-empty path"
+                    )
                 canonical = str(Path(path).expanduser())
                 if canonical in seen_paths:
                     continue
@@ -167,13 +203,17 @@ class GenerationConfig:
                 metadata = entry.get("metadata", {})
                 features = entry.get("features", {})
                 if not isinstance(metadata, dict) or not isinstance(features, dict):
-                    raise ValueError(f"sample bank metadata/features for {role} must be JSON objects")
-                normalized_entries.append({
-                    **entry,
-                    "path": canonical,
-                    "metadata": dict(metadata),
-                    "features": dict(features),
-                })
+                    raise ValueError(
+                        f"sample bank metadata/features for {role} must be JSON objects"
+                    )
+                normalized_entries.append(
+                    {
+                        **entry,
+                        "path": canonical,
+                        "metadata": dict(metadata),
+                        "features": dict(features),
+                    }
+                )
             normalized_banks[role] = tuple(normalized_entries)
         object.__setattr__(self, "sample_banks", normalized_banks)
 
@@ -186,7 +226,11 @@ class GenerationConfig:
         if self.melody_profile != "auto" and self.melody_profile not in MELODY_PROFILES:
             raise ValueError(f"unknown melody profile: {self.melody_profile}")
         if self.break_style not in {
-            "auto", "broken_funk", "half_time", "straight", "sparse"
+            "auto",
+            "broken_funk",
+            "half_time",
+            "straight",
+            "sparse",
         }:
             raise ValueError("unknown break style")
         if not 0.0 <= float(self.break_density) <= 1.0:
@@ -224,7 +268,9 @@ class GenerationConfig:
         if not 0.25 <= float(self.break_grain_density) <= 4.0:
             raise ValueError("break_grain_density must be between 0.25 and 4.0")
         if not 0.0 <= float(self.break_spectral_freeze_position) <= 1.0:
-            raise ValueError("break_spectral_freeze_position must be between zero and one")
+            raise ValueError(
+                "break_spectral_freeze_position must be between zero and one"
+            )
 
     @property
     def frame_count(self) -> int:
@@ -252,7 +298,9 @@ class GenerationConfig:
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["sample_paths"] = {role: str(Path(path)) for role, path in self.sample_paths.items()}
+        data["sample_paths"] = {
+            role: str(Path(path)) for role, path in self.sample_paths.items()
+        }
         data["sample_banks"] = {
             role: [dict(entry) for entry in entries]
             for role, entries in self.sample_banks.items()

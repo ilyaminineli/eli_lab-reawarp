@@ -1,6 +1,11 @@
 """Break sample analysis and transformation tools."""
 
-from reawarp.transforms.analysis import AudioSlice, auto_slice, detect_transients, slice_audio
+from reawarp.transforms.analysis import (
+    AudioSlice,
+    auto_slice,
+    detect_transients,
+    slice_audio,
+)
 from reawarp.transforms.effects import (
     dropout,
     gate_audio,

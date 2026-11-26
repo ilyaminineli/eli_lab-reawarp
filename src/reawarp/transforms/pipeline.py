@@ -30,11 +30,11 @@ BREAK_TRANSFORMS = (
 
 
 def _rhythmic_dropout(
-        audio: np.ndarray,
-        sample_rate: int,
-        bpm: float,
-        probability: float,
-        rng: np.random.Generator,
+    audio: np.ndarray,
+    sample_rate: int,
+    bpm: float,
+    probability: float,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Mute at most one sixteenth-note cell per bar, with short edge fades."""
     if bpm <= 0:
@@ -69,8 +69,8 @@ def _rhythmic_dropout(
 
 
 def _controlled_slice_order(
-        slice_count: int,
-        rng: np.random.Generator,
+    slice_count: int,
+    rng: np.random.Generator,
 ) -> list[int]:
     """Return identity order with one local edit; keep the opening slice fixed."""
     order = list(range(slice_count))
@@ -81,22 +81,22 @@ def _controlled_slice_order(
 
 
 def apply_break_transforms(
-        audio: np.ndarray,
-        sample_rate: int,
-        transforms: tuple[str, ...] | list[str],
-        rng: np.random.Generator,
-        *,
-        bpm: float = 120.0,
-        slice_count: int = 16,
-        stutter_repeats: int = 4,
-        dropout_probability: float = 0.18,
-        pitch_semitones: float = 0.0,
-        stretch_factor: float = 1.0,
-        gate_rate_hz: float = 8.0,
-        gate_duty: float = 0.62,
-        grain_size_ms: float = 80.0,
-        grain_density: float = 1.5,
-        freeze_position: float = 0.25,
+    audio: np.ndarray,
+    sample_rate: int,
+    transforms: tuple[str, ...] | list[str],
+    rng: np.random.Generator,
+    *,
+    bpm: float = 120.0,
+    slice_count: int = 16,
+    stutter_repeats: int = 4,
+    dropout_probability: float = 0.18,
+    pitch_semitones: float = 0.0,
+    stretch_factor: float = 1.0,
+    gate_rate_hz: float = 8.0,
+    gate_duty: float = 0.62,
+    grain_size_ms: float = 80.0,
+    grain_density: float = 1.5,
+    freeze_position: float = 0.25,
 ) -> np.ndarray:
     """Apply named operations in order; the input buffer is never modified."""
     unknown = set(transforms) - set(BREAK_TRANSFORMS)
@@ -122,7 +122,9 @@ def apply_break_transforms(
         elif operation == "stutter":
             if len(result):
                 segment_end = max(1, int(round(len(result) * 0.25)))
-                result = stutter(result, repeats=stutter_repeats, start=0, end=segment_end)
+                result = stutter(
+                    result, repeats=stutter_repeats, start=0, end=segment_end
+                )
         elif operation == "dropout":
             result = _rhythmic_dropout(
                 result, sample_rate, bpm, dropout_probability, rng
@@ -130,7 +132,9 @@ def apply_break_transforms(
         elif operation == "reverse":
             result = reverse_audio(result)
         elif operation == "gate":
-            result = gate_audio(result, sample_rate, rate_hz=gate_rate_hz, duty=gate_duty)
+            result = gate_audio(
+                result, sample_rate, rate_hz=gate_rate_hz, duty=gate_duty
+            )
         elif operation == "pitch_shift":
             result = pitch_shift(result, pitch_semitones)
         elif operation == "time_stretch":

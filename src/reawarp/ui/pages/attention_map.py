@@ -1,4 +1,5 @@
 """Score-native M29 figure/ground attention map workspace."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -7,15 +8,32 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton, QSplitter,
-    QVBoxLayout, QWidget,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
 
-from reawarp.score.attention import attention_conflict_id, estimate_attention_descriptors
+from reawarp.score.attention import (
+    attention_conflict_id,
+    estimate_attention_descriptors,
+)
 from reawarp.score.orchestration_intent import (
-    ATTENTION_DEPTHS, ATTENTION_ROLES, AttentionSpan, OrchestrationPlan,
-    inspect_attention_conflicts, inspect_attention_handoffs,
+    ATTENTION_DEPTHS,
+    ATTENTION_ROLES,
+    AttentionSpan,
+    OrchestrationPlan,
+    inspect_attention_conflicts,
+    inspect_attention_handoffs,
     inspect_event_onset_conflicts,
 )
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -70,7 +88,9 @@ class AttentionMapPage(QWidget):
         form = QFormLayout(span_form_group)
         self.role = QComboBox()
         self.role.setEditable(True)
-        self.role.setToolTip("Score voice or orchestral role, for example melody, kick or texture.")
+        self.role.setToolTip(
+            "Score voice or orchestral role, for example melody, kick or texture."
+        )
         form.addRow("Sound role", self.role)
 
         time_row = QHBoxLayout()
@@ -97,7 +117,9 @@ class AttentionMapPage(QWidget):
         self.handoff_id.setPlaceholderText("Shared ID on both sides of a hand-off")
         form.addRow("Atomic hand-off ID", self.handoff_id)
         self.intentional_overlap_id = QLineEdit()
-        self.intentional_overlap_id.setPlaceholderText("Shared ID to mark an intentional merge")
+        self.intentional_overlap_id.setPlaceholderText(
+            "Shared ID to mark an intentional merge"
+        )
         form.addRow("Intentional merge ID", self.intentional_overlap_id)
 
         self.register_low = QLineEdit()
@@ -148,17 +170,24 @@ class AttentionMapPage(QWidget):
         self.recede_button.clicked.connect(self._set_recede)
         self.reset_gesture_button.clicked.connect(self._reset_render_gesture)
         for button in (
-            self.save_span_button, self.delete_span_button,
-            self.focus_button, self.recede_button, self.reset_gesture_button,
+            self.save_span_button,
+            self.delete_span_button,
+            self.focus_button,
+            self.recede_button,
+            self.reset_gesture_button,
         ):
             actions.addWidget(button)
         form.addRow(actions)
         span_layout.addWidget(span_form_group)
 
-        self.estimate_button = QPushButton("ESTIMATE MISSING DESCRIPTORS FROM SCORE EVENTS")
+        self.estimate_button = QPushButton(
+            "ESTIMATE MISSING DESCRIPTORS FROM SCORE EVENTS"
+        )
         self.estimate_button.clicked.connect(self._estimate_descriptors)
         span_layout.addWidget(self.estimate_button)
-        self.span_status = QLabel("Load a composition to inspect and edit its Score attention map.")
+        self.span_status = QLabel(
+            "Load a composition to inspect and edit its Score attention map."
+        )
         self.span_status.setObjectName("muted")
         self.span_status.setWordWrap(True)
         span_layout.addWidget(self.span_status)
@@ -265,15 +294,24 @@ class AttentionMapPage(QWidget):
             self._refresh_diagnostics()
             self._refresh_controls()
             return
-        raw_plan = score.orchestration_plan or score.metadata.get("perceptual_orchestration")
+        raw_plan = score.orchestration_plan or score.metadata.get(
+            "perceptual_orchestration"
+        )
         try:
-            self._plan = OrchestrationPlan.from_dict(raw_plan) if raw_plan else OrchestrationPlan()
+            self._plan = (
+                OrchestrationPlan.from_dict(raw_plan)
+                if raw_plan
+                else OrchestrationPlan()
+            )
         except (TypeError, ValueError, KeyError):
             self._plan = OrchestrationPlan()
-            self.span_status.setText("The project's orchestration plan could not be parsed; an empty view is shown.")
+            self.span_status.setText(
+                "The project's orchestration plan could not be parsed; an empty view is shown."
+            )
         self._reviews = dict(score.metadata.get("m29_attention_reviews", {}))
         roles = {
-            str(event.voice_id) for event in score.events
+            str(event.voice_id)
+            for event in score.events
             if getattr(event, "kind", None) not in {"marker", "control"}
         }
         roles.update(span.role for span in self._plan.attention)
@@ -315,7 +353,8 @@ class AttentionMapPage(QWidget):
         self.spans.blockSignals(False)
         self._selected_span_index = (
             int(self.spans.currentItem().data(Qt.ItemDataRole.UserRole))
-            if self.spans.currentItem() is not None else None
+            if self.spans.currentItem() is not None
+            else None
         )
         self._load_selected_span()
 
@@ -325,10 +364,17 @@ class AttentionMapPage(QWidget):
             self.start_beats.setText("0")
             self.end_beats.setText("8")
             for field in (
-                self.register_low, self.register_high, self.onset_density,
-                self.transient_strength, self.sustain, self.spatial_position,
-                self.prominence, self.spectral_band, self.handoff_id,
-                self.intentional_overlap_id, self.register_shift,
+                self.register_low,
+                self.register_high,
+                self.onset_density,
+                self.transient_strength,
+                self.sustain,
+                self.spatial_position,
+                self.prominence,
+                self.spectral_band,
+                self.handoff_id,
+                self.intentional_overlap_id,
+                self.register_shift,
             ):
                 field.clear()
             self._refresh_controls()
@@ -352,7 +398,9 @@ class AttentionMapPage(QWidget):
         self.prominence.setText(self._format_optional(span.prominence))
         self._refresh_controls()
 
-    def _span_selected(self, item: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
+    def _span_selected(
+        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None
+    ) -> None:
         self._selected_span_index = (
             int(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
         )
@@ -365,7 +413,9 @@ class AttentionMapPage(QWidget):
             return None
         return self._plan.attention[self._selected_span_index]
 
-    def _emit_plan(self, spans: tuple[AttentionSpan, ...], message: str, selected: int | None) -> None:
+    def _emit_plan(
+        self, spans: tuple[AttentionSpan, ...], message: str, selected: int | None
+    ) -> None:
         try:
             updated = replace(self._plan, attention=spans)
         except ValueError as exc:
@@ -390,15 +440,24 @@ class AttentionMapPage(QWidget):
                 depth=str(self.depth.currentData()),
                 handoff_id=self.handoff_id.text().strip() or None,
                 register_low=self._optional_number(self.register_low, "register low"),
-                register_high=self._optional_number(self.register_high, "register high"),
+                register_high=self._optional_number(
+                    self.register_high, "register high"
+                ),
                 spectral_band=self.spectral_band.text().strip() or None,
                 attention_role=str(self.attention_role.currentData()),
-                onset_density=self._optional_number(self.onset_density, "onset density"),
-                transient_strength=self._optional_number(self.transient_strength, "transient strength"),
+                onset_density=self._optional_number(
+                    self.onset_density, "onset density"
+                ),
+                transient_strength=self._optional_number(
+                    self.transient_strength, "transient strength"
+                ),
                 sustain=self._optional_number(self.sustain, "sustain"),
-                spatial_position=self._optional_number(self.spatial_position, "spatial position"),
+                spatial_position=self._optional_number(
+                    self.spatial_position, "spatial position"
+                ),
                 prominence=self._optional_number(self.prominence, "prominence"),
-                intentional_overlap_id=self.intentional_overlap_id.text().strip() or None,
+                intentional_overlap_id=self.intentional_overlap_id.text().strip()
+                or None,
             )
         except (ValueError, ZeroDivisionError) as exc:
             self.span_status.setText(f"Invalid attention span: {exc}")
@@ -421,14 +480,20 @@ class AttentionMapPage(QWidget):
         removed = {self._selected_span_index}
         if selected.handoff_id:
             removed.update(
-                index for index, span in enumerate(self._plan.attention)
+                index
+                for index, span in enumerate(self._plan.attention)
                 if span.handoff_id == selected.handoff_id
             )
         spans = tuple(
-            span for index, span in enumerate(self._plan.attention)
+            span
+            for index, span in enumerate(self._plan.attention)
             if index not in removed
         )
-        self._emit_plan(spans, "Deleted selected attention span and its paired hand-off side, if present.", None)
+        self._emit_plan(
+            spans,
+            "Deleted selected attention span and its paired hand-off side, if present.",
+            None,
+        )
 
     def _set_focus(self) -> None:
         self._set_depth_operation("foreground")
@@ -442,12 +507,19 @@ class AttentionMapPage(QWidget):
             return
         prominence = selected.prominence
         if depth == "foreground":
-            prominence = min(1.0, (prominence if prominence is not None else 0.70) + 0.15)
+            prominence = min(
+                1.0, (prominence if prominence is not None else 0.70) + 0.15
+            )
         else:
-            prominence = max(0.0, (prominence if prominence is not None else 0.50) - 0.15)
+            prominence = max(
+                0.0, (prominence if prominence is not None else 0.50) - 0.15
+            )
         spans = list(self._plan.attention)
         spans[self._selected_span_index] = replace(
-            selected, depth=depth, reserved_silence=False, prominence=prominence,
+            selected,
+            depth=depth,
+            reserved_silence=False,
+            prominence=prominence,
         )
         try:
             register_shift = self._optional_number(
@@ -467,23 +539,27 @@ class AttentionMapPage(QWidget):
             f"{selected.role} assigned to {depth}; render gesture queued for its exact beat span.",
             self._selected_span_index,
         )
-        self.gestureRequested.emit({
-            "role": selected.role,
-            "start_beats": str(selected.start_beats),
-            "end_beats": str(selected.end_beats),
-            "action": "focus" if depth == "foreground" else "recede",
-            "register_shift_semitones": register_shift,
-        })
+        self.gestureRequested.emit(
+            {
+                "role": selected.role,
+                "start_beats": str(selected.start_beats),
+                "end_beats": str(selected.end_beats),
+                "action": "focus" if depth == "foreground" else "recede",
+                "register_shift_semitones": register_shift,
+            }
+        )
 
     def _reset_render_gesture(self) -> None:
         selected = self._selected_span()
         if selected is None:
             return
-        self.gestureRemoveRequested.emit({
-            "role": selected.role,
-            "start_beats": str(selected.start_beats),
-            "end_beats": str(selected.end_beats),
-        })
+        self.gestureRemoveRequested.emit(
+            {
+                "role": selected.role,
+                "start_beats": str(selected.start_beats),
+                "end_beats": str(selected.end_beats),
+            }
+        )
 
     def _estimate_descriptors(self) -> None:
         if self._score is None:
@@ -509,7 +585,8 @@ class AttentionMapPage(QWidget):
             f"{atomic} atomic hand-off(s) · {len(invalid)} incomplete/non-atomic hand-off(s). "
             + (
                 "Unpaired IDs need a matching opposite side at the same beat boundary."
-                if invalid else "Hand-offs use exact rational-beat boundaries."
+                if invalid
+                else "Hand-offs use exact rational-beat boundaries."
             )
         )
         warnings = list(inspect_attention_conflicts(self._plan))
@@ -539,9 +616,13 @@ class AttentionMapPage(QWidget):
         )
 
     def _diagnostic_selected(
-        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None,
+        self,
+        item: QListWidgetItem | None,
+        _previous: QListWidgetItem | None,
     ) -> None:
-        warning_id = str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
+        warning_id = (
+            str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
+        )
         review = self._reviews.get(warning_id or "", {})
         state = str(review.get("disposition", "unresolved"))
         index = self.review_disposition.findData(state)
@@ -552,17 +633,21 @@ class AttentionMapPage(QWidget):
     def _record_review(self) -> None:
         item = self.diagnostics.currentItem()
         if item is None:
-            self.diagnostic_status.setText("Select a diagnostic before recording a review.")
+            self.diagnostic_status.setText(
+                "Select a diagnostic before recording a review."
+            )
             return
         warning_id = str(item.data(Qt.ItemDataRole.UserRole))
         warning = self._diagnostics.get(warning_id)
         if warning is None:
             return
-        self.reviewRequested.emit({
-            "warning": warning,
-            "disposition": str(self.review_disposition.currentData()),
-            "notes": self.review_notes.toPlainText(),
-        })
+        self.reviewRequested.emit(
+            {
+                "warning": warning,
+                "disposition": str(self.review_disposition.currentData()),
+                "notes": self.review_notes.toPlainText(),
+            }
+        )
 
     def set_review_records(self, reviews: dict[str, Any]) -> None:
         self._reviews = dict(reviews)

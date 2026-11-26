@@ -16,8 +16,11 @@ import numpy as np
 
 from reawarp.config import GenerationConfig
 from reawarp.core.manifest import (
-    audit_project_assets, audit_project_file_inventory, prepare_project_assets,
-    resolve_project_asset_paths, write_project_manifest,
+    audit_project_assets,
+    audit_project_file_inventory,
+    prepare_project_assets,
+    resolve_project_asset_paths,
+    write_project_manifest,
 )
 from reawarp.export.wav import write_wav
 
@@ -35,11 +38,17 @@ class ReawarpProject:
     events: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     score: Score | None = None
-    variation_candidates: dict[str, ReawarpProject] = field(default_factory=dict, repr=False, compare=False)
+    variation_candidates: dict[str, ReawarpProject] = field(
+        default_factory=dict, repr=False, compare=False
+    )
 
     @property
     def frame_count(self) -> int:
-        return next(iter(self.stems.values())).shape[0] if self.stems else self.config.frame_count
+        return (
+            next(iter(self.stems.values())).shape[0]
+            if self.stems
+            else self.config.frame_count
+        )
 
     @property
     def duration(self) -> float:
@@ -51,7 +60,11 @@ class ReawarpProject:
         from reawarp.composition.brief import CompositionBrief
 
         saved = self.metadata.get("m27_composition_brief")
-        return CompositionBrief.from_dict(saved) if isinstance(saved, dict) else CompositionBrief.legacy()
+        return (
+            CompositionBrief.from_dict(saved)
+            if isinstance(saved, dict)
+            else CompositionBrief.legacy()
+        )
 
     def to_score(self, *, title: str | None = None):
         """Return the canonical score, or adapt a legacy project when absent."""
@@ -74,24 +87,26 @@ class ReawarpProject:
         return np.clip(master, -1.0, 1.0).astype(np.float32, copy=False)
 
     def export(
-            self,
-            directory: str | Path,
-            *,
-            bit_depth: int = 24,
-            include_stems: bool = True,
-            include_master: bool = True,
-            fx_routing: dict[str, Any] | None = None,
-            fx_automation: dict[str, Any] | None = None,
-            asset_policy: str = "copy",
-            include_midi: bool = False,
-            cancel_event: Any | None = None,
-            _include_variations: bool = True,
+        self,
+        directory: str | Path,
+        *,
+        bit_depth: int = 24,
+        include_stems: bool = True,
+        include_master: bool = True,
+        fx_routing: dict[str, Any] | None = None,
+        fx_automation: dict[str, Any] | None = None,
+        asset_policy: str = "copy",
+        include_midi: bool = False,
+        cancel_event: Any | None = None,
+        _include_variations: bool = True,
     ) -> Path:
         output = Path(directory).expanduser()
         output.mkdir(parents=True, exist_ok=True)
         _check_cancelled(cancel_event, "project export")
         asset_records, portable_config = prepare_project_assets(
-            self.config.to_dict(), output, asset_policy=asset_policy,
+            self.config.to_dict(),
+            output,
+            asset_policy=asset_policy,
             cancel_event=cancel_event,
         )
         if include_stems:
@@ -99,19 +114,25 @@ class ReawarpProject:
             stem_directory.mkdir(parents=True, exist_ok=True)
             for name, audio in self.stems.items():
                 _check_cancelled(cancel_event, "project export")
-                write_wav(stem_directory / f"{name}.wav", audio, self.sample_rate, bit_depth)
+                write_wav(
+                    stem_directory / f"{name}.wav", audio, self.sample_rate, bit_depth
+                )
         _check_cancelled(cancel_event, "project export")
         if include_master:
-            write_wav(output / "master.wav", self.render_master(), self.sample_rate, bit_depth)
+            write_wav(
+                output / "master.wav", self.render_master(), self.sample_rate, bit_depth
+            )
 
         project_record = {
             "schema_version": 1,
             "application": "eli_lab-reawarp",
             "application_version": "0.12.0",
-            "renderer_version": str(self.metadata.get(
-                "renderer_version",
-                f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
-            )),
+            "renderer_version": str(
+                self.metadata.get(
+                    "renderer_version",
+                    f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
+                )
+            ),
             "score_file": "score.json",
             "score_schema_version": 1,
             "python_version": platform.python_version(),
@@ -122,18 +143,23 @@ class ReawarpProject:
             "metadata": self.metadata,
             "stems": list(self.stems),
             "render_provenance": {
-                "renderer_version": str(self.metadata.get(
-                    "renderer_version",
-                    f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
-                )),
+                "renderer_version": str(
+                    self.metadata.get(
+                        "renderer_version",
+                        f"legacy-generator/{self.metadata.get('algorithm_version', 'unknown')}",
+                    )
+                ),
                 "root_seed": self.config.seed,
                 "sample_rate": self.sample_rate,
                 "frame_count": self.frame_count,
                 "duration_seconds": self.duration,
             },
             "export": {
-                "bit_depth": bit_depth, "master": include_master, "stems": include_stems,
-                "asset_policy": asset_policy, "midi": bool(include_midi),
+                "bit_depth": bit_depth,
+                "master": include_master,
+                "stems": include_stems,
+                "asset_policy": asset_policy,
+                "midi": bool(include_midi),
             },
         }
         if fx_routing is None:
@@ -141,7 +167,9 @@ class ReawarpProject:
             fx_routing = saved_routing if isinstance(saved_routing, dict) else None
         if fx_automation is None:
             saved_automation = self.metadata.get("project_fx_automation")
-            fx_automation = saved_automation if isinstance(saved_automation, dict) else None
+            fx_automation = (
+                saved_automation if isinstance(saved_automation, dict) else None
+            )
         if fx_routing is not None:
             from reawarp.fx_routing import normalise_fx_routing
 
@@ -170,10 +198,17 @@ class ReawarpProject:
                 _check_cancelled(cancel_event, "project export")
                 safe_id = str(candidate_id)
                 if (
-                    not safe_id or safe_id in {".", ".."}
-                    or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in safe_id)
+                    not safe_id
+                    or safe_id in {".", ".."}
+                    or any(
+                        ch
+                        not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+                        for ch in safe_id
+                    )
                 ):
-                    raise ValueError(f"invalid variation candidate ID: {candidate_id!r}")
+                    raise ValueError(
+                        f"invalid variation candidate ID: {candidate_id!r}"
+                    )
                 candidate.export(
                     output / "candidates" / safe_id,
                     bit_depth=bit_depth,
@@ -189,7 +224,11 @@ class ReawarpProject:
             json.dumps(project_record, indent=2, ensure_ascii=False), encoding="utf-8"
         )
         (output / "events.json").write_text(
-            json.dumps({"schema_version": 1, "events": self.events}, indent=2, ensure_ascii=False),
+            json.dumps(
+                {"schema_version": 1, "events": self.events},
+                indent=2,
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         session = self.metadata.get("m23_variations")
@@ -223,12 +262,16 @@ class ReawarpProject:
         m32_session = self.metadata.get("m32_listening_session")
         if isinstance(m32_session, dict):
             from reawarp.listening import (
-                listening_report_markdown, validate_listening_session,
+                listening_report_markdown,
+                validate_listening_session,
             )
 
             validated_session = validate_listening_session(m32_session)
             (output / "critical_listening_report.json").write_text(
-                json.dumps(validated_session, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                json.dumps(
+                    validated_session, indent=2, ensure_ascii=False, allow_nan=False
+                )
+                + "\n",
                 encoding="utf-8",
             )
             (output / "critical_listening_report.md").write_text(
@@ -240,7 +283,8 @@ class ReawarpProject:
         arrangement_record = score.metadata.get("m33_arrangement")
         if isinstance(arrangement_record, dict):
             from reawarp.composition.arrangement import (
-                arrangement_snapshot, copy_print_assets,
+                arrangement_snapshot,
+                copy_print_assets,
             )
 
             snapshot = arrangement_snapshot(score)
@@ -248,7 +292,8 @@ class ReawarpProject:
                 arrangement_record, output / "arrangement_prints"
             )
             (output / "arrangement_snapshot.json").write_text(
-                json.dumps(snapshot, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                json.dumps(snapshot, indent=2, ensure_ascii=False, allow_nan=False)
+                + "\n",
                 encoding="utf-8",
             )
         score.save(output / "score.json")
@@ -262,10 +307,13 @@ class ReawarpProject:
             import re
 
             exported_voice_files = []
-            voices = sorted({
-                event.voice_id for event in score.events
-                if event.kind not in {"control", "marker"}
-            })
+            voices = sorted(
+                {
+                    event.voice_id
+                    for event in score.events
+                    if event.kind not in {"control", "marker"}
+                }
+            )
             for voice_id in voices:
                 _check_cancelled(cancel_event, "project MIDI export")
                 events = tuple(
@@ -279,7 +327,9 @@ class ReawarpProject:
                     automation_sources=(),
                     modulations=(),
                 )
-                slug = re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                slug = (
+                    re.sub(r"[^A-Za-z0-9_-]+", "_", str(voice_id)).strip("_") or "voice"
+                )
                 digest = hashlib.sha256(str(voice_id).encode("utf-8")).hexdigest()[:8]
                 voice_path = voice_root / f"{slug[:48]}-{digest}.mid"
                 voice_score.export_midi(voice_path)
@@ -318,7 +368,9 @@ class ReawarpProject:
         if record.get("application") != "eli_lab-reawarp":
             raise ValueError("directory is not a Reawarp project")
         export_options = record.get("export", {})
-        if not isinstance(export_options, dict) or not export_options.get("stems", True):
+        if not isinstance(export_options, dict) or not export_options.get(
+            "stems", True
+        ):
             raise ValueError("project export does not contain source stems")
 
         config_data = record.get("config")
@@ -332,7 +384,9 @@ class ReawarpProject:
                 or manifest.get("format") != "eli_lab_reawarp_project_manifest"
                 or manifest.get("schema_version") != 1
             ):
-                raise ValueError("unsupported project manifest schema; an explicit migration is required")
+                raise ValueError(
+                    "unsupported project manifest schema; an explicit migration is required"
+                )
             asset_validation = audit_project_assets(
                 root, manifest.get("source_assets", []), cancel_event=cancel_event
             )
@@ -356,11 +410,13 @@ class ReawarpProject:
         if sample_rate <= 0 or frame_count <= 0:
             raise ValueError("project sample rate and frame count must be positive")
         if config.sample_rate != sample_rate or config.frame_count != frame_count:
-            raise ValueError("project timing does not match its generation configuration")
+            raise ValueError(
+                "project timing does not match its generation configuration"
+            )
         duration = float(record.get("duration_seconds", -1.0))
         expected_duration = frame_count / float(sample_rate)
         if not math.isfinite(duration) or not math.isclose(
-                duration, expected_duration, rel_tol=0.0, abs_tol=1.0 / sample_rate
+            duration, expected_duration, rel_tol=0.0, abs_tol=1.0 / sample_rate
         ):
             raise ValueError("project duration does not match its frame count")
 
@@ -371,7 +427,9 @@ class ReawarpProject:
             raise ValueError("project stem names must be unique")
 
         stems: dict[str, np.ndarray] = {}
-        safe_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+        safe_characters = (
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+        )
         for name in stem_names:
             _check_cancelled(cancel_event, "project load")
             if (
@@ -385,16 +443,23 @@ class ReawarpProject:
             if stem_rate != sample_rate:
                 raise ValueError(f"stem {name!r} uses a different sample rate")
             if len(audio) != frame_count:
-                raise ValueError(f"stem {name!r} is not aligned to the project frame count")
+                raise ValueError(
+                    f"stem {name!r} is not aligned to the project frame count"
+                )
             if not np.isfinite(audio).all():
                 raise ValueError(f"stem {name!r} contains non-finite samples")
             stems[name] = audio
 
         event_record = json.loads((root / "events.json").read_text(encoding="utf-8"))
-        if not isinstance(event_record, dict) or event_record.get("schema_version") != 1:
+        if (
+            not isinstance(event_record, dict)
+            or event_record.get("schema_version") != 1
+        ):
             raise ValueError("unsupported or invalid project event schema")
         events = event_record.get("events")
-        if not isinstance(events, list) or any(not isinstance(item, dict) for item in events):
+        if not isinstance(events, list) or any(
+            not isinstance(item, dict) for item in events
+        ):
             raise ValueError("project events must be a list of JSON objects")
 
         metadata = record.get("metadata", {})
@@ -407,17 +472,25 @@ class ReawarpProject:
             brief = CompositionBrief.from_dict(brief_record)
             resolved_intent = metadata.get("m27_resolved_intent")
             if not isinstance(resolved_intent, dict):
-                raise ValueError("project M27 brief is missing its resolved-intent provenance")
+                raise ValueError(
+                    "project M27 brief is missing its resolved-intent provenance"
+                )
             if resolved_intent.get("schema_version") != 1:
                 raise ValueError("unsupported project M27 resolved-intent schema")
             if resolved_intent.get("brief_fingerprint") != brief.fingerprint:
-                raise ValueError("project M27 brief fingerprint does not match its provenance")
+                raise ValueError(
+                    "project M27 brief fingerprint does not match its provenance"
+                )
             if resolved_intent.get("brief_id") != brief.brief_id:
                 raise ValueError("project M27 brief ID does not match its provenance")
             if resolved_intent.get("generation_seed") != config.seed:
-                raise ValueError("project M27 generation seed does not match its configuration")
+                raise ValueError(
+                    "project M27 generation seed does not match its configuration"
+                )
             if not isinstance(resolved_intent.get("source_families"), list):
-                raise ValueError("project M27 resolved source-family provenance is invalid")
+                raise ValueError(
+                    "project M27 resolved source-family provenance is invalid"
+                )
 
             exploration = metadata.get("m27_bounded_exploration")
             exploration_enabled = metadata.get(
@@ -426,22 +499,34 @@ class ReawarpProject:
             if not isinstance(exploration_enabled, bool):
                 raise ValueError("project M27 exploration-enabled flag must be boolean")
             if exploration_enabled != (exploration is not None):
-                raise ValueError("project M27 exploration flag and audit record disagree")
+                raise ValueError(
+                    "project M27 exploration flag and audit record disagree"
+                )
             if exploration is not None:
-                if not isinstance(exploration, dict) or exploration.get("schema_version") != 1:
-                    raise ValueError("project M27 bounded-exploration provenance is invalid")
+                if (
+                    not isinstance(exploration, dict)
+                    or exploration.get("schema_version") != 1
+                ):
+                    raise ValueError(
+                        "project M27 bounded-exploration provenance is invalid"
+                    )
                 changes = exploration.get("field_changes")
                 seeds = exploration.get("seed_lineage")
                 preserved = exploration.get("preserved_fields")
                 applied = exploration.get("applied_contract_ids")
                 if (
-                    not isinstance(changes, dict) or not changes
+                    not isinstance(changes, dict)
+                    or not changes
                     or not isinstance(seeds, dict)
                     or not isinstance(preserved, list)
                     or not isinstance(applied, list)
                 ):
-                    raise ValueError("project M27 exploration audit fields are malformed")
-                contracts = {item.contract_id: item for item in brief.mutation_contracts}
+                    raise ValueError(
+                        "project M27 exploration audit fields are malformed"
+                    )
+                contracts = {
+                    item.contract_id: item for item in brief.mutation_contracts
+                }
                 field_contracts: dict[str, Any] = {}
                 for contract in brief.mutation_contracts:
                     for field_name in contract.mutable_fields:
@@ -451,18 +536,28 @@ class ReawarpProject:
                             )
                         field_contracts[field_name] = contract
                 if not set(changes) <= set(field_contracts):
-                    raise ValueError("project M27 exploration changed a field outside its contracts")
+                    raise ValueError(
+                        "project M27 exploration changed a field outside its contracts"
+                    )
                 expected_seeds: dict[str, int] = {}
                 changed_contract_ids: set[str] = set()
                 config_values = config.to_dict()
                 from reawarp.core.random_streams import derive_seed
 
                 for field_name, change in changes.items():
-                    if not isinstance(change, dict) or not {"before", "after", "contract_id"} <= set(change):
-                        raise ValueError(f"project M27 change record for {field_name!r} is malformed")
+                    if not isinstance(change, dict) or not {
+                        "before",
+                        "after",
+                        "contract_id",
+                    } <= set(change):
+                        raise ValueError(
+                            f"project M27 change record for {field_name!r} is malformed"
+                        )
                     contract = field_contracts[field_name]
                     if change["contract_id"] != contract.contract_id:
-                        raise ValueError(f"project M27 change for {field_name!r} names the wrong contract")
+                        raise ValueError(
+                            f"project M27 change for {field_name!r} names the wrong contract"
+                        )
                     changed_contract_ids.add(contract.contract_id)
                     seed_name = (
                         f"composition-brief:v{brief.schema_version}:"
@@ -477,23 +572,42 @@ class ReawarpProject:
                             f"project M27 final config does not match the recorded {field_name!r} mutation"
                         )
                 if set(seeds) != set(expected_seeds):
-                    raise ValueError("project M27 seed lineage does not match changed fields")
+                    raise ValueError(
+                        "project M27 seed lineage does not match changed fields"
+                    )
                 for seed_name, expected_seed in expected_seeds.items():
                     if seeds.get(seed_name) != expected_seed:
-                        raise ValueError(f"project M27 seed lineage is invalid for {seed_name!r}")
-                if set(applied) != changed_contract_ids or not set(applied) <= set(contracts):
-                    raise ValueError("project M27 applied contract IDs do not match changed fields")
+                        raise ValueError(
+                            f"project M27 seed lineage is invalid for {seed_name!r}"
+                        )
+                if set(applied) != changed_contract_ids or not set(applied) <= set(
+                    contracts
+                ):
+                    raise ValueError(
+                        "project M27 applied contract IDs do not match changed fields"
+                    )
                 if not set(preserved) >= {
-                    "seed", "sample_rate", "sample_paths", "sample_metadata", "sample_banks"
+                    "seed",
+                    "sample_rate",
+                    "sample_paths",
+                    "sample_metadata",
+                    "sample_banks",
                 } or set(preserved) & set(changes):
-                    raise ValueError("project M27 preserved-field audit violates source/clock invariants")
+                    raise ValueError(
+                        "project M27 preserved-field audit violates source/clock invariants"
+                    )
         score_name = str(record.get("score_file", "score.json"))
         score_path = (root / score_name).resolve()
         if not score_path.is_relative_to(root) or not score_path.is_file():
             raise ValueError(f"project Score file is missing or unsafe: {score_name}")
         score = Score.load(score_path)
-        if int(record.get("score_schema_version", score.schema_version)) != score.schema_version:
-            raise ValueError("project score_schema_version does not match the archived Score")
+        if (
+            int(record.get("score_schema_version", score.schema_version))
+            != score.schema_version
+        ):
+            raise ValueError(
+                "project score_schema_version does not match the archived Score"
+            )
         if int(score.metadata.get("sample_rate", 0)) != sample_rate:
             raise ValueError("project score sample rate does not match the audio stems")
         if list(score.metadata.get("render_stems", [])) != list(stem_names):
@@ -506,8 +620,13 @@ class ReawarpProject:
             from reawarp.fx_routing import load_fx_routing
 
             routing_path = (root / str(routing_name)).resolve()
-            if not routing_path.is_relative_to(root.resolve()) or not routing_path.is_file():
-                raise ValueError(f"project FX routing file is missing or unsafe: {routing_name}")
+            if (
+                not routing_path.is_relative_to(root.resolve())
+                or not routing_path.is_file()
+            ):
+                raise ValueError(
+                    f"project FX routing file is missing or unsafe: {routing_name}"
+                )
             metadata["project_fx_routing"] = load_fx_routing(
                 routing_path, tuple(stem_names), sample_rate
             )
@@ -518,8 +637,13 @@ class ReawarpProject:
             from reawarp.fx_automation import load_fx_automation
 
             automation_path = (root / str(automation_name)).resolve()
-            if not automation_path.is_relative_to(root.resolve()) or not automation_path.is_file():
-                raise ValueError(f"project FX automation file is missing or unsafe: {automation_name}")
+            if (
+                not automation_path.is_relative_to(root.resolve())
+                or not automation_path.is_file()
+            ):
+                raise ValueError(
+                    f"project FX automation file is missing or unsafe: {automation_name}"
+                )
             metadata["project_fx_automation"] = load_fx_automation(
                 automation_path, tuple(stem_names)
             )
@@ -536,14 +660,12 @@ class ReawarpProject:
             asset_validation and asset_validation.get("assets")
         )
         asset_findings = bool(
-            asset_validation and (
-                asset_validation.get("missing") or asset_validation.get("changed")
-            )
+            asset_validation
+            and (asset_validation.get("missing") or asset_validation.get("changed"))
         )
         file_findings = bool(
-            file_validation and (
-                file_validation.get("missing") or file_validation.get("changed")
-            )
+            file_validation
+            and (file_validation.get("missing") or file_validation.get("changed"))
         )
         if asset_validation is not None and (asset_records_present or asset_findings):
             project.metadata["project_asset_validation"] = asset_validation
@@ -556,8 +678,13 @@ class ReawarpProject:
             _check_cancelled(cancel_event, "project load")
             safe_id = str(candidate_id)
             if (
-                not safe_id or safe_id in {".", ".."}
-                or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-" for ch in safe_id)
+                not safe_id
+                or safe_id in {".", ".."}
+                or any(
+                    ch
+                    not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+                    for ch in safe_id
+                )
             ):
                 raise ValueError(f"invalid variation candidate ID: {candidate_id!r}")
             candidate_directory = root / "candidates" / safe_id

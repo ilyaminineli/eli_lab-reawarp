@@ -1,17 +1,32 @@
 """Score-native M28 phrase workbench and contextual audition controls."""
+
 from __future__ import annotations
 
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
-    QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.composition.phrases import (
-    PHRASE_FUNCTIONS, PHRASE_STATES, PhrasePlan,
+    PHRASE_FUNCTIONS,
+    PHRASE_STATES,
+    PhrasePlan,
 )
 from reawarp.ui.widgets.audio_preview import AudioPreview
 
@@ -63,7 +78,9 @@ class PhraseWorkbenchPage(QWidget):
         identity_row = QHBoxLayout()
         self.phrase_id = QLineEdit("phrase-01")
         self.phrase_id.setPlaceholderText("Unique phrase ID")
-        self.phrase_id.setToolTip("Stable identity used by candidate and freeze lineage.")
+        self.phrase_id.setToolTip(
+            "Stable identity used by candidate and freeze lineage."
+        )
         identity_row.addWidget(self.phrase_id, 1)
         self.function = QComboBox()
         for function in sorted(PHRASE_FUNCTIONS):
@@ -298,12 +315,17 @@ class PhraseWorkbenchPage(QWidget):
         self._refresh_controls()
 
     def set_score(
-        self, score: Any | None, *, selected_phrase_id: str | None = None,
+        self,
+        score: Any | None,
+        *,
+        selected_phrase_id: str | None = None,
     ) -> None:
         self.clear_comparison()
         self._score = score
         try:
-            self._plan = PhrasePlan.from_score(score) if score is not None else PhrasePlan(())
+            self._plan = (
+                PhrasePlan.from_score(score) if score is not None else PhrasePlan(())
+            )
         except ValueError:
             self._plan = PhrasePlan(())
         self._refresh_phrases(selected_phrase_id)
@@ -315,7 +337,8 @@ class PhraseWorkbenchPage(QWidget):
         self.phrases.clear()
         freezes = (
             self._score.metadata.get("m28_phrase_freezes", {})
-            if self._score is not None else {}
+            if self._score is not None
+            else {}
         )
         for phrase in self._plan.phrases if self._plan is not None else ():
             frozen = phrase.phrase_id in freezes
@@ -342,7 +365,9 @@ class PhraseWorkbenchPage(QWidget):
         self._refresh_controls()
 
     def _phrase_selected(
-        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None,
+        self,
+        item: QListWidgetItem | None,
+        _previous: QListWidgetItem | None,
     ) -> None:
         selected_phrase_id = (
             str(item.data(Qt.ItemDataRole.UserRole)) if item is not None else None
@@ -370,7 +395,8 @@ class PhraseWorkbenchPage(QWidget):
         self._loading_phrase = False
         freezes = (
             self._score.metadata.get("m28_phrase_freezes", {})
-            if self._score is not None else {}
+            if self._score is not None
+            else {}
         )
         frozen = freezes.get(phrase.phrase_id)
         event_count = len(phrase.event_ids)
@@ -379,7 +405,8 @@ class PhraseWorkbenchPage(QWidget):
             f"{phrase.duration_beats} beats · {event_count} event(s)"
             + (
                 f"\nFROZEN · {frozen.get('candidate_id', '')}"
-                if isinstance(frozen, dict) else "\nNOT FROZEN"
+                if isinstance(frozen, dict)
+                else "\nNOT FROZEN"
             )
         )
         self._candidates.clear()
@@ -391,7 +418,11 @@ class PhraseWorkbenchPage(QWidget):
         if self._plan is None or not self._selected_phrase_id:
             return None
         return next(
-            (item for item in self._plan.phrases if item.phrase_id == self._selected_phrase_id),
+            (
+                item
+                for item in self._plan.phrases
+                if item.phrase_id == self._selected_phrase_id
+            ),
             None,
         )
 
@@ -400,7 +431,9 @@ class PhraseWorkbenchPage(QWidget):
 
     def _save_phrase(self) -> None:
         if self._score is None:
-            self.audition_status.setText("Generate or load a project before defining phrases.")
+            self.audition_status.setText(
+                "Generate or load a project before defining phrases."
+            )
             return
         phrase_id = self.phrase_id.text().strip()
         if not phrase_id:
@@ -415,10 +448,14 @@ class PhraseWorkbenchPage(QWidget):
             "start_beats": self.start_beats.text().strip(),
             "end_beats": self.end_beats.text().strip(),
             "function": function,
-            "custom_function": custom_function if function not in PHRASE_FUNCTIONS else None,
+            "custom_function": (
+                custom_function if function not in PHRASE_FUNCTIONS else None
+            ),
             "state": str(self.state.currentData() or "closed"),
             "motif_ids": [
-                item.strip() for item in self.motif_ids.text().split(",") if item.strip()
+                item.strip()
+                for item in self.motif_ids.text().split(",")
+                if item.strip()
             ],
             "roles": [
                 item.strip() for item in self.roles.text().split(",") if item.strip()
@@ -432,7 +469,9 @@ class PhraseWorkbenchPage(QWidget):
 
     def _request_batch(self) -> None:
         if not self._selected_phrase_id:
-            self.audition_status.setText("Select or define a phrase before generating candidates.")
+            self.audition_status.setText(
+                "Select or define a phrase before generating candidates."
+            )
             return
         payload = {
             "phrase_id": self._selected_phrase_id,
@@ -443,7 +482,9 @@ class PhraseWorkbenchPage(QWidget):
         }
         self.batchRequested.emit(payload)
 
-    def set_candidates(self, candidates: list[Any], selected_id: str | None = None) -> None:
+    def set_candidates(
+        self, candidates: list[Any], selected_id: str | None = None
+    ) -> None:
         self._candidates = {str(item.candidate_id): item for item in candidates}
         self.candidate_list.blockSignals(True)
         self.candidate_list.clear()
@@ -462,7 +503,9 @@ class PhraseWorkbenchPage(QWidget):
         self._refresh_controls()
 
     def _candidate_selected(
-        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None,
+        self,
+        item: QListWidgetItem | None,
+        _previous: QListWidgetItem | None,
     ) -> None:
         if item is None:
             self._selected_candidate_id = None
@@ -481,7 +524,9 @@ class PhraseWorkbenchPage(QWidget):
             return
         change = ", ".join(candidate.transformation.changed_dimensions) or "none"
         preserved = ", ".join(candidate.transformation.preserved_dimensions)
-        self.candidate_title.setText(f"CANDIDATE {candidate.index:02d} · {candidate.operation.upper()}")
+        self.candidate_title.setText(
+            f"CANDIDATE {candidate.index:02d} · {candidate.operation.upper()}"
+        )
         self.candidate_details.setText(
             f"CHANGED  ·  {change}\nPRESERVED  ·  {preserved}\n"
             f"SEED  ·  {candidate.seed} ({candidate.seed_name})\n"
@@ -500,9 +545,7 @@ class PhraseWorkbenchPage(QWidget):
     def _branch(self) -> None:
         if not self._selected_phrase_id:
             return
-        self.branchRequested.emit(
-            self._selected_phrase_id, self.seed.text().strip()
-        )
+        self.branchRequested.emit(self._selected_phrase_id, self.seed.text().strip())
 
     def _restore(self) -> None:
         if self._selected_phrase_id:
@@ -514,11 +557,11 @@ class PhraseWorkbenchPage(QWidget):
             return
         target = str(self.audition_target.currentData())
         if target == "candidate" and self._selected_candidate() is None:
-            self.audition_status.setText("Select a candidate before candidate audition.")
+            self.audition_status.setText(
+                "Select a candidate before candidate audition."
+            )
             return
-        self.auditionRequested.emit(
-            target, str(self.audition_context.currentData())
-        )
+        self.auditionRequested.emit(target, str(self.audition_context.currentData()))
 
     def _request_comparison(self) -> None:
         candidate = self._selected_candidate()
@@ -526,7 +569,9 @@ class PhraseWorkbenchPage(QWidget):
             self.compare_status.setText("Select a phrase and load a project first.")
             return
         if candidate is None:
-            self.compare_status.setText("Generate and select a candidate before comparing.")
+            self.compare_status.setText(
+                "Generate and select a candidate before comparing."
+            )
             return
         self.audition_tabs.setCurrentIndex(1)
         self.compareRequested.emit(
@@ -545,7 +590,11 @@ class PhraseWorkbenchPage(QWidget):
         self._refresh_controls()
 
     def set_audition_audio(
-        self, audio: Any | None, sample_rate: int, *, message: str = "",
+        self,
+        audio: Any | None,
+        sample_rate: int,
+        *,
+        message: str = "",
     ) -> None:
         self.audition_preview.set_audio(audio, sample_rate)
         if message:
@@ -553,14 +602,21 @@ class PhraseWorkbenchPage(QWidget):
 
     def set_comparison_busy(self, busy: bool, message: str = "") -> None:
         self._busy = bool(busy)
-        self.compare_button.setText("RENDERING A/B…" if busy else "MATCHED A/B + DIFFERENCE")
+        self.compare_button.setText(
+            "RENDERING A/B…" if busy else "MATCHED A/B + DIFFERENCE"
+        )
         if message:
             self.compare_status.setText(message)
         self._refresh_controls()
 
     def set_comparison(
-        self, reference: Any, candidate: Any, difference: Any, sample_rate: int,
-        *, message: str = "",
+        self,
+        reference: Any,
+        candidate: Any,
+        difference: Any,
+        sample_rate: int,
+        *,
+        message: str = "",
     ) -> None:
         self._comparison_buffers = {
             "reference": reference,
@@ -615,11 +671,10 @@ class PhraseWorkbenchPage(QWidget):
         candidate = self._selected_candidate()
         freezes = (
             self._score.metadata.get("m28_phrase_freezes", {})
-            if self._score is not None else {}
+            if self._score is not None
+            else {}
         )
-        frozen = bool(
-            self._selected_phrase_id and self._selected_phrase_id in freezes
-        )
+        frozen = bool(self._selected_phrase_id and self._selected_phrase_id in freezes)
         self.save_phrase_button.setEnabled(has_score and not frozen)
         self.delete_phrase_button.setEnabled(has_phrase and not frozen)
         idle = not self._busy and not self._batch_busy
@@ -627,11 +682,12 @@ class PhraseWorkbenchPage(QWidget):
         self.freeze_button.setEnabled(candidate is not None and not frozen and idle)
         self.branch_button.setEnabled(frozen and idle)
         self.restore_button.setEnabled(frozen and idle)
-        self.render_audition_button.setEnabled(
-            has_phrase and not self._busy
-        )
+        self.render_audition_button.setEnabled(has_phrase and not self._busy)
         self.compare_button.setEnabled(
-            candidate is not None and has_phrase and not self._busy and not self._batch_busy
+            candidate is not None
+            and has_phrase
+            and not self._busy
+            and not self._batch_busy
         )
         comparison_ready = bool(self._comparison_buffers)
         self.play_reference_button.setEnabled(comparison_ready and not self._busy)

@@ -25,24 +25,34 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("input", nargs="?", type=Path, help="source audio file")
     parser.add_argument("output", nargs="?", type=Path, help="destination WAV file")
     parser.add_argument(
-        "--preset", choices=tuple(FX_PRESETS), default=None,
+        "--preset",
+        choices=tuple(FX_PRESETS),
+        default=None,
         help="starter chain (default: restrained_space unless --chain-json is used)",
     )
     parser.add_argument(
-        "--chain-json", type=Path,
+        "--chain-json",
+        type=Path,
         help="render a portable custom chain saved by the FX Lab",
     )
     parser.add_argument(
-        "--validate-chain-json", type=Path,
+        "--validate-chain-json",
+        type=Path,
         help="validate a chain file and exit without requiring Pyo or an audio file",
     )
     parser.add_argument("--wet", type=float, default=None, help="global wet mix (0–1)")
     parser.add_argument(
-        "--tail", type=float, default=None,
+        "--tail",
+        type=float,
+        default=None,
         help="seconds appended for delay/reverb tails (0–12)",
     )
-    parser.add_argument("--list-presets", action="store_true", help="list starter chains and exit")
-    parser.add_argument("--list-stages", action="store_true", help="list available stage types and exit")
+    parser.add_argument(
+        "--list-presets", action="store_true", help="list starter chains and exit"
+    )
+    parser.add_argument(
+        "--list-stages", action="store_true", help="list available stage types and exit"
+    )
     return parser
 
 

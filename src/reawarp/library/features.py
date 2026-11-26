@@ -62,7 +62,9 @@ def source_audio_info(path: str | Path) -> tuple[int, int]:
     return int(info.samplerate), int(info.channels)
 
 
-def _spectral_descriptors(audio: np.ndarray, sample_rate: int) -> tuple[float, float, float]:
+def _spectral_descriptors(
+    audio: np.ndarray, sample_rate: int
+) -> tuple[float, float, float]:
     frame_length = 2_048
     hop_length = 1_024
     if audio.size <= frame_length:
@@ -77,8 +79,8 @@ def _spectral_descriptors(audio: np.ndarray, sample_rate: int) -> tuple[float, f
     window = np.hanning(frame_length).astype(np.float64)
     frames = np.zeros((len(starts), frame_length), dtype=np.float64)
     for index, start in enumerate(starts):
-        chunk = audio[start:start + frame_length]
-        frames[index, :len(chunk)] = chunk
+        chunk = audio[start : start + frame_length]
+        frames[index, : len(chunk)] = chunk
     power = np.abs(np.fft.rfft(frames * window[None, :], axis=1)) ** 2
     frequencies = np.fft.rfftfreq(frame_length, 1.0 / float(sample_rate))
     totals = np.sum(power, axis=1) + 1e-15
@@ -90,7 +92,7 @@ def _spectral_descriptors(audio: np.ndarray, sample_rate: int) -> tuple[float, f
 
     positive_power = np.maximum(power[:, 1:], 1e-15)
     flatness = np.exp(np.mean(np.log(positive_power), axis=1)) / (
-            np.mean(positive_power, axis=1) + 1e-15
+        np.mean(positive_power, axis=1) + 1e-15
     )
     return (
         float(np.mean(centroid)),
@@ -100,9 +102,9 @@ def _spectral_descriptors(audio: np.ndarray, sample_rate: int) -> tuple[float, f
 
 
 def _rhythm_descriptors(
-        onsets: list[int],
-        sample_rate: int,
-        duration_seconds: float,
+    onsets: list[int],
+    sample_rate: int,
+    duration_seconds: float,
 ) -> tuple[float, float, float | None, tuple[float, ...]]:
     if len(onsets) >= 2:
         intervals = np.diff(np.asarray(onsets, dtype=np.float64)) / float(sample_rate)
@@ -150,7 +152,11 @@ def analyze_audio_file(path: str | Path) -> tuple[dict[str, int], AudioFeatures]
     rms = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64))))
     rms_dbfs = float(20.0 * math.log10(max(rms, 1e-12)))
     crest_db = float(20.0 * math.log10(max(peak, 1e-12) / max(rms, 1e-12)))
-    zero_crossing = float(np.mean(np.not_equal(audio[1:] < 0.0, audio[:-1] < 0.0))) if frames > 1 else 0.0
+    zero_crossing = (
+        float(np.mean(np.not_equal(audio[1:] < 0.0, audio[:-1] < 0.0)))
+        if frames > 1
+        else 0.0
+    )
     centroid, rolloff, flatness = _spectral_descriptors(audio, ANALYSIS_SAMPLE_RATE)
     onsets = detect_transients(
         audio, ANALYSIS_SAMPLE_RATE, threshold=0.20, min_interval_ms=40.0
@@ -167,7 +173,9 @@ def analyze_audio_file(path: str | Path) -> tuple[dict[str, int], AudioFeatures]
 
         harmonic, percussive = librosa.effects.hpss(audio)
         harmonic_rms = float(np.sqrt(np.mean(np.square(harmonic, dtype=np.float64))))
-        percussive_rms = float(np.sqrt(np.mean(np.square(percussive, dtype=np.float64))))
+        percussive_rms = float(
+            np.sqrt(np.mean(np.square(percussive, dtype=np.float64)))
+        )
         onset_envelope = librosa.onset.onset_strength(
             y=audio, sr=ANALYSIS_SAMPLE_RATE, hop_length=512
         )

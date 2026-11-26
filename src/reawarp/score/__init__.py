@@ -2,18 +2,34 @@
 
 from reawarp.score.events import AutomationLane, AutomationPoint, MusicalEvent
 from reawarp.score.automation import (
-    AutomationControlBus, AutomationModulation, AutomationSamples, AutomationSource,
-    AutomationTarget, AutomationTargetRegistry, DEFAULT_AUTOMATION_TARGETS,
+    AutomationControlBus,
+    AutomationModulation,
+    AutomationSamples,
+    AutomationSource,
+    AutomationTarget,
+    AutomationTargetRegistry,
+    DEFAULT_AUTOMATION_TARGETS,
 )
 from reawarp.score.render import (
-    ScheduledScoreEvent, ScoreRenderResult, ScoreRenderer, build_score_control_bus,
+    ScheduledScoreEvent,
+    ScoreRenderResult,
+    ScoreRenderer,
+    build_score_control_bus,
 )
 from reawarp.score.timeline import RenderTimeline
 from reawarp.score.model import Score
 from reawarp.score.orchestration_intent import (
-    AttentionSpan, CycleSpec, MutationPolicy, OrchestrationPlan, PhraseSpan,
-    RoleRelationship, TransitionSpan, build_orchestration_plan,
-    inspect_attention_conflicts, inspect_attention_handoffs, inspect_event_onset_conflicts,
+    AttentionSpan,
+    CycleSpec,
+    MutationPolicy,
+    OrchestrationPlan,
+    PhraseSpan,
+    RoleRelationship,
+    TransitionSpan,
+    build_orchestration_plan,
+    inspect_attention_conflicts,
+    inspect_attention_handoffs,
+    inspect_event_onset_conflicts,
 )
 from reawarp.score.planner import (
     melody_to_score_events,
@@ -22,20 +38,35 @@ from reawarp.score.planner import (
     score_to_legacy_grid_events,
 )
 from reawarp.score.pitch import (
-    EqualTemperamentTuning, Pitch, PitchCandidate, PitchField, Sonority, TuningSystem,
-    pitch_field_from_score, tuning_from_score,
+    EqualTemperamentTuning,
+    Pitch,
+    PitchCandidate,
+    PitchField,
+    Sonority,
+    TuningSystem,
+    pitch_field_from_score,
+    tuning_from_score,
 )
 from reawarp.score.harmony import (
-    VoiceLeadingResult, VoiceLeadingWeights, assign_voice_leading,
+    VoiceLeadingResult,
+    VoiceLeadingWeights,
+    assign_voice_leading,
 )
 from reawarp.score.voice_leading import (
-    SonorityBoundary, SonoritySequencePlan, VoiceLeadingConstraints,
-    VoiceLeadingPlanConfig, VoiceLeadingPreferences, VoiceLeadingTransition,
-    VoiceRoleTarget, plan_sonority_sequence,
+    SonorityBoundary,
+    SonoritySequencePlan,
+    VoiceLeadingConstraints,
+    VoiceLeadingPlanConfig,
+    VoiceLeadingPreferences,
+    VoiceLeadingTransition,
+    VoiceRoleTarget,
+    plan_sonority_sequence,
 )
 from reawarp.score.bass_role import BassRoleConfig, BassRolePlan, plan_bass_role
 from reawarp.score.motif import (
-    MotifResolutionPlan, MotifResolutionRecord, resolve_motif_plan_to_score,
+    MotifResolutionPlan,
+    MotifResolutionRecord,
+    resolve_motif_plan_to_score,
 )
 from reawarp.score.sonority import (
     derive_spectral_sonority,
@@ -57,8 +88,10 @@ from reawarp.score.time import (
     as_fraction,
 )
 from reawarp.score.attention import (
-    apply_attention_gesture, apply_attention_gesture_to_event,
-    reconcile_attention_gestures, remove_attention_gesture,
+    apply_attention_gesture,
+    apply_attention_gesture_to_event,
+    reconcile_attention_gestures,
+    remove_attention_gesture,
 )
 
 __all__ = [
@@ -66,9 +99,17 @@ __all__ = [
     "apply_attention_gesture_to_event",
     "reconcile_attention_gestures",
     "remove_attention_gesture",
-    "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
-    "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
-    "inspect_attention_conflicts", "inspect_attention_handoffs", "inspect_event_onset_conflicts",
+    "AttentionSpan",
+    "CycleSpec",
+    "MutationPolicy",
+    "OrchestrationPlan",
+    "PhraseSpan",
+    "RoleRelationship",
+    "TransitionSpan",
+    "build_orchestration_plan",
+    "inspect_attention_conflicts",
+    "inspect_attention_handoffs",
+    "inspect_event_onset_conflicts",
     "AutomationControlBus",
     "AutomationLane",
     "AutomationModulation",

@@ -20,7 +20,9 @@ def default_database_path() -> Path:
 
 
 def _canonical_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -44,33 +46,74 @@ def _similarity_distance(left: dict[str, Any], right: dict[str, Any]) -> float:
         return float(value) if value is not None else default
 
     components: list[tuple[float, float]] = []
-    components.append((
-        abs(math.log2((number(left, "duration_seconds") + 0.02) /
-                      (number(right, "duration_seconds") + 0.02))) / 3.0, 0.8
-    ))
-    components.append((
-        abs(math.log2((number(left, "spectral_centroid_hz") + 20.0) /
-                      (number(right, "spectral_centroid_hz") + 20.0))) / 2.5, 1.0
-    ))
-    components.append((
-        abs(math.log((number(left, "spectral_flatness") + 0.003) /
-                     (number(right, "spectral_flatness") + 0.003))) / 4.0, 0.8
-    ))
-    components.append((
-        abs(number(left, "spectral_rolloff85_hz") -
-            number(right, "spectral_rolloff85_hz")) / 8_000.0, 0.7
-    ))
-    components.append((
-        abs(number(left, "rms_dbfs") - number(right, "rms_dbfs")) / 36.0, 0.45
-    ))
-    components.append((
-        abs(number(left, "zero_crossing_rate") -
-            number(right, "zero_crossing_rate")) / 0.25, 0.5
-    ))
-    components.append((
-        abs(math.log1p(number(left, "onset_density_per_second")) -
-            math.log1p(number(right, "onset_density_per_second"))) / 2.5, 1.0
-    ))
+    components.append(
+        (
+            abs(
+                math.log2(
+                    (number(left, "duration_seconds") + 0.02)
+                    / (number(right, "duration_seconds") + 0.02)
+                )
+            )
+            / 3.0,
+            0.8,
+        )
+    )
+    components.append(
+        (
+            abs(
+                math.log2(
+                    (number(left, "spectral_centroid_hz") + 20.0)
+                    / (number(right, "spectral_centroid_hz") + 20.0)
+                )
+            )
+            / 2.5,
+            1.0,
+        )
+    )
+    components.append(
+        (
+            abs(
+                math.log(
+                    (number(left, "spectral_flatness") + 0.003)
+                    / (number(right, "spectral_flatness") + 0.003)
+                )
+            )
+            / 4.0,
+            0.8,
+        )
+    )
+    components.append(
+        (
+            abs(
+                number(left, "spectral_rolloff85_hz")
+                - number(right, "spectral_rolloff85_hz")
+            )
+            / 8_000.0,
+            0.7,
+        )
+    )
+    components.append(
+        (abs(number(left, "rms_dbfs") - number(right, "rms_dbfs")) / 36.0, 0.45)
+    )
+    components.append(
+        (
+            abs(
+                number(left, "zero_crossing_rate") - number(right, "zero_crossing_rate")
+            )
+            / 0.25,
+            0.5,
+        )
+    )
+    components.append(
+        (
+            abs(
+                math.log1p(number(left, "onset_density_per_second"))
+                - math.log1p(number(right, "onset_density_per_second"))
+            )
+            / 2.5,
+            1.0,
+        )
+    )
     left_tempo, right_tempo = left.get("tempo_bpm"), right.get("tempo_bpm")
     if left_tempo is None and right_tempo is None:
         tempo_distance = 0.0
@@ -79,17 +122,23 @@ def _similarity_distance(left: dict[str, Any], right: dict[str, Any]) -> float:
     else:
         tempo_distance = abs(float(left_tempo) - float(right_tempo)) / 90.0
     components.append((tempo_distance, 0.9))
-    components.append((
-        abs(number(left, "onset_interval_cv") -
-            number(right, "onset_interval_cv")) / 2.5, 0.65
-    ))
+    components.append(
+        (
+            abs(number(left, "onset_interval_cv") - number(right, "onset_interval_cv"))
+            / 2.5,
+            0.65,
+        )
+    )
 
     left_hist = left.get("rhythm_histogram") or [0.0] * 16
     right_hist = right.get("rhythm_histogram") or [0.0] * 16
-    histogram_distance = sum(
-        abs(float(a) - float(b))
-        for a, b in zip(left_hist, right_hist, strict=False)
-    ) / 2.0
+    histogram_distance = (
+        sum(
+            abs(float(a) - float(b))
+            for a, b in zip(left_hist, right_hist, strict=False)
+        )
+        / 2.0
+    )
     components.append((histogram_distance, 1.0))
 
     weight_total = sum(weight for _, weight in components)
@@ -135,8 +184,7 @@ class SampleLibrary:
         self._create_schema()
 
     def _create_schema(self) -> None:
-        self._connection.executescript(
-            """
+        self._connection.executescript("""
             CREATE TABLE IF NOT EXISTS assets (
                 asset_id TEXT PRIMARY KEY,
                 path TEXT NOT NULL UNIQUE,
@@ -257,8 +305,7 @@ class SampleLibrary:
             );
             CREATE INDEX IF NOT EXISTS idx_sound_object_variants_patch
                 ON sound_object_variants(patch_id);
-            """
-        )
+            """)
         self._connection.commit()
 
     def close(self) -> None:
@@ -272,20 +319,18 @@ class SampleLibrary:
 
     @staticmethod
     def _normalize_tags(tags: Iterable[str]) -> tuple[str, ...]:
-        return tuple(sorted({
-            str(tag).strip().casefold()
-            for tag in tags
-            if str(tag).strip()
-        }))
+        return tuple(
+            sorted({str(tag).strip().casefold() for tag in tags if str(tag).strip()})
+        )
 
     def index_file(
-            self,
-            path: str | Path,
-            *,
-            asset_type: str = "sample",
-            role: str | None = None,
-            tags: Iterable[str] = (),
-            metadata: dict[str, Any] | None = None,
+        self,
+        path: str | Path,
+        *,
+        asset_type: str = "sample",
+        role: str | None = None,
+        tags: Iterable[str] = (),
+        metadata: dict[str, Any] | None = None,
     ) -> LibraryAsset:
         source = Path(path).expanduser().resolve()
         if not source.is_file():
@@ -319,10 +364,12 @@ class SampleLibrary:
             normalized_tags.add(str(role).strip().casefold())
         normalized_tags.add(source.suffix.lower().lstrip("."))
         extra = dict(metadata or {})
-        extra.update({
-            "file_size_bytes": int(stat.st_size),
-            "modified_time_ns": int(stat.st_mtime_ns),
-        })
+        extra.update(
+            {
+                "file_size_bytes": int(stat.st_size),
+                "modified_time_ns": int(stat.st_mtime_ns),
+            }
+        )
         indexed_at = datetime.now(timezone.utc).isoformat()
         self._connection.execute(
             """
@@ -347,11 +394,20 @@ class SampleLibrary:
                 indexed_at=excluded.indexed_at
             """,
             (
-                asset_id, str(source), source.name, digest, asset_type,
+                asset_id,
+                str(source),
+                source.name,
+                digest,
+                asset_type,
                 role.strip().casefold() if role else None,
                 _canonical_json(sorted(normalized_tags)),
-                source_rate, channels, analysis_rate, duration,
-                _canonical_json(features), _canonical_json(extra), indexed_at,
+                source_rate,
+                channels,
+                analysis_rate,
+                duration,
+                _canonical_json(features),
+                _canonical_json(extra),
+                indexed_at,
             ),
         )
         self._connection.commit()
@@ -367,10 +423,10 @@ class SampleLibrary:
         return self._asset_from_row(row) if row is not None else None
 
     def _asset_from_row(
-            self,
-            row: sqlite3.Row,
-            *,
-            similarity: float | None = None,
+        self,
+        row: sqlite3.Row,
+        *,
+        similarity: float | None = None,
     ) -> LibraryAsset:
         return LibraryAsset(
             asset_id=str(row["asset_id"]),
@@ -410,19 +466,29 @@ class SampleLibrary:
             or metadata.get("m23_project_fingerprint")
         )
         family_id = (
-            str(family_source)[:24] if family_source
-            else hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()[:24]
+            str(family_source)[:24]
+            if family_source
+            else hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()[
+                :24
+            ]
         )
         project_id = hashlib.sha256(
-            (str(project_file.parent).casefold() + "\0" +
-             _sha256_file(project_file)).encode("utf-8")
+            (
+                str(project_file.parent).casefold() + "\0" + _sha256_file(project_file)
+            ).encode("utf-8")
         ).hexdigest()[:24]
         root_seed = str(config.get("seed")) if config.get("seed") is not None else None
-        variation_stem = str(variation.get("stem")) if variation and variation.get("stem") else None
+        variation_stem = (
+            str(variation.get("stem")) if variation and variation.get("stem") else None
+        )
         variation_index = int(variation.get("index", 0)) if variation else None
         if candidate:
             targets = candidate.get("targets", [])
-            variation_stem = "+".join(str(item) for item in targets) if targets else str(candidate.get("mode", "full_project"))
+            variation_stem = (
+                "+".join(str(item) for item in targets)
+                if targets
+                else str(candidate.get("mode", "full_project"))
+            )
             variation_index = int(candidate.get("index", 0))
         parent = self._connection.execute(
             """
@@ -432,7 +498,9 @@ class SampleLibrary:
             """,
             (family_id, project_id),
         ).fetchone()
-        parent_id = str(parent["project_id"]) if parent is not None and variation else None
+        parent_id = (
+            str(parent["project_id"]) if parent is not None and variation else None
+        )
         indexed_at = datetime.now(timezone.utc).isoformat()
 
         self._connection.execute(
@@ -453,9 +521,16 @@ class SampleLibrary:
                 indexed_at=excluded.indexed_at
             """,
             (
-                project_id, family_id, str(project_file.parent), root_seed,
-                variation_stem, variation_index, parent_id, _canonical_json(config),
-                _canonical_json(metadata), indexed_at,
+                project_id,
+                family_id,
+                str(project_file.parent),
+                root_seed,
+                variation_stem,
+                variation_index,
+                parent_id,
+                _canonical_json(config),
+                _canonical_json(metadata),
+                indexed_at,
             ),
         )
         if variation is None:
@@ -493,18 +568,26 @@ class SampleLibrary:
                     indexed_at=excluded.indexed_at
                 """,
                 (
-                    str(candidate.get("candidate_id", "")), project_id,
-                    str(candidate.get("batch_id", "")), candidate.get("parent_candidate_id"),
+                    str(candidate.get("candidate_id", "")),
+                    project_id,
+                    str(candidate.get("batch_id", "")),
+                    candidate.get("parent_candidate_id"),
                     str(candidate.get("selection_state", "unreviewed")),
-                    str(candidate.get("label", "Candidate")), str(candidate.get("mode", "stems")),
+                    str(candidate.get("label", "Candidate")),
+                    str(candidate.get("mode", "stems")),
                     _canonical_json(candidate.get("targets", [])),
-                    None if candidate.get("root_seed") is None else str(candidate.get("root_seed")),
+                    (
+                        None
+                        if candidate.get("root_seed") is None
+                        else str(candidate.get("root_seed"))
+                    ),
                     int(candidate.get("variation_seed", 1)),
                     _canonical_json(candidate.get("seed_lineage", {})),
                     _canonical_json(candidate.get("changed_parameters", {})),
                     _canonical_json(candidate.get("technical_flags", [])),
                     _canonical_json(candidate.get("technical_metrics", {})),
-                    str(candidate.get("notes", "")), indexed_at,
+                    str(candidate.get("notes", "")),
+                    indexed_at,
                 ),
             )
         self._connection.commit()
@@ -518,14 +601,19 @@ class SampleLibrary:
                     stem_path,
                     asset_type="stem",
                     role=str(stem_name),
-                    tags=("project-stem", f"seed-{root_seed}" if root_seed else "project"),
+                    tags=(
+                        "project-stem",
+                        f"seed-{root_seed}" if root_seed else "project",
+                    ),
                     metadata={
                         "project_id": project_id,
                         "family_id": family_id,
                         "root_seed": root_seed,
                         "variation": variation,
                         "m23_candidate": candidate,
-                        "sound_object_variants": metadata.get("sound_object_variants", []),
+                        "sound_object_variants": metadata.get(
+                            "sound_object_variants", []
+                        ),
                     },
                 )
                 indexed_assets.append(asset.asset_id)
@@ -541,7 +629,9 @@ class SampleLibrary:
             )
             indexed_assets.append(master.asset_id)
 
-        for source_role, source_record in (metadata.get("sample_sources") or {}).items():
+        for source_role, source_record in (
+            metadata.get("sample_sources") or {}
+        ).items():
             source_path = Path(str(source_record.get("path", ""))).expanduser()
             if source_path.is_file():
                 source_asset = self.index_file(
@@ -587,10 +677,14 @@ class SampleLibrary:
                 errors.append({"path": str(project_file.parent), "error": str(exc)})
 
         files = sorted(
-            path for path in root.rglob("*")
-            if path.is_file() and path.suffix.lower() in SUPPORTED_AUDIO_SUFFIXES
-            and not any(project_root == path.parent or project_root in path.parents
-                        for project_root in project_roots)
+            path
+            for path in root.rglob("*")
+            if path.is_file()
+            and path.suffix.lower() in SUPPORTED_AUDIO_SUFFIXES
+            and not any(
+                project_root == path.parent or project_root in path.parents
+                for project_root in project_roots
+            )
         )
         for path in files:
             try:
@@ -606,14 +700,14 @@ class SampleLibrary:
         }
 
     def search(
-            self,
-            *,
-            query: str | None = None,
-            asset_type: str | None = None,
-            role: str | None = None,
-            tags: Iterable[str] = (),
-            similar_to: str | None = None,
-            limit: int = 20,
+        self,
+        *,
+        query: str | None = None,
+        asset_type: str | None = None,
+        role: str | None = None,
+        tags: Iterable[str] = (),
+        similar_to: str | None = None,
+        limit: int = 20,
     ) -> list[LibraryAsset]:
         if limit < 1:
             raise ValueError("limit must be positive")
@@ -622,7 +716,8 @@ class SampleLibrary:
             reference = self.get_asset(similar_to)
             if reference is None:
                 row = self._connection.execute(
-                    "SELECT * FROM assets WHERE path = ?", (str(Path(similar_to).expanduser().resolve()),)
+                    "SELECT * FROM assets WHERE path = ?",
+                    (str(Path(similar_to).expanduser().resolve()),),
                 ).fetchone()
                 reference = self._asset_from_row(row) if row is not None else None
             if reference is None:
@@ -641,31 +736,48 @@ class SampleLibrary:
             if required_tags and not required_tags.issubset(set(item.tags)):
                 continue
             if needle:
-                searchable = " ".join((
-                    item.file_name, item.path, item.role or "",
-                    " ".join(item.tags), _canonical_json(item.metadata),
-                )).casefold()
+                searchable = " ".join(
+                    (
+                        item.file_name,
+                        item.path,
+                        item.role or "",
+                        " ".join(item.tags),
+                        _canonical_json(item.metadata),
+                    )
+                ).casefold()
                 if needle not in searchable:
                     continue
             if reference is not None:
                 distance = _similarity_distance(reference.features, item.features)
-                item = LibraryAsset(**{
-                    **item.to_dict(),
-                    "similarity": float(1.0 / (1.0 + distance)),
-                })
+                item = LibraryAsset(
+                    **{
+                        **item.to_dict(),
+                        "similarity": float(1.0 / (1.0 + distance)),
+                    }
+                )
             results.append(item)
 
         if reference is not None:
-            results.sort(key=lambda item: (-(item.similarity or 0.0), item.file_name.casefold()))
+            results.sort(
+                key=lambda item: (-(item.similarity or 0.0), item.file_name.casefold())
+            )
         else:
-            results.sort(key=lambda item: (item.asset_type, item.role or "", item.file_name.casefold()))
+            results.sort(
+                key=lambda item: (
+                    item.asset_type,
+                    item.role or "",
+                    item.file_name.casefold(),
+                )
+            )
         return results[:limit]
 
     def create_collection(self, name: str, description: str = "") -> str:
         normalized_name = str(name).strip()
         if not normalized_name:
             raise ValueError("collection name cannot be empty")
-        collection_id = hashlib.sha256(normalized_name.casefold().encode("utf-8")).hexdigest()[:24]
+        collection_id = hashlib.sha256(
+            normalized_name.casefold().encode("utf-8")
+        ).hexdigest()[:24]
         now = datetime.now(timezone.utc).isoformat()
         self._connection.execute(
             """
@@ -685,16 +797,14 @@ class SampleLibrary:
         return str(row["collection_id"])
 
     def collections(self) -> list[dict[str, Any]]:
-        rows = self._connection.execute(
-            """
+        rows = self._connection.execute("""
             SELECT c.collection_id, c.name, c.description, c.created_at,
                    c.updated_at, COUNT(ca.asset_id) AS asset_count
             FROM collections c
             LEFT JOIN collection_assets ca ON ca.collection_id = c.collection_id
             GROUP BY c.collection_id
             ORDER BY c.name COLLATE NOCASE
-            """
-        ).fetchall()
+            """).fetchall()
         return [dict(row) for row in rows]
 
     def add_to_collection(self, name: str, asset_ids: Iterable[str]) -> int:
@@ -721,7 +831,12 @@ class SampleLibrary:
                 (collection_id, asset_id, position, added_at)
                 VALUES (?, ?, ?, ?)
                 """,
-                (collection_id, str(asset_id), position, datetime.now(timezone.utc).isoformat()),
+                (
+                    collection_id,
+                    str(asset_id),
+                    position,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
             )
             added += int(cursor.rowcount > 0)
         self._connection.commit()
@@ -802,17 +917,22 @@ class SampleLibrary:
             _canonical_json(record.get("config") or {}).encode("utf-8")
         ).hexdigest()[:24]
 
-
     def save_sound_object(self, patch: Any, *, tags: Iterable[str] = ()) -> str:
         """Persist one validated patch, retaining source and processing identities."""
         from reawarp.synthesis.sound_object import SoundObjectPatch
 
-        value = patch if isinstance(patch, SoundObjectPatch) else SoundObjectPatch.from_dict(patch)
+        value = (
+            patch
+            if isinstance(patch, SoundObjectPatch)
+            else SoundObjectPatch.from_dict(patch)
+        )
         for source in value.sources:
             if source.asset_id:
                 asset = self.get_asset(source.asset_id)
                 if asset is None:
-                    raise KeyError(f"sound-object source asset not found: {source.asset_id}")
+                    raise KeyError(
+                        f"sound-object source asset not found: {source.asset_id}"
+                    )
                 if asset.sha256.casefold() != str(source.asset_sha256).casefold():
                     raise ValueError(
                         f"sound-object source hash does not match indexed asset: {source.asset_id}"
@@ -820,10 +940,15 @@ class SampleLibrary:
         canonical = _canonical_json(value.to_dict())
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         normalized_tags = set(self._normalize_tags(tags))
-        normalized_tags.update({
-            "sound-object", value.name.casefold(), value.patch_id.casefold(),
-            value.source_identity_id.casefold(), value.processing_identity_id.casefold(),
-        })
+        normalized_tags.update(
+            {
+                "sound-object",
+                value.name.casefold(),
+                value.patch_id.casefold(),
+                value.source_identity_id.casefold(),
+                value.processing_identity_id.casefold(),
+            }
+        )
         indexed_at = datetime.now(timezone.utc).isoformat()
         self._connection.execute(
             """
@@ -841,9 +966,14 @@ class SampleLibrary:
                 indexed_at=excluded.indexed_at
             """,
             (
-                value.patch_id, value.name, value.source_identity_id,
-                value.processing_identity_id, digest,
-                _canonical_json(sorted(normalized_tags)), canonical, indexed_at,
+                value.patch_id,
+                value.name,
+                value.source_identity_id,
+                value.processing_identity_id,
+                digest,
+                _canonical_json(sorted(normalized_tags)),
+                canonical,
+                indexed_at,
             ),
         )
         row = self._connection.execute(
@@ -877,13 +1007,16 @@ class SampleLibrary:
             "FROM sound_object_versions WHERE patch_id = ? ORDER BY revision",
             (str(patch_id),),
         ).fetchall()
-        return [{
-            "version_id": str(row["version_id"]),
-            "revision": int(row["revision"]),
-            "content_sha256": str(row["content_sha256"]),
-            "patch": SoundObjectPatch.from_dict(json.loads(row["patch_json"])),
-            "created_at": str(row["created_at"]),
-        } for row in rows]
+        return [
+            {
+                "version_id": str(row["version_id"]),
+                "revision": int(row["revision"]),
+                "content_sha256": str(row["content_sha256"]),
+                "patch": SoundObjectPatch.from_dict(json.loads(row["patch_json"])),
+                "created_at": str(row["created_at"]),
+            }
+            for row in rows
+        ]
 
     def get_sound_object_version(self, version_id: str) -> dict[str, Any] | None:
         """Load one immutable patch snapshot by its stable version ID."""
@@ -913,12 +1046,20 @@ class SampleLibrary:
             "SELECT patch_json FROM sound_objects WHERE patch_id = ?",
             (str(patch_id),),
         ).fetchone()
-        return None if row is None else SoundObjectPatch.from_dict(json.loads(row["patch_json"]))
+        return (
+            None
+            if row is None
+            else SoundObjectPatch.from_dict(json.loads(row["patch_json"]))
+        )
 
     def search_sound_objects(
-        self, *, query: str | None = None, tags: Iterable[str] = (),
+        self,
+        *,
+        query: str | None = None,
+        tags: Iterable[str] = (),
         source_identity_id: str | None = None,
-        processing_identity_id: str | None = None, limit: int = 20,
+        processing_identity_id: str | None = None,
+        limit: int = 20,
     ):
         """Search sound-object patches by name, identity and tags."""
         from reawarp.synthesis.sound_object import SoundObjectPatch
@@ -939,12 +1080,20 @@ class SampleLibrary:
                 continue
             if source_identity_id and patch.source_identity_id != source_identity_id:
                 continue
-            if processing_identity_id and patch.processing_identity_id != processing_identity_id:
+            if (
+                processing_identity_id
+                and patch.processing_identity_id != processing_identity_id
+            ):
                 continue
-            searchable = " ".join((
-                patch.name, patch.patch_id, patch.source_identity_id,
-                patch.processing_identity_id, " ".join(sorted(row_tags)),
-            )).casefold()
+            searchable = " ".join(
+                (
+                    patch.name,
+                    patch.patch_id,
+                    patch.source_identity_id,
+                    patch.processing_identity_id,
+                    " ".join(sorted(row_tags)),
+                )
+            ).casefold()
             if needle and needle not in searchable:
                 continue
             result.append(patch)
@@ -953,7 +1102,11 @@ class SampleLibrary:
         return result
 
     def record_sound_object_variant(
-        self, patch_id: str, asset_id: str, *, seed: int,
+        self,
+        patch_id: str,
+        asset_id: str,
+        *,
+        seed: int,
         source_hashes: Iterable[str] | None = None,
         transformations: Iterable[Any] = (),
     ) -> str:
@@ -968,11 +1121,14 @@ class SampleLibrary:
             raise KeyError(f"sound-object variant asset not found: {asset_id}")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise ValueError("variant seed must be an integer")
-        hashes = tuple(sorted(
-            str(item).casefold() for item in (
-                source_hashes if source_hashes is not None else patch.source_hashes
+        hashes = tuple(
+            sorted(
+                str(item).casefold()
+                for item in (
+                    source_hashes if source_hashes is not None else patch.source_hashes
+                )
             )
-        ))
+        )
         if any(
             len(value) != 64 or any(ch not in "0123456789abcdef" for ch in value)
             for value in hashes
@@ -981,14 +1137,17 @@ class SampleLibrary:
         records = []
         for item in transformations:
             record = (
-                item if isinstance(item, TransformationRecord)
+                item
+                if isinstance(item, TransformationRecord)
                 else TransformationRecord.from_dict(item)
             )
             records.append(record.to_dict())
         transforms_json = _canonical_json(records)
         hashes_json = _canonical_json(list(hashes))
         variant_id = hashlib.sha256(
-            f"{patch.patch_id}|{asset.asset_id}|{seed}|{transforms_json}".encode("utf-8")
+            f"{patch.patch_id}|{asset.asset_id}|{seed}|{transforms_json}".encode(
+                "utf-8"
+            )
         ).hexdigest()[:24]
         created_at = datetime.now(timezone.utc).isoformat()
         self._connection.execute(
@@ -1002,8 +1161,13 @@ class SampleLibrary:
                 created_at=excluded.created_at
             """,
             (
-                variant_id, patch.patch_id, asset.asset_id, int(seed),
-                hashes_json, transforms_json, created_at,
+                variant_id,
+                patch.patch_id,
+                asset.asset_id,
+                int(seed),
+                hashes_json,
+                transforms_json,
+                created_at,
             ),
         )
         self._connection.commit()
@@ -1025,15 +1189,18 @@ class SampleLibrary:
             """,
             (str(patch_id),),
         ).fetchall()
-        return [{
-            "variant_id": str(row["variant_id"]),
-            "patch_id": str(row["patch_id"]),
-            "asset_id": str(row["asset_id"]),
-            "seed": int(row["seed"]),
-            "source_hashes": json.loads(row["source_hashes_json"]),
-            "transformations": json.loads(row["transformations_json"]),
-            "created_at": str(row["created_at"]),
-            "path": str(row["path"]),
-            "asset_sha256": str(row["sha256"]),
-            "features": json.loads(row["feature_json"]),
-        } for row in rows]
+        return [
+            {
+                "variant_id": str(row["variant_id"]),
+                "patch_id": str(row["patch_id"]),
+                "asset_id": str(row["asset_id"]),
+                "seed": int(row["seed"]),
+                "source_hashes": json.loads(row["source_hashes_json"]),
+                "transformations": json.loads(row["transformations_json"]),
+                "created_at": str(row["created_at"]),
+                "path": str(row["path"]),
+                "asset_sha256": str(row["sha256"]),
+                "features": json.loads(row["feature_json"]),
+            }
+            for row in rows
+        ]

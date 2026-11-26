@@ -1,4 +1,5 @@
 """Beat-based FX automation editor for the Stem Mixer."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,13 +7,28 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QMessageBox, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.fx_automation import (
-    FX_AUTOMATION_CURVES, FX_AUTOMATION_MAX_POINTS, automation_targets, load_fx_automation,
-    normalise_fx_automation, save_fx_automation,
+    FX_AUTOMATION_CURVES,
+    FX_AUTOMATION_MAX_POINTS,
+    automation_targets,
+    load_fx_automation,
+    normalise_fx_automation,
+    save_fx_automation,
 )
 
 
@@ -117,7 +133,9 @@ class FXAutomationEditor(QGroupBox):
         self.lane.blockSignals(True)
         self.lane.clear()
         for target in automation_targets(self._stem_names):
-            self.lane.addItem(target.replace(".", " / ").replace("_", " ").upper(), target)
+            self.lane.addItem(
+                target.replace(".", " / ").replace("_", " ").upper(), target
+            )
         self.lane.blockSignals(False)
         self.tempo_label.setText(f"{self._bpm:g} BPM")
         self._refresh_table()
@@ -129,7 +147,9 @@ class FXAutomationEditor(QGroupBox):
         self._automation = normalise_fx_automation(payload, self._stem_names)
         self._refresh_table()
         self.changed.emit()
-        self.status.setText(f"Loaded {len(self._automation['lanes'])} automation lane(s).")
+        self.status.setText(
+            f"Loaded {len(self._automation['lanes'])} automation lane(s)."
+        )
 
     def automation(self) -> dict[str, Any]:
         return normalise_fx_automation(self._automation, self._stem_names)
@@ -156,7 +176,8 @@ class FXAutomationEditor(QGroupBox):
         self._select_point()
         self.status.setText(
             "Static value is used outside this lane's points."
-            if not points else f"{len(points)} points · beat positions follow the project tempo."
+            if not points
+            else f"{len(points)} points · beat positions follow the project tempo."
         )
 
     def _point_from_controls(self) -> dict[str, float | str]:
@@ -172,11 +193,15 @@ class FXAutomationEditor(QGroupBox):
             return
         points = list(self._automation["lanes"].get(target, []))
         if len(points) >= FX_AUTOMATION_MAX_POINTS:
-            self.status.setText(f"A lane can contain at most {FX_AUTOMATION_MAX_POINTS} points.")
+            self.status.setText(
+                f"A lane can contain at most {FX_AUTOMATION_MAX_POINTS} points."
+            )
             return
         point = self._point_from_controls()
         if any(abs(float(item["beat"]) - point["beat"]) < 1e-6 for item in points):
-            self.status.setText("A point already exists at that beat. Select it and use UPDATE.")
+            self.status.setText(
+                "A point already exists at that beat. Select it and use UPDATE."
+            )
             return
         points.append(point)
         points.sort(key=lambda item: float(item["beat"]))

@@ -21,7 +21,9 @@ def _finite_json_object(value: Mapping[str, Any]) -> dict[str, Any]:
     try:
         return json.loads(json.dumps(dict(value), ensure_ascii=False, allow_nan=False))
     except (TypeError, ValueError) as exc:
-        raise ValueError("automation parameters must be finite JSON-compatible values") from exc
+        raise ValueError(
+            "automation parameters must be finite JSON-compatible values"
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +36,13 @@ class AutomationTarget:
     value_type: str = "continuous"
     minimum: float | None = None
     maximum: float | None = None
-    interpolation: tuple[str, ...] = ("step", "linear", "smooth", "cubic", "exponential")
+    interpolation: tuple[str, ...] = (
+        "step",
+        "linear",
+        "smooth",
+        "cubic",
+        "exponential",
+    )
     smoothing_seconds: float = 0.0
     hysteresis: float = 0.0
     update_clock: str = "control"
@@ -44,7 +52,13 @@ class AutomationTarget:
         if not self.target_id.strip():
             raise ValueError("automation target_id cannot be empty")
         if self.domain not in {
-            "synthesis", "composition", "spatial", "fx", "transport", "midi", "custom"
+            "synthesis",
+            "composition",
+            "spatial",
+            "fx",
+            "transport",
+            "midi",
+            "custom",
         }:
             raise ValueError("unsupported automation target domain")
         if self.value_type not in {"continuous", "integer", "boolean", "discrete"}:
@@ -59,12 +73,17 @@ class AutomationTarget:
             for item in self.interpolation
         ):
             raise ValueError("automation target has unsupported interpolation modes")
-        if not math.isfinite(float(self.smoothing_seconds)) or self.smoothing_seconds < 0:
+        if (
+            not math.isfinite(float(self.smoothing_seconds))
+            or self.smoothing_seconds < 0
+        ):
             raise ValueError("target smoothing_seconds must be finite and non-negative")
         if not math.isfinite(float(self.hysteresis)) or self.hysteresis < 0:
             raise ValueError("target hysteresis must be finite and non-negative")
         if self.update_clock not in {"sample", "control", "event"}:
-            raise ValueError("automation update_clock must be sample, control, or event")
+            raise ValueError(
+                "automation update_clock must be sample, control, or event"
+            )
         if not math.isfinite(float(self.control_rate_hz)) or self.control_rate_hz <= 0:
             raise ValueError("automation control_rate_hz must be positive and finite")
 
@@ -96,7 +115,9 @@ class AutomationTargetRegistry:
 
     def register(self, target: AutomationTarget) -> None:
         if target.target_id in self._targets:
-            raise ValueError(f"automation target already registered: {target.target_id}")
+            raise ValueError(
+                f"automation target already registered: {target.target_id}"
+            )
         self._targets[target.target_id] = target
 
     def resolve(self, target_id: str) -> AutomationTarget | None:
@@ -139,10 +160,14 @@ class AutomationTargetRegistry:
             )
         if lane.minimum is not None and target.minimum is not None:
             if lane.minimum < target.minimum:
-                raise ValueError(f"automation lane {lane.target_id!r} exceeds target minimum")
+                raise ValueError(
+                    f"automation lane {lane.target_id!r} exceeds target minimum"
+                )
         if lane.maximum is not None and target.maximum is not None:
             if lane.maximum > target.maximum:
-                raise ValueError(f"automation lane {lane.target_id!r} exceeds target maximum")
+                raise ValueError(
+                    f"automation lane {lane.target_id!r} exceeds target maximum"
+                )
         for point in lane.points:
             if (
                 point.interpolation_to_next is not None
@@ -171,36 +196,189 @@ class AutomationTargetRegistry:
         return tuple(self._targets.values())
 
 
-DEFAULT_AUTOMATION_TARGETS = AutomationTargetRegistry((
-    AutomationTarget("synth.cutoff", "synthesis", "Hz", minimum=20.0, maximum=18_000.0),
-    AutomationTarget("synth.resonance", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.gain", "synthesis", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("synth.pitch", "synthesis", "semitones", minimum=-48.0, maximum=48.0, update_clock="event"),
-    AutomationTarget("synth.attack", "synthesis", "seconds", minimum=0.001, maximum=2.0, update_clock="event"),
-    AutomationTarget("synth.decay", "synthesis", "seconds", minimum=0.01, maximum=4.0, update_clock="event"),
-    AutomationTarget("synth.release", "synthesis", "seconds", minimum=0.02, maximum=0.65, update_clock="event"),
-    AutomationTarget("synth.modulation.depth", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("synth.modulation.rate", "synthesis", "Hz", minimum=0.0, maximum=40.0, update_clock="event"),
-    AutomationTarget("synth.wavetable.position", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("synth.partial.balance", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("synth.grain.size", "synthesis", "milliseconds", minimum=1.0, maximum=500.0, update_clock="event"),
-    AutomationTarget("synth.grain.position", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("synth.grain.density", "synthesis", "Hz", minimum=0.0, maximum=200.0, update_clock="event"),
-    AutomationTarget("event.velocity_scale", "composition", "ratio", minimum=0.0, maximum=2.0, update_clock="event"),
-    AutomationTarget("event.probability", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("role.activity", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("role.density", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("role.syncopation", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("role.articulation", "composition", "articulation_index", value_type="discrete", minimum=0, maximum=4, update_clock="event"),
-    AutomationTarget("sample.mix", "composition", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("spatial.pan", "spatial", "normalized", minimum=-1.0, maximum=1.0, update_clock="event"),
-    AutomationTarget("spatial.width", "spatial", "ratio", minimum=0.0, maximum=2.0, update_clock="event"),
-    AutomationTarget("fx.insert.wet", "fx", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("fx.send.space", "fx", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("fx.send.echo", "fx", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("fx.return.space.wet", "fx", "normalized", minimum=0.0, maximum=1.0),
-    AutomationTarget("fx.return.echo.wet", "fx", "normalized", minimum=0.0, maximum=1.0),
-))
+DEFAULT_AUTOMATION_TARGETS = AutomationTargetRegistry(
+    (
+        AutomationTarget(
+            "synth.cutoff", "synthesis", "Hz", minimum=20.0, maximum=18_000.0
+        ),
+        AutomationTarget(
+            "synth.resonance", "synthesis", "normalized", minimum=0.0, maximum=1.0
+        ),
+        AutomationTarget(
+            "synth.gain", "synthesis", "normalized", minimum=0.0, maximum=1.0
+        ),
+        AutomationTarget(
+            "synth.pitch",
+            "synthesis",
+            "semitones",
+            minimum=-48.0,
+            maximum=48.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.attack",
+            "synthesis",
+            "seconds",
+            minimum=0.001,
+            maximum=2.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.decay",
+            "synthesis",
+            "seconds",
+            minimum=0.01,
+            maximum=4.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.release",
+            "synthesis",
+            "seconds",
+            minimum=0.02,
+            maximum=0.65,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.modulation.depth",
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.modulation.rate",
+            "synthesis",
+            "Hz",
+            minimum=0.0,
+            maximum=40.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.wavetable.position",
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.partial.balance",
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.grain.size",
+            "synthesis",
+            "milliseconds",
+            minimum=1.0,
+            maximum=500.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.grain.position",
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "synth.grain.density",
+            "synthesis",
+            "Hz",
+            minimum=0.0,
+            maximum=200.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "event.velocity_scale",
+            "composition",
+            "ratio",
+            minimum=0.0,
+            maximum=2.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "event.probability",
+            "composition",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "role.activity",
+            "composition",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "role.density",
+            "composition",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "role.syncopation",
+            "composition",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "role.articulation",
+            "composition",
+            "articulation_index",
+            value_type="discrete",
+            minimum=0,
+            maximum=4,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "sample.mix",
+            "composition",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "spatial.pan",
+            "spatial",
+            "normalized",
+            minimum=-1.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            "spatial.width",
+            "spatial",
+            "ratio",
+            minimum=0.0,
+            maximum=2.0,
+            update_clock="event",
+        ),
+        AutomationTarget("fx.insert.wet", "fx", "normalized", minimum=0.0, maximum=1.0),
+        AutomationTarget("fx.send.space", "fx", "normalized", minimum=0.0, maximum=1.0),
+        AutomationTarget("fx.send.echo", "fx", "normalized", minimum=0.0, maximum=1.0),
+        AutomationTarget(
+            "fx.return.space.wet", "fx", "normalized", minimum=0.0, maximum=1.0
+        ),
+        AutomationTarget(
+            "fx.return.echo.wet", "fx", "normalized", minimum=0.0, maximum=1.0
+        ),
+    )
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -224,22 +402,38 @@ class AutomationSource:
     def __post_init__(self) -> None:
         if not self.source_id.strip():
             raise ValueError("automation source_id cannot be empty")
-        if self.kind not in {"lfo", "envelope", "stepped", "random_walk", "phrase_curve"}:
+        if self.kind not in {
+            "lfo",
+            "envelope",
+            "stepped",
+            "random_walk",
+            "phrase_curve",
+        }:
             raise ValueError("unsupported automation source kind")
         start, end = as_fraction(self.start), as_fraction(self.end)
         if start < 0 or end <= start:
             raise ValueError("automation source requires 0 <= start < end")
         if self.minimum > self.maximum:
             raise ValueError("automation source minimum cannot exceed maximum")
-        if not math.isfinite(float(self.minimum)) or not math.isfinite(float(self.maximum)):
+        if not math.isfinite(float(self.minimum)) or not math.isfinite(
+            float(self.maximum)
+        ):
             raise ValueError("automation source bounds must be finite")
-        if self.interpolation not in {"step", "linear", "smooth", "cubic", "exponential"}:
+        if self.interpolation not in {
+            "step",
+            "linear",
+            "smooth",
+            "cubic",
+            "exponential",
+        }:
             raise ValueError("unsupported automation source interpolation")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("automation source seed must be an integer")
         object.__setattr__(self, "start", start)
         object.__setattr__(self, "end", end)
-        object.__setattr__(self, "parameters", _finite_json_object(self.parameters or {}))
+        object.__setattr__(
+            self, "parameters", _finite_json_object(self.parameters or {})
+        )
 
     @property
     def target_id(self) -> str:
@@ -266,10 +460,14 @@ class AutomationSource:
             center = float(parameters.get("center", 0.5))
             depth = float(parameters.get("depth", 0.5))
             waveform = str(parameters.get("waveform", "sine"))
-            if not math.isfinite(period) or period <= 0 or not all(
-                math.isfinite(value) for value in (phase, center, depth)
+            if (
+                not math.isfinite(period)
+                or period <= 0
+                or not all(math.isfinite(value) for value in (phase, center, depth))
             ):
-                raise ValueError("LFO period, phase, centre, and depth must be finite; period > 0")
+                raise ValueError(
+                    "LFO period, phase, centre, and depth must be finite; period > 0"
+                )
             if waveform not in {"sine", "triangle", "square", "saw"}:
                 raise ValueError("LFO waveform must be sine, triangle, square, or saw")
             positions = self._positions(count)
@@ -285,12 +483,13 @@ class AutomationSource:
                 else:
                     wave = math.sin(2.0 * math.pi * cycles)
                 segment_curve = (
-                    "step" if waveform == "square" and index < len(positions) - 1
+                    "step"
+                    if waveform == "square" and index < len(positions) - 1
                     else None
                 )
-                points.append(AutomationPoint(
-                    position, center + depth * wave, segment_curve
-                ))
+                points.append(
+                    AutomationPoint(position, center + depth * wave, segment_curve)
+                )
 
         elif self.kind in {"envelope", "phrase_curve"}:
             if self.kind == "envelope":
@@ -300,30 +499,51 @@ class AutomationSource:
                 values = parameters.get("values", [0.0, 0.7, 0.35, 1.0])
                 if not isinstance(values, list) or len(values) < 2:
                     raise ValueError("phrase_curve requires at least two values")
-                shape = [[index / (len(values) - 1), value] for index, value in enumerate(values)]
+                shape = [
+                    [index / (len(values) - 1), value]
+                    for index, value in enumerate(values)
+                ]
                 interpolation = str(parameters.get("curve", self.interpolation))
             if not isinstance(shape, list) or len(shape) < 2:
-                raise ValueError(f"{self.kind} requires at least two [position, value] points")
-            if interpolation not in {"step", "linear", "smooth", "cubic", "exponential"}:
+                raise ValueError(
+                    f"{self.kind} requires at least two [position, value] points"
+                )
+            if interpolation not in {
+                "step",
+                "linear",
+                "smooth",
+                "cubic",
+                "exponential",
+            }:
                 raise ValueError("unsupported source curve interpolation")
             normalized: list[tuple[float, float]] = []
             for item in shape:
                 if not isinstance(item, (list, tuple)) or len(item) != 2:
-                    raise ValueError("source shape points must be [normalized_position, value]")
+                    raise ValueError(
+                        "source shape points must be [normalized_position, value]"
+                    )
                 at, value = float(item[0]), float(item[1])
-                if not math.isfinite(at) or not math.isfinite(value) or not 0.0 <= at <= 1.0:
-                    raise ValueError("source shape positions must be within 0..1 and values finite")
+                if (
+                    not math.isfinite(at)
+                    or not math.isfinite(value)
+                    or not 0.0 <= at <= 1.0
+                ):
+                    raise ValueError(
+                        "source shape positions must be within 0..1 and values finite"
+                    )
                 normalized.append((at, value))
             if normalized[0][0] != 0.0 or normalized[-1][0] != 1.0:
                 raise ValueError("source shape must begin at 0 and end at 1")
             if any(a[0] >= b[0] for a, b in zip(normalized, normalized[1:])):
                 raise ValueError("source shape positions must be strictly increasing")
             for index, (at, value) in enumerate(normalized):
-                points.append(AutomationPoint(
-                    self.start + duration * Fraction(str(at)),
-                    value,
-                    interpolation if index < len(normalized) - 1 else None,
-                ))
+                points.append(
+                    AutomationPoint(
+                        self.start + duration * Fraction(str(at)),
+                        value,
+                        interpolation if index < len(normalized) - 1 else None,
+                    )
+                )
 
         elif self.kind == "stepped":
             values = parameters.get("values", [0.0, 1.0, 0.5, 0.8])
@@ -336,7 +556,11 @@ class AutomationSource:
             cursor = self.start
             index = 0
             while cursor < self.end:
-                value = float(values[index % len(values)] if repeat else values[min(index, len(values) - 1)])
+                value = float(
+                    values[index % len(values)]
+                    if repeat
+                    else values[min(index, len(values) - 1)]
+                )
                 if not math.isfinite(value):
                     raise ValueError("stepped source values must be finite")
                 points.append(AutomationPoint(cursor, value, "step"))
@@ -349,13 +573,25 @@ class AutomationSource:
         else:
             step_beats = as_fraction(str(parameters.get("step_beats", 1)))
             step_size = float(parameters.get("step_size", 0.12))
-            initial = float(parameters.get("initial", (self.minimum + self.maximum) / 2.0))
+            initial = float(
+                parameters.get("initial", (self.minimum + self.maximum) / 2.0)
+            )
             if step_beats <= 0 or not math.isfinite(step_size) or step_size < 0:
-                raise ValueError("random_walk step_beats must be positive and step_size non-negative")
+                raise ValueError(
+                    "random_walk step_beats must be positive and step_size non-negative"
+                )
             if not self.minimum <= initial <= self.maximum:
-                raise ValueError("random_walk initial value must lie inside source bounds")
-            seed_material = f"reawarp:automation-source:v1:{self.seed}:{self.source_id}".encode("utf-8")
-            seed = int.from_bytes(hashlib.blake2b(seed_material, digest_size=8).digest(), "little")
+                raise ValueError(
+                    "random_walk initial value must lie inside source bounds"
+                )
+            seed_material = (
+                f"reawarp:automation-source:v1:{self.seed}:{self.source_id}".encode(
+                    "utf-8"
+                )
+            )
+            seed = int.from_bytes(
+                hashlib.blake2b(seed_material, digest_size=8).digest(), "little"
+            )
             rng = np.random.default_rng(seed)
             cursor = self.start
             value = initial
@@ -368,7 +604,9 @@ class AutomationSource:
                 if span > 0:
                     period = 2.0 * span
                     folded = (value - self.minimum) % period
-                    value = self.minimum + (folded if folded <= span else period - folded)
+                    value = self.minimum + (
+                        folded if folded <= span else period - folded
+                    )
                 else:
                     value = self.minimum
                 points.append(AutomationPoint(cursor, value, "linear"))
@@ -448,11 +686,18 @@ class AutomationModulation:
         if self.mode not in {"add", "multiply"}:
             raise ValueError("modulation mode must be add or multiply")
         if self.retrigger not in {"free", "event", "role", "section"}:
-            raise ValueError("modulation retrigger must be free, event, role, or section")
+            raise ValueError(
+                "modulation retrigger must be free, event, role, or section"
+            )
         if not math.isfinite(float(self.amount)):
             raise ValueError("modulation amount must be finite")
-        if not math.isfinite(float(self.smoothing_seconds)) or self.smoothing_seconds < 0:
-            raise ValueError("modulation smoothing_seconds must be finite and non-negative")
+        if (
+            not math.isfinite(float(self.smoothing_seconds))
+            or self.smoothing_seconds < 0
+        ):
+            raise ValueError(
+                "modulation smoothing_seconds must be finite and non-negative"
+            )
         if not math.isfinite(float(self.hysteresis)) or self.hysteresis < 0:
             raise ValueError("modulation hysteresis must be finite and non-negative")
         if self.minimum is not None and not math.isfinite(float(self.minimum)):
@@ -461,7 +706,11 @@ class AutomationModulation:
             raise ValueError("modulation maximum must be finite")
         if self.base_value is not None and not math.isfinite(float(self.base_value)):
             raise ValueError("modulation base_value must be finite")
-        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+        if (
+            self.minimum is not None
+            and self.maximum is not None
+            and self.minimum > self.maximum
+        ):
             raise ValueError("modulation minimum cannot exceed maximum")
         if self.scope not in {"global", "section", "role", "event"}:
             raise ValueError("modulation scope must be global, section, role, or event")
@@ -500,7 +749,9 @@ class AutomationModulation:
             hysteresis=float(data.get("hysteresis", 0.0)),
             minimum=None if data.get("minimum") is None else float(data["minimum"]),
             maximum=None if data.get("maximum") is None else float(data["maximum"]),
-            base_value=None if data.get("base_value") is None else float(data["base_value"]),
+            base_value=(
+                None if data.get("base_value") is None else float(data["base_value"])
+            ),
             scope=str(data.get("scope", "global")),
             scope_id=None if data.get("scope_id") is None else str(data["scope_id"]),
         )
@@ -548,9 +799,7 @@ class AutomationControlBus:
             str(key): dict(value) for key, value in (event_contexts or {}).items()
         }
         source_items = tuple(sources)
-        source_lanes = {
-            source.source_id: source.to_lane() for source in source_items
-        }
+        source_lanes = {source.source_id: source.to_lane() for source in source_items}
         lane_items = tuple(lanes) + tuple(source_lanes.values())
         lane_keys: set[tuple[str, str, str | None]] = set()
         for lane in lane_items:
@@ -563,7 +812,8 @@ class AutomationControlBus:
             lane_keys.add(key)
             target = registry.validate_lane(
                 lane,
-                allow_custom=allow_custom_targets or lane.target_id.startswith("source."),
+                allow_custom=allow_custom_targets
+                or lane.target_id.startswith("source."),
             )
             self._lanes.setdefault(lane.target_id, []).append(lane)
             self._targets[lane.target_id] = target
@@ -623,8 +873,14 @@ class AutomationControlBus:
             return seconds
         return seconds * self.source_sample_rate
 
-    def _context(self, event_id: str | None, context: Mapping[str, Any] | None) -> dict[str, Any]:
-        result = dict(self._event_contexts.get(str(event_id), {})) if event_id is not None else {}
+    def _context(
+        self, event_id: str | None, context: Mapping[str, Any] | None
+    ) -> dict[str, Any]:
+        result = (
+            dict(self._event_contexts.get(str(event_id), {}))
+            if event_id is not None
+            else {}
+        )
         if context:
             result.update(context)
         return result
@@ -640,10 +896,7 @@ class AutomationControlBus:
             "role": "role_id",
             "event": "event_id",
         }[modulation.scope]
-        return (
-            scope_key is None
-            or str(context.get(scope_key)) == modulation.scope_id
-        )
+        return scope_key is None or str(context.get(scope_key)) == modulation.scope_id
 
     def _value_before_modulation(
         self,
@@ -702,13 +955,15 @@ class AutomationControlBus:
             target_id, int(frame), default_value=default_value, context=resolved_context
         )
         destination_modulations = tuple(
-            item for item in self._modulations.get(target_id, ())
+            item
+            for item in self._modulations.get(target_id, ())
             if self._modulation_matches_context(item, resolved_context)
         )
         if not active:
             explicit_base = next(
                 (
-                    item.base_value for item in destination_modulations
+                    item.base_value
+                    for item in destination_modulations
                     if item.base_value is not None
                 ),
                 None,
@@ -725,7 +980,9 @@ class AutomationControlBus:
                 "section": "section_onset_frame",
             }[modulation.retrigger]
             origin = resolved_context.get(origin_key) if origin_key else None
-            source_frame = max(0, int(frame) - int(origin)) if origin is not None else int(frame)
+            source_frame = (
+                max(0, int(frame) - int(origin)) if origin is not None else int(frame)
+            )
             source_position = self._lane_position(source_lane, source_frame)
             if origin is not None:
                 source_position += self._sources[modulation.source_id].start
@@ -799,9 +1056,18 @@ class AutomationControlBus:
         for lane in self._lanes.get(target_id, ()):
             applies = (
                 lane.scope == "global"
-                or (lane.scope == "role" and resolved_context.get("role_id") == lane.scope_id)
-                or (lane.scope == "section" and resolved_context.get("section_id") == lane.scope_id)
-                or (lane.scope == "event" and resolved_context.get("event_id") == lane.scope_id)
+                or (
+                    lane.scope == "role"
+                    and resolved_context.get("role_id") == lane.scope_id
+                )
+                or (
+                    lane.scope == "section"
+                    and resolved_context.get("section_id") == lane.scope_id
+                )
+                or (
+                    lane.scope == "event"
+                    and resolved_context.get("event_id") == lane.scope_id
+                )
             )
             if applies:
                 smoothing = max(smoothing, lane.smoothing_seconds)

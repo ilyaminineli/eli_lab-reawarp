@@ -37,36 +37,45 @@ def percussion_to_score_events(
     result: list[MusicalEvent] = []
     index = 0
     for lane in sorted(lanes):
-        for source in sorted(lanes[lane], key=lambda item: (int(item.step), str(item.kind or ""))):
+        for source in sorted(
+            lanes[lane], key=lambda item: (int(item.step), str(item.kind or ""))
+        ):
             role = str(getattr(source, "lane", lane))
             kind = str(getattr(source, "kind", "") or "")
             voice_duration = _percussion_voice_duration(role, kind)
-            duration_beats = Fraction(str(voice_duration * float(bpm) / 60.0)).limit_denominator(15360)
-            result.append(MusicalEvent(
-                event_id=f"perc-{index:07d}",
-                voice_id=role,
-                onset_beats=_step_beats(int(source.step)),
-                duration_beats=max(Fraction(1, 64), duration_beats),
-                kind="hit",
-                velocity=float(source.velocity),
-                parameters={
-                    "pan": float(getattr(source, "pan", 0.0)),
-                    "step": int(source.step),
-                    "pattern_style": getattr(source, "pattern_style", None),
-                    "motif_id": getattr(source, "motif_id", None),
-                    "motif_relation": getattr(source, "motif_relation", None),
-                    "source_kind": kind,
-                    "planner": "percussion",
-                    "voice_duration_seconds": voice_duration,
-                },
-                tags=("percussion", role, kind),
-                source_id=getattr(source, "motif_id", None) or role,
-                seed=_event_seed(streams, f"{role}_pattern"),
-            ))
+            duration_beats = Fraction(
+                str(voice_duration * float(bpm) / 60.0)
+            ).limit_denominator(15360)
+            result.append(
+                MusicalEvent(
+                    event_id=f"perc-{index:07d}",
+                    voice_id=role,
+                    onset_beats=_step_beats(int(source.step)),
+                    duration_beats=max(Fraction(1, 64), duration_beats),
+                    kind="hit",
+                    velocity=float(source.velocity),
+                    parameters={
+                        "pan": float(getattr(source, "pan", 0.0)),
+                        "step": int(source.step),
+                        "pattern_style": getattr(source, "pattern_style", None),
+                        "motif_id": getattr(source, "motif_id", None),
+                        "motif_relation": getattr(source, "motif_relation", None),
+                        "source_kind": kind,
+                        "planner": "percussion",
+                        "voice_duration_seconds": voice_duration,
+                    },
+                    tags=("percussion", role, kind),
+                    source_id=getattr(source, "motif_id", None) or role,
+                    seed=_event_seed(streams, f"{role}_pattern"),
+                )
+            )
             index += 1
-    return tuple(sorted(result, key=lambda event: (
-        event.onset_beats, event.voice_id, event.event_id
-    )))
+    return tuple(
+        sorted(
+            result,
+            key=lambda event: (event.onset_beats, event.voice_id, event.event_id),
+        )
+    )
 
 
 def _percussion_voice_duration(role: str, kind: str) -> float:
@@ -95,34 +104,38 @@ def melody_to_score_events(
             str(float(source.duration) * float(bpm) / 60.0)
         ).limit_denominator(15360)
         gate_duration = max(Fraction(1, 64), raw_duration)
-        tail_duration = Fraction(str(float(release_seconds) * float(bpm) / 60.0)).limit_denominator(15360)
+        tail_duration = Fraction(
+            str(float(release_seconds) * float(bpm) / 60.0)
+        ).limit_denominator(15360)
         duration = gate_duration + tail_duration
-        result.append(MusicalEvent(
-            event_id=f"melody-{index:07d}",
-            voice_id=voice_id,
-            onset_beats=onset,
-            duration_beats=duration,
-            kind="note",
-            pitch=float(source.midi_note),
-            frequency_hz=float(source.frequency),
-            velocity=float(source.velocity),
-            parameters={
-                "pan": float(source.pan),
-                "source_x": float(source.source_x),
-                "source_y": float(source.source_y),
-                "step": int(source.step),
-                "gate_duration_beats": str(gate_duration),
-                "release_seconds": float(release_seconds),
-                "motif_id": getattr(source, "motif_id", None),
-                "motif_transform": getattr(source, "motif_transform", None),
-                "phrase_index": getattr(source, "phrase_index", None),
-                "synthesis_intent": "melody",
-                "planner": "melody",
-            },
-            tags=("melody", "note"),
-            source_id=getattr(source, "motif_id", None),
-            seed=seed,
-        ))
+        result.append(
+            MusicalEvent(
+                event_id=f"melody-{index:07d}",
+                voice_id=voice_id,
+                onset_beats=onset,
+                duration_beats=duration,
+                kind="note",
+                pitch=float(source.midi_note),
+                frequency_hz=float(source.frequency),
+                velocity=float(source.velocity),
+                parameters={
+                    "pan": float(source.pan),
+                    "source_x": float(source.source_x),
+                    "source_y": float(source.source_y),
+                    "step": int(source.step),
+                    "gate_duration_beats": str(gate_duration),
+                    "release_seconds": float(release_seconds),
+                    "motif_id": getattr(source, "motif_id", None),
+                    "motif_transform": getattr(source, "motif_transform", None),
+                    "phrase_index": getattr(source, "phrase_index", None),
+                    "synthesis_intent": "melody",
+                    "planner": "melody",
+                },
+                tags=("melody", "note"),
+                source_id=getattr(source, "motif_id", None),
+                seed=seed,
+            )
+        )
     return tuple(result)
 
 
@@ -139,15 +152,21 @@ def score_from_planner_events(
     if bpm <= 0:
         raise ValueError("bpm must be positive")
     streams = dict(seed_streams or {})
-    drum_events = percussion_to_score_events(percussion or {}, bpm=bpm, seed_streams=streams)
+    drum_events = percussion_to_score_events(
+        percussion or {}, bpm=bpm, seed_streams=streams
+    )
     melody_events = melody_to_score_events(
-        melody, bpm=bpm, seed=_event_seed(streams, "melody_pattern"),
+        melody,
+        bpm=bpm,
+        seed=_event_seed(streams, "melody_pattern"),
         release_seconds=melody_release_seconds,
     )
-    merged = tuple(sorted(
-        (*drum_events, *melody_events),
-        key=lambda event: (event.onset_beats, event.voice_id, event.event_id),
-    ))
+    merged = tuple(
+        sorted(
+            (*drum_events, *melody_events),
+            key=lambda event: (event.onset_beats, event.voice_id, event.event_id),
+        )
+    )
     return Score(
         title="Reawarp planner score",
         tempo_map=TempoMap.constant(float(bpm)),
@@ -171,21 +190,27 @@ def score_to_legacy_grid_events(score: Score) -> dict[str, list[dict[str, Any]]]
     for event in score.events:
         step = event.onset_beats * 4
         if step.denominator != 1:
-            raise ValueError("legacy grid projection cannot represent non-sixteenth positions")
-        result.setdefault(event.voice_id, []).append({
-            "step": int(step),
-            "time": float(score.tempo_map.beat_to_seconds(event.onset_beats)),
-            "duration_beats": event.parameters.get("gate_duration_beats", str(event.duration_beats)),
-            "render_duration_beats": str(event.duration_beats),
-            "velocity": event.velocity,
-            "pan": float(event.parameters.get("pan", 0.0)),
-            "kind": event.parameters.get("source_kind", event.kind),
-            "pattern_style": event.parameters.get("pattern_style"),
-            "motif_id": event.parameters.get("motif_id"),
-            "motif_relation": event.parameters.get("motif_relation"),
-            "midi_note": event.pitch,
-            "frequency": event.frequency_hz,
-        })
+            raise ValueError(
+                "legacy grid projection cannot represent non-sixteenth positions"
+            )
+        result.setdefault(event.voice_id, []).append(
+            {
+                "step": int(step),
+                "time": float(score.tempo_map.beat_to_seconds(event.onset_beats)),
+                "duration_beats": event.parameters.get(
+                    "gate_duration_beats", str(event.duration_beats)
+                ),
+                "render_duration_beats": str(event.duration_beats),
+                "velocity": event.velocity,
+                "pan": float(event.parameters.get("pan", 0.0)),
+                "kind": event.parameters.get("source_kind", event.kind),
+                "pattern_style": event.parameters.get("pattern_style"),
+                "motif_id": event.parameters.get("motif_id"),
+                "motif_relation": event.parameters.get("motif_relation"),
+                "midi_note": event.pitch,
+                "frequency": event.frequency_hz,
+            }
+        )
     for records in result.values():
         records.sort(key=lambda item: (item["step"], str(item["kind"] or "")))
     return result

@@ -3,6 +3,7 @@
 M24.6 intentionally exposes one fixed orthogonal topology. It is not a
 user-wired feedback graph, a live effect callback, or an M22 default insert.
 """
+
 from __future__ import annotations
 
 import math
@@ -12,7 +13,12 @@ from typing import Any, Sequence
 
 import numpy as np
 
-from reawarp.dsp._stft import audio_channels, finite_range, restore_shape, signal_diagnostics
+from reawarp.dsp._stft import (
+    audio_channels,
+    finite_range,
+    restore_shape,
+    signal_diagnostics,
+)
 
 _TOPOLOGY = (
     np.asarray(
@@ -83,7 +89,9 @@ class FeedbackDelayNetwork:
         tail_threshold_db: float = 80.0,
         output_ceiling: float = 0.98,
     ) -> None:
-        if isinstance(sample_rate, bool) or not isinstance(sample_rate, (int, np.integer)):
+        if isinstance(sample_rate, bool) or not isinstance(
+            sample_rate, (int, np.integer)
+        ):
             raise ValueError("sample_rate must be an integer")
         if not 8_000 <= int(sample_rate) <= 192_000:
             raise ValueError("sample_rate must be between 8000 and 192000 Hz")
@@ -100,13 +108,19 @@ class FeedbackDelayNetwork:
             for value in normalized
         )
         if len(set(self.delay_frames)) != 4:
-            raise ValueError("delay_times_ms must resolve to four distinct sample delays")
+            raise ValueError(
+                "delay_times_ms must resolve to four distinct sample delays"
+            )
         self.feedback_gain = finite_range(feedback_gain, "feedback_gain", 0.0, 0.98)
         self.input_gain = finite_range(input_gain, "input_gain", 0.0, 1.0)
         self.dry = finite_range(dry, "dry", 0.0, 1.0)
         self.wet = finite_range(wet, "wet", 0.0, 1.0)
-        self.max_tail_seconds = finite_range(max_tail_seconds, "max_tail_seconds", 0.0, 30.0)
-        self.tail_threshold_db = finite_range(tail_threshold_db, "tail_threshold_db", 40.0, 120.0)
+        self.max_tail_seconds = finite_range(
+            max_tail_seconds, "max_tail_seconds", 0.0, 30.0
+        )
+        self.tail_threshold_db = finite_range(
+            tail_threshold_db, "tail_threshold_db", 40.0, 120.0
+        )
         self.output_ceiling = finite_range(output_ceiling, "output_ceiling", 0.1, 1.0)
 
         self._block_size = min(min(self.delay_frames), 8_192)
@@ -167,7 +181,9 @@ class FeedbackDelayNetwork:
             self._injection = _MONO_INJECTION if channels == 1 else _STEREO_INJECTION
             self._decode = self._injection.T
         elif self._channels != channels:
-            raise ValueError("feedback network channel count cannot change before reset")
+            raise ValueError(
+                "feedback network channel count cannot change before reset"
+            )
 
     def process(
         self,
@@ -177,9 +193,13 @@ class FeedbackDelayNetwork:
     ) -> np.ndarray:
         """Process one streaming block and retain the network state."""
         if self._stopped:
-            raise RuntimeError("feedback network is panic-stopped; call start() or reset()")
+            raise RuntimeError(
+                "feedback network is panic-stopped; call start() or reset()"
+            )
         if self._flushed:
-            raise RuntimeError("feedback network has been flushed; call start() or reset()")
+            raise RuntimeError(
+                "feedback network has been flushed; call start() or reset()"
+            )
         source, was_vector = audio_channels(audio, "feedback input")
         self._configure_channels(source, was_vector)
         if len(source) == 0:
@@ -201,7 +221,7 @@ class FeedbackDelayNetwork:
                     slots = (positions[valid] - delay) % self._ring_size
                     delayed[line, valid] = self._ring[line, slots]
 
-            chunk = source[offset:offset + count].astype(np.float64, copy=False)
+            chunk = source[offset : offset + count].astype(np.float64, copy=False)
             assert self._injection is not None and self._decode is not None
             injected = (chunk @ self._injection.T).T * self.input_gain
             feedback = _TOPOLOGY @ delayed
@@ -211,7 +231,7 @@ class FeedbackDelayNetwork:
 
             echo = (self._decode @ delayed).T
             mixed = self.dry * chunk + self.wet * echo
-            output[offset:offset + count] = mixed.astype(np.float32)
+            output[offset : offset + count] = mixed.astype(np.float32)
             self._frame_index += count
 
         return restore_shape(output, was_vector)
@@ -224,7 +244,9 @@ class FeedbackDelayNetwork:
     ) -> np.ndarray:
         """Render and return the remaining bounded feedback tail."""
         if self._stopped:
-            raise RuntimeError("feedback network is panic-stopped; call start() or reset()")
+            raise RuntimeError(
+                "feedback network is panic-stopped; call start() or reset()"
+            )
         if self._flushed:
             raise RuntimeError("feedback network has already been flushed")
         plan = self.tail_plan(max_tail_seconds)
@@ -299,28 +321,33 @@ def feedback_delay_network(
     started = time.perf_counter()
     if bypass or (processor.wet == 0.0 and processor.dry == 1.0) or len(source) == 0:
         direct = restore_shape(source.copy(), was_vector)
-        return FeedbackNetworkResult(direct, {
-            "module": "m24.6.feedback_network",
-            "topology": processor.topology_id,
-            "bypass": True,
-            "sample_rate": processor.sample_rate,
-            "input_frames": len(source),
-            "output_frames": len(source),
-            "tail_frames": 0,
-            "tail_seconds": 0.0,
-            "tail_truncated": False,
-            "feedback_gain": processor.feedback_gain,
-            "feedback_matrix_operator_norm": 1.0,
-            "stability_margin": processor.stability_margin,
-            "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(direct),
-        })
+        return FeedbackNetworkResult(
+            direct,
+            {
+                "module": "m24.6.feedback_network",
+                "topology": processor.topology_id,
+                "bypass": True,
+                "sample_rate": processor.sample_rate,
+                "input_frames": len(source),
+                "output_frames": len(source),
+                "tail_frames": 0,
+                "tail_seconds": 0.0,
+                "tail_truncated": False,
+                "feedback_gain": processor.feedback_gain,
+                "feedback_matrix_operator_norm": 1.0,
+                "stability_margin": processor.stability_margin,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(direct),
+            },
+        )
 
     head = processor.process(source, cancel_event=cancel_event)
     tail = processor.flush(cancel_event=cancel_event)
     combined = np.concatenate((np.asarray(head), np.asarray(tail)), axis=0)
     raw_peak = float(np.max(np.abs(combined))) if combined.size else 0.0
-    guard_gain = min(1.0, processor.output_ceiling / raw_peak) if raw_peak > 0.0 else 1.0
+    guard_gain = (
+        min(1.0, processor.output_ceiling / raw_peak) if raw_peak > 0.0 else 1.0
+    )
     guarded = np.asarray(combined * np.float32(guard_gain), dtype=np.float32)
     output = restore_shape(guarded, was_vector)
     tail_plan = processor.tail_plan()
@@ -350,8 +377,11 @@ def feedback_delay_network(
         "peak_before_guard": raw_peak,
         "output_guard_gain": guard_gain,
         "estimated_working_bytes": int(
-            processor._ring.nbytes + np.asarray(head).nbytes
-            + np.asarray(tail).nbytes + combined.nbytes + guarded.nbytes
+            processor._ring.nbytes
+            + np.asarray(head).nbytes
+            + np.asarray(tail).nbytes
+            + combined.nbytes
+            + guarded.nbytes
         ),
         "processing_seconds": time.perf_counter() - started,
         **signal_diagnostics(output),

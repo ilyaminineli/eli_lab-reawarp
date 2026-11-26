@@ -4,6 +4,7 @@ A transition is a bounded three-phase instruction over existing M28/M20 phrase
 identity. The model records intent and an atomic scene-change boundary; it does
 not create a second playback timeline or silently mutate rendered audio.
 """
+
 from __future__ import annotations
 
 import copy
@@ -17,40 +18,43 @@ from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.time import as_fraction
 
-
 TRANSITION_SCHEMA_VERSION = 1
 TRANSITION_FORMAT = "eli_lab_reawarp_transition_plan"
-TRANSITION_TYPES = frozenset({
-    "additive",
-    "subtractive",
-    "filtered_registral",
-    "rhythmic_displacement",
-    "metric_reinterpretation",
-    "fragmentation",
-    "overlap",
-    "silence",
-    "false_return",
-    "motif_bridge",
-})
+TRANSITION_TYPES = frozenset(
+    {
+        "additive",
+        "subtractive",
+        "filtered_registral",
+        "rhythmic_displacement",
+        "metric_reinterpretation",
+        "fragmentation",
+        "overlap",
+        "silence",
+        "false_return",
+        "motif_bridge",
+    }
+)
 TRANSITION_PHASES = ("preparation", "change", "arrival")
-TRANSITION_DIMENSIONS = frozenset({
-    "roles",
-    "density",
-    "register",
-    "rhythm",
-    "meter",
-    "timbre",
-    "articulation",
-    "harmony",
-    "space",
-    "texture",
-    "motif",
-    "silence",
-    "energy",
-    "dynamics",
-    "duration",
-    "identity",
-})
+TRANSITION_DIMENSIONS = frozenset(
+    {
+        "roles",
+        "density",
+        "register",
+        "rhythm",
+        "meter",
+        "timbre",
+        "articulation",
+        "harmony",
+        "space",
+        "texture",
+        "motif",
+        "silence",
+        "energy",
+        "dynamics",
+        "duration",
+        "identity",
+    }
+)
 _TRANSITION_METADATA_KEY = "m30_transition_plans"
 _TRANSITION_FINGERPRINT_KEY = "m30_transition_plan_fingerprint"
 _MARKER_PARAMETER_KEY = "m30_transition_marker"
@@ -80,17 +84,20 @@ def _json_object(value: Mapping[str, Any], name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{name} must be a JSON object")
     try:
-        return json.loads(json.dumps(
-            dict(value), sort_keys=True, ensure_ascii=False, allow_nan=False
-        ))
+        return json.loads(
+            json.dumps(dict(value), sort_keys=True, ensure_ascii=False, allow_nan=False)
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must contain finite JSON-compatible values") from exc
 
 
 def _fingerprint(value: Any) -> str:
     encoded = json.dumps(
-        value, sort_keys=True, ensure_ascii=False,
-        separators=(",", ":"), allow_nan=False,
+        value,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -177,7 +184,12 @@ class TransitionPlan:
             raise ValueError(
                 f"unsupported transition plan schema version: {self.schema_version}"
             )
-        for name in ("transition_id", "source_phrase_id", "target_phrase_id", "seed_name"):
+        for name in (
+            "transition_id",
+            "source_phrase_id",
+            "target_phrase_id",
+            "seed_name",
+        ):
             object.__setattr__(self, name, _text(getattr(self, name), name))
         if self.source_phrase_id == self.target_phrase_id:
             raise ValueError("transition source and target phrases must be different")
@@ -190,35 +202,54 @@ class TransitionPlan:
         object.__setattr__(self, "transition_type", transition_type)
 
         phases = tuple(
-            item if isinstance(item, TransitionPhase) else TransitionPhase.from_dict(item)
+            (
+                item
+                if isinstance(item, TransitionPhase)
+                else TransitionPhase.from_dict(item)
+            )
             for item in self.phases
         )
-        if len(phases) != 3 or tuple(item.phase for item in phases) != TRANSITION_PHASES:
+        if (
+            len(phases) != 3
+            or tuple(item.phase for item in phases) != TRANSITION_PHASES
+        ):
             raise ValueError(
                 "transition plan requires preparation, change and arrival phases in order"
             )
         if phases[0].end_beats != phases[1].start_beats:
-            raise ValueError("preparation and change phases must meet at one exact beat")
+            raise ValueError(
+                "preparation and change phases must meet at one exact beat"
+            )
         if phases[1].end_beats != phases[2].start_beats:
             raise ValueError("change and arrival phases must meet at one exact beat")
         object.__setattr__(self, "phases", phases)
 
-        changed = tuple(_text(item, "changed dimension") for item in self.changed_dimensions)
-        preserved = tuple(_text(item, "preserved dimension") for item in self.preserved_dimensions)
+        changed = tuple(
+            _text(item, "changed dimension") for item in self.changed_dimensions
+        )
+        preserved = tuple(
+            _text(item, "preserved dimension") for item in self.preserved_dimensions
+        )
         if not changed:
             raise ValueError("transition must declare at least one changed dimension")
         if len(changed) != len(set(changed)) or len(preserved) != len(set(preserved)):
             raise ValueError("changed and preserved dimensions must be unique")
         unknown = (set(changed) | set(preserved)) - TRANSITION_DIMENSIONS
         if unknown:
-            raise ValueError("unsupported transition dimensions: " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unsupported transition dimensions: " + ", ".join(sorted(unknown))
+            )
         overlap = set(changed) & set(preserved)
         if overlap:
-            raise ValueError("a transition dimension cannot be both changed and preserved")
+            raise ValueError(
+                "a transition dimension cannot be both changed and preserved"
+            )
         object.__setattr__(self, "changed_dimensions", changed)
         object.__setattr__(self, "preserved_dimensions", preserved)
 
-        roles = tuple(_text(item, "participating role") for item in self.participating_roles)
+        roles = tuple(
+            _text(item, "participating role") for item in self.participating_roles
+        )
         if len(roles) != len(set(roles)):
             raise ValueError("participating roles must be unique")
         object.__setattr__(self, "participating_roles", roles)
@@ -228,7 +259,11 @@ class TransitionPlan:
         object.__setattr__(self, "source_state", source_state)
         object.__setattr__(self, "target_state", target_state)
 
-        if isinstance(self.seed, bool) or not isinstance(self.seed, int) or self.seed < 0:
+        if (
+            isinstance(self.seed, bool)
+            or not isinstance(self.seed, int)
+            or self.seed < 0
+        ):
             raise ValueError("transition seed must be a non-negative integer")
         if transition_type == "motif_bridge":
             motif_id = _text(self.motif_bridge_id or "", "motif_bridge_id")
@@ -285,7 +320,9 @@ class TransitionPlan:
             source_phrase_id=str(data.get("source_phrase_id", "")),
             target_phrase_id=str(data.get("target_phrase_id", "")),
             transition_type=str(data.get("transition_type", "")),
-            phases=tuple(TransitionPhase.from_dict(item) for item in data.get("phases", ())),
+            phases=tuple(
+                TransitionPhase.from_dict(item) for item in data.get("phases", ())
+            ),
             changed_dimensions=tuple(data.get("changed_dimensions", ())),
             preserved_dimensions=tuple(data.get("preserved_dimensions", ())),
             participating_roles=tuple(data.get("participating_roles", ())),
@@ -322,9 +359,13 @@ def _validate_phrase_references(score: Score, plan: TransitionPlan) -> None:
     source = phrases.get(plan.source_phrase_id)
     target = phrases.get(plan.target_phrase_id)
     if source is None:
-        raise ValueError(f"transition references unknown source phrase: {plan.source_phrase_id}")
+        raise ValueError(
+            f"transition references unknown source phrase: {plan.source_phrase_id}"
+        )
     if target is None:
-        raise ValueError(f"transition references unknown target phrase: {plan.target_phrase_id}")
+        raise ValueError(
+            f"transition references unknown target phrase: {plan.target_phrase_id}"
+        )
     if source.start_beats >= target.start_beats:
         raise ValueError("transition target phrase must follow its source phrase")
     if not source.start_beats <= plan.start_beats < source.end_beats:
@@ -363,7 +404,8 @@ def transition_marker_events(plan: TransitionPlan) -> tuple[MusicalEvent, ...]:
             "atomic_scene_commit": phase.atomic_scene_commit,
             "scene_state": (
                 _json_object(plan.target_state, "target_state")
-                if phase.atomic_scene_commit else None
+                if phase.atomic_scene_commit
+                else None
             ),
             "source_state": _json_object(plan.source_state, "source_state"),
             "target_state": _json_object(plan.target_state, "target_state"),
@@ -374,17 +416,19 @@ def transition_marker_events(plan: TransitionPlan) -> tuple[MusicalEvent, ...]:
             "seed_name": plan.seed_name,
             "seed": plan.seed,
         }
-        events.append(MusicalEvent(
-            event_id=_marker_event_id(plan.transition_id, phase.phase),
-            voice_id=_MARKER_VOICE_ID,
-            onset_beats=phase.start_beats,
-            duration_beats=Fraction(0),
-            kind="marker",
-            velocity=0.0,
-            articulation="marker",
-            parameters={_MARKER_PARAMETER_KEY: marker},
-            tags=("m30_transition", f"m30_phase:{phase.phase}"),
-        ))
+        events.append(
+            MusicalEvent(
+                event_id=_marker_event_id(plan.transition_id, phase.phase),
+                voice_id=_MARKER_VOICE_ID,
+                onset_beats=phase.start_beats,
+                duration_beats=Fraction(0),
+                kind="marker",
+                velocity=0.0,
+                articulation="marker",
+                parameters={_MARKER_PARAMETER_KEY: marker},
+                tags=("m30_transition", f"m30_phase:{phase.phase}"),
+            )
+        )
 
     end = plan.end_beats
     completion = {
@@ -404,17 +448,19 @@ def transition_marker_events(plan: TransitionPlan) -> tuple[MusicalEvent, ...]:
         "seed_name": plan.seed_name,
         "seed": plan.seed,
     }
-    events.append(MusicalEvent(
-        event_id=_marker_event_id(plan.transition_id, "complete"),
-        voice_id=_MARKER_VOICE_ID,
-        onset_beats=end,
-        duration_beats=Fraction(0),
-        kind="marker",
-        velocity=0.0,
-        articulation="marker",
-        parameters={_MARKER_PARAMETER_KEY: completion},
-        tags=("m30_transition", "m30_phase:complete"),
-    ))
+    events.append(
+        MusicalEvent(
+            event_id=_marker_event_id(plan.transition_id, "complete"),
+            voice_id=_MARKER_VOICE_ID,
+            onset_beats=end,
+            duration_beats=Fraction(0),
+            kind="marker",
+            velocity=0.0,
+            articulation="marker",
+            parameters={_MARKER_PARAMETER_KEY: completion},
+            tags=("m30_transition", "m30_phase:complete"),
+        )
+    )
     return tuple(events)
 
 
@@ -441,7 +487,9 @@ def compile_transition_plans(
         return score
     incoming_ids = [item.transition_id for item in incoming]
     if len(incoming_ids) != len(set(incoming_ids)):
-        raise ValueError("transition plan IDs must be unique within one compilation batch")
+        raise ValueError(
+            "transition plan IDs must be unique within one compilation batch"
+        )
 
     existing_records = score.metadata.get(_TRANSITION_METADATA_KEY, [])
     if not isinstance(existing_records, list):
@@ -450,22 +498,24 @@ def compile_transition_plans(
     existing_by_id = {item.transition_id: item for item in existing}
     collision = set(incoming_ids) & set(existing_by_id)
     if collision and not replace_existing:
-        raise ValueError("transition plan already exists: " + ", ".join(sorted(collision)))
+        raise ValueError(
+            "transition plan already exists: " + ", ".join(sorted(collision))
+        )
 
     for plan in incoming:
         _validate_phrase_references(score, plan)
 
     merged_by_id = dict(existing_by_id)
     merged_by_id.update({item.transition_id: item for item in incoming})
-    merged = tuple(sorted(
-        merged_by_id.values(),
-        key=lambda item: (item.start_beats, item.change_beat, item.transition_id),
-    ))
+    merged = tuple(
+        sorted(
+            merged_by_id.values(),
+            key=lambda item: (item.start_beats, item.change_beat, item.transition_id),
+        )
+    )
 
     old_marker_ids = {
-        event.event_id
-        for plan in existing
-        for event in transition_marker_events(plan)
+        event.event_id for plan in existing for event in transition_marker_events(plan)
     }
     source_events = [
         event for event in score.events if event.event_id not in old_marker_ids
@@ -511,7 +561,6 @@ def transition_plans_from_score(score: Score) -> tuple[TransitionPlan, ...]:
     return plans
 
 
-
 @dataclass(frozen=True, slots=True)
 class TransitionActuation:
     """Resolved M30 transition state at one exact Score beat.
@@ -534,7 +583,9 @@ class TransitionActuation:
         object.__setattr__(
             self, "scene_state", _json_object(self.scene_state, "actuation scene_state")
         )
-        roles = tuple(_text(item, "actuation role") for item in self.participating_roles)
+        roles = tuple(
+            _text(item, "actuation role") for item in self.participating_roles
+        )
         if len(roles) != len(set(roles)):
             raise ValueError("actuation roles must be unique")
         object.__setattr__(self, "participating_roles", roles)
@@ -563,7 +614,8 @@ def transition_actuation_at(
         else:
             phase = next(
                 (
-                    item.phase for item in plan.phases
+                    item.phase
+                    for item in plan.phases
                     if item.start_beats <= beat < item.end_beats
                 ),
                 None,
@@ -571,15 +623,18 @@ def transition_actuation_at(
             if phase is None:
                 continue
         committed = beat >= plan.change_beat
-        resolved.append(TransitionActuation(
-            transition_id=plan.transition_id,
-            at_beats=beat,
-            phase=phase,
-            atomic_scene_commit=beat == plan.change_beat,
-            scene_state=plan.target_state if committed else plan.source_state,
-            participating_roles=plan.participating_roles,
-        ))
+        resolved.append(
+            TransitionActuation(
+                transition_id=plan.transition_id,
+                at_beats=beat,
+                phase=phase,
+                atomic_scene_commit=beat == plan.change_beat,
+                scene_state=plan.target_state if committed else plan.source_state,
+                participating_roles=plan.participating_roles,
+            )
+        )
     return tuple(resolved)
+
 
 __all__ = [
     "TRANSITION_DIMENSIONS",

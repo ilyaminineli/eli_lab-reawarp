@@ -1,4 +1,5 @@
 """Local sample and stem library workspace."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,8 +7,15 @@ from typing import Any
 
 from PySide6.QtCore import QThreadPool, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QWidget, QInputDialog,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+    QInputDialog,
 )
 
 from reawarp.samples.io import read_sample
@@ -55,9 +63,18 @@ class LibraryPage(QWidget):
         self.asset_type.addItems(["all", "sample", "stem", "master"])
         search_row.addWidget(self.asset_type)
         self.role = QComboBox()
-        self.role.addItems([
-            "all", "kick", "snare", "hat", "break", "melody", "ambience", "noise_texture"
-        ])
+        self.role.addItems(
+            [
+                "all",
+                "kick",
+                "snare",
+                "hat",
+                "break",
+                "melody",
+                "ambience",
+                "noise_texture",
+            ]
+        )
         search_row.addWidget(self.role)
         self.tags = QLineEdit()
         self.tags.setPlaceholderText("required tags, comma separated")
@@ -66,20 +83,24 @@ class LibraryPage(QWidget):
         search_button.clicked.connect(self._search)
         search_row.addWidget(search_button)
         self.similar_button = QPushButton("SIMILAR")
-        self.similar_button.setToolTip("Find assets with similar timbral and rhythmic descriptors.")
+        self.similar_button.setToolTip(
+            "Find assets with similar timbral and rhythmic descriptors."
+        )
         self.similar_button.clicked.connect(self._search_similar)
         search_row.addWidget(self.similar_button)
         self.bundled_button = QPushButton("BUNDLED SAMPLES")
-        self.bundled_button.setToolTip("Browse the audio files already shipped in samples/ without indexing them first.")
+        self.bundled_button.setToolTip(
+            "Browse the audio files already shipped in samples/ without indexing them first."
+        )
         self.bundled_button.clicked.connect(self._browse_bundled_samples)
         search_row.addWidget(self.bundled_button)
         layout.addLayout(search_row)
 
         iro_row = QHBoxLayout()
         self.iro_source = QComboBox()
-        self.iro_source.addItems([
-            "ALL IRO", "DRUM KIT", "MATH ENTITIES", "SOUND LAB", "SOUND FX"
-        ])
+        self.iro_source.addItems(
+            ["ALL IRO", "DRUM KIT", "MATH ENTITIES", "SOUND LAB", "SOUND FX"]
+        )
         iro_row.addWidget(QLabel("IRO CATALOG"))
         iro_row.addWidget(self.iro_source, 1)
         self.iro_search = QLineEdit()
@@ -119,8 +140,10 @@ class LibraryPage(QWidget):
         self.use_role = QComboBox()
         self.use_role.addItem("AUTO-DETECT ROLE", "auto")
         for role, label in (
-            ("kick", "KICK"), ("snare", "SNARE / CLAP"),
-            ("hat", "HAT / CYMBAL"), ("break", "BREAK / PHRASE"),
+            ("kick", "KICK"),
+            ("snare", "SNARE / CLAP"),
+            ("hat", "HAT / CYMBAL"),
+            ("break", "BREAK / PHRASE"),
         ):
             self.use_role.addItem(label, role)
         use_row.addWidget(self.use_role)
@@ -141,7 +164,9 @@ class LibraryPage(QWidget):
     def _use_in_generator(self) -> None:
         asset_id = self.results.currentData()
         if not asset_id:
-            self.details.setText("Select a playable sample before sending it to the Generator.")
+            self.details.setText(
+                "Select a playable sample before sending it to the Generator."
+            )
             return
 
         selected_role = str(self.use_role.currentData() or "auto")
@@ -165,8 +190,11 @@ class LibraryPage(QWidget):
                 return
             path = asset.path
             inferred_role = {
-                "kick": "kick", "sub_kick": "kick",
-                "snare": "snare", "closed_hat": "hat", "open_hat": "hat",
+                "kick": "kick",
+                "sub_kick": "kick",
+                "snare": "snare",
+                "closed_hat": "hat",
+                "open_hat": "hat",
                 "hat": "hat",
             }.get(asset.role)
         else:
@@ -176,7 +204,9 @@ class LibraryPage(QWidget):
                 with SampleLibrary() as library:
                     asset = library.get_asset(str(asset_id))
                 if asset is None:
-                    self.details.setText("The selected library asset could not be opened.")
+                    self.details.setText(
+                        "The selected library asset could not be opened."
+                    )
                     return
                 path = Path(asset.path)
                 if asset.role in {"kick", "snare", "hat", "break"}:
@@ -188,6 +218,7 @@ class LibraryPage(QWidget):
         if selected_role == "auto":
             if inferred_role is None:
                 from reawarp.samples.catalog import classify_sample_role
+
                 inferred_role = classify_sample_role(path)
             selected_role = inferred_role or ""
         if selected_role not in {"kick", "snare", "hat", "break"}:
@@ -208,7 +239,8 @@ class LibraryPage(QWidget):
         query = self.query.text().strip().casefold()
         if query:
             catalog = [
-                item for item in catalog
+                item
+                for item in catalog
                 if query in f"{item.label} {item.relative_path} {item.role}".casefold()
             ]
         self._bundled_assets = {
@@ -248,10 +280,18 @@ class LibraryPage(QWidget):
         query = self.iro_search.text().strip().lower()
         if query:
             catalog = [
-                item for item in catalog
-                if query in " ".join((
-                    item.relative_path, item.role, item.family, item.articulation, item.pack
-                )).lower()
+                item
+                for item in catalog
+                if query
+                in " ".join(
+                    (
+                        item.relative_path,
+                        item.role,
+                        item.family,
+                        item.articulation,
+                        item.pack,
+                    )
+                ).lower()
             ]
         self._iro_assets = {item.asset_id: item for item in catalog}
         self._bundled_assets = {}
@@ -259,7 +299,11 @@ class LibraryPage(QWidget):
         self.results.blockSignals(True)
         self.results.clear()
         for item in catalog:
-            duration = f"{item.duration_seconds:.2f}s" if item.duration_seconds is not None else "duration n/a"
+            duration = (
+                f"{item.duration_seconds:.2f}s"
+                if item.duration_seconds is not None
+                else "duration n/a"
+            )
             availability = "PLAYABLE" if item.available else "INDEX ONLY · WAV MISSING"
             self.results.addItem(
                 f"{item.family} · {item.articulation or item.role} · {duration} · {availability}",
@@ -341,7 +385,8 @@ class LibraryPage(QWidget):
         for asset in assets:
             similarity = (
                 f" · sim {asset.similarity:.3f}"
-                if getattr(asset, "similarity", None) is not None else ""
+                if getattr(asset, "similarity", None) is not None
+                else ""
             )
             self.results.addItem(
                 f"{asset.file_name} · {asset.asset_type} · "
@@ -385,7 +430,9 @@ class LibraryPage(QWidget):
     def _search_similar(self) -> None:
         asset_id = self.results.currentData()
         if not asset_id:
-            self.details.setText("Select an indexed asset before searching for similar material.")
+            self.details.setText(
+                "Select an indexed asset before searching for similar material."
+            )
             return
         self._search(similar_to=str(asset_id))
 
@@ -395,7 +442,9 @@ class LibraryPage(QWidget):
         try:
             with SampleLibrary() as library:
                 collections = library.collections()
-            selected = self.collections.currentText() if hasattr(self, "collections") else ""
+            selected = (
+                self.collections.currentText() if hasattr(self, "collections") else ""
+            )
             self.collections.blockSignals(True)
             self.collections.clear()
             for collection in collections:
@@ -414,7 +463,9 @@ class LibraryPage(QWidget):
     def _create_collection(self) -> None:
         from reawarp.library.store import SampleLibrary
 
-        name, accepted = QInputDialog.getText(self, "New collection", "Collection name:")
+        name, accepted = QInputDialog.getText(
+            self, "New collection", "Collection name:"
+        )
         if not accepted or not name.strip():
             return
         try:
@@ -440,7 +491,8 @@ class LibraryPage(QWidget):
             with SampleLibrary() as library:
                 added = library.add_to_collection(str(collection), [str(asset_id)])
             self.details.setText(
-                f"Added selected asset to {collection}." if added
+                f"Added selected asset to {collection}."
+                if added
                 else f"Selected asset is already in {collection}."
             )
             self._refresh_collections()
@@ -512,6 +564,7 @@ class LibraryPage(QWidget):
             return
 
         from reawarp.library.store import SampleLibrary
+
         try:
             with SampleLibrary() as library:
                 asset = library.get_asset(str(asset_id))

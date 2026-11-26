@@ -163,7 +163,9 @@ def normalise_fx_stages(
             try:
                 value = float(raw.get(field, default))
             except (TypeError, ValueError) as exc:
-                raise ValueError(f"FX stage {index} parameter {field} must be numeric") from exc
+                raise ValueError(
+                    f"FX stage {index} parameter {field} must be numeric"
+                ) from exc
             if not math.isfinite(value):
                 raise ValueError(f"FX stage {index} parameter {field} must be finite")
             low, high, *_ = FX_STAGE_PARAMETERS[kind][field]
@@ -181,7 +183,9 @@ def normalise_fx_stages(
     return tuple(result)
 
 
-def load_fx_chain(path: str | Path, *, sample_rate: int | None = None) -> dict[str, Any]:
+def load_fx_chain(
+    path: str | Path, *, sample_rate: int | None = None
+) -> dict[str, Any]:
     """Load and validate a portable version-1 FX chain JSON file."""
     source = Path(path).expanduser()
     payload = json.loads(source.read_text(encoding="utf-8"))
@@ -256,19 +260,27 @@ def _validate_audio(audio: np.ndarray, sample_rate: int) -> np.ndarray:
     return np.ascontiguousarray(samples, dtype=np.float32)
 
 
-def _make_stage(pyo: Any, source: Any, stage: dict[str, float | str], sample_rate: int) -> Any:
+def _make_stage(
+    pyo: Any, source: Any, stage: dict[str, float | str], sample_rate: int
+) -> Any:
     kind = str(stage["type"])
     mix = float(stage.get("mix", 1.0))
     nyquist_guard = float(sample_rate) * 0.45
     if kind == "highpass":
-        processed = pyo.ButHP(source, freq=min(float(stage["cutoff_hz"]), nyquist_guard))
+        processed = pyo.ButHP(
+            source, freq=min(float(stage["cutoff_hz"]), nyquist_guard)
+        )
     elif kind == "lowpass":
-        processed = pyo.ButLP(source, freq=min(float(stage["cutoff_hz"]), nyquist_guard))
+        processed = pyo.ButLP(
+            source, freq=min(float(stage["cutoff_hz"]), nyquist_guard)
+        )
     elif kind == "bandpass":
         center = min(float(stage["center_hz"]), nyquist_guard)
         processed = pyo.ButBP(source, freq=center, q=float(stage["q"]))
     elif kind == "saturation":
-        processed = pyo.Disto(source, drive=float(stage["drive"]), slope=float(stage["slope"]))
+        processed = pyo.Disto(
+            source, drive=float(stage["drive"]), slope=float(stage["slope"])
+        )
     elif kind == "delay":
         delay_seconds = float(stage["delay_seconds"])
         processed = pyo.Delay(
@@ -330,14 +342,14 @@ def render_pyo_fx(
         import soundfile as sf
     except ImportError as exc:
         raise RuntimeError(
-            'SoundFile is required for the FX Lab. Install it with: '
+            "SoundFile is required for the FX Lab. Install it with: "
             'python -m pip install -e ".[pyo]"'
         ) from exc
     try:
         import pyo
     except Exception as exc:
         raise RuntimeError(
-            'Pyo is required for the FX Lab. Install it with: '
+            "Pyo is required for the FX Lab. Install it with: "
             'python -m pip install -e ".[pyo]"'
         ) from exc
 
@@ -349,8 +361,11 @@ def render_pyo_fx(
             rendered_path = Path(temporary) / "processed.wav"
             logger.debug(
                 "Pyo FX start: rate=%s frames=%s channels=%s stages=%s source=%s",
-                sample_rate, len(samples), samples.shape[1],
-                [str(stage["type"]) for stage in chain], source_path,
+                sample_rate,
+                len(samples),
+                samples.shape[1],
+                [str(stage["type"]) for stage in chain],
+                source_path,
             )
             sf.write(str(source_path), samples, int(sample_rate), subtype="FLOAT")
             server = pyo.Server(
@@ -373,7 +388,9 @@ def render_pyo_fx(
                 source = pyo.SfPlayer(str(source_path), loop=False, interp=4)
                 processed = source
                 for stage in chain:
-                    processed = _make_stage(pyo, processed, dict(stage), int(sample_rate))
+                    processed = _make_stage(
+                        pyo, processed, dict(stage), int(sample_rate)
+                    )
                 output = source * (1.0 - float(wet)) + processed * float(wet)
                 output.out()
                 server.start()
@@ -385,7 +402,9 @@ def render_pyo_fx(
                     try:
                         source.stop()
                     except Exception:
-                        logger.debug("Pyo SfPlayer stop raised during cleanup", exc_info=True)
+                        logger.debug(
+                            "Pyo SfPlayer stop raised during cleanup", exc_info=True
+                        )
                 try:
                     server.stop()
                 except Exception:
@@ -393,9 +412,12 @@ def render_pyo_fx(
                 try:
                     server.shutdown()
                 except Exception:
-                    logger.debug("Pyo server shutdown raised during cleanup", exc_info=True)
+                    logger.debug(
+                        "Pyo server shutdown raised during cleanup", exc_info=True
+                    )
                 del output, processed, source
                 import gc
+
                 gc.collect()
 
             if not rendered_path.is_file():
@@ -417,4 +439,3 @@ def render_pyo_fx(
         rendered *= 0.98 / peak
     logger.debug("Pyo FX complete: %s frames", len(rendered))
     return np.ascontiguousarray(rendered, dtype=np.float32)
-

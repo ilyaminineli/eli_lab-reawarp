@@ -44,11 +44,14 @@ class VoiceRoleTarget:
             if value is not None:
                 object.__setattr__(self, name, _finite(value, name))
         if (
-            self.register_min is not None and self.register_max is not None
+            self.register_min is not None
+            and self.register_max is not None
             and self.register_min > self.register_max
         ):
             raise ValueError("role register_min cannot exceed register_max")
-        object.__setattr__(self, "weight", _finite(self.weight, "role weight", minimum=0.0))
+        object.__setattr__(
+            self, "weight", _finite(self.weight, "role weight", minimum=0.0)
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -66,15 +69,18 @@ class VoiceRoleTarget:
             voice_id=str(data.get("voice_id", "")),
             role=str(data.get("role", "")),
             preferred_pitch=(
-                None if data.get("preferred_pitch") is None
+                None
+                if data.get("preferred_pitch") is None
                 else float(data["preferred_pitch"])
             ),
             register_min=(
-                None if data.get("register_min") is None
+                None
+                if data.get("register_min") is None
                 else float(data["register_min"])
             ),
             register_max=(
-                None if data.get("register_max") is None
+                None
+                if data.get("register_max") is None
                 else float(data["register_max"])
             ),
             weight=float(data.get("weight", 1.0)),
@@ -100,7 +106,8 @@ class VoiceLeadingConstraints:
             if value is not None:
                 object.__setattr__(self, name, _finite(value, name, minimum=0.0))
         if (
-            self.minimum_motion is not None and self.maximum_motion is not None
+            self.minimum_motion is not None
+            and self.maximum_motion is not None
             and self.minimum_motion > self.maximum_motion
         ):
             raise ValueError("minimum_motion cannot exceed maximum_motion")
@@ -115,7 +122,8 @@ class VoiceLeadingConstraints:
             ):
                 raise ValueError(f"{name} must be a non-negative integer or None")
         object.__setattr__(
-            self, "common_tone_tolerance",
+            self,
+            "common_tone_tolerance",
             _finite(self.common_tone_tolerance, "common_tone_tolerance", minimum=0.0),
         )
 
@@ -134,18 +142,25 @@ class VoiceLeadingConstraints:
     @classmethod
     def from_dict(cls, data: Mapping[str, object]) -> "VoiceLeadingConstraints":
         return cls(
-            maximum_leap=None if data.get("maximum_leap") is None else float(data["maximum_leap"]),
+            maximum_leap=(
+                None
+                if data.get("maximum_leap") is None
+                else float(data["maximum_leap"])
+            ),
             minimum_motion=(
-                None if data.get("minimum_motion") is None
+                None
+                if data.get("minimum_motion") is None
                 else float(data["minimum_motion"])
             ),
             maximum_motion=(
-                None if data.get("maximum_motion") is None
+                None
+                if data.get("maximum_motion") is None
                 else float(data["maximum_motion"])
             ),
             allow_voice_crossing=bool(data.get("allow_voice_crossing", True)),
             maximum_voice_crossings=(
-                None if data.get("maximum_voice_crossings") is None
+                None
+                if data.get("maximum_voice_crossings") is None
                 else int(data["maximum_voice_crossings"])
             ),
             minimum_common_tones=int(data.get("minimum_common_tones", 0)),
@@ -165,11 +180,15 @@ class VoiceLeadingPreferences:
     def __post_init__(self) -> None:
         allowed = {"contrary", "oblique", "parallel"}
         styles = tuple(self.motion_styles)
-        if len(styles) != len(set(styles)) or any(item not in allowed for item in styles):
+        if len(styles) != len(set(styles)) or any(
+            item not in allowed for item in styles
+        ):
             raise ValueError(
                 "motion_styles may contain unique values from contrary, oblique, parallel"
             )
-        canonical = tuple(item for item in ("contrary", "oblique", "parallel") if item in styles)
+        canonical = tuple(
+            item for item in ("contrary", "oblique", "parallel") if item in styles
+        )
         object.__setattr__(self, "motion_styles", canonical)
         if not isinstance(self.retain_common_tones, bool):
             raise ValueError("retain_common_tones must be a boolean")
@@ -211,7 +230,8 @@ class VoiceLeadingPlanConfig:
         if not isinstance(self.preferences, VoiceLeadingPreferences):
             raise ValueError("preferences must be VoiceLeadingPreferences")
         if (
-            isinstance(self.beam_width, bool) or not isinstance(self.beam_width, int)
+            isinstance(self.beam_width, bool)
+            or not isinstance(self.beam_width, int)
             or not 1 <= self.beam_width <= 64
         ):
             raise ValueError("beam_width must be an integer between 1 and 64")
@@ -245,8 +265,12 @@ class VoiceLeadingPlanConfig:
     def from_dict(cls, data: Mapping[str, object]) -> "VoiceLeadingPlanConfig":
         return cls(
             weights=VoiceLeadingWeights.from_dict(dict(data.get("weights", {}))),
-            constraints=VoiceLeadingConstraints.from_dict(dict(data.get("constraints", {}))),
-            preferences=VoiceLeadingPreferences.from_dict(dict(data.get("preferences", {}))),
+            constraints=VoiceLeadingConstraints.from_dict(
+                dict(data.get("constraints", {}))
+            ),
+            preferences=VoiceLeadingPreferences.from_dict(
+                dict(data.get("preferences", {}))
+            ),
             voice_ids=tuple(str(item) for item in data.get("voice_ids", ())),
             beam_width=int(data.get("beam_width", 16)),
             seed=data.get("seed", 0),
@@ -284,9 +308,12 @@ class SonorityBoundary:
         onset = as_fraction(self.onset_beats)
         duration = as_fraction(self.duration_beats)
         if onset < 0 or duration <= 0:
-            raise ValueError("boundary onset must be non-negative and duration positive")
+            raise ValueError(
+                "boundary onset must be non-negative and duration positive"
+            )
         if (
-            isinstance(self.voice_count, bool) or not isinstance(self.voice_count, int)
+            isinstance(self.voice_count, bool)
+            or not isinstance(self.voice_count, int)
             or not 1 <= self.voice_count <= 8
         ):
             raise ValueError("voice_count must be an integer between 1 and 8")
@@ -294,14 +321,17 @@ class SonorityBoundary:
         if pitches and len(pitches) != self.voice_count:
             raise ValueError("explicit boundary pitches must match voice_count")
         if self.bass_pitch is not None:
-            object.__setattr__(self, "bass_pitch", _finite(self.bass_pitch, "bass_pitch"))
+            object.__setattr__(
+                self, "bass_pitch", _finite(self.bass_pitch, "bass_pitch")
+            )
         object.__setattr__(self, "tension", _finite(self.tension, "tension"))
         low = _finite(self.minimum_pitch, "minimum_pitch")
         high = _finite(self.maximum_pitch, "maximum_pitch")
         step = _finite(self.pitch_step, "pitch_step", minimum=0.0)
         min_gap = _finite(self.minimum_spacing, "minimum_spacing", minimum=0.0)
         max_gap = (
-            None if self.maximum_spacing is None
+            None
+            if self.maximum_spacing is None
             else _finite(self.maximum_spacing, "maximum_spacing", minimum=0.0)
         )
         temperature = _finite(self.temperature, "temperature", minimum=0.0)
@@ -353,7 +383,9 @@ class SonorityBoundary:
             section_id=str(data.get("section_id", "section-1")),
             phrase_id=str(data.get("phrase_id", "phrase-1")),
             pitches=tuple(float(item) for item in data.get("pitches", ())),
-            bass_pitch=None if data.get("bass_pitch") is None else float(data["bass_pitch"]),
+            bass_pitch=(
+                None if data.get("bass_pitch") is None else float(data["bass_pitch"])
+            ),
             tension=float(data.get("tension", 0.0)),
             voice_count=int(data.get("voice_count", 4)),
             minimum_pitch=float(data.get("minimum_pitch", 48.0)),
@@ -361,13 +393,13 @@ class SonorityBoundary:
             pitch_step=float(data.get("pitch_step", 1.0)),
             minimum_spacing=float(data.get("minimum_spacing", 0.0)),
             maximum_spacing=(
-                None if data.get("maximum_spacing") is None
+                None
+                if data.get("maximum_spacing") is None
                 else float(data["maximum_spacing"])
             ),
             temperature=float(data.get("temperature", 0.0)),
             voice_roles=tuple(
-                VoiceRoleTarget.from_dict(item)
-                for item in data.get("voice_roles", ())
+                VoiceRoleTarget.from_dict(item) for item in data.get("voice_roles", ())
             ),
         )
 
@@ -451,14 +483,20 @@ class SonoritySequencePlan:
     def __post_init__(self) -> None:
         count = len(self.boundaries)
         if count == 0 or len(self.sonorities) != count or len(self.voicings) != count:
-            raise ValueError("a sequence plan requires one sonority and voicing per boundary")
+            raise ValueError(
+                "a sequence plan requires one sonority and voicing per boundary"
+            )
         if len(self.transitions) != count - 1:
-            raise ValueError("sequence plan transition count must be boundary count minus one")
+            raise ValueError(
+                "sequence plan transition count must be boundary count minus one"
+            )
         if len(self.voice_ids) == 0 or len(self.voice_ids) > 8:
             raise ValueError("sequence plan requires one to eight voice IDs")
         if any(len(item) != len(self.voice_ids) for item in self.voicings):
             raise ValueError("every planned voicing must match the voice ID count")
-        if any(not math.isfinite(float(value)) for row in self.voicings for value in row):
+        if any(
+            not math.isfinite(float(value)) for row in self.voicings for value in row
+        ):
             raise ValueError("planned voicings must contain finite pitches")
         if not math.isfinite(float(self.total_cost)):
             raise ValueError("sequence plan total_cost must be finite")
@@ -474,7 +512,9 @@ class SonoritySequencePlan:
             "boundaries": [item.to_dict() for item in self.boundaries],
             "voice_ids": list(self.voice_ids),
             "voicings": [list(item) for item in self.voicings],
-            "initial_cost_components": [list(item) for item in self.initial_cost_components],
+            "initial_cost_components": [
+                list(item) for item in self.initial_cost_components
+            ],
             "transitions": [item.to_dict() for item in self.transitions],
             "total_cost": self.total_cost,
         }
@@ -497,7 +537,8 @@ class SonoritySequencePlan:
             ),
             voice_ids=tuple(str(item) for item in data.get("voice_ids", ())),
             voicings=tuple(
-                tuple(float(value) for value in item) for item in data.get("voicings", ())
+                tuple(float(value) for value in item)
+                for item in data.get("voicings", ())
             ),
             initial_cost_components=tuple(
                 (str(item[0]), _finite(item[1], "initial cost component"))
@@ -530,7 +571,9 @@ class SonoritySequencePlan:
 
 
 def _derived_seed(seed: int | str, sonority_id: str) -> int:
-    payload = f"reawarp:m19.3:{type(seed).__name__}:{seed}:{sonority_id}".encode("utf-8")
+    payload = f"reawarp:m19.3:{type(seed).__name__}:{seed}:{sonority_id}".encode(
+        "utf-8"
+    )
     return int.from_bytes(hashlib.blake2b(payload, digest_size=8).digest(), "big")
 
 
@@ -551,7 +594,8 @@ def _build_sonority(
                 () if boundary.bass_pitch is None else (boundary.bass_pitch,)
             )
             rejected = tuple(
-                pitch for pitch in checked_pitches
+                pitch
+                for pitch in checked_pitches
                 if not pitch_field.evaluate(pitch, tuning).allowed
             )
             if rejected:
@@ -629,8 +673,12 @@ def _role_costs(
         role = roles.get(voice_id)
         if role is None:
             continue
-        below = 0.0 if role.register_min is None else max(0.0, role.register_min - pitch)
-        above = 0.0 if role.register_max is None else max(0.0, pitch - role.register_max)
+        below = (
+            0.0 if role.register_min is None else max(0.0, role.register_min - pitch)
+        )
+        above = (
+            0.0 if role.register_max is None else max(0.0, pitch - role.register_max)
+        )
         outside = below + above
         if config.constraints.hard_role_registers and outside > 1e-9:
             return None
@@ -661,10 +709,7 @@ def _crossed_voice_pairs(
         for right in range(left + 1, len(source)):
             before = source[left] - source[right]
             after = target[left] - target[right]
-            if (
-                (before > 1e-9 and after < -1e-9)
-                or (before < -1e-9 and after > 1e-9)
-            ):
+            if (before > 1e-9 and after < -1e-9) or (before < -1e-9 and after > 1e-9):
                 pairs.append((voice_ids[left], voice_ids[right]))
     return tuple(pairs)
 
@@ -689,9 +734,15 @@ def _score_transition(
         distance > constraints.maximum_leap + 1e-9 for distance in distances
     ):
         return None
-    if constraints.minimum_motion is not None and motion < constraints.minimum_motion - 1e-9:
+    if (
+        constraints.minimum_motion is not None
+        and motion < constraints.minimum_motion - 1e-9
+    ):
         return None
-    if constraints.maximum_motion is not None and motion > constraints.maximum_motion + 1e-9:
+    if (
+        constraints.maximum_motion is not None
+        and motion > constraints.maximum_motion + 1e-9
+    ):
         return None
     if common_tones < constraints.minimum_common_tones:
         return None
@@ -713,23 +764,26 @@ def _score_transition(
 
     components = {
         "motion": weights.motion * motion,
-        "large_leaps": weights.leap * sum(
-            max(0.0, distance - weights.leap_threshold) ** 2
-            for distance in distances
+        "large_leaps": weights.leap
+        * sum(
+            max(0.0, distance - weights.leap_threshold) ** 2 for distance in distances
         ),
         "register_crossing": register_cost,
         "target_role": role_cost,
         "common_tone": (
             -weights.common_tone_bonus * common_tones
-            if config.preferences.retain_common_tones else 0.0
+            if config.preferences.retain_common_tones
+            else 0.0
         ),
         "voice_crossing": (
             weights.crossing * len(crossed_pairs)
-            if config.preferences.crossing == "avoid" else 0.0
+            if config.preferences.crossing == "avoid"
+            else 0.0
         ),
         "deliberate_crossing": (
             -weights.deliberate_crossing_bonus * len(crossed_pairs)
-            if config.preferences.crossing == "prefer" else 0.0
+            if config.preferences.crossing == "prefer"
+            else 0.0
         ),
         "contrary_preference": 0.0,
         "oblique_preference": 0.0,
@@ -737,18 +791,20 @@ def _score_transition(
     }
 
     directions = tuple(
-        0 if distance <= constraints.common_tone_tolerance
-        else (1 if delta > 0 else -1)
+        0 if distance <= constraints.common_tone_tolerance else (1 if delta > 0 else -1)
         for delta, distance in zip(deltas, distances)
     )
     moving_directions = tuple(value for value in directions if value != 0)
     if "contrary" in config.preferences.motion_styles:
         same_direction_pairs = sum(
-            1 for left in range(len(moving_directions))
+            1
+            for left in range(len(moving_directions))
             for right in range(left + 1, len(moving_directions))
             if moving_directions[left] == moving_directions[right]
         )
-        components["contrary_preference"] = weights.contrary_motion * same_direction_pairs
+        components["contrary_preference"] = (
+            weights.contrary_motion * same_direction_pairs
+        )
     if "oblique" in config.preferences.motion_styles:
         has_stationary = len(moving_directions) < len(directions)
         has_motion = bool(moving_directions)
@@ -766,13 +822,18 @@ def _score_transition(
         )
 
     ordered_names = (
-        "motion", "large_leaps", "register_crossing", "target_role",
-        "common_tone", "voice_crossing", "deliberate_crossing",
-        "contrary_preference", "oblique_preference", "parallel_preference",
+        "motion",
+        "large_leaps",
+        "register_crossing",
+        "target_role",
+        "common_tone",
+        "voice_crossing",
+        "deliberate_crossing",
+        "contrary_preference",
+        "oblique_preference",
+        "parallel_preference",
     )
-    cost_components = tuple(
-        (name, float(components[name])) for name in ordered_names
-    )
+    cost_components = tuple((name, float(components[name])) for name in ordered_names)
     total_cost = float(sum(value for _name, value in cost_components))
     if not math.isfinite(total_cost):
         raise ValueError("voice-leading weights produced a non-finite transition cost")
@@ -786,7 +847,8 @@ def _score_transition(
     if stationary and any(value != 0 for value in directions):
         motion_types.append("oblique")
     if (
-        len(deltas) > 1 and all(value != 0 for value in directions)
+        len(deltas) > 1
+        and all(value != 0 for value in directions)
         and len(set(directions)) == 1
         and max(deltas) - min(deltas) <= max(0.5, constraints.common_tone_tolerance)
     ):
@@ -842,13 +904,17 @@ def plan_sonority_sequence(
         raise ValueError("sonority boundary IDs must be unique")
     starts = [as_fraction(item.onset_beats) for item in boundary_items]
     if any(right <= left for left, right in zip(starts, starts[1:])):
-        raise ValueError("sonority boundaries must be in strictly increasing beat order")
+        raise ValueError(
+            "sonority boundaries must be in strictly increasing beat order"
+        )
     voice_count = boundary_items[0].voice_count
     if any(item.voice_count != voice_count for item in boundary_items):
         raise ValueError("all sequence boundaries must use the same voice_count")
     if config.voice_ids and len(config.voice_ids) != voice_count:
         raise ValueError("configured voice_ids must match the sequence voice_count")
-    voice_ids = config.voice_ids or tuple(f"voice-{index + 1}" for index in range(voice_count))
+    voice_ids = config.voice_ids or tuple(
+        f"voice-{index + 1}" for index in range(voice_count)
+    )
 
     sonorities = tuple(
         _build_sonority(item, tuning, pitch_field, config.seed)
@@ -861,7 +927,8 @@ def plan_sonority_sequence(
     first_roles = _roles_by_voice(first, voice_ids)
     first_candidates = (
         _unique_voicings(sonorities[0].pitches)
-        if first_roles else (sonorities[0].pitches,)
+        if first_roles
+        else (sonorities[0].pitches,)
     )
     initial_candidates = []
     for candidate in first_candidates:
@@ -876,7 +943,9 @@ def plan_sonority_sequence(
         total = float(register_cost + target_role_cost)
         initial_candidates.append((total, candidate, components))
     if not initial_candidates:
-        raise ValueError("first sonority cannot satisfy its hard role-register constraints")
+        raise ValueError(
+            "first sonority cannot satisfy its hard role-register constraints"
+        )
     initial_candidates.sort(key=lambda item: (item[0], item[1]))
     initial_cost, first_voicing, initial_components = initial_candidates[0]
     beam = [_BeamState(initial_cost, (first_voicing,), ())]
@@ -892,8 +961,12 @@ def plan_sonority_sequence(
             def candidates_for_state():
                 for target_voicing in target_voicings:
                     transition = _score_transition(
-                        source_voicing, target_voicing, voice_ids,
-                        source_boundary, target_boundary, config,
+                        source_voicing,
+                        target_voicing,
+                        voice_ids,
+                        source_boundary,
+                        target_boundary,
+                        config,
                     )
                     if transition is None:
                         continue
@@ -916,7 +989,7 @@ def plan_sonority_sequence(
                 f"{source_boundary.sonority_id} and {target_boundary.sonority_id}"
             )
         expanded.sort(key=lambda item: item[0])
-        beam = [item[1] for item in expanded[:config.beam_width]]
+        beam = [item[1] for item in expanded[: config.beam_width]]
 
     best = min(beam, key=lambda item: (item.total_cost, item.voicings))
     return SonoritySequencePlan(

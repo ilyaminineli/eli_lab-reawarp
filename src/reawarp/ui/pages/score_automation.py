@@ -12,15 +12,23 @@ import numpy as np
 from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QPushButton, QSpinBox,
-    QVBoxLayout, QWidget,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.fx_automation import automation_targets
 from reawarp.score.automation import AutomationModulation, AutomationSource
 from reawarp.score.model import Score
-
 
 _TARGETS = (
     ("synth.cutoff", "Filter cutoff · Hz"),
@@ -150,7 +158,8 @@ class AutomationCurvePreview(QWidget):
         self._drag_index = None
         self.setToolTip(
             "Drag points vertically to edit this curve."
-            if self._editable else "Generated automation curve preview."
+            if self._editable
+            else "Generated automation curve preview."
         )
         self.update()
 
@@ -169,7 +178,11 @@ class AutomationCurvePreview(QWidget):
             painter.drawLine(int(x), bounds.top(), int(x), bounds.bottom())
         if len(self._values) < 2:
             painter.setPen(QColor("#818894"))
-            painter.drawText(bounds, Qt.AlignmentFlag.AlignCenter, "ADD A SOURCE TO PREVIEW ITS SHAPE")
+            painter.drawText(
+                bounds,
+                Qt.AlignmentFlag.AlignCenter,
+                "ADD A SOURCE TO PREVIEW ITS SHAPE",
+            )
             painter.end()
             return
         low = 0.0 if self._editable else min(self._values)
@@ -193,8 +206,16 @@ class AutomationCurvePreview(QWidget):
             for point in points:
                 painter.drawEllipse(point, 4.0, 4.0)
         painter.setPen(QColor("#818894"))
-        painter.drawText(bounds.adjusted(3, 2, -3, -2), Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft, f"{high:.3g}")
-        painter.drawText(bounds.adjusted(3, 2, -3, -2), Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft, f"{low:.3g}")
+        painter.drawText(
+            bounds.adjusted(3, 2, -3, -2),
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+            f"{high:.3g}",
+        )
+        painter.drawText(
+            bounds.adjusted(3, 2, -3, -2),
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
+            f"{low:.3g}",
+        )
         painter.end()
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 - Qt API
@@ -208,7 +229,9 @@ class AutomationCurvePreview(QWidget):
             bounds.left() + bounds.width() * index / (len(self._values) - 1)
             for index in range(len(self._values))
         ]
-        nearest = min(range(len(positions)), key=lambda index: abs(positions[index] - x))
+        nearest = min(
+            range(len(positions)), key=lambda index: abs(positions[index] - x)
+        )
         if abs(positions[nearest] - x) <= 14.0:
             self.editStarted.emit()
             self._drag_index = nearest
@@ -394,7 +417,9 @@ class ScoreAutomationEditor(QGroupBox):
         footer.addWidget(self.apply_button)
         root.addLayout(footer)
 
-        self.status = QLabel("Generate a project to edit its Score control performance.")
+        self.status = QLabel(
+            "Generate a project to edit its Score control performance."
+        )
         self.status.setWordWrap(True)
         self.status.setObjectName("muted")
         root.addWidget(self.status)
@@ -406,7 +431,9 @@ class ScoreAutomationEditor(QGroupBox):
         self._target_changed()
 
     @staticmethod
-    def _number(minimum: float, maximum: float, value: float, decimals: int) -> QDoubleSpinBox:
+    def _number(
+        minimum: float, maximum: float, value: float, decimals: int
+    ) -> QDoubleSpinBox:
         control = QDoubleSpinBox()
         control.setRange(minimum, maximum)
         control.setDecimals(decimals)
@@ -426,9 +453,7 @@ class ScoreAutomationEditor(QGroupBox):
     def _source_kind_changed(self, *_args: Any) -> None:
         kind = str(self.source_kind.currentData())
         self.lfo_waveform.setEnabled(kind == "lfo")
-        self.source_values.setEnabled(
-            kind in {"envelope", "stepped", "phrase_curve"}
-        )
+        self.source_values.setEnabled(kind in {"envelope", "stepped", "phrase_curve"})
         self.random_step_size.setEnabled(kind == "random_walk")
         self.random_initial.setEnabled(kind == "random_walk")
         if kind not in {"envelope", "stepped", "phrase_curve"}:
@@ -474,10 +499,15 @@ class ScoreAutomationEditor(QGroupBox):
         if score is not None:
             stems = tuple(score.metadata.get("render_stems", ()))
             if not stems:
-                stems = tuple(sorted({
-                    event.voice_id for event in score.events
-                    if event.voice_id != "sample_break"
-                }))
+                stems = tuple(
+                    sorted(
+                        {
+                            event.voice_id
+                            for event in score.events
+                            if event.voice_id != "sample_break"
+                        }
+                    )
+                )
             for target_id in automation_targets(stems):
                 self.target.addItem(self._fx_target_label(target_id), target_id)
                 self._target_ranges[target_id] = (0.0, 1.0)
@@ -504,7 +534,9 @@ class ScoreAutomationEditor(QGroupBox):
         self.scope_id.setEnabled(not is_global)
         if is_global:
             self.scope_id.clear()
-            self.scope_id.setToolTip("Global controls apply to every matching Score event.")
+            self.scope_id.setToolTip(
+                "Global controls apply to every matching Score event."
+            )
             return
         self._refresh_scope_ids()
 
@@ -523,10 +555,14 @@ class ScoreAutomationEditor(QGroupBox):
             identifiers = {
                 str(value)
                 for event in self._score.events
-                if (value := (
-                    event.parameters.get("section_id")
-                    or event.parameters.get("section_name")
-                )) is not None and str(value).strip()
+                if (
+                    value := (
+                        event.parameters.get("section_id")
+                        or event.parameters.get("section_name")
+                    )
+                )
+                is not None
+                and str(value).strip()
             }
         else:
             identifiers = {event.event_id for event in self._score.events}
@@ -575,10 +611,14 @@ class ScoreAutomationEditor(QGroupBox):
         source: AutomationSource,
         modulations: list[AutomationModulation],
     ) -> str:
-        destinations = ", ".join(
-            item.destination_target_id
-            for item in modulations if item.source_id == source.source_id
-        ) or "unconnected"
+        destinations = (
+            ", ".join(
+                item.destination_target_id
+                for item in modulations
+                if item.source_id == source.source_id
+            )
+            or "unconnected"
+        )
         return f"{source.source_id}  →  {destinations}"
 
     def _refresh_control_list(self, selected_row: int | None = None) -> None:
@@ -658,34 +698,69 @@ class ScoreAutomationEditor(QGroupBox):
     def _apply_template(self) -> None:
         templates = {
             "Slow filter sweep": {
-                "target": "synth.cutoff", "kind": "lfo", "waveform": "triangle",
-                "scope": "global", "scope_id": "", "retrigger": "free",
-                "period": 16.0, "amount": 1_200.0, "start": 0.0,
-                "end": 64.0, "values": "0.0, 1.0, 0.0",
+                "target": "synth.cutoff",
+                "kind": "lfo",
+                "waveform": "triangle",
+                "scope": "global",
+                "scope_id": "",
+                "retrigger": "free",
+                "period": 16.0,
+                "amount": 1_200.0,
+                "start": 0.0,
+                "end": 64.0,
+                "values": "0.0, 1.0, 0.0",
             },
             "Phrase gain envelope": {
-                "target": "synth.gain", "kind": "envelope", "waveform": "sine",
-                "scope": "role", "scope_id": "melody", "retrigger": "event",
-                "period": 4.0, "amount": 0.25, "start": 0.0,
-                "end": 16.0, "values": "0.0, 1.0, 0.7, 0.0",
+                "target": "synth.gain",
+                "kind": "envelope",
+                "waveform": "sine",
+                "scope": "role",
+                "scope_id": "melody",
+                "retrigger": "event",
+                "period": 4.0,
+                "amount": 0.25,
+                "start": 0.0,
+                "end": 16.0,
+                "values": "0.0, 1.0, 0.7, 0.0",
             },
             "Rhythmic role thinning": {
-                "target": "role.density", "kind": "stepped", "waveform": "sine",
-                "scope": "role", "scope_id": "hat", "retrigger": "role",
-                "period": 2.0, "amount": 0.5, "start": 0.0,
-                "end": 64.0, "values": "1.0, 0.75, 0.45, 0.9",
+                "target": "role.density",
+                "kind": "stepped",
+                "waveform": "sine",
+                "scope": "role",
+                "scope_id": "hat",
+                "retrigger": "role",
+                "period": 2.0,
+                "amount": 0.5,
+                "start": 0.0,
+                "end": 64.0,
+                "values": "1.0, 0.75, 0.45, 0.9",
             },
             "Granular density motion": {
-                "target": "synth.grain.density", "kind": "lfo", "waveform": "triangle",
-                "scope": "role", "scope_id": "melody", "retrigger": "section",
-                "period": 8.0, "amount": 25.0, "start": 0.0,
-                "end": 64.0, "values": "0.0, 1.0, 0.0",
+                "target": "synth.grain.density",
+                "kind": "lfo",
+                "waveform": "triangle",
+                "scope": "role",
+                "scope_id": "melody",
+                "retrigger": "section",
+                "period": 8.0,
+                "amount": 25.0,
+                "start": 0.0,
+                "end": 64.0,
+                "values": "0.0, 1.0, 0.0",
             },
             "Stereo drift": {
-                "target": "spatial.pan", "kind": "lfo", "waveform": "sine",
-                "scope": "role", "scope_id": "ambience", "retrigger": "section",
-                "period": 8.0, "amount": 0.35, "start": 0.0,
-                "end": 64.0, "values": "0.0, 1.0, 0.0",
+                "target": "spatial.pan",
+                "kind": "lfo",
+                "waveform": "sine",
+                "scope": "role",
+                "scope_id": "ambience",
+                "retrigger": "section",
+                "period": 8.0,
+                "amount": 0.35,
+                "start": 0.0,
+                "end": 64.0,
+                "values": "0.0, 1.0, 0.0",
             },
         }
         specification = templates[str(self.template.currentData())]
@@ -696,7 +771,9 @@ class ScoreAutomationEditor(QGroupBox):
             )
             return
         self.target.setCurrentIndex(target_index)
-        self.source_kind.setCurrentIndex(self.source_kind.findData(specification["kind"]))
+        self.source_kind.setCurrentIndex(
+            self.source_kind.findData(specification["kind"])
+        )
         self.lfo_waveform.setCurrentIndex(
             self.lfo_waveform.findData(specification["waveform"])
         )
@@ -742,8 +819,7 @@ class ScoreAutomationEditor(QGroupBox):
             denominator = max(1, len(values) - 1)
             parameters = {
                 "shape": [
-                    [index / denominator, value]
-                    for index, value in enumerate(values)
+                    [index / denominator, value] for index, value in enumerate(values)
                 ],
                 "curve": "smooth",
             }
@@ -845,9 +921,9 @@ class ScoreAutomationEditor(QGroupBox):
         self.end_beat.setValue(float(source.end))
         self.seed.setValue(int(source.seed))
         parameters = source.parameters or {}
-        self.period.setValue(float(
-            parameters.get("period_beats", parameters.get("step_beats", 4.0))
-        ))
+        self.period.setValue(
+            float(parameters.get("period_beats", parameters.get("step_beats", 4.0)))
+        )
         waveform_index = self.lfo_waveform.findData(
             str(parameters.get("waveform", "sine"))
         )
@@ -863,9 +939,7 @@ class ScoreAutomationEditor(QGroupBox):
                 )
             ]
         else:
-            values = [
-                float(value) for value in parameters.get("values", [0.0, 1.0])
-            ]
+            values = [float(value) for value in parameters.get("values", [0.0, 1.0])]
         self.source_values.blockSignals(True)
         self.source_values.setText(", ".join(f"{value:.4f}" for value in values))
         self.source_values.blockSignals(False)
@@ -899,4 +973,3 @@ class ScoreAutomationEditor(QGroupBox):
             values if editable else [point.value for point in lane.points],
             editable=editable,
         )
-

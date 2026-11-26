@@ -3,6 +3,7 @@
 The model describes musical relationships and attention; it does not schedule
 playback or claim to measure artistic quality. Musical time remains rational.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,26 +15,69 @@ from reawarp.score.time import Beat, as_fraction
 PLAN_FORMAT = "eli_lab_reawarp_orchestration_plan"
 PLAN_SCHEMA_VERSION = 3
 
-PHRASE_FUNCTIONS = frozenset({
-    "proposition", "establishment", "development", "contrast", "suspension",
-    "transition", "return", "residue", "coda",
-})
-RELATION_KINDS = frozenset({
-    "unison", "reinforcement", "doubling", "complement", "interlock",
-    "call_response", "antiphonal", "counterpoint", "convergence",
-})
+PHRASE_FUNCTIONS = frozenset(
+    {
+        "proposition",
+        "establishment",
+        "development",
+        "contrast",
+        "suspension",
+        "transition",
+        "return",
+        "residue",
+        "coda",
+    }
+)
+RELATION_KINDS = frozenset(
+    {
+        "unison",
+        "reinforcement",
+        "doubling",
+        "complement",
+        "interlock",
+        "call_response",
+        "antiphonal",
+        "counterpoint",
+        "convergence",
+    }
+)
 ATTENTION_DEPTHS = frozenset({"foreground", "midground", "background", "absence"})
-ATTENTION_ROLES = frozenset({
-    "unassigned", "anchor", "low_frequency_foundation", "primary_rhythm",
-    "counter_rhythm", "motif", "harmonic_field", "texture", "transition",
-    "spatial_bed",
-})
-TRANSITION_GESTURES = frozenset({
-    "pickup", "fill", "riser", "subtraction", "hard_cut", "reverse_swell",
-    "register_shift", "echo_handoff", "rhythmic_collapse", "silence_gate",
-    "fragment_reassembly", "false_cadence", "silence", "collapse", "return",
-    "residue", "open_ending", "closed_ending",
-})
+ATTENTION_ROLES = frozenset(
+    {
+        "unassigned",
+        "anchor",
+        "low_frequency_foundation",
+        "primary_rhythm",
+        "counter_rhythm",
+        "motif",
+        "harmonic_field",
+        "texture",
+        "transition",
+        "spatial_bed",
+    }
+)
+TRANSITION_GESTURES = frozenset(
+    {
+        "pickup",
+        "fill",
+        "riser",
+        "subtraction",
+        "hard_cut",
+        "reverse_swell",
+        "register_shift",
+        "echo_handoff",
+        "rhythmic_collapse",
+        "silence_gate",
+        "fragment_reassembly",
+        "false_cadence",
+        "silence",
+        "collapse",
+        "return",
+        "residue",
+        "open_ending",
+        "closed_ending",
+    }
+)
 
 
 def _text(value: Any, field: str) -> str:
@@ -73,7 +117,9 @@ class PhraseSpan:
         object.__setattr__(self, "end_beats", end)
         object.__setattr__(self, "section_id", _text(self.section_id, "section_id"))
         if self.overlap_group is not None:
-            object.__setattr__(self, "overlap_group", _text(self.overlap_group, "overlap_group"))
+            object.__setattr__(
+                self, "overlap_group", _text(self.overlap_group, "overlap_group")
+            )
         object.__setattr__(self, "tags", tuple(str(item) for item in self.tags))
 
     @property
@@ -129,7 +175,9 @@ class CycleSpec:
         return self.phase_beats % self.length_beats
 
     def onset_beats(
-        self, *, until: Beat | int | str,
+        self,
+        *,
+        until: Beat | int | str,
         from_beat: Beat | int | str | None = None,
     ) -> tuple[Beat, ...]:
         """Enumerate exact cycle-grid onsets in the half-open interval [start, stop)."""
@@ -185,9 +233,12 @@ class RoleRelationship:
             raise ValueError("a role relationship requires two distinct roles")
         if self.kind not in RELATION_KINDS:
             raise ValueError(f"unsupported role relationship: {self.kind}")
-        object.__setattr__(self, "start_beats", _time(self.start_beats, "relationship start"))
         object.__setattr__(
-            self, "offset_beats",
+            self, "start_beats", _time(self.start_beats, "relationship start")
+        )
+        object.__setattr__(
+            self,
+            "offset_beats",
             _time(self.offset_beats, "relationship offset", allow_negative=True),
         )
         object.__setattr__(
@@ -203,7 +254,9 @@ class RoleRelationship:
                 self, "transition_intent", str(self.transition_intent).strip() or None
             )
 
-    def target_onsets(self, source_onsets: Iterable[Beat | int | str]) -> tuple[Beat, ...]:
+    def target_onsets(
+        self, source_onsets: Iterable[Beat | int | str]
+    ) -> tuple[Beat, ...]:
         """Apply a deterministic timing grammar to one role's onset sequence."""
         source = tuple(sorted(as_fraction(value) for value in source_onsets))
         if self.kind in {"unison", "reinforcement", "doubling"}:
@@ -217,15 +270,20 @@ class RoleRelationship:
                 raise ValueError("convergence requires an end_beats boundary")
             duration = self.end_beats - self.start_beats
             mapped = tuple(
-                value + self.offset_beats * (
-                    1 - min(Fraction(1), max(Fraction(0), (
-                        value - self.start_beats
-                    ) / duration))
+                value
+                + self.offset_beats
+                * (
+                    1
+                    - min(
+                        Fraction(1),
+                        max(Fraction(0), (value - self.start_beats) / duration),
+                    )
                 )
                 for value in source
             )
         return tuple(
-            value for value in mapped
+            value
+            for value in mapped
             if value >= self.start_beats
             and (self.end_beats is None or value < self.end_beats)
         )
@@ -289,21 +347,32 @@ class AttentionSpan:
                     raise ValueError("register bounds must be finite")
                 object.__setattr__(self, name, value)
         if (
-            self.register_low is not None and self.register_high is not None
+            self.register_low is not None
+            and self.register_high is not None
             and self.register_high < self.register_low
         ):
             raise ValueError("register_high must be >= register_low")
         if self.spectral_band is not None:
-            object.__setattr__(self, "spectral_band", _text(self.spectral_band, "spectral_band"))
+            object.__setattr__(
+                self, "spectral_band", _text(self.spectral_band, "spectral_band")
+            )
         if self.attention_role not in ATTENTION_ROLES:
-            raise ValueError(f"unsupported semantic attention role: {self.attention_role}")
+            raise ValueError(
+                f"unsupported semantic attention role: {self.attention_role}"
+            )
         if self.intentional_overlap_id is not None:
             object.__setattr__(
-                self, "intentional_overlap_id",
+                self,
+                "intentional_overlap_id",
                 _text(self.intentional_overlap_id, "intentional_overlap_id"),
             )
-        for name in ("onset_density", "transient_strength", "sustain",
-                     "spatial_position", "prominence"):
+        for name in (
+            "onset_density",
+            "transient_strength",
+            "sustain",
+            "spatial_position",
+            "prominence",
+        ):
             value = getattr(self, name)
             if value is None:
                 continue
@@ -360,10 +429,17 @@ class MutationPolicy:
     rupture_reason: str | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "phrase_id", _text(self.phrase_id, "mutation phrase_id"))
+        object.__setattr__(
+            self, "phrase_id", _text(self.phrase_id, "mutation phrase_id")
+        )
         for name in (
-            "stable_anchors", "preserve_pattern", "preserve_motif", "preserve_sound",
-            "allow_pattern", "allow_motif", "allow_sound",
+            "stable_anchors",
+            "preserve_pattern",
+            "preserve_motif",
+            "preserve_sound",
+            "allow_pattern",
+            "allow_motif",
+            "allow_sound",
         ):
             object.__setattr__(
                 self, name, tuple(_text(value, name) for value in getattr(self, name))
@@ -375,7 +451,9 @@ class MutationPolicy:
         ):
             raise ValueError("principal_developments must be a non-negative integer")
         if self.principal_developments > 1 and not self.deliberate_rupture:
-            raise ValueError("multiple principal developments require deliberate_rupture")
+            raise ValueError(
+                "multiple principal developments require deliberate_rupture"
+            )
         if self.deliberate_rupture and not (self.rupture_reason or "").strip():
             raise ValueError("deliberate_rupture requires rupture_reason")
         if not self.deliberate_rupture and self.rupture_reason is not None:
@@ -399,8 +477,13 @@ class MutationPolicy:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "MutationPolicy":
         tuple_fields = {
-            "stable_anchors", "preserve_pattern", "preserve_motif", "preserve_sound",
-            "allow_pattern", "allow_motif", "allow_sound",
+            "stable_anchors",
+            "preserve_pattern",
+            "preserve_motif",
+            "preserve_sound",
+            "allow_pattern",
+            "allow_motif",
+            "allow_sound",
         }
         values = {
             key: tuple(value) if key in tuple_fields else value
@@ -437,7 +520,8 @@ class TransitionSpan:
         object.__setattr__(self, "end_beats", end)
         object.__setattr__(self, "intensity", intensity)
         object.__setattr__(
-            self, "affected_roles",
+            self,
+            "affected_roles",
             tuple(_text(role, "affected role") for role in self.affected_roles),
         )
         if self.transition_intent is not None:
@@ -508,11 +592,12 @@ class OrchestrationPlan:
             key=lambda item: (item.start_beats, item.end_beats, item.phrase_id),
         )
         for index, left in enumerate(ordered):
-            for right in ordered[index + 1:]:
+            for right in ordered[index + 1 :]:
                 if right.start_beats >= left.end_beats:
                     break
                 permitted = (
-                    left.allow_overlap or right.allow_overlap
+                    left.allow_overlap
+                    or right.allow_overlap
                     or (
                         left.overlap_group is not None
                         and left.overlap_group == right.overlap_group
@@ -528,41 +613,58 @@ class OrchestrationPlan:
         ends = [item.end_beats for item in self.phrases]
         ends.extend(item.end_beats for item in self.attention)
         ends.extend(item.end_beats for item in self.transitions)
-        ends.extend(item.end_beats for item in self.relationships if item.end_beats is not None)
-        ends.extend(item.end_beats for item in self.cycles if item.end_beats is not None)
+        ends.extend(
+            item.end_beats for item in self.relationships if item.end_beats is not None
+        )
+        ends.extend(
+            item.end_beats for item in self.cycles if item.end_beats is not None
+        )
         return max(ends, default=Fraction(0))
 
     def attention_at(self, role: str, beat: Beat | int | str) -> AttentionSpan | None:
         position = as_fraction(beat)
         active = [
-            item for item in self.attention
+            item
+            for item in self.attention
             if item.role == role and item.start_beats <= position < item.end_beats
         ]
-        return max(active, key=lambda item: (item.start_beats, item.end_beats)) if active else None
+        return (
+            max(active, key=lambda item: (item.start_beats, item.end_beats))
+            if active
+            else None
+        )
 
     def foreground_at(self, beat: Beat | int | str) -> tuple[str, ...]:
         position = as_fraction(beat)
-        return tuple(sorted({
-            item.role for item in self.attention
-            if item.depth == "foreground"
-            and item.start_beats <= position < item.end_beats
-        }))
+        return tuple(
+            sorted(
+                {
+                    item.role
+                    for item in self.attention
+                    if item.depth == "foreground"
+                    and item.start_beats <= position < item.end_beats
+                }
+            )
+        )
 
     def cycle_alignments(
-        self, left_cycle_id: str, right_cycle_id: str,
-        *, start_beats: Beat | int | str = 0,
+        self,
+        left_cycle_id: str,
+        right_cycle_id: str,
+        *,
+        start_beats: Beat | int | str = 0,
         end_beats: Beat | int | str,
     ) -> tuple[Beat, ...]:
         """Return exact shared onsets of two independent cycles in a bounded window."""
         by_id = {item.cycle_id: item for item in self.cycles}
         if left_cycle_id not in by_id or right_cycle_id not in by_id:
             raise KeyError("unknown cycle ID")
-        left = set(by_id[left_cycle_id].onset_beats(
-            from_beat=start_beats, until=end_beats
-        ))
-        right = set(by_id[right_cycle_id].onset_beats(
-            from_beat=start_beats, until=end_beats
-        ))
+        left = set(
+            by_id[left_cycle_id].onset_beats(from_beat=start_beats, until=end_beats)
+        )
+        right = set(
+            by_id[right_cycle_id].onset_beats(from_beat=start_beats, until=end_beats)
+        )
         return tuple(sorted(left & right))
 
     def to_dict(self) -> dict[str, Any]:
@@ -585,12 +687,17 @@ class OrchestrationPlan:
             raise ValueError("unsupported orchestration plan format")
         version = int(data.get("schema_version", 0))
         if version not in {1, 2, PLAN_SCHEMA_VERSION}:
-            raise ValueError(f"unsupported orchestration plan schema version: {version}")
+            raise ValueError(
+                f"unsupported orchestration plan schema version: {version}"
+            )
         return cls(
-            phrases=tuple(PhraseSpan.from_dict(item) for item in data.get("phrases", ())),
+            phrases=tuple(
+                PhraseSpan.from_dict(item) for item in data.get("phrases", ())
+            ),
             cycles=tuple(CycleSpec.from_dict(item) for item in data.get("cycles", ())),
             relationships=tuple(
-                RoleRelationship.from_dict(item) for item in data.get("relationships", ())
+                RoleRelationship.from_dict(item)
+                for item in data.get("relationships", ())
             ),
             attention=tuple(
                 AttentionSpan.from_dict(item) for item in data.get("attention", ())
@@ -647,30 +754,42 @@ def inspect_attention_handoffs(plan: OrchestrationPlan) -> tuple[dict[str, Any],
             reason = "source and target roles must differ"
         else:
             shared = {
-                spans[0].end_beats if spans[0].end_beats == spans[1].start_beats else None,
-                spans[1].end_beats if spans[1].end_beats == spans[0].start_beats else None,
+                (
+                    spans[0].end_beats
+                    if spans[0].end_beats == spans[1].start_beats
+                    else None
+                ),
+                (
+                    spans[1].end_beats
+                    if spans[1].end_beats == spans[0].start_beats
+                    else None
+                ),
             } - {None}
             if len(shared) != 1:
                 reason = "handoff sides must meet at one exact beat boundary without a gap or overlap"
             else:
                 boundary = str(next(iter(shared)))
         if reason:
-            warnings.append({
-                "kind": "non_atomic_handoff",
-                "handoff_id": handoff_id,
-                "roles": sorted(span.role for span in spans),
-                "reason": reason,
-                "heuristic_only": False,
-            })
+            warnings.append(
+                {
+                    "kind": "non_atomic_handoff",
+                    "handoff_id": handoff_id,
+                    "roles": sorted(span.role for span in spans),
+                    "reason": reason,
+                    "heuristic_only": False,
+                }
+            )
         else:
-            warnings.append({
-                "kind": "atomic_handoff",
-                "handoff_id": handoff_id,
-                "roles": [span.role for span in spans],
-                "boundary_beats": boundary,
-                "valid": True,
-                "heuristic_only": False,
-            })
+            warnings.append(
+                {
+                    "kind": "atomic_handoff",
+                    "handoff_id": handoff_id,
+                    "roles": [span.role for span in spans],
+                    "boundary_beats": boundary,
+                    "valid": True,
+                    "heuristic_only": False,
+                }
+            )
     return tuple(warnings)
 
 
@@ -685,7 +804,7 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
         plan.attention, key=lambda item: (item.start_beats, item.role, item.end_beats)
     )
     for index, left in enumerate(spans):
-        for right in spans[index + 1:]:
+        for right in spans[index + 1 :]:
             if right.start_beats >= left.end_beats:
                 break
             if left.role == right.role:
@@ -696,8 +815,10 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
             ):
                 continue
             register_overlap = (
-                left.register_low is not None and left.register_high is not None
-                and right.register_low is not None and right.register_high is not None
+                left.register_low is not None
+                and left.register_high is not None
+                and right.register_low is not None
+                and right.register_high is not None
                 and max(left.register_low, right.register_low)
                 <= min(left.register_high, right.register_high)
             )
@@ -723,8 +844,10 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
                 and abs(left.spatial_position - right.spatial_position) <= 0.25
             )
             sustain_overlap = (
-                left.sustain is not None and right.sustain is not None
-                and left.sustain >= 0.70 and right.sustain >= 0.70
+                left.sustain is not None
+                and right.sustain is not None
+                and left.sustain >= 0.70
+                and right.sustain >= 0.70
                 and (register_overlap or spectral_overlap)
             )
             evidence = []
@@ -735,28 +858,36 @@ def inspect_attention_conflicts(plan: OrchestrationPlan) -> tuple[dict[str, Any]
             if transient_competition:
                 evidence.append("both roles have strong transient descriptors")
             if density_competition:
-                evidence.append("both roles have high onset density (>= 0.75 events/beat)")
+                evidence.append(
+                    "both roles have high onset density (>= 0.75 events/beat)"
+                )
             if stereo_proximity:
-                evidence.append("stereo positions are close (within 0.25 of normalized width)")
+                evidence.append(
+                    "stereo positions are close (within 0.25 of normalized width)"
+                )
             if sustain_overlap:
-                evidence.append("both roles have sustained energy in an overlapping zone")
+                evidence.append(
+                    "both roles have sustained energy in an overlapping zone"
+                )
             if evidence:
-                warnings.append({
-                    "kind": "attention_competition",
-                    "roles": [left.role, right.role],
-                    "semantic_roles": [left.attention_role, right.attention_role],
-                    "start_beats": str(max(left.start_beats, right.start_beats)),
-                    "end_beats": str(min(left.end_beats, right.end_beats)),
-                    "evidence": evidence,
-                    "register_overlap": register_overlap,
-                    "spectral_overlap": spectral_overlap,
-                    "transient_competition": transient_competition,
-                    "density_competition": density_competition,
-                    "stereo_proximity": stereo_proximity,
-                    "sustain_overlap": sustain_overlap,
-                    "heuristic_only": True,
-                    "review_state": "unreviewed",
-                })
+                warnings.append(
+                    {
+                        "kind": "attention_competition",
+                        "roles": [left.role, right.role],
+                        "semantic_roles": [left.attention_role, right.attention_role],
+                        "start_beats": str(max(left.start_beats, right.start_beats)),
+                        "end_beats": str(min(left.end_beats, right.end_beats)),
+                        "evidence": evidence,
+                        "register_overlap": register_overlap,
+                        "spectral_overlap": spectral_overlap,
+                        "transient_competition": transient_competition,
+                        "density_competition": density_competition,
+                        "stereo_proximity": stereo_proximity,
+                        "sustain_overlap": sustain_overlap,
+                        "heuristic_only": True,
+                        "review_state": "unreviewed",
+                    }
+                )
     return tuple(warnings)
 
 
@@ -784,11 +915,13 @@ def inspect_event_onset_conflicts(
         roles = sorted({str(event.voice_id) for event in group})
         if len(roles) < 2:
             continue
-        warnings.append({
-            "kind": "onset_overlap",
-            "onset_beats": str(as_fraction(group[0].onset_beats)),
-            "roles": roles,
-            "event_ids": sorted(str(event.event_id) for event in group),
-            "heuristic_only": True,
-        })
+        warnings.append(
+            {
+                "kind": "onset_overlap",
+                "onset_beats": str(as_fraction(group[0].onset_beats)),
+                "roles": roles,
+                "event_ids": sorted(str(event.event_id) for event in group),
+                "heuristic_only": True,
+            }
+        )
     return tuple(warnings)

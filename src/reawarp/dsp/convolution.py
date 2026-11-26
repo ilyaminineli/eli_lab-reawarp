@@ -3,6 +3,7 @@
 The module is independent of the M22 mixer, renders offline, uses NumPy only,
 and never mutates the input signal or impulse response.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +15,6 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-
 
 IR_FORMAT = "reawarp_impulse_response"
 IR_SCHEMA_VERSION = 1
@@ -38,7 +38,9 @@ def _json_object(value: Mapping[str, Any]) -> dict[str, Any]:
     try:
         return json.loads(json.dumps(dict(value), ensure_ascii=False, allow_nan=False))
     except (TypeError, ValueError) as exc:
-        raise ValueError("impulse-response design metadata must be finite JSON data") from exc
+        raise ValueError(
+            "impulse-response design metadata must be finite JSON data"
+        ) from exc
 
 
 def _canonical_audio(audio: np.ndarray) -> np.ndarray:
@@ -94,17 +96,26 @@ class ImpulseResponse:
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("seed must be an integer")
         if self.schema_version != IR_SCHEMA_VERSION:
-            raise ValueError(f"unsupported impulse-response schema: {self.schema_version}")
+            raise ValueError(
+                f"unsupported impulse-response schema: {self.schema_version}"
+            )
         samples, _mono_vector = _audio_channels(self.samples, "impulse response")
         if len(samples) < 1:
             raise ValueError("impulse response cannot be empty")
         if len(samples) > int(self.sample_rate * _MAX_IR_SECONDS):
-            raise ValueError(f"impulse response cannot exceed {_MAX_IR_SECONDS:g} seconds")
+            raise ValueError(
+                f"impulse response cannot exceed {_MAX_IR_SECONDS:g} seconds"
+            )
         frozen = samples.copy()
         frozen.setflags(write=False)
         object.__setattr__(self, "samples", frozen)
         object.__setattr__(self, "sample_rate", int(self.sample_rate))
-        for name in ("name", "impulse_id", "source_identity_id", "processing_identity_id"):
+        for name in (
+            "name",
+            "impulse_id",
+            "source_identity_id",
+            "processing_identity_id",
+        ):
             value = str(getattr(self, name)).strip()
             if not value:
                 raise ValueError(f"{name} cannot be empty")
@@ -178,14 +189,20 @@ class ImpulseResponse:
             raise ValueError("impulse-response frame count does not match its manifest")
         channel_count = 1 if samples.ndim == 1 else samples.shape[1]
         if int(manifest.get("channels", -1)) != channel_count:
-            raise ValueError("impulse-response channel count does not match its manifest")
+            raise ValueError(
+                "impulse-response channel count does not match its manifest"
+            )
         result = cls(
             samples=samples,
             sample_rate=int(manifest["sample_rate"]),
             name=str(manifest.get("name", "Impulse response")),
             impulse_id=str(manifest.get("impulse_id", "ir")),
-            source_identity_id=str(manifest.get("source_identity_id", "source:impulse-response")),
-            processing_identity_id=str(manifest.get("processing_identity_id", "process:convolution")),
+            source_identity_id=str(
+                manifest.get("source_identity_id", "source:impulse-response")
+            ),
+            processing_identity_id=str(
+                manifest.get("processing_identity_id", "process:convolution")
+            ),
             seed=int(manifest.get("seed", 0)),
             design=dict(manifest.get("design", {})),
             schema_version=int(manifest.get("schema_version", IR_SCHEMA_VERSION)),
@@ -222,7 +239,9 @@ def design_resonant_ir(
     if isinstance(sample_rate, bool) or int(sample_rate) < 1000:
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
-    duration = _finite_number(duration_seconds, "duration_seconds", 1.0 / rate, _MAX_IR_SECONDS)
+    duration = _finite_number(
+        duration_seconds, "duration_seconds", 1.0 / rate, _MAX_IR_SECONDS
+    )
     if isinstance(seed, bool) or not isinstance(seed, int):
         raise ValueError("seed must be an integer")
     if not modes or len(modes) > _MAX_MODES:
@@ -240,34 +259,53 @@ def design_resonant_ir(
         if not isinstance(item, Mapping):
             raise ValueError(f"mode {index} must be an object")
         frequency = _finite_number(
-            item.get("frequency_hz"), f"modes[{index}].frequency_hz",
-            0.1, rate * 0.499 / (1.0 + spread)
+            item.get("frequency_hz"),
+            f"modes[{index}].frequency_hz",
+            0.1,
+            rate * 0.499 / (1.0 + spread),
         )
         gain = _finite_number(item.get("gain", 1.0), f"modes[{index}].gain", 0.0, 4.0)
         decay = _finite_number(
-            item.get("decay_seconds", 0.5), f"modes[{index}].decay_seconds", 0.001, 120.0
+            item.get("decay_seconds", 0.5),
+            f"modes[{index}].decay_seconds",
+            0.001,
+            120.0,
         )
         phase = _finite_number(
-            item.get("phase_radians", 0.0), f"modes[{index}].phase_radians",
-            -math.tau * 1000.0, math.tau * 1000.0,
+            item.get("phase_radians", 0.0),
+            f"modes[{index}].phase_radians",
+            -math.tau * 1000.0,
+            math.tau * 1000.0,
         )
-        normalized_modes.append({
-            "frequency_hz": frequency, "gain": gain,
-            "decay_seconds": decay, "phase_radians": phase,
-        })
+        normalized_modes.append(
+            {
+                "frequency_hz": frequency,
+                "gain": gain,
+                "decay_seconds": decay,
+                "phase_radians": phase,
+            }
+        )
         envelope = np.exp(-time_axis / decay)
         if channels == 1:
-            output[:, 0] += gain * np.sin(math.tau * frequency * time_axis + phase) * envelope
+            output[:, 0] += (
+                gain * np.sin(math.tau * frequency * time_axis + phase) * envelope
+            )
         else:
             left_frequency = frequency * (1.0 - spread)
             right_frequency = frequency * (1.0 + spread)
-            output[:, 0] += gain * np.sin(math.tau * left_frequency * time_axis + phase) * envelope
-            output[:, 1] += gain * np.sin(math.tau * right_frequency * time_axis + phase) * envelope
+            output[:, 0] += (
+                gain * np.sin(math.tau * left_frequency * time_axis + phase) * envelope
+            )
+            output[:, 1] += (
+                gain * np.sin(math.tau * right_frequency * time_axis + phase) * envelope
+            )
 
     if noise_amount > 0.0:
         noise = rng.standard_normal((frames, channels), dtype=np.float64)
         noise_decay = max(duration * 0.32, 0.01)
-        output += noise_amount * 0.08 * noise * np.exp(-time_axis[:, None] / noise_decay)
+        output += (
+            noise_amount * 0.08 * noise * np.exp(-time_axis[:, None] / noise_decay)
+        )
 
     return ImpulseResponse(
         samples=np.ascontiguousarray(output, dtype=np.float32),
@@ -307,11 +345,19 @@ def convolve_partitioned(
     amount = _finite_number(wet, "wet", 0.0, 1.0)
     if isinstance(block_size, bool) or not isinstance(block_size, int):
         raise ValueError("block_size must be an integer power of two")
-    if block_size < _MIN_BLOCK_SIZE or block_size > _MAX_BLOCK_SIZE or block_size & (block_size - 1):
+    if (
+        block_size < _MIN_BLOCK_SIZE
+        or block_size > _MAX_BLOCK_SIZE
+        or block_size & (block_size - 1)
+    ):
         raise ValueError(
             f"block_size must be a power of two between {_MIN_BLOCK_SIZE} and {_MAX_BLOCK_SIZE}"
         )
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) <= 0:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) <= 0
+    ):
         raise ValueError("sample_rate must be a positive integer")
     rate = int(sample_rate)
     started = time.perf_counter()
@@ -323,10 +369,17 @@ def convolve_partitioned(
         return ConvolutionResult(
             audio=np.ascontiguousarray(result_audio, dtype=np.float32),
             diagnostics={
-                "module": "m24.1.convolution", "algorithm": "bypass", "bypass": True,
-                "sample_rate": rate, "input_frames": int(len(source)),
-                "output_frames": int(len(source)), "tail_frames": 0, "tail_seconds": 0.0,
-                "latency_frames": 0, "processing_seconds": elapsed, "wet": amount,
+                "module": "m24.1.convolution",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "input_frames": int(len(source)),
+                "output_frames": int(len(source)),
+                "tail_frames": 0,
+                "tail_seconds": 0.0,
+                "latency_frames": 0,
+                "processing_seconds": elapsed,
+                "wet": amount,
                 "finite_output": True,
             },
         )
@@ -351,11 +404,15 @@ def convolve_partitioned(
     input_channels, ir_channels = source.shape[1], ir.shape[1]
     if input_channels == 1 and ir_channels == 2:
         source_channels, filter_channels, output_channels = (
-            np.repeat(source, 2, axis=1), ir, 2
+            np.repeat(source, 2, axis=1),
+            ir,
+            2,
         )
     elif input_channels == 2 and ir_channels == 1:
         source_channels, filter_channels, output_channels = (
-            source, np.repeat(ir, 2, axis=1), 2
+            source,
+            np.repeat(ir, 2, axis=1),
+            2,
         )
     elif input_channels == ir_channels:
         source_channels, filter_channels, output_channels = source, ir, input_channels
@@ -370,17 +427,25 @@ def convolve_partitioned(
         return ConvolutionResult(
             audio=output,
             diagnostics={
-                "module": "m24.1.convolution", "algorithm": "partitioned_overlap_add",
-                "bypass": False, "sample_rate": rate, "input_frames": 0,
-                "output_frames": 0, "tail_frames": 0, "tail_seconds": 0.0,
-                "latency_frames": 0, "processing_seconds": 0.0, "wet": amount,
-                "impulse_response_id": ir_id, "impulse_response_sha256": ir_sha,
+                "module": "m24.1.convolution",
+                "algorithm": "partitioned_overlap_add",
+                "bypass": False,
+                "sample_rate": rate,
+                "input_frames": 0,
+                "output_frames": 0,
+                "tail_frames": 0,
+                "tail_seconds": 0.0,
+                "latency_frames": 0,
+                "processing_seconds": 0.0,
+                "wet": amount,
+                "impulse_response_id": ir_id,
+                "impulse_response_sha256": ir_sha,
                 "finite_output": True,
             },
         )
 
     partitions = [
-        filter_channels[offset:offset + block_size]
+        filter_channels[offset : offset + block_size]
         for offset in range(0, ir_frames, block_size)
     ]
     fft_size, bins = block_size * 2, block_size + 1
@@ -389,30 +454,26 @@ def convolve_partitioned(
     )
     for part_index, part in enumerate(partitions):
         padded = np.zeros((fft_size, output_channels), dtype=np.float64)
-        padded[:len(part)] = part
+        padded[: len(part)] = part
         filter_spectra[part_index] = np.fft.rfft(padded, axis=0)
 
     partition_count = len(partitions)
     input_blocks = int(math.ceil(input_frames / block_size))
     output_frames = input_frames + ir_frames - 1
     output_blocks = int(math.ceil(output_frames / block_size))
-    history = np.zeros(
-        (partition_count, bins, output_channels), dtype=np.complex128
-    )
+    history = np.zeros((partition_count, bins, output_channels), dtype=np.complex128)
     wet_accumulator = np.zeros((output_frames, output_channels), dtype=np.float64)
 
     # For output block k, sum X[k-p] * H[p], then overlap-add the 2B-1 result.
     for output_block in range(output_blocks):
         if output_block < input_blocks:
             offset = output_block * block_size
-            chunk = source_channels[offset:offset + block_size]
+            chunk = source_channels[offset : offset + block_size]
             padded_input = np.zeros((fft_size, output_channels), dtype=np.float64)
-            padded_input[:len(chunk)] = chunk
+            padded_input[: len(chunk)] = chunk
             history[output_block % partition_count] = np.fft.rfft(padded_input, axis=0)
 
-        accumulated_spectrum = np.zeros(
-            (bins, output_channels), dtype=np.complex128
-        )
+        accumulated_spectrum = np.zeros((bins, output_channels), dtype=np.complex128)
         max_partition = min(partition_count, output_block + 1)
         for partition_index in range(max_partition):
             input_index = output_block - partition_index
@@ -426,7 +487,9 @@ def convolve_partitioned(
         output_offset = output_block * block_size
         count = min(fft_size, output_frames - output_offset)
         if count > 0:
-            wet_accumulator[output_offset:output_offset + count] += convolved_block[:count]
+            wet_accumulator[output_offset : output_offset + count] += convolved_block[
+                :count
+            ]
 
     wet_audio = np.asarray(wet_accumulator, dtype=np.float32)
     if amount < 1.0:
@@ -440,13 +503,23 @@ def convolve_partitioned(
     if not finite_output:
         raise FloatingPointError("convolution produced non-finite output")
     peak = float(np.max(np.abs(mixed))) if mixed.size else 0.0
-    rms = float(np.sqrt(np.mean(np.square(mixed, dtype=np.float64)))) if mixed.size else 0.0
+    rms = (
+        float(np.sqrt(np.mean(np.square(mixed, dtype=np.float64))))
+        if mixed.size
+        else 0.0
+    )
     elapsed = time.perf_counter() - started
     preserve_vector = source_was_vector and output_channels == 1
-    output = np.ascontiguousarray(mixed[:, 0] if preserve_vector else mixed, dtype=np.float32)
+    output = np.ascontiguousarray(
+        mixed[:, 0] if preserve_vector else mixed, dtype=np.float32
+    )
     estimated_working_bytes = int(
-        filter_spectra.nbytes + history.nbytes + wet_accumulator.nbytes
-        + source_channels.nbytes + filter_channels.nbytes + mixed.nbytes
+        filter_spectra.nbytes
+        + history.nbytes
+        + wet_accumulator.nbytes
+        + source_channels.nbytes
+        + filter_channels.nbytes
+        + mixed.nbytes
     )
     return ConvolutionResult(
         audio=output,
@@ -480,9 +553,12 @@ def convolve_partitioned(
             "headroom_db": 20.0 * math.log10(max(1e-12, 1.0 / max(peak, 1e-12))),
             "over_unity": bool(peak > 1.0),
             "finite_output": finite_output,
-            "denormal_sample_count": int(np.count_nonzero(
-                (np.abs(output) > 0.0) & (np.abs(output) < np.finfo(np.float32).tiny)
-            )),
+            "denormal_sample_count": int(
+                np.count_nonzero(
+                    (np.abs(output) > 0.0)
+                    & (np.abs(output) < np.finfo(np.float32).tiny)
+                )
+            ),
             "random_policy": "none_in_convolution",
             "reproducibility": "same-environment deterministic",
         },
@@ -504,8 +580,12 @@ def spectral_imprint(
     time-varying spectral delay processing.
     """
     result = convolve_partitioned(
-        audio, impulse_response, sample_rate,
-        wet=wet, block_size=block_size, bypass=bypass,
+        audio,
+        impulse_response,
+        sample_rate,
+        wet=wet,
+        block_size=block_size,
+        bypass=bypass,
     )
     diagnostics = dict(result.diagnostics)
     diagnostics["instrument"] = "spectral_imprint"
@@ -514,6 +594,11 @@ def spectral_imprint(
 
 
 __all__ = [
-    "IR_FORMAT", "IR_SCHEMA_VERSION", "ImpulseResponse", "ConvolutionResult",
-    "design_resonant_ir", "convolve_partitioned", "spectral_imprint",
+    "IR_FORMAT",
+    "IR_SCHEMA_VERSION",
+    "ImpulseResponse",
+    "ConvolutionResult",
+    "design_resonant_ir",
+    "convolve_partitioned",
+    "spectral_imprint",
 ]

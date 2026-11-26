@@ -1,4 +1,5 @@
 """Candidate selection and critical-listening workspace."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -6,9 +7,22 @@ from typing import Any
 import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
-    QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPlainTextEdit,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -70,12 +84,16 @@ class VariationBrowserPage(QWidget):
         top.addWidget(self.count)
         self.blind = QCheckBox("HIDE CANDIDATE IDENTITY")
         self.blind.setChecked(True)
-        self.blind.setToolTip("Keep candidate labels anonymous during the first listening pass.")
+        self.blind.setToolTip(
+            "Keep candidate labels anonymous during the first listening pass."
+        )
         top.addWidget(self.blind)
         controls_layout.addLayout(top)
         self.targets = QListWidget()
         self.targets.setMaximumHeight(92)
-        self.targets.setToolTip("Choose one or more stems. Pair selections are regenerated together.")
+        self.targets.setToolTip(
+            "Choose one or more stems. Pair selections are regenerated together."
+        )
         controls_layout.addWidget(self.targets)
         actions = QHBoxLayout()
         self.generate_button = QPushButton("GENERATE BATCH")
@@ -102,17 +120,22 @@ class VariationBrowserPage(QWidget):
         self.discard_button = QPushButton("DISCARD")
         self.promote_button = QPushButton("PROMOTE")
         for button, state in (
-            (self.keep_button, "kept"), (self.discard_button, "discarded"),
+            (self.keep_button, "kept"),
+            (self.discard_button, "discarded"),
             (self.promote_button, "promoted"),
         ):
-            button.clicked.connect(lambda _checked=False, value=state: self._action(value))
+            button.clicked.connect(
+                lambda _checked=False, value=state: self._action(value)
+            )
             state_actions.addWidget(button)
         left_layout.addLayout(state_actions)
         branch_actions = QHBoxLayout()
         self.branch_button = QPushButton("BRANCH FROM SELECTED")
         self.restore_button = QPushButton("RESTORE FROZEN BASE")
         self.branch_button.clicked.connect(lambda: self._action("branched"))
-        self.restore_button.clicked.connect(lambda: self.candidateAction.emit("restore", "base"))
+        self.restore_button.clicked.connect(
+            lambda: self.candidateAction.emit("restore", "base")
+        )
         branch_actions.addWidget(self.branch_button)
         branch_actions.addWidget(self.restore_button)
         left_layout.addLayout(branch_actions)
@@ -135,7 +158,9 @@ class VariationBrowserPage(QWidget):
         self.details.setWordWrap(True)
         right_layout.addWidget(self.details)
         self.notes = QPlainTextEdit()
-        self.notes.setPlaceholderText("Listening notes — identity, role clarity, negative space, transient preservation…")
+        self.notes.setPlaceholderText(
+            "Listening notes — identity, role clarity, negative space, transient preservation…"
+        )
         self.notes.setMaximumHeight(76)
         self.notes.textChanged.connect(self._notes_changed)
         right_layout.addWidget(self.notes)
@@ -143,10 +168,16 @@ class VariationBrowserPage(QWidget):
         compare_row = QHBoxLayout()
         self.compare_stage = QComboBox()
         for label, stage in (
-            ("DRY MASTER", "dry_master"), ("DRY STEM", "dry_stem"),
-            ("DIRECT", "direct"), ("PROCESSED STEM", "processed"), ("INSERT", "insert"), ("SPACE SEND", "send.space"),
-            ("ECHO SEND", "send.echo"), ("SPACE RETURN", "return.space"),
-            ("ECHO RETURN", "return.echo"), ("FX MASTER", "master"),
+            ("DRY MASTER", "dry_master"),
+            ("DRY STEM", "dry_stem"),
+            ("DIRECT", "direct"),
+            ("PROCESSED STEM", "processed"),
+            ("INSERT", "insert"),
+            ("SPACE SEND", "send.space"),
+            ("ECHO SEND", "send.echo"),
+            ("SPACE RETURN", "return.space"),
+            ("ECHO RETURN", "return.echo"),
+            ("FX MASTER", "master"),
         ):
             self.compare_stage.addItem(label, stage)
         compare_row.addWidget(self.compare_stage)
@@ -156,32 +187,55 @@ class VariationBrowserPage(QWidget):
         self.play_diff_button = QPushButton("PLAY Δ")
         self.play_listening_button = QPushButton("PLAY LISTENING SET")
         self.compare_button.clicked.connect(self._compare)
-        self.play_a_button.clicked.connect(lambda: self.auditionRequested.emit("reference"))
-        self.play_b_button.clicked.connect(lambda: self.auditionRequested.emit("candidate"))
-        self.play_diff_button.clicked.connect(lambda: self.auditionRequested.emit("difference"))
-        for button in (self.compare_button, self.play_a_button, self.play_b_button, self.play_diff_button, self.play_listening_button):
+        self.play_a_button.clicked.connect(
+            lambda: self.auditionRequested.emit("reference")
+        )
+        self.play_b_button.clicked.connect(
+            lambda: self.auditionRequested.emit("candidate")
+        )
+        self.play_diff_button.clicked.connect(
+            lambda: self.auditionRequested.emit("difference")
+        )
+        for button in (
+            self.compare_button,
+            self.play_a_button,
+            self.play_b_button,
+            self.play_diff_button,
+            self.play_listening_button,
+        ):
             compare_row.addWidget(button)
-        self.play_listening_button.clicked.connect(lambda: self.auditionRequested.emit("listening"))
+        self.play_listening_button.clicked.connect(
+            lambda: self.auditionRequested.emit("listening")
+        )
         right_layout.addLayout(compare_row)
 
         listening_row = QHBoxLayout()
         listening_row.addWidget(QLabel("LISTENING SET"))
         self.listening_set = QComboBox()
         for label, key in (
-            ("FULL MIX", "full_mix"), ("ISOLATED ROLES", "isolated_roles"),
-            ("ROLE PAIRS", "role_pairs"), ("TRANSITIONS", "transitions"),
-            ("OPENING", "opening"), ("MIDDLE", "middle"), ("ENDING", "ending"),
+            ("FULL MIX", "full_mix"),
+            ("ISOLATED ROLES", "isolated_roles"),
+            ("ROLE PAIRS", "role_pairs"),
+            ("TRANSITIONS", "transitions"),
+            ("OPENING", "opening"),
+            ("MIDDLE", "middle"),
+            ("ENDING", "ending"),
             ("SUBTRACTION", "subtraction"),
         ):
             self.listening_set.addItem(label, key)
         self.listening_set.currentIndexChanged.connect(
-            lambda: self.listeningSetRequested.emit(str(self.listening_set.currentData()))
+            lambda: self.listeningSetRequested.emit(
+                str(self.listening_set.currentData())
+            )
         )
         listening_row.addWidget(self.listening_set, 1)
         self.listening_item = QComboBox()
         self.listening_item.currentIndexChanged.connect(
-            lambda: self.listeningItemRequested.emit(str(self.listening_item.currentData()))
-            if self.listening_item.currentData() is not None else None
+            lambda: (
+                self.listeningItemRequested.emit(str(self.listening_item.currentData()))
+                if self.listening_item.currentData() is not None
+                else None
+            )
         )
         listening_row.addWidget(self.listening_item, 1)
         right_layout.addLayout(listening_row)
@@ -200,7 +254,9 @@ class VariationBrowserPage(QWidget):
             ("REDUCED DENSITY", "reduced_density"),
             ("ALTERED REGISTER", "altered_register"),
             ("INVARIANCE REMOVAL", "invariance"),
-            ("OPENING", "opening"), ("MIDDLE", "middle"), ("ENDING", "ending"),
+            ("OPENING", "opening"),
+            ("MIDDLE", "middle"),
+            ("ENDING", "ending"),
         ):
             self.m32_context.addItem(label, key)
         self.m32_phrase = QComboBox()
@@ -252,7 +308,9 @@ class VariationBrowserPage(QWidget):
         level_row.addWidget(self.m32_analysis_enabled)
         parameter_panel.addLayout(level_row)
         self.m32_identity_label = QLineEdit()
-        self.m32_identity_label.setPlaceholderText("Invariance anchor / material identity")
+        self.m32_identity_label.setPlaceholderText(
+            "Invariance anchor / material identity"
+        )
         parameter_panel.addWidget(self.m32_identity_label)
         self.m32_identity_result = QComboBox()
         self.m32_identity_result.addItem("NOT REVIEWED", None)
@@ -268,8 +326,12 @@ class VariationBrowserPage(QWidget):
         self.m32_keep_button = QPushButton("KEEP PASS")
         self.m32_restore_button = QPushButton("RESTORE")
         self.m32_build_button.clicked.connect(self._m32_request_context)
-        self.m32_keep_button.clicked.connect(lambda: self.m32DecisionRequested.emit("keep"))
-        self.m32_restore_button.clicked.connect(lambda: self.m32DecisionRequested.emit("restore"))
+        self.m32_keep_button.clicked.connect(
+            lambda: self.m32DecisionRequested.emit("keep")
+        )
+        self.m32_restore_button.clicked.connect(
+            lambda: self.m32DecisionRequested.emit("restore")
+        )
         m32_actions.addWidget(self.m32_build_button)
         m32_actions.addWidget(self.m32_keep_button)
         m32_actions.addWidget(self.m32_restore_button)
@@ -305,6 +367,7 @@ class VariationBrowserPage(QWidget):
             "technical_integrity": "Technical integrity",
         }
         from reawarp.listening import REPORT_PROMPTS
+
         for index, (key, label) in enumerate(report_prompts.items()):
             row, column = divmod(index, 2)
             field = QLineEdit()
@@ -319,7 +382,9 @@ class VariationBrowserPage(QWidget):
             lambda: self.m32ReportRequested.emit(self.m32_report_notes())
         )
         report_layout.addWidget(self.m32_report_save_button)
-        self.m32_report_status = QLabel("Report notes are saved into project metadata and exported as JSON + Markdown.")
+        self.m32_report_status = QLabel(
+            "Report notes are saved into project metadata and exported as JSON + Markdown."
+        )
         self.m32_report_status.setObjectName("muted")
         self.m32_report_status.setWordWrap(True)
         report_layout.addWidget(self.m32_report_status)
@@ -378,13 +443,17 @@ class VariationBrowserPage(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, str(name))
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(
-                Qt.CheckState.Checked if str(name) in selected else Qt.CheckState.Unchecked
+                Qt.CheckState.Checked
+                if str(name) in selected
+                else Qt.CheckState.Unchecked
             )
             self.m32_roles.addItem(item)
         if self.m32_roles.count() and not selected:
             self.m32_roles.item(0).setCheckState(Qt.CheckState.Checked)
 
-    def set_phrase_choices(self, choices: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> None:
+    def set_phrase_choices(
+        self, choices: list[tuple[str, str]] | tuple[tuple[str, str], ...]
+    ) -> None:
         selected = self.m32_phrase.currentData()
         self.m32_phrase.blockSignals(True)
         self.m32_phrase.clear()
@@ -396,7 +465,9 @@ class VariationBrowserPage(QWidget):
         self.m32_phrase.setCurrentIndex(index)
         self.m32_phrase.blockSignals(False)
 
-    def set_m32_diagnostics(self, analysis: dict[str, Any], audition_analysis: dict[str, Any] | None = None) -> None:
+    def set_m32_diagnostics(
+        self, analysis: dict[str, Any], audition_analysis: dict[str, Any] | None = None
+    ) -> None:
         if not analysis.get("enabled", False):
             self.m32_diagnostics.setText(
                 "TECHNICAL ANALYSIS DISABLED · audition transforms remain available; no metrics or warnings were generated."
@@ -404,10 +475,13 @@ class VariationBrowserPage(QWidget):
             return
         master = analysis.get("master", {})
         warnings = analysis.get("warnings", [])
-        warning_text = ", ".join(
-            f"{str(item.get('severity', 'info')).upper()} {item.get('code', '')}"
-            for item in warnings
-        ) or "No threshold warnings"
+        warning_text = (
+            ", ".join(
+                f"{str(item.get('severity', 'info')).upper()} {item.get('code', '')}"
+                for item in warnings
+            )
+            or "No threshold warnings"
+        )
         text = (
             f"MASTER · peak {master.get('peak_dbfs', float('nan')):.1f} dBFS · "
             f"RMS {master.get('rms_dbfs', float('nan')):.1f} dBFS · "
@@ -433,7 +507,9 @@ class VariationBrowserPage(QWidget):
             field.setText(str(notes.get(key, "")))
 
     def m32_report_notes(self) -> dict[str, str]:
-        return {key: field.text().strip() for key, field in self._m32_report_fields.items()}
+        return {
+            key: field.text().strip() for key, field in self._m32_report_fields.items()
+        }
 
     @staticmethod
     def _preview_panel(title: str, preview: AudioPreview) -> QWidget:
@@ -451,8 +527,12 @@ class VariationBrowserPage(QWidget):
         self._populate_targets()
         self.set_m32_roles(self._stems)
 
-    def set_sound_objects(self, patches: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> None:
-        self._sound_objects = tuple((str(patch_id), str(name)) for patch_id, name in patches)
+    def set_sound_objects(
+        self, patches: list[tuple[str, str]] | tuple[tuple[str, str], ...]
+    ) -> None:
+        self._sound_objects = tuple(
+            (str(patch_id), str(name)) for patch_id, name in patches
+        )
         self._populate_targets()
 
     def _populate_targets(self) -> None:
@@ -477,7 +557,11 @@ class VariationBrowserPage(QWidget):
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.targets.addItem(item)
-        default = "melody" if "melody" in self._stems else (self._stems[0] if self._stems else None)
+        default = (
+            "melody"
+            if "melody" in self._stems
+            else (self._stems[0] if self._stems else None)
+        )
         if default:
             for index in range(self.targets.count()):
                 item = self.targets.item(index)
@@ -499,19 +583,27 @@ class VariationBrowserPage(QWidget):
         mode = str(self.mode.currentData() or "stems")
         if mode in {"stems", "sound_object"} and not selected:
             self.candidate_title.setText(
-                "SELECT A STEM" if mode == "stems" else "INDEX OR SELECT A SOUND OBJECT IN THE LIBRARY"
+                "SELECT A STEM"
+                if mode == "stems"
+                else "INDEX OR SELECT A SOUND OBJECT IN THE LIBRARY"
             )
             return
-        self.batchRequested.emit({
-            "mode": mode, "targets": selected, "count": self.count.value(),
-            "label": "Variation batch",
-        })
+        self.batchRequested.emit(
+            {
+                "mode": mode,
+                "targets": selected,
+                "count": self.count.value(),
+                "label": "Variation batch",
+            }
+        )
 
     def set_batch_busy(self, busy: bool) -> None:
         self.generate_button.setEnabled(not busy)
         self.cancel_button.setEnabled(busy)
 
-    def set_candidates(self, records: list[Any], *, selected_id: str | None = None) -> None:
+    def set_candidates(
+        self, records: list[Any], *, selected_id: str | None = None
+    ) -> None:
         previous = selected_id or self._selected_id
         self._records = {str(item.candidate_id): item for item in records}
         self.candidates.blockSignals(True)
@@ -525,7 +617,10 @@ class VariationBrowserPage(QWidget):
         selected_index = 0
         if previous:
             for index in range(self.candidates.count()):
-                if self.candidates.item(index).data(Qt.ItemDataRole.UserRole) == previous:
+                if (
+                    self.candidates.item(index).data(Qt.ItemDataRole.UserRole)
+                    == previous
+                ):
                     selected_index = index
                     break
         self.candidates.setCurrentRow(selected_index if self.candidates.count() else -1)
@@ -559,9 +654,13 @@ class VariationBrowserPage(QWidget):
                 f"TECHNICAL FLAGS {', '.join(record.technical_flags) or 'NONE'}"
             )
         else:
-            self.details.setText("Candidate parameters hidden · select by listening before revealing changes.")
+            self.details.setText(
+                "Candidate parameters hidden · select by listening before revealing changes."
+            )
 
-    def _selected_changed(self, item: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
+    def _selected_changed(
+        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None
+    ) -> None:
         if item is None:
             self._selected_id = None
             self.candidate_title.setText("NO CANDIDATE SELECTED")
@@ -570,9 +669,15 @@ class VariationBrowserPage(QWidget):
         candidate_id = str(item.data(Qt.ItemDataRole.UserRole))
         self._selected_id = candidate_id
         record = self._records.get(candidate_id)
-        self.candidate_title.setText("CANDIDATE" if self.blind.isChecked() else getattr(record, "label", candidate_id))
+        self.candidate_title.setText(
+            "CANDIDATE"
+            if self.blind.isChecked()
+            else getattr(record, "label", candidate_id)
+        )
         self._notes_loading = True
-        self.notes.setPlainText(getattr(record, "notes", "") if record is not None else "")
+        self.notes.setPlainText(
+            getattr(record, "notes", "") if record is not None else ""
+        )
         self._notes_loading = False
         self._refresh_details()
         self.candidateSelected.emit(candidate_id)
@@ -590,7 +695,9 @@ class VariationBrowserPage(QWidget):
         if self._selected_id:
             self.compareRequested.emit(self._selected_id)
 
-    def set_comparison(self, reference, candidate, difference, sample_rate: int) -> None:
+    def set_comparison(
+        self, reference, candidate, difference, sample_rate: int
+    ) -> None:
         self.reference_preview.set_audio(reference, sample_rate)
         self.candidate_preview.set_audio(candidate, sample_rate)
         self.difference_preview.set_audio(difference, sample_rate)
@@ -615,5 +722,6 @@ class VariationBrowserPage(QWidget):
 
 def json_summary(value: Any) -> str:
     import json
+
     text = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     return text if len(text) <= 280 else text[:277] + "..."

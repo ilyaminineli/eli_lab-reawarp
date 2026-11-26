@@ -86,52 +86,157 @@ SNARE_PROFILES: dict[str, SnareProfile] = {
 }
 
 HAT_PROFILES: dict[str, HatProfile] = {
-    "closed": HatProfile(0.62, 0.38, 0.022, 0.975, ((463, 0.25), (701, 0.19), (1139, 0.16), (1777, 0.12)), 1.1),
-    "open": HatProfile(0.58, 0.42, 0.115, 0.965, ((463, 0.22), (701, 0.18), (1139, 0.16), (1777, 0.13), (2633, 0.10)),
-                       1.15),
-    "metallic": HatProfile(0.28, 0.72, 0.055, 0.982,
-                           ((401, 0.28), (617, 0.24), (997, 0.21), (1601, 0.18), (2477, 0.14)), 1.45),
-    "digital": HatProfile(0.72, 0.28, 0.035, 0.995, ((523, 0.18), (1047, 0.16), (2093, 0.14), (3136, 0.12)), 2.2),
+    "closed": HatProfile(
+        0.62,
+        0.38,
+        0.022,
+        0.975,
+        ((463, 0.25), (701, 0.19), (1139, 0.16), (1777, 0.12)),
+        1.1,
+    ),
+    "open": HatProfile(
+        0.58,
+        0.42,
+        0.115,
+        0.965,
+        ((463, 0.22), (701, 0.18), (1139, 0.16), (1777, 0.13), (2633, 0.10)),
+        1.15,
+    ),
+    "metallic": HatProfile(
+        0.28,
+        0.72,
+        0.055,
+        0.982,
+        ((401, 0.28), (617, 0.24), (997, 0.21), (1601, 0.18), (2477, 0.14)),
+        1.45,
+    ),
+    "digital": HatProfile(
+        0.72,
+        0.28,
+        0.035,
+        0.995,
+        ((523, 0.18), (1047, 0.16), (2093, 0.14), (3136, 0.12)),
+        2.2,
+    ),
     "noisy": HatProfile(0.92, 0.08, 0.045, 0.91, ((881, 0.08), (1760, 0.06)), 1.05),
-    "dark": HatProfile(0.68, 0.32, 0.075, 0.90, ((330, 0.24), (494, 0.18), (740, 0.14), (1110, 0.10)), 1.25),
+    "dark": HatProfile(
+        0.68,
+        0.32,
+        0.075,
+        0.90,
+        ((330, 0.24), (494, 0.18), (740, 0.14), (1110, 0.10)),
+        1.25,
+    ),
 }
 
 MELODY_PROFILES: dict[str, MelodyProfile] = {
     "soft_keys": MelodyProfile(
         ((1.0, 0.72), (2.0, 0.22), (3.0, 0.075), (4.0, 0.025)),
-        0.012, 0.16, 0.42, 0.13, 1.50, 0.42, 1.8, 6_500.0, 1.04,
+        0.012,
+        0.16,
+        0.42,
+        0.13,
+        1.50,
+        0.42,
+        1.8,
+        6_500.0,
+        1.04,
     ),
     "glass_bell": MelodyProfile(
         ((1.0, 0.62), (2.01, 0.25), (3.98, 0.12), (6.01, 0.045)),
-        0.003, 0.46, 0.20, 0.26, 2.35, 0.78, 0.7, 10_500.0, 1.00,
+        0.003,
+        0.46,
+        0.20,
+        0.26,
+        2.35,
+        0.78,
+        0.7,
+        10_500.0,
+        1.00,
     ),
     "soft_pluck": MelodyProfile(
         ((1.0, 0.78), (2.0, 0.18), (3.0, 0.045)),
-        0.004, 0.12, 0.18, 0.09, 1.08, 0.26, 2.6, 5_500.0, 1.06,
+        0.004,
+        0.12,
+        0.18,
+        0.09,
+        1.08,
+        0.26,
+        2.6,
+        5_500.0,
+        1.06,
     ),
     "reed_pad": MelodyProfile(
         ((1.0, 0.72), (2.0, 0.34), (3.0, 0.16), (4.0, 0.055), (5.0, 0.018)),
-        0.045, 0.28, 0.68, 0.30, 0.52, 0.34, 3.2, 4_800.0, 1.02,
+        0.045,
+        0.28,
+        0.68,
+        0.30,
+        0.52,
+        0.34,
+        3.2,
+        4_800.0,
+        1.02,
     ),
     "wood_mallet": MelodyProfile(
         ((1.0, 0.72), (2.7, 0.18), (4.2, 0.075), (6.8, 0.025)),
-        0.003, 0.24, 0.16, 0.18, 1.92, 0.58, 0.5, 8_200.0, 1.00,
+        0.003,
+        0.24,
+        0.16,
+        0.18,
+        1.92,
+        0.58,
+        0.5,
+        8_200.0,
+        1.00,
     ),
     "inharmonic_mallet": MelodyProfile(
-        ((1.0, .62), (2.76, .27), (5.41, .14), (8.93, .07)),
-        .002, .38, .12, .42, 2.71, .92, .4, 11_500.0, 1.35,
+        ((1.0, 0.62), (2.76, 0.27), (5.41, 0.14), (8.93, 0.07)),
+        0.002,
+        0.38,
+        0.12,
+        0.42,
+        2.71,
+        0.92,
+        0.4,
+        11_500.0,
+        1.35,
     ),
     "metallic_fm": MelodyProfile(
-        ((1.0, .58), (1.414, .23), (2.718, .12), (4.07, .06)),
-        .001, .22, .16, .34, 2.73, 1.25, 1.1, 12_000.0, 1.8,
+        ((1.0, 0.58), (1.414, 0.23), (2.718, 0.12), (4.07, 0.06)),
+        0.001,
+        0.22,
+        0.16,
+        0.34,
+        2.73,
+        1.25,
+        1.1,
+        12_000.0,
+        1.8,
     ),
     "dark_formant": MelodyProfile(
-        ((1.0, .66), (1.48, .21), (2.25, .12), (3.4, .05)),
-        .018, .20, .52, .22, .71, .48, 4.2, 3_200.0, 1.25,
+        ((1.0, 0.66), (1.48, 0.21), (2.25, 0.12), (3.4, 0.05)),
+        0.018,
+        0.20,
+        0.52,
+        0.22,
+        0.71,
+        0.48,
+        4.2,
+        3_200.0,
+        1.25,
     ),
     "soft_spectral_pad": MelodyProfile(
-        ((1.0, .58), (1.997, .22), (3.01, .12), (4.98, .06), (6.03, .03)),
-        .12, .35, .76, .65, .50, .28, 6.0, 5_200.0, 1.02,
+        ((1.0, 0.58), (1.997, 0.22), (3.01, 0.12), (4.98, 0.06), (6.03, 0.03)),
+        0.12,
+        0.35,
+        0.76,
+        0.65,
+        0.50,
+        0.28,
+        6.0,
+        5_200.0,
+        1.02,
     ),
 }
 
@@ -140,27 +245,67 @@ MELODY_PROFILES: dict[str, MelodyProfile] = {
 
 # Extended sound-object palette. Renderer selection is explicit and deterministic.
 SYNTH_PALETTES = (
-    "subtractive", "hybrid", "fm", "additive", "modal", "inharmonic", "wavetable", "granular", "physical",
+    "subtractive",
+    "hybrid",
+    "fm",
+    "additive",
+    "modal",
+    "inharmonic",
+    "wavetable",
+    "granular",
+    "physical",
 )
 
 # Each voice is a compact, serialisable recipe: its oscillator family, spectral
 # character and temporal envelope. These remain data-driven profiles.
 EXTENDED_MELODY_PROFILES: dict[str, MelodyProfile] = {
     "inharmonic_mallet": MelodyProfile(
-        ((1.0, .62), (2.76, .27), (5.41, .14), (8.93, .07)),
-        .002, .38, .12, .42, 2.71, .92, .4, 11_500.0, 1.35,
+        ((1.0, 0.62), (2.76, 0.27), (5.41, 0.14), (8.93, 0.07)),
+        0.002,
+        0.38,
+        0.12,
+        0.42,
+        2.71,
+        0.92,
+        0.4,
+        11_500.0,
+        1.35,
     ),
     "metallic_fm": MelodyProfile(
-        ((1.0, .58), (1.414, .23), (2.718, .12), (4.07, .06)),
-        .001, .22, .16, .34, 2.73, 1.25, 1.1, 12_000.0, 1.8,
+        ((1.0, 0.58), (1.414, 0.23), (2.718, 0.12), (4.07, 0.06)),
+        0.001,
+        0.22,
+        0.16,
+        0.34,
+        2.73,
+        1.25,
+        1.1,
+        12_000.0,
+        1.8,
     ),
     "dark_formant": MelodyProfile(
-        ((1.0, .66), (1.48, .21), (2.25, .12), (3.4, .05)),
-        .018, .20, .52, .22, .71, .48, 4.2, 3_200.0, 1.25,
+        ((1.0, 0.66), (1.48, 0.21), (2.25, 0.12), (3.4, 0.05)),
+        0.018,
+        0.20,
+        0.52,
+        0.22,
+        0.71,
+        0.48,
+        4.2,
+        3_200.0,
+        1.25,
     ),
     "soft_spectral_pad": MelodyProfile(
-        ((1.0, .58), (1.997, .22), (3.01, .12), (4.98, .06), (6.03, .03)),
-        .12, .35, .76, .65, .50, .28, 6.0, 5_200.0, 1.02,
+        ((1.0, 0.58), (1.997, 0.22), (3.01, 0.12), (4.98, 0.06), (6.03, 0.03)),
+        0.12,
+        0.35,
+        0.76,
+        0.65,
+        0.50,
+        0.28,
+        6.0,
+        5_200.0,
+        1.02,
     ),
 }
 
@@ -194,40 +339,71 @@ class SubtractiveVoiceProfile:
 
 
 SUBTRACTIVE_VOICES: dict[str, SubtractiveVoiceProfile] = {
-    "soft_reed": SubtractiveVoiceProfile((1.0, .24, .09, .035), 5.0, .12, .018, .28, .42, .24, .18, .7),
-    "dry_pluck": SubtractiveVoiceProfile((1.0, .38, .12, .035, .01), 8.0, .08, .002, .14, .10, .08, .38, .15),
-    "dark_pulse": SubtractiveVoiceProfile((1.0, .28, .19, .08, .03), 3.2, .22, .006, .22, .24, .16, .22, .25),
-    "thin_bass": SubtractiveVoiceProfile((1.0, .18, .045), 2.6, .06, .004, .20, .28, .12, .16, .1),
+    "soft_reed": SubtractiveVoiceProfile(
+        (1.0, 0.24, 0.09, 0.035), 5.0, 0.12, 0.018, 0.28, 0.42, 0.24, 0.18, 0.7
+    ),
+    "dry_pluck": SubtractiveVoiceProfile(
+        (1.0, 0.38, 0.12, 0.035, 0.01), 8.0, 0.08, 0.002, 0.14, 0.10, 0.08, 0.38, 0.15
+    ),
+    "dark_pulse": SubtractiveVoiceProfile(
+        (1.0, 0.28, 0.19, 0.08, 0.03), 3.2, 0.22, 0.006, 0.22, 0.24, 0.16, 0.22, 0.25
+    ),
+    "thin_bass": SubtractiveVoiceProfile(
+        (1.0, 0.18, 0.045), 2.6, 0.06, 0.004, 0.20, 0.28, 0.12, 0.16, 0.1
+    ),
 }
 
 PERCUSSION_VOICES: dict[str, PercussionVoiceProfile] = {
-    "dry_thump": PercussionVoiceProfile(68.0, .105, .55, .003, .025, .0, .02, .0),
-    "soft_kick": PercussionVoiceProfile(55.0, .155, .28, .004, .015, .0, .02, .0),
-    "wood_tap": PercussionVoiceProfile(185.0, .055, .72, .0018, .025, .03, .035, .12),
-    "paper_snare": PercussionVoiceProfile(175.0, .065, .32, .002, .22, .08, .055, .08),
-    "metal_tick": PercussionVoiceProfile(620.0, .085, .52, .0012, .045, .18, .16, .62),
-    "glass_ping": PercussionVoiceProfile(880.0, .24, .35, .001, .0, .42, .32, .74),
-    "muted_rim": PercussionVoiceProfile(930.0, .028, .58, .0008, .01, .0, .015, .3),
-    "noise_hat": PercussionVoiceProfile(0.0, .035, .0, .0008, .20, .0, .04, 0.0),
+    "dry_thump": PercussionVoiceProfile(
+        68.0, 0.105, 0.55, 0.003, 0.025, 0.0, 0.02, 0.0
+    ),
+    "soft_kick": PercussionVoiceProfile(
+        55.0, 0.155, 0.28, 0.004, 0.015, 0.0, 0.02, 0.0
+    ),
+    "wood_tap": PercussionVoiceProfile(
+        185.0, 0.055, 0.72, 0.0018, 0.025, 0.03, 0.035, 0.12
+    ),
+    "paper_snare": PercussionVoiceProfile(
+        175.0, 0.065, 0.32, 0.002, 0.22, 0.08, 0.055, 0.08
+    ),
+    "metal_tick": PercussionVoiceProfile(
+        620.0, 0.085, 0.52, 0.0012, 0.045, 0.18, 0.16, 0.62
+    ),
+    "glass_ping": PercussionVoiceProfile(
+        880.0, 0.24, 0.35, 0.001, 0.0, 0.42, 0.32, 0.74
+    ),
+    "muted_rim": PercussionVoiceProfile(
+        930.0, 0.028, 0.58, 0.0008, 0.01, 0.0, 0.015, 0.3
+    ),
+    "noise_hat": PercussionVoiceProfile(0.0, 0.035, 0.0, 0.0008, 0.20, 0.0, 0.04, 0.0),
 }
 
-AUTO_KICK_PROFILES = ("deep_sub", "909_punch", "soft_round", "rubber", "wooden", "long_tail")
+AUTO_KICK_PROFILES = (
+    "deep_sub",
+    "909_punch",
+    "soft_round",
+    "rubber",
+    "wooden",
+    "long_tail",
+)
 AUTO_SNARE_PROFILES = ("acoustic", "909_crack", "tonal", "soft_brush")
 AUTO_HAT_PROFILES = ("closed", "open", "dark")
 AUTO_MELODY_PROFILES = ("dry_pluck", "soft_reed", "thin_bass")
 
 
 def select_profile_name(
-        profile: str,
-        catalog: dict,
-        rng,
-        *,
-        auto_choices: tuple[str, ...] | None = None,
+    profile: str,
+    catalog: dict,
+    rng,
+    *,
+    auto_choices: tuple[str, ...] | None = None,
 ) -> str:
     """Resolve a named profile or select one deterministically for automatic mode."""
     if profile == "auto":
         choices = auto_choices or tuple(catalog)
         return str(rng.choice(choices))
     if profile not in catalog:
-        raise ValueError(f"unknown profile {profile!r}; choose one of: {', '.join(catalog)}")
+        raise ValueError(
+            f"unknown profile {profile!r}; choose one of: {', '.join(catalog)}"
+        )
     return profile

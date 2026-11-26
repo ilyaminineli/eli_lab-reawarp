@@ -4,6 +4,7 @@ The compact pitch-class tables keep the core renderer deterministic and
 dependency-free. When the optional music21 extra is installed, callers can
 request richer symbolic scale objects for analysis and notation workflows.
 """
+
 from __future__ import annotations
 
 from typing import Any

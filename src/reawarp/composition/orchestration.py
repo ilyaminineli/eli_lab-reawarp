@@ -1,4 +1,5 @@
 """Section-level role intent and phrase-boundary transition planning."""
+
 from __future__ import annotations
 
 import hashlib
@@ -9,25 +10,136 @@ import numpy as np
 
 from reawarp.composition.director import section_for_time
 
-
 ROLE_NAMES = ("kick", "snare", "hat", "break", "melody", "texture", "ambience")
 
 # Musical function is a composition decision, not a linear proxy for energy.
 _FUNCTION_ACTIVITY: dict[str, dict[str, float]] = {
-    "introduction": {"kick": .18, "snare": .04, "hat": .24, "break": .08, "melody": .48, "texture": .22, "ambience": .72},
-    "establishment": {"kick": .78, "snare": .52, "hat": .38, "break": .24, "melody": .74, "texture": .24, "ambience": .42},
-    "continuation": {"kick": .66, "snare": .56, "hat": .52, "break": .46, "melody": .68, "texture": .34, "ambience": .40},
-    "development": {"kick": .72, "snare": .68, "hat": .72, "break": .58, "melody": .82, "texture": .50, "ambience": .34},
-    "uplift": {"kick": .86, "snare": .76, "hat": .94, "break": .72, "melody": .90, "texture": .44, "ambience": .36},
-    "arrival": {"kick": 1.00, "snare": .92, "hat": .96, "break": .82, "melody": .88, "texture": .25, "ambience": .42},
-    "drop": {"kick": .08, "snare": .12, "hat": .24, "break": .08, "melody": .34, "texture": .16, "ambience": .76},
-    "silence": {"kick": 0.0, "snare": 0.0, "hat": .015, "break": 0.0, "melody": .015, "texture": 0.0, "ambience": .90},
-    "contrast": {"kick": .36, "snare": .76, "hat": .48, "break": .32, "melody": .72, "texture": .46, "ambience": .64},
-    "return": {"kick": .78, "snare": .52, "hat": .38, "break": .30, "melody": .78, "texture": .22, "ambience": .46},
-    "false_return": {"kick": .48, "snare": .34, "hat": .28, "break": .18, "melody": .60, "texture": .18, "ambience": .66},
-    "transition": {"kick": .46, "snare": .56, "hat": .64, "break": .50, "melody": .58, "texture": .42, "ambience": .66},
-    "residue": {"kick": .06, "snare": .12, "hat": .22, "break": .06, "melody": .30, "texture": .12, "ambience": .82},
-    "outro": {"kick": .015, "snare": .02, "hat": .10, "break": .02, "melody": .20, "texture": .10, "ambience": .78},
+    "introduction": {
+        "kick": 0.18,
+        "snare": 0.04,
+        "hat": 0.24,
+        "break": 0.08,
+        "melody": 0.48,
+        "texture": 0.22,
+        "ambience": 0.72,
+    },
+    "establishment": {
+        "kick": 0.78,
+        "snare": 0.52,
+        "hat": 0.38,
+        "break": 0.24,
+        "melody": 0.74,
+        "texture": 0.24,
+        "ambience": 0.42,
+    },
+    "continuation": {
+        "kick": 0.66,
+        "snare": 0.56,
+        "hat": 0.52,
+        "break": 0.46,
+        "melody": 0.68,
+        "texture": 0.34,
+        "ambience": 0.40,
+    },
+    "development": {
+        "kick": 0.72,
+        "snare": 0.68,
+        "hat": 0.72,
+        "break": 0.58,
+        "melody": 0.82,
+        "texture": 0.50,
+        "ambience": 0.34,
+    },
+    "uplift": {
+        "kick": 0.86,
+        "snare": 0.76,
+        "hat": 0.94,
+        "break": 0.72,
+        "melody": 0.90,
+        "texture": 0.44,
+        "ambience": 0.36,
+    },
+    "arrival": {
+        "kick": 1.00,
+        "snare": 0.92,
+        "hat": 0.96,
+        "break": 0.82,
+        "melody": 0.88,
+        "texture": 0.25,
+        "ambience": 0.42,
+    },
+    "drop": {
+        "kick": 0.08,
+        "snare": 0.12,
+        "hat": 0.24,
+        "break": 0.08,
+        "melody": 0.34,
+        "texture": 0.16,
+        "ambience": 0.76,
+    },
+    "silence": {
+        "kick": 0.0,
+        "snare": 0.0,
+        "hat": 0.015,
+        "break": 0.0,
+        "melody": 0.015,
+        "texture": 0.0,
+        "ambience": 0.90,
+    },
+    "contrast": {
+        "kick": 0.36,
+        "snare": 0.76,
+        "hat": 0.48,
+        "break": 0.32,
+        "melody": 0.72,
+        "texture": 0.46,
+        "ambience": 0.64,
+    },
+    "return": {
+        "kick": 0.78,
+        "snare": 0.52,
+        "hat": 0.38,
+        "break": 0.30,
+        "melody": 0.78,
+        "texture": 0.22,
+        "ambience": 0.46,
+    },
+    "false_return": {
+        "kick": 0.48,
+        "snare": 0.34,
+        "hat": 0.28,
+        "break": 0.18,
+        "melody": 0.60,
+        "texture": 0.18,
+        "ambience": 0.66,
+    },
+    "transition": {
+        "kick": 0.46,
+        "snare": 0.56,
+        "hat": 0.64,
+        "break": 0.50,
+        "melody": 0.58,
+        "texture": 0.42,
+        "ambience": 0.66,
+    },
+    "residue": {
+        "kick": 0.06,
+        "snare": 0.12,
+        "hat": 0.22,
+        "break": 0.06,
+        "melody": 0.30,
+        "texture": 0.12,
+        "ambience": 0.82,
+    },
+    "outro": {
+        "kick": 0.015,
+        "snare": 0.02,
+        "hat": 0.10,
+        "break": 0.02,
+        "melody": 0.20,
+        "texture": 0.10,
+        "ambience": 0.78,
+    },
 }
 
 
@@ -66,9 +178,13 @@ class SectionOrchestrationPlan:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "section_index": self.section_index, "section_name": self.section_name,
-            "function": self.function, "start_bar": self.start_bar, "end_bar": self.end_bar,
-            "motif_id": self.motif_id, "motif_transform": self.motif_transform,
+            "section_index": self.section_index,
+            "section_name": self.section_name,
+            "function": self.function,
+            "start_bar": self.start_bar,
+            "end_bar": self.end_bar,
+            "motif_id": self.motif_id,
+            "motif_transform": self.motif_transform,
             "roles": [intent.to_dict() for intent in self.roles],
         }
 
@@ -94,22 +210,26 @@ class TransitionGesture:
 
 
 def _stable_role_value(
-        seed: int | str, role: str, section_index: int, step: int,
-        kind: str, purpose: str,
+    seed: int | str,
+    role: str,
+    section_index: int,
+    step: int,
+    kind: str,
+    purpose: str,
 ) -> float:
     payload = f"{seed}:{role}:{section_index}:{step}:{kind}:{purpose}".encode("utf-8")
     digest = hashlib.blake2b(payload, digest_size=8).digest()
-    return int.from_bytes(digest, "little") / float(2 ** 64)
+    return int.from_bytes(digest, "little") / float(2**64)
 
 
 def shape_role_events(
-        role: str,
-        events: Sequence[Any],
-        composition_plan: Any,
-        orchestration_plan: Sequence[SectionOrchestrationPlan],
-        *,
-        step_seconds: float,
-        seed: int | str,
+    role: str,
+    events: Sequence[Any],
+    composition_plan: Any,
+    orchestration_plan: Sequence[SectionOrchestrationPlan],
+    *,
+    step_seconds: float,
+    seed: int | str,
 ) -> list[Any]:
     """Apply section density and syncopation without consuming generator RNG streams.
 
@@ -166,10 +286,7 @@ def shape_role_events(
                 seed, role, section.index, step, kind, "syncopation"
             )
             shifted_step = step + 1
-            if (
-                shift_value < shift_probability
-                and shifted_step // 16 == step // 16
-            ):
+            if shift_value < shift_probability and shifted_step // 16 == step // 16:
                 adjusted = replace(
                     event, step=shifted_step, time=shifted_step * step_seconds
                 )
@@ -179,14 +296,16 @@ def shape_role_events(
 
 
 def build_section_orchestration_plan(
-        composition_plan: Any,
-        phrase_directives: Sequence[Any],
-        config: Any,
-        motif_plan: Any = None,
+    composition_plan: Any,
+    phrase_directives: Sequence[Any],
+    config: Any,
+    motif_plan: Any = None,
 ) -> tuple[SectionOrchestrationPlan, ...]:
     """Allocate role activity and musical intent independently for each section."""
     directives = {int(item.index): item for item in phrase_directives}
-    motifs = {int(item.section_index): item for item in getattr(motif_plan, "instances", ())}
+    motifs = {
+        int(item.section_index): item for item in getattr(motif_plan, "instances", ())
+    }
     result = []
     for section in composition_plan.sections:
         directive = directives[int(section.index)]
@@ -197,55 +316,92 @@ def build_section_orchestration_plan(
         for role in ROLE_NAMES:
             initial = float(base[role])
             if role in {"kick", "snare"}:
-                activity = initial * (.45 + .55 * float(config.arrangement_density))
+                activity = initial * (0.45 + 0.55 * float(config.arrangement_density))
             elif role == "hat":
-                activity = initial * (.35 + .65 * float(config.rhythmic_syncopation))
+                activity = initial * (0.35 + 0.65 * float(config.rhythmic_syncopation))
             elif role == "break":
                 activity = initial * (
-                    .50 + .30 * float(config.arrangement_density)
-                    + .20 * float(config.rhythmic_syncopation)
+                    0.50
+                    + 0.30 * float(config.arrangement_density)
+                    + 0.20 * float(config.rhythmic_syncopation)
                 )
             elif role == "melody":
                 activity = initial * float(config.melodic_activity)
             elif role == "texture":
-                activity = initial * (.35 + .65 * float(config.arrangement_instability))
+                activity = initial * (
+                    0.35 + 0.65 * float(config.arrangement_instability)
+                )
             else:
-                activity = initial * (.35 + .65 * float(config.spatial_intent))
+                activity = initial * (0.35 + 0.65 * float(config.spatial_intent))
 
             register = int(config.melody_register_semitones)
             if role == "melody" and function != "return":
                 register += int(section.motif_register_semitones)
-            brightness = float(np.clip(
-                .68 * float(config.tonal_brightness) + .32 * float(section.brightness),
-                0.0, 1.0,
-            ))
-            space = float(np.clip(
-                .58 * float(config.spatial_intent) + .42 * float(section.space),
-                0.0, 1.0,
-            ))
-            role_density = float(np.clip(
-                float(config.arrangement_density) * (.45 + .55 * initial), 0.0, 1.0
-            ))
-            syncopation = float(np.clip(
-                float(config.rhythmic_syncopation)
-                * (.60 + .40 * float(section.instability)),
-                0.0, 1.0,
-            ))
+            brightness = float(
+                np.clip(
+                    0.68 * float(config.tonal_brightness)
+                    + 0.32 * float(section.brightness),
+                    0.0,
+                    1.0,
+                )
+            )
+            space = float(
+                np.clip(
+                    0.58 * float(config.spatial_intent) + 0.42 * float(section.space),
+                    0.0,
+                    1.0,
+                )
+            )
+            role_density = float(
+                np.clip(
+                    float(config.arrangement_density) * (0.45 + 0.55 * initial),
+                    0.0,
+                    1.0,
+                )
+            )
+            syncopation = float(
+                np.clip(
+                    float(config.rhythmic_syncopation)
+                    * (0.60 + 0.40 * float(section.instability)),
+                    0.0,
+                    1.0,
+                )
+            )
 
             if role == "kick":
-                relation = "anchor" if function in {"establishment", "return", "arrival"} else "pulse"
+                relation = (
+                    "anchor"
+                    if function in {"establishment", "return", "arrival"}
+                    else "pulse"
+                )
             elif role == "snare":
                 relation = "response" if function == "contrast" else "backbeat"
             elif role == "hat":
-                relation = "shadow" if function in {"development", "contrast", "uplift"} else "ornament"
+                relation = (
+                    "shadow"
+                    if function in {"development", "contrast", "uplift"}
+                    else "ornament"
+                )
             elif role == "break":
-                relation = "fragment" if motif and motif.operation in {"fragmentation", "dissolve"} else "phrase"
+                relation = (
+                    "fragment"
+                    if motif and motif.operation in {"fragmentation", "dissolve"}
+                    else "phrase"
+                )
             elif role == "melody":
                 relation = "carrier"
             elif role == "texture":
-                relation = "counter_motion" if function in {"development", "contrast"} else "bed"
+                relation = (
+                    "counter_motion"
+                    if function in {"development", "contrast"}
+                    else "bed"
+                )
             else:
-                relation = "handoff" if function in {"residue", "outro", "transition"} else "space"
+                relation = (
+                    "handoff"
+                    if function in {"residue", "outro", "transition"}
+                    else "space"
+                )
 
             if role == "melody" and not config.include_melody:
                 activity = 0.0
@@ -254,27 +410,37 @@ def build_section_orchestration_plan(
             elif role == "ambience" and not config.include_ambience:
                 activity = 0.0
             activity = float(np.clip(activity, 0.0, 1.0))
-            roles.append(RoleIntent(
-                role=role, active=activity > .015, activity=activity,
-                density=role_density, syncopation=syncopation,
-                register_semitones=register if role == "melody" else 0,
-                brightness=brightness, space_intent=space,
-                motif_relation=relation,
-            ))
-        result.append(SectionOrchestrationPlan(
-            section_index=int(section.index), section_name=str(section.name),
-            function=function, start_bar=int(section.start_bar),
-            end_bar=int(section.end_bar),
-            motif_id=motif.motif_id if motif else None,
-            motif_transform=motif.operation if motif else None,
-            roles=tuple(roles),
-        ))
+            roles.append(
+                RoleIntent(
+                    role=role,
+                    active=activity > 0.015,
+                    activity=activity,
+                    density=role_density,
+                    syncopation=syncopation,
+                    register_semitones=register if role == "melody" else 0,
+                    brightness=brightness,
+                    space_intent=space,
+                    motif_relation=relation,
+                )
+            )
+        result.append(
+            SectionOrchestrationPlan(
+                section_index=int(section.index),
+                section_name=str(section.name),
+                function=function,
+                start_bar=int(section.start_bar),
+                end_bar=int(section.end_bar),
+                motif_id=motif.motif_id if motif else None,
+                motif_transform=motif.operation if motif else None,
+                roles=tuple(roles),
+            )
+        )
     return tuple(result)
 
 
 def build_transition_plan(
-        composition_plan: Any,
-        phrase_directives: Sequence[Any],
+    composition_plan: Any,
+    phrase_directives: Sequence[Any],
 ) -> tuple[TransitionGesture, ...]:
     """Convert phrase grammar gestures into bounded section-end windows."""
     directives = {int(item.index): item for item in phrase_directives}
@@ -287,8 +453,12 @@ def build_transition_plan(
         if gesture in {"", "none"}:
             continue
         start_bar = max(int(section.start_bar), int(section.end_bar) - 1)
-        start_seconds = max(float(section.start_seconds), float(section.end_seconds) - bar_seconds)
-        end_seconds = min(float(composition_plan.duration_seconds), float(section.end_seconds))
+        start_seconds = max(
+            float(section.start_seconds), float(section.end_seconds) - bar_seconds
+        )
+        end_seconds = min(
+            float(composition_plan.duration_seconds), float(section.end_seconds)
+        )
         if end_seconds <= start_seconds:
             continue
         affected = {
@@ -305,88 +475,115 @@ def build_transition_plan(
             "fragment_reassembly": ("melody", "hat", "snare"),
             "false_cadence": ("kick", "snare", "melody"),
         }.get(gesture, ROLE_NAMES)
-        plans.append(TransitionGesture(
-            source_section=int(section.index), target_section=int(following.index),
-            source_name=str(section.name), target_name=str(following.name),
-            gesture=gesture, start_bar=start_bar, boundary_bar=int(section.end_bar),
-            start_seconds=start_seconds, end_seconds=end_seconds,
-            intensity=float(np.clip(directive.variation_budget, 0.0, 1.0)),
-            affected_roles=tuple(affected),
-        ))
+        plans.append(
+            TransitionGesture(
+                source_section=int(section.index),
+                target_section=int(following.index),
+                source_name=str(section.name),
+                target_name=str(following.name),
+                gesture=gesture,
+                start_bar=start_bar,
+                boundary_bar=int(section.end_bar),
+                start_seconds=start_seconds,
+                end_seconds=end_seconds,
+                intensity=float(np.clip(directive.variation_budget, 0.0, 1.0)),
+                affected_roles=tuple(affected),
+            )
+        )
     return tuple(plans)
 
 
-def _transition_multiplier(role: str, gesture: str, phase: np.ndarray, intensity: float) -> np.ndarray:
+def _transition_multiplier(
+    role: str, gesture: str, phase: np.ndarray, intensity: float
+) -> np.ndarray:
     p = np.clip(np.asarray(phase, dtype=np.float64), 0.0, 1.0)
     strength = float(np.clip(intensity, 0.0, 1.0))
     ones = np.ones_like(p)
     if gesture in {"pickup", "fill"}:
         amount = strength * p
         factors = {
-            "kick": 1.0 + .12 * amount, "snare": 1.0 + .38 * amount,
-            "hat": 1.0 + .42 * amount, "break": 1.0 + .20 * amount,
+            "kick": 1.0 + 0.12 * amount,
+            "snare": 1.0 + 0.38 * amount,
+            "hat": 1.0 + 0.42 * amount,
+            "break": 1.0 + 0.20 * amount,
         }
         return np.clip(factors.get(role, ones), 0.0, 1.35)
     if gesture in {"riser", "reverse_swell"}:
         if role in {"texture", "ambience"}:
-            return .62 + .55 * strength * p
+            return 0.62 + 0.55 * strength * p
         if role == "melody":
-            return .94 + .08 * strength * p
+            return 0.94 + 0.08 * strength * p
     if gesture == "subtraction":
         amount = strength * p
         factors = {
-            "kick": 1.0 - .80 * amount, "snare": 1.0 - .76 * amount,
-            "hat": 1.0 - .52 * amount, "break": 1.0 - .82 * amount,
-            "melody": 1.0 - .24 * amount,
+            "kick": 1.0 - 0.80 * amount,
+            "snare": 1.0 - 0.76 * amount,
+            "hat": 1.0 - 0.52 * amount,
+            "break": 1.0 - 0.82 * amount,
+            "melody": 1.0 - 0.24 * amount,
         }
         return np.clip(factors.get(role, ones), 0.0, 1.0)
     if gesture == "rhythmic_collapse":
         amount = strength * p
-        factor = 1.0 - (.44 if role == "hat" else .74) * amount
+        factor = 1.0 - (0.44 if role == "hat" else 0.74) * amount
         return np.full_like(p, factor)
     if gesture in {"hard_cut", "silence_gate"} and role in {
-        "kick", "snare", "hat", "break", "melody", "texture"
+        "kick",
+        "snare",
+        "hat",
+        "break",
+        "melody",
+        "texture",
     }:
-        fade_start = .82 if gesture == "hard_cut" else .64
+        fade_start = 0.82 if gesture == "hard_cut" else 0.64
         fade = np.clip((p - fade_start) / (1.0 - fade_start), 0.0, 1.0)
         return 1.0 - fade
     if gesture == "echo_handoff":
         if role == "ambience":
-            return 1.0 + .30 * strength * p
+            return 1.0 + 0.30 * strength * p
         if role == "texture":
-            return 1.0 + .12 * strength * p
+            return 1.0 + 0.12 * strength * p
     if gesture == "fragment_reassembly":
         if role == "melody":
-            return .84 + .20 * strength * p
+            return 0.84 + 0.20 * strength * p
         if role == "hat":
-            return 1.0 + .14 * strength * p
+            return 1.0 + 0.14 * strength * p
     if gesture == "false_cadence":
         if role == "melody":
-            return 1.0 - .18 * strength * p
+            return 1.0 - 0.18 * strength * p
         if role in {"kick", "snare"}:
-            return 1.0 - .58 * strength * p
+            return 1.0 - 0.58 * strength * p
     return ones
 
 
 def role_intent_at_time(
-        role: str, time_seconds: float, composition_plan: Any,
-        orchestration_plan: Sequence[SectionOrchestrationPlan],
+    role: str,
+    time_seconds: float,
+    composition_plan: Any,
+    orchestration_plan: Sequence[SectionOrchestrationPlan],
 ) -> RoleIntent:
     if role not in ROLE_NAMES:
         raise KeyError(f"unknown composition role: {role}")
     section = section_for_time(composition_plan, time_seconds)
-    plan = next((item for item in orchestration_plan if item.section_index == section.index), None)
+    plan = next(
+        (item for item in orchestration_plan if item.section_index == section.index),
+        None,
+    )
     if plan is None:
         raise ValueError(f"no orchestration plan for section {section.index}")
     return plan.role(role)
 
 
 def role_activity_at_time(
-        role: str, time_seconds: float, composition_plan: Any,
-        orchestration_plan: Sequence[SectionOrchestrationPlan],
-        transitions: Sequence[TransitionGesture],
+    role: str,
+    time_seconds: float,
+    composition_plan: Any,
+    orchestration_plan: Sequence[SectionOrchestrationPlan],
+    transitions: Sequence[TransitionGesture],
 ) -> float:
-    intent = role_intent_at_time(role, time_seconds, composition_plan, orchestration_plan)
+    intent = role_intent_at_time(
+        role, time_seconds, composition_plan, orchestration_plan
+    )
     multiplier = 1.0
     for transition in transitions:
         if (
@@ -395,16 +592,21 @@ def role_activity_at_time(
         ):
             duration = max(1e-9, transition.end_seconds - transition.start_seconds)
             phase = (time_seconds - transition.start_seconds) / duration
-            multiplier *= float(_transition_multiplier(
-                role, transition.gesture, np.asarray([phase]), transition.intensity
-            )[0])
+            multiplier *= float(
+                _transition_multiplier(
+                    role, transition.gesture, np.asarray([phase]), transition.intensity
+                )[0]
+            )
     return float(np.clip(intent.activity * multiplier, 0.0, 1.35))
 
 
 def render_role_envelope(
-        role: str, frame_count: int, sample_rate: int, composition_plan: Any,
-        orchestration_plan: Sequence[SectionOrchestrationPlan],
-        transitions: Sequence[TransitionGesture],
+    role: str,
+    frame_count: int,
+    sample_rate: int,
+    composition_plan: Any,
+    orchestration_plan: Sequence[SectionOrchestrationPlan],
+    transitions: Sequence[TransitionGesture],
 ) -> np.ndarray:
     """Render section intents with continuous, bar-aligned transition shaping."""
     if role not in ROLE_NAMES:

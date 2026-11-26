@@ -14,7 +14,9 @@ def export_main() -> None:
         description="Export a Reawarp score JSON file as a standard MIDI 1.0 file.",
     )
     parser.add_argument("score", type=Path, help="input score.json")
-    parser.add_argument("-o", "--output", type=Path, required=True, help="output .mid file")
+    parser.add_argument(
+        "-o", "--output", type=Path, required=True, help="output .mid file"
+    )
     parser.add_argument("--ppq", type=int, help="override MIDI ticks per quarter note")
     parser.add_argument(
         "--tempo-ramp-resolution",
@@ -37,7 +39,9 @@ def import_main() -> None:
         description="Import a standard MIDI 1.0 file as a Reawarp score JSON file.",
     )
     parser.add_argument("midi", type=Path, help="input .mid file")
-    parser.add_argument("-o", "--output", type=Path, required=True, help="output score.json")
+    parser.add_argument(
+        "-o", "--output", type=Path, required=True, help="output score.json"
+    )
     args = parser.parse_args()
     score = Score.from_midi(args.midi)
     output = score.save(args.output)

@@ -1,4 +1,5 @@
 """Compact editor for per-stem inserts and shared send buses."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,14 +7,32 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QMessageBox, QPushButton, QSlider, QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.fx import FX_PRESETS, normalise_fx_stages
 from reawarp.fx_routing import (
-    FX_BUSES, FX_DELAY_DIVISIONS, SEND_TAP_POINTS, default_fx_routing,
-    role_aware_fx_routing, load_fx_routing, normalise_fx_routing, save_fx_routing,
+    FX_BUSES,
+    FX_DELAY_DIVISIONS,
+    SEND_TAP_POINTS,
+    default_fx_routing,
+    role_aware_fx_routing,
+    load_fx_routing,
+    normalise_fx_routing,
+    save_fx_routing,
 )
 
 
@@ -28,7 +47,9 @@ class FXRoutingEditor(QGroupBox):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("AUTOMATIC ROLE FX · INSERTS + SHARED RETURNS", parent)
-        self.setToolTip("Effects are assigned by musical role and processed on each source path before the master.")
+        self.setToolTip(
+            "Effects are assigned by musical role and processed on each source path before the master."
+        )
         self._stem_names: tuple[str, ...] = ()
         self._routing: dict[str, Any] = role_aware_fx_routing()
         self.send_taps: dict[str, QComboBox] = {}
@@ -155,7 +176,11 @@ class FXRoutingEditor(QGroupBox):
             tail.setSingleStep(0.5)
             tail.setSuffix(" s")
             tail.setValue(2.0 if bus == "space" else 1.5)
-            self.bus_chain[bus], self.bus_wet[bus], self.bus_tail[bus] = chain, wet, tail
+            self.bus_chain[bus], self.bus_wet[bus], self.bus_tail[bus] = (
+                chain,
+                wet,
+                tail,
+            )
             form = QGroupBox(bus.upper())
             row = QFormLayout(form)
             row.addRow("Processor", chain)
@@ -164,7 +189,14 @@ class FXRoutingEditor(QGroupBox):
             if bus == "echo":
                 sync = QComboBox()
                 for division in FX_DELAY_DIVISIONS:
-                    sync.addItem("STATIC" if division == "off" else division.replace("_", " ").upper(), division)
+                    sync.addItem(
+                        (
+                            "STATIC"
+                            if division == "off"
+                            else division.replace("_", " ").upper()
+                        ),
+                        division,
+                    )
                 self.bus_sync[bus] = sync
                 row.addRow("Delay division", sync)
                 sync.currentIndexChanged.connect(self._store_buses)
@@ -220,16 +252,24 @@ class FXRoutingEditor(QGroupBox):
         self.play_variation_button = QPushButton("PLAY VARIANT")
         self.play_variation_button.setEnabled(False)
         self.play_variation_button.clicked.connect(
-            lambda: self.variationAuditionRequested.emit(
-                str(self.variation_choice.currentData())
-            ) if self.variation_choice.currentData() else None
+            lambda: (
+                self.variationAuditionRequested.emit(
+                    str(self.variation_choice.currentData())
+                )
+                if self.variation_choice.currentData()
+                else None
+            )
         )
         self.apply_variation_button = QPushButton("USE ROUTE")
         self.apply_variation_button.setEnabled(False)
         self.apply_variation_button.clicked.connect(
-            lambda: self.variationApplyRequested.emit(
-                str(self.variation_choice.currentData())
-            ) if self.variation_choice.currentData() else None
+            lambda: (
+                self.variationApplyRequested.emit(
+                    str(self.variation_choice.currentData())
+                )
+                if self.variation_choice.currentData()
+                else None
+            )
         )
         self.variation_choice.currentIndexChanged.connect(
             lambda: (
@@ -257,9 +297,12 @@ class FXRoutingEditor(QGroupBox):
         audition_row = QHBoxLayout()
         self.audition_stage = QComboBox()
         for label, stage in (
-            ("DIRECT", "direct"), ("INSERT", "insert"),
-            ("SPACE SEND", "send.space"), ("ECHO SEND", "send.echo"),
-            ("SPACE RETURN", "return.space"), ("ECHO RETURN", "return.echo"),
+            ("DIRECT", "direct"),
+            ("INSERT", "insert"),
+            ("SPACE SEND", "send.space"),
+            ("ECHO SEND", "send.echo"),
+            ("SPACE RETURN", "return.space"),
+            ("ECHO RETURN", "return.echo"),
             ("MASTER", "master"),
         ):
             self.audition_stage.addItem(label, stage)
@@ -275,7 +318,9 @@ class FXRoutingEditor(QGroupBox):
         audition_row.addWidget(self.audition_button)
         root.addLayout(audition_row)
 
-    def set_stems(self, names: list[str] | tuple[str, ...], sample_rate: int, bpm: float = 120.0) -> None:
+    def set_stems(
+        self, names: list[str] | tuple[str, ...], sample_rate: int, bpm: float = 120.0
+    ) -> None:
         self._stem_names = tuple(names)
         self._sample_rate = int(sample_rate)
         self._bpm = float(bpm)
@@ -307,7 +352,8 @@ class FXRoutingEditor(QGroupBox):
         record = self._routing["stems"][name]
         insert = record["insert"]
         preset = (
-            insert.get("preset") if insert["kind"] == "preset"
+            insert.get("preset")
+            if insert["kind"] == "preset"
             else "__custom__" if insert["kind"] == "stages" else "bypass"
         )
         self.insert.blockSignals(True)
@@ -322,9 +368,11 @@ class FXRoutingEditor(QGroupBox):
             slider.blockSignals(False)
             tap = self.send_taps[bus]
             tap.blockSignals(True)
-            tap.setCurrentIndex(tap.findData(record.get("send_taps", {}).get(
-                bus, "post_insert_post_fader"
-            )))
+            tap.setCurrentIndex(
+                tap.findData(
+                    record.get("send_taps", {}).get(bus, "post_insert_post_fader")
+                )
+            )
             tap.blockSignals(False)
 
     def _store_selected(self, *_args: Any) -> None:
@@ -345,30 +393,39 @@ class FXRoutingEditor(QGroupBox):
             }
         else:
             insert = {
-                "kind": "preset", "preset": choice,
-                "wet": self.insert_wet.value() / 100, "tail_seconds": 1.5,
+                "kind": "preset",
+                "preset": choice,
+                "wet": self.insert_wet.value() / 100,
+                "tail_seconds": 1.5,
             }
         self._routing["stems"][name] = {
             **prior,
             "insert": insert,
             "sends": {bus: slider.value() / 100 for bus, slider in self.sends.items()},
-            "send_taps": {bus: tap.currentData() for bus, tap in self.send_taps.items()},
+            "send_taps": {
+                bus: tap.currentData() for bus, tap in self.send_taps.items()
+            },
         }
         self._routing["routing_mode"] = "manual"
         self.changed.emit()
 
     def _load_buses_into_widgets(self) -> None:
         for bus, record in self._routing["buses"].items():
-            self.bus_chain[bus].setCurrentIndex(max(0, self.bus_chain[bus].findData(record["chain"])))
+            self.bus_chain[bus].setCurrentIndex(
+                max(0, self.bus_chain[bus].findData(record["chain"]))
+            )
             self.bus_wet[bus].setValue(round(record["wet"] * 100))
             self.bus_tail[bus].setValue(record["tail_seconds"])
             if bus in self.bus_sync:
                 sync = self.bus_sync[bus]
                 sync.blockSignals(True)
-                sync.setCurrentIndex(max(0, sync.findData(record.get("delay_sync", "off"))))
+                sync.setCurrentIndex(
+                    max(0, sync.findData(record.get("delay_sync", "off")))
+                )
                 sync.blockSignals(False)
                 has_delay = any(
-                    stage.get("type") == "delay" for stage in FX_PRESETS[record["chain"]]
+                    stage.get("type") == "delay"
+                    for stage in FX_PRESETS[record["chain"]]
                 )
                 sync.setEnabled(has_delay)
 
@@ -390,7 +447,9 @@ class FXRoutingEditor(QGroupBox):
                 "chain": self.bus_chain[bus].currentData(),
                 "wet": self.bus_wet[bus].value() / 100,
                 "tail_seconds": self.bus_tail[bus].value(),
-                "delay_sync": self.bus_sync[bus].currentData() if bus in self.bus_sync else "off",
+                "delay_sync": (
+                    self.bus_sync[bus].currentData() if bus in self.bus_sync else "off"
+                ),
             }
             for bus in FX_BUSES
         }
@@ -399,7 +458,9 @@ class FXRoutingEditor(QGroupBox):
     def _load_file(self) -> None:
         if not self._stem_names:
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Load FX routing", str(Path.cwd()), "Routing (*.json)")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load FX routing", str(Path.cwd()), "Routing (*.json)"
+        )
         if not path:
             return
         try:
@@ -413,22 +474,26 @@ class FXRoutingEditor(QGroupBox):
         self._load_buses_into_widgets()
         self._load_sidechains_into_widgets()
         self._loading = False
-        self.mixerStateRequested.emit({
-            name: {
-                "gain_db": float(record.get("gain_db", 0.0)),
-                "pan": float(record.get("pan", 0.0)),
-                "mute": bool(record.get("mute", False)),
-                "solo": bool(record.get("solo", False)),
+        self.mixerStateRequested.emit(
+            {
+                name: {
+                    "gain_db": float(record.get("gain_db", 0.0)),
+                    "pan": float(record.get("pan", 0.0)),
+                    "mute": bool(record.get("mute", False)),
+                    "solo": bool(record.get("solo", False)),
+                }
+                for name, record in self._routing["stems"].items()
             }
-            for name, record in self._routing["stems"].items()
-        })
+        )
         self.status.setText(f"Loaded routing: {Path(path).name}")
         self.changed.emit()
 
     def _save_file(self) -> None:
         if not self._stem_names:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "Save FX routing", "reawarp_routing.json", "Routing (*.json)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save FX routing", "reawarp_routing.json", "Routing (*.json)"
+        )
         if not path:
             return
         try:
@@ -440,7 +505,9 @@ class FXRoutingEditor(QGroupBox):
 
     def set_routing(self, payload: dict[str, Any]) -> None:
         self._loading = True
-        self._routing = normalise_fx_routing(payload, self._stem_names, self._sample_rate)
+        self._routing = normalise_fx_routing(
+            payload, self._stem_names, self._sample_rate
+        )
         self._load_selected()
         self._load_buses_into_widgets()
         self._load_sidechains_into_widgets()
@@ -466,8 +533,9 @@ class FXRoutingEditor(QGroupBox):
             record["mute"] = bool(values.get("mute", record.get("mute", False)))
             record["solo"] = bool(values.get("solo", record.get("solo", False)))
 
-
-    def _load_sidechains_into_widgets(self, selected_route_id: str | None = None) -> None:
+    def _load_sidechains_into_widgets(
+        self, selected_route_id: str | None = None
+    ) -> None:
         """Refresh the sidechain route selector without changing saved routing."""
         if not hasattr(self, "sidechain_choice"):
             return
@@ -501,8 +569,11 @@ class FXRoutingEditor(QGroupBox):
     def _load_sidechain_widgets(self, *_args: Any) -> None:
         route_id = self.sidechain_choice.currentData()
         route = next(
-            (item for item in self._routing.get("sidechains", ())
-             if item.get("route_id") == route_id),
+            (
+                item
+                for item in self._routing.get("sidechains", ())
+                if item.get("route_id") == route_id
+            ),
             None,
         )
         if route is not None:
@@ -579,7 +650,8 @@ class FXRoutingEditor(QGroupBox):
         if not route_id:
             return
         routes = [
-            dict(item) for item in self._routing.get("sidechains", ())
+            dict(item)
+            for item in self._routing.get("sidechains", ())
             if item.get("route_id") != route_id
         ]
         self._routing = normalise_fx_routing(
@@ -607,6 +679,7 @@ class FXRoutingEditor(QGroupBox):
         if not meters:
             self.meter_report.setText("ROUTING METERS · not rendered yet")
             return
+
         def summarize(record: dict[str, Any]) -> str:
             return (
                 f"peak {float(record.get('peak_dbfs', -240.0)):.1f} dBFS · "
@@ -614,6 +687,7 @@ class FXRoutingEditor(QGroupBox):
                 f"crest {float(record.get('crest_factor_db', 0.0)):.1f} dB · "
                 f"headroom {float(record.get('headroom_db', 0.0)):.1f} dB"
             )
+
         rows = []
         for boundary in ("direct", "insert", "returns"):
             records = meters.get(boundary, {})
@@ -631,7 +705,8 @@ class FXRoutingEditor(QGroupBox):
         ]
         if send_records:
             rows.append(
-                "SEND CONTRIBUTIONS · " + " | ".join(
+                "SEND CONTRIBUTIONS · "
+                + " | ".join(
                     f"{stem}/{bus}: peak {record['peak_dbfs']:.1f} dBFS · "
                     f"RMS {record['rms_dbfs']:.1f} dBFS"
                     for stem, bus, record in send_records
@@ -640,7 +715,9 @@ class FXRoutingEditor(QGroupBox):
         master = meters.get("master")
         if master:
             rows.append(f"MASTER · {summarize(master)}")
-        self.meter_report.setText("\n".join(rows) if rows else "ROUTING METERS · silence")
+        self.meter_report.setText(
+            "\n".join(rows) if rows else "ROUTING METERS · silence"
+        )
 
     def set_custom_insert(
         self,
@@ -686,6 +763,9 @@ class FXRoutingEditor(QGroupBox):
             self.play_variation_button.setEnabled(False)
             self.apply_variation_button.setEnabled(False)
 
-
     def routing(self) -> dict[str, Any]:
-        return normalise_fx_routing(self._routing, self._stem_names, self._sample_rate) if self._stem_names else default_fx_routing()
+        return (
+            normalise_fx_routing(self._routing, self._stem_names, self._sample_rate)
+            if self._stem_names
+            else default_fx_routing()
+        )

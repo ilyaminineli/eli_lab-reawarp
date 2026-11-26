@@ -1,4 +1,5 @@
 """Small NumPy-only STFT helpers shared by offline M24 spectral modules."""
+
 from __future__ import annotations
 
 import math
@@ -46,31 +47,47 @@ def validate_stft(frame_size: int, hop_size: int) -> tuple[int, int]:
     return frame_size, hop_size
 
 
-def stft(audio: np.ndarray, frame_size: int, hop_size: int) -> tuple[np.ndarray, dict[str, Any]]:
+def stft(
+    audio: np.ndarray, frame_size: int, hop_size: int
+) -> tuple[np.ndarray, dict[str, Any]]:
     """Centered periodic-Hann STFT with deterministic zero padding and WOLA metadata."""
     source, was_vector = audio_channels(audio)
     validate_stft(frame_size, hop_size)
-    frame_count = 0 if len(source) == 0 else 1 + int(math.ceil((len(source) - 1) / hop_size))
+    frame_count = (
+        0 if len(source) == 0 else 1 + int(math.ceil((len(source) - 1) / hop_size))
+    )
     window = np.hanning(frame_size + 1)[:-1].astype(np.float64)
     if frame_count == 0:
-        return np.zeros((0, frame_size // 2 + 1, source.shape[1]), dtype=np.complex128), {
-            "window": window, "pad_left": frame_size // 2, "input_frames": 0,
-            "frame_size": frame_size, "hop_size": hop_size, "was_vector": was_vector,
+        return np.zeros(
+            (0, frame_size // 2 + 1, source.shape[1]), dtype=np.complex128
+        ), {
+            "window": window,
+            "pad_left": frame_size // 2,
+            "input_frames": 0,
+            "frame_size": frame_size,
+            "hop_size": hop_size,
+            "was_vector": was_vector,
         }
     pad = frame_size // 2
     padded = np.pad(source.astype(np.float64), ((pad, pad + hop_size), (0, 0)))
     frames = np.empty((frame_count, frame_size, source.shape[1]), dtype=np.float64)
     for index in range(frame_count):
         start = index * hop_size
-        frames[index] = padded[start:start + frame_size] * window[:, None]
+        frames[index] = padded[start : start + frame_size] * window[:, None]
     spectra = np.fft.rfft(frames, axis=1)
     return spectra, {
-        "window": window, "pad_left": pad, "input_frames": len(source),
-        "frame_size": frame_size, "hop_size": hop_size, "was_vector": was_vector,
+        "window": window,
+        "pad_left": pad,
+        "input_frames": len(source),
+        "frame_size": frame_size,
+        "hop_size": hop_size,
+        "was_vector": was_vector,
     }
 
 
-def istft(spectra: np.ndarray, metadata: dict[str, Any], output_frames: int | None = None) -> np.ndarray:
+def istft(
+    spectra: np.ndarray, metadata: dict[str, Any], output_frames: int | None = None
+) -> np.ndarray:
     """Weighted overlap-add inverse, cropped to the requested aligned file length."""
     frame_size = int(metadata["frame_size"])
     hop_size = int(metadata["hop_size"])
@@ -84,13 +101,13 @@ def istft(spectra: np.ndarray, metadata: dict[str, Any], output_frames: int | No
     window_sq = window * window
     for index, frame in enumerate(frames):
         start = index * hop_size
-        accumulated[start:start + frame_size] += frame * window[:, None]
-        weights[start:start + frame_size] += window_sq
+        accumulated[start : start + frame_size] += frame * window[:, None]
+        weights[start : start + frame_size] += window_sq
     valid = weights > 1e-12
     accumulated[valid] /= weights[valid, None]
     accumulated[~valid] = 0.0
     length = int(metadata["input_frames"] if output_frames is None else output_frames)
-    result = accumulated[pad:pad + length]
+    result = accumulated[pad : pad + length]
     if len(result) < length:
         result = np.pad(result, ((0, length - len(result)), (0, 0)))
     if not np.isfinite(result).all():
@@ -118,6 +135,10 @@ def signal_diagnostics(audio: np.ndarray) -> dict[str, Any]:
         "rms": rms,
         "headroom_db": float(20.0 * math.log10(1.0 / peak)) if peak > 0.0 else None,
         "over_unity": peak > 1.0,
-        "denormal_sample_count": int(np.count_nonzero((np.abs(value) > 0.0) & (np.abs(value) < np.finfo(np.float32).tiny))),
+        "denormal_sample_count": int(
+            np.count_nonzero(
+                (np.abs(value) > 0.0) & (np.abs(value) < np.finfo(np.float32).tiny)
+            )
+        ),
         "output_bytes": int(np.asarray(audio).nbytes),
     }

@@ -5,6 +5,7 @@ Once those planners have made their decisions, every event-backed lane is stored
 as a rational-beat MusicalEvent before audio rendering begins. Seconds are only
 introduced later by the RenderTimeline, or when producing a legacy export view.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -40,7 +41,8 @@ from reawarp.generators.percussion import (
 from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.orchestration_intent import (
-    inspect_attention_conflicts, inspect_event_onset_conflicts,
+    inspect_attention_conflicts,
+    inspect_event_onset_conflicts,
 )
 from reawarp.score.planner import melody_to_score_events, percussion_to_score_events
 from reawarp.score.time import MeterMap, TempoMap
@@ -129,13 +131,18 @@ def _profile_options() -> dict[str, dict[str, tuple[str, ...]]]:
     }
 
 
-def _seed_overrides(regenerate: str | None, variation: int, seed: int | str) -> dict[str, int]:
+def _seed_overrides(
+    regenerate: str | None, variation: int, seed: int | str
+) -> dict[str, int]:
     groups = {
         "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
         "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
         "hats": ("hat_pattern", "hat_synthesis", "hat_profile"),
         "synthetic_break": (
-            "break_pattern", "break_synthesis", "break_profile", "break_processing",
+            "break_pattern",
+            "break_synthesis",
+            "break_profile",
+            "break_processing",
         ),
         "melody": ("melody_pattern", "melody_synthesis", "melody_profile"),
         "noise_texture": ("texture_synthesis",),
@@ -158,7 +165,8 @@ def _section_at_time(composition_plan, time_seconds: float):
             return section
     return (
         composition_plan.sections[0]
-        if time_seconds < 0 else composition_plan.sections[-1]
+        if time_seconds < 0
+        else composition_plan.sections[-1]
     )
 
 
@@ -246,9 +254,7 @@ def build_score_generation_plan(
         drum_plan=drum_plan,
     )
 
-    melody_variation_events = build_melody_events(
-        config, streams.get("melody_pattern")
-    )
+    melody_variation_events = build_melody_events(config, streams.get("melody_pattern"))
     motif_anchor_streams = RandomStreams(config.seed)
     motif_source_events = build_melody_events(
         config, motif_anchor_streams.get("motif_anchor")
@@ -264,88 +270,121 @@ def build_score_generation_plan(
         render_motif_events(
             motif_plan, bpm=config.bpm, duration_seconds=config.duration
         )
-        if motif_plan is not None else melody_variation_events
+        if motif_plan is not None
+        else melody_variation_events
     )
     if motif_plan is not None and melody_variation_events:
         melody_events = [
             replace(
                 event,
-                velocity=float(np.clip(
-                    event.velocity * (
-                        0.90 + 0.20
-                        * melody_variation_events[index % len(melody_variation_events)].velocity
-                    ),
-                    0.0, 1.0,
-                )),
-                pan=float(np.clip(
-                    event.pan * 0.86
-                    + 0.14 * melody_variation_events[index % len(melody_variation_events)].pan,
-                    -0.85, 0.85,
-                )),
+                velocity=float(
+                    np.clip(
+                        event.velocity
+                        * (
+                            0.90
+                            + 0.20
+                            * melody_variation_events[
+                                index % len(melody_variation_events)
+                            ].velocity
+                        ),
+                        0.0,
+                        1.0,
+                    )
+                ),
+                pan=float(
+                    np.clip(
+                        event.pan * 0.86
+                        + 0.14
+                        * melody_variation_events[
+                            index % len(melody_variation_events)
+                        ].pan,
+                        -0.85,
+                        0.85,
+                    )
+                ),
             )
             for index, event in enumerate(melody_events)
         ]
 
-    section_orchestration = tuple(build_section_orchestration_plan(
-        composition_plan, phrase_directives, config, motif_plan
-    ))
-    transition_plan = tuple(build_transition_plan(
-        composition_plan, phrase_directives
-    ))
+    section_orchestration = tuple(
+        build_section_orchestration_plan(
+            composition_plan, phrase_directives, config, motif_plan
+        )
+    )
+    transition_plan = tuple(build_transition_plan(composition_plan, phrase_directives))
     perceptual_orchestration = build_perceptual_orchestration_plan(
-        composition_plan, phrase_directives, section_orchestration,
-        transition_plan, config=config, motif_plan=motif_plan,
+        composition_plan,
+        phrase_directives,
+        section_orchestration,
+        transition_plan,
+        config=config,
+        motif_plan=motif_plan,
     )
     if motif_plan is not None:
         for accent in build_motif_role_accents(
             motif_plan, bpm=config.bpm, duration_seconds=config.duration
         ):
-            percussion[accent.role].append(PercussionEvent(
-                lane=accent.role,
-                step=accent.step,
-                time=accent.step * config.sixteenth_seconds,
-                velocity=accent.velocity,
-                pan=accent.pan,
-                kind=accent.kind,
-                pattern_style=accent.pattern_style,
-                motif_id=accent.motif_id,
-                motif_relation=accent.motif_relation,
-            ))
+            percussion[accent.role].append(
+                PercussionEvent(
+                    lane=accent.role,
+                    step=accent.step,
+                    time=accent.step * config.sixteenth_seconds,
+                    velocity=accent.velocity,
+                    pan=accent.pan,
+                    kind=accent.kind,
+                    pattern_style=accent.pattern_style,
+                    motif_id=accent.motif_id,
+                    motif_relation=accent.motif_relation,
+                )
+            )
     for role in percussion:
         percussion[role] = shape_role_events(
-            role, percussion[role], composition_plan, section_orchestration,
-            step_seconds=config.sixteenth_seconds, seed=config.seed,
+            role,
+            percussion[role],
+            composition_plan,
+            section_orchestration,
+            step_seconds=config.sixteenth_seconds,
+            seed=config.seed,
         )
 
     activity_defaults = {
-        "kick": 0.78, "snare": 0.66, "hat": 0.68, "break": 0.62,
+        "kick": 0.78,
+        "snare": 0.66,
+        "hat": 0.68,
+        "break": 0.62,
     }
     for role, events in percussion.items():
         adjusted = []
         for event in events:
             activity = role_activity_at_time(
-                role, float(event.time), composition_plan,
-                section_orchestration, transition_plan,
+                role,
+                float(event.time),
+                composition_plan,
+                section_orchestration,
+                transition_plan,
             )
             velocity = (
                 float(event.velocity) * min(1.0, activity / activity_defaults[role])
-                if activity > 0.0 else 0.0
+                if activity > 0.0
+                else 0.0
             )
             if velocity > 1e-7:
-                adjusted.append(replace(
-                    event, velocity=float(np.clip(velocity, 0.0, 1.0))
-                ))
+                adjusted.append(
+                    replace(event, velocity=float(np.clip(velocity, 0.0, 1.0)))
+                )
         percussion[role] = adjusted
 
     phrase_shaped_melody = []
     for event in melody_events:
         activity = role_activity_at_time(
-            "melody", float(event.time), composition_plan,
-            section_orchestration, transition_plan,
+            "melody",
+            float(event.time),
+            composition_plan,
+            section_orchestration,
+            transition_plan,
         )
         velocity = (
-            float(event.velocity) * min(1.0, activity / 0.72)
-            if activity > 0.0 else 0.0
+            float(event.velocity) * min(1.0, activity / 0.72) if activity > 0.0 else 0.0
         )
         if velocity > 1e-7:
             phrase_shaped_melody.append(
@@ -359,15 +398,21 @@ def build_score_generation_plan(
     break_profile_rng = streams.get("break_profile")
     break_profiles = {
         "kick": select_profile_name(
-            config.kick_profile, KICK_PROFILES, break_profile_rng,
+            config.kick_profile,
+            KICK_PROFILES,
+            break_profile_rng,
             auto_choices=AUTO_KICK_PROFILES,
         ),
         "snare": select_profile_name(
-            config.snare_profile, SNARE_PROFILES, break_profile_rng,
+            config.snare_profile,
+            SNARE_PROFILES,
+            break_profile_rng,
             auto_choices=AUTO_SNARE_PROFILES,
         ),
         "hat": select_profile_name(
-            config.hat_profile, HAT_PROFILES, break_profile_rng,
+            config.hat_profile,
+            HAT_PROFILES,
+            break_profile_rng,
             auto_choices=AUTO_HAT_PROFILES,
         ),
     }
@@ -386,7 +431,8 @@ def build_score_generation_plan(
 
     # Build score events from the planners' exact sixteenth-grid positions.
     percussion_score = percussion_to_score_events(
-        percussion, bpm=config.bpm,
+        percussion,
+        bpm=config.bpm,
         seed_streams={
             role: streams.seed_for(f"{role}_pattern")
             for role in ("kick", "snare", "hat", "break")
@@ -402,7 +448,9 @@ def build_score_generation_plan(
         role = event.voice_id
         source = source_by_role[role][source_index[role]]
         source_index[role] += 1
-        onset_seconds = float(Fraction(int(source.step), 4) * Fraction(60, 1) / Fraction(str(config.bpm)))
+        onset_seconds = float(
+            Fraction(int(source.step), 4) * Fraction(60, 1) / Fraction(str(config.bpm))
+        )
         section = _section_at_time(composition_plan, onset_seconds)
         phrase = _phrase_at_time(phrase_directives, config.bpm, onset_seconds)
 
@@ -412,8 +460,10 @@ def build_score_generation_plan(
         if role == "snare" and section.density < 0.14 and source.velocity < 0.70:
             continue
         if (
-            role == "hat" and source.motif_relation != "shadow"
-            and streams.get("section_ornaments").random() > section.percussion_density_scale
+            role == "hat"
+            and source.motif_relation != "shadow"
+            and streams.get("section_ornaments").random()
+            > section.percussion_density_scale
         ):
             continue
         velocity = float(source.velocity)
@@ -423,27 +473,35 @@ def build_score_generation_plan(
             if source.kind != "kick" and section.density < 0.16:
                 continue
             break_activity = role_activity_at_time(
-                "break", onset_seconds, composition_plan,
-                section_orchestration, transition_plan,
+                "break",
+                onset_seconds,
+                composition_plan,
+                section_orchestration,
+                transition_plan,
             )
             velocity *= min(1.0, break_activity / 0.62)
             if velocity <= 1e-7:
                 continue
 
         parameters = dict(event.parameters)
-        parameters.update({
-            "section_name": section.name,
-            "phrase_function": phrase.function,
-            "sound_profile": (
-                selected_profiles[role][section.index]
-                if role in selected_profiles else break_profiles.get(str(source.kind), "909_crack")
-            ),
-        })
-        scored_percussion.append(replace(
-            event,
-            velocity=float(np.clip(velocity, 0.0, 1.0)),
-            parameters=parameters,
-        ))
+        parameters.update(
+            {
+                "section_name": section.name,
+                "phrase_function": phrase.function,
+                "sound_profile": (
+                    selected_profiles[role][section.index]
+                    if role in selected_profiles
+                    else break_profiles.get(str(source.kind), "909_crack")
+                ),
+            }
+        )
+        scored_percussion.append(
+            replace(
+                event,
+                velocity=float(np.clip(velocity, 0.0, 1.0)),
+                parameters=parameters,
+            )
+        )
 
     melody_score = melody_to_score_events(
         melody_events,
@@ -457,29 +515,35 @@ def build_score_generation_plan(
         sorted(melody_events, key=lambda item: (int(item.step), int(item.midi_note))),
         strict=True,
     ):
-        onset_seconds = float(Fraction(int(source.step), 4) * Fraction(60, 1) / Fraction(str(config.bpm)))
+        onset_seconds = float(
+            Fraction(int(source.step), 4) * Fraction(60, 1) / Fraction(str(config.bpm))
+        )
         section = _section_at_time(composition_plan, onset_seconds)
         if not section.melody:
             continue
         intent = role_intent_at_time(
             "melody", onset_seconds, composition_plan, section_orchestration
         )
-        instability = float(np.clip(
-            0.62 * config.arrangement_instability
-            + 0.38 * section.instability,
-            0.0, 1.0,
-        ))
+        instability = float(
+            np.clip(
+                0.62 * config.arrangement_instability + 0.38 * section.instability,
+                0.0,
+                1.0,
+            )
+        )
         parameters = dict(event.parameters)
-        parameters.update({
-            "section_name": section.name,
-            "phrase_function": _phrase_at_time(
-                phrase_directives, config.bpm, onset_seconds
-            ).function,
-            "register_semitones": float(intent.register_semitones),
-            "brightness": float(intent.brightness),
-            "instability": instability,
-            "synthesis_profile": melody_profile,
-        })
+        parameters.update(
+            {
+                "section_name": section.name,
+                "phrase_function": _phrase_at_time(
+                    phrase_directives, config.bpm, onset_seconds
+                ).function,
+                "register_semitones": float(intent.register_semitones),
+                "brightness": float(intent.brightness),
+                "instability": instability,
+                "synthesis_profile": melody_profile,
+            }
+        )
         scored_melody.append(replace(event, parameters=parameters))
 
     events: list[MusicalEvent] = [*scored_percussion, *scored_melody]
@@ -487,40 +551,44 @@ def build_score_generation_plan(
         str(config.duration * float(config.bpm) / 60.0)
     ).limit_denominator(15360)
     if config.include_texture:
-        events.append(MusicalEvent(
-            event_id="field-noise-texture",
-            voice_id="noise_texture",
-            onset_beats=Fraction(0),
-            duration_beats=duration_beats,
-            kind="marker",
-            velocity=1.0,
-            parameters={
-                "legacy_lane": "noise_texture",
-                "legacy_kind": "coloured_noise",
-                "duration_seconds": config.duration,
-            },
-            tags=("field-renderer", "texture"),
-        ))
+        events.append(
+            MusicalEvent(
+                event_id="field-noise-texture",
+                voice_id="noise_texture",
+                onset_beats=Fraction(0),
+                duration_beats=duration_beats,
+                kind="marker",
+                velocity=1.0,
+                parameters={
+                    "legacy_lane": "noise_texture",
+                    "legacy_kind": "coloured_noise",
+                    "duration_seconds": config.duration,
+                },
+                tags=("field-renderer", "texture"),
+            )
+        )
     if config.include_ambience:
         root_frequency = 55.0 * (
             2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
         )
-        events.append(MusicalEvent(
-            event_id="field-ambience-bed",
-            voice_id="ambience",
-            onset_beats=Fraction(0),
-            duration_beats=duration_beats,
-            kind="marker",
-            velocity=1.0,
-            parameters={
-                "legacy_lane": "ambience",
-                "legacy_kind": "harmonic_ambient_bed",
-                "duration_seconds": config.duration,
-                "root_frequency": root_frequency,
-                "amount": config.ambience_level,
-            },
-            tags=("field-renderer", "ambience"),
-        ))
+        events.append(
+            MusicalEvent(
+                event_id="field-ambience-bed",
+                voice_id="ambience",
+                onset_beats=Fraction(0),
+                duration_beats=duration_beats,
+                kind="marker",
+                velocity=1.0,
+                parameters={
+                    "legacy_lane": "ambience",
+                    "legacy_kind": "harmonic_ambient_bed",
+                    "duration_seconds": config.duration,
+                    "root_frequency": root_frequency,
+                    "amount": config.ambience_level,
+                },
+                tags=("field-renderer", "ambience"),
+            )
+        )
 
     stems = ["kick", "snare", "hats", "synthetic_break"]
     if config.include_melody:
@@ -533,15 +601,26 @@ def build_score_generation_plan(
         stems.append("sample_break")
 
     seed_stream_names = (
-        "kick_pattern", "snare_pattern", "hat_pattern", "break_pattern",
-        "kick_synthesis", "snare_synthesis", "hat_synthesis", "break_synthesis",
-        "kick_profile", "snare_profile", "hat_profile", "break_profile",
-        "section_ornaments", "melody_pattern", "melody_synthesis",
-        "melody_profile", "texture_synthesis", "ambience_synthesis",
+        "kick_pattern",
+        "snare_pattern",
+        "hat_pattern",
+        "break_pattern",
+        "kick_synthesis",
+        "snare_synthesis",
+        "hat_synthesis",
+        "break_synthesis",
+        "kick_profile",
+        "snare_profile",
+        "hat_profile",
+        "break_profile",
+        "section_ornaments",
+        "melody_pattern",
+        "melody_synthesis",
+        "melody_profile",
+        "texture_synthesis",
+        "ambience_synthesis",
     )
-    seed_streams = {
-        name: streams.seed_for(name) for name in seed_stream_names
-    }
+    seed_streams = {name: streams.seed_for(name) for name in seed_stream_names}
     motif_plan_dict = motif_plan.to_dict() if motif_plan is not None else None
     composition_dict = composition_plan.to_dict()
     section_schedule = []
@@ -549,13 +628,15 @@ def build_score_generation_plan(
         function = _phrase_at_time(
             phrase_directives, config.bpm, section.start_seconds
         ).function
-        section_schedule.append({
-            "index": section.index,
-            "name": section.name,
-            "start_bar": section.start_bar,
-            "end_bar": section.end_bar,
-            "function": function,
-        })
+        section_schedule.append(
+            {
+                "index": section.index,
+                "name": section.name,
+                "start_bar": section.start_bar,
+                "end_bar": section.end_bar,
+                "function": function,
+            }
+        )
     metadata = {
         "perceptual_orchestration": perceptual_orchestration.to_dict(),
         "perceptual_attention_warnings": list(
@@ -594,8 +675,8 @@ def build_score_generation_plan(
             "melody": (
                 f"persistent {motif_plan.anchor.motif_id} motif + section transformations + "
                 f"{config.synth_palette} synthesis palette"
-                if motif_plan is not None else
-                f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette"
+                if motif_plan is not None
+                else f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette"
             ),
             "texture": "coloured noise with low-frequency amplitude modulation",
             "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
@@ -630,7 +711,8 @@ def build_score_generation_plan(
         "break_rhythm": {
             "style": next(
                 (
-                    event.pattern_style for event in percussion["break"]
+                    event.pattern_style
+                    for event in percussion["break"]
                     if event.pattern_style is not None
                 ),
                 config.break_style,
@@ -692,7 +774,8 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
                 "lane": str(parameters.get("legacy_lane", event.voice_id)),
                 "kind": str(parameters.get("legacy_kind", "marker")),
                 **{
-                    key: value for key, value in parameters.items()
+                    key: value
+                    for key, value in parameters.items()
                     if key not in {"legacy_lane", "legacy_kind", "duration_seconds"}
                 },
                 "duration": float(parameters.get("duration_seconds", 0.0)),
@@ -702,51 +785,59 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
         if event.kind == "trigger":
             role = str(parameters.get("sample_role", event.voice_id))
             lane = "sample_break" if role == "break" else f"sample_{role}"
-            records.append({
-                **base,
-                "lane": lane,
-                "source_lane": role,
-                "kind": "sample_trigger",
-                "sample_metadata": dict(parameters.get("sample_metadata", {})),
-                "sample_source": {
-                    "asset_id": event.source_id,
-                    "path": parameters.get("sample_path"),
-                    "sha256": parameters.get("sample_sha256"),
-                    "label": parameters.get("sample_label"),
-                    "variant_index": parameters.get("sample_variant_index"),
-                },
-                "transforms": list(parameters.get("break_transforms", [])),
-                "slice_index": parameters.get("break_slice_index"),
-                "source_frame_start": parameters.get("break_source_frame_start"),
-                "source_frame_end": parameters.get("break_source_frame_end"),
-                "rendered_frames": None,
-                "trimmed_to_next_trigger": True if role == "break" else False,
-            })
+            records.append(
+                {
+                    **base,
+                    "lane": lane,
+                    "source_lane": role,
+                    "kind": "sample_trigger",
+                    "sample_metadata": dict(parameters.get("sample_metadata", {})),
+                    "sample_source": {
+                        "asset_id": event.source_id,
+                        "path": parameters.get("sample_path"),
+                        "sha256": parameters.get("sample_sha256"),
+                        "label": parameters.get("sample_label"),
+                        "variant_index": parameters.get("sample_variant_index"),
+                    },
+                    "transforms": list(parameters.get("break_transforms", [])),
+                    "slice_index": parameters.get("break_slice_index"),
+                    "source_frame_start": parameters.get("break_source_frame_start"),
+                    "source_frame_end": parameters.get("break_source_frame_end"),
+                    "rendered_frames": None,
+                    "trimmed_to_next_trigger": True if role == "break" else False,
+                }
+            )
             continue
 
         if event.kind == "note":
             gate_beats = parameters.get("gate_duration_beats")
             if gate_beats is None:
-                duration = float(score.tempo_map.beat_to_seconds(event.end_beats) - onset_seconds)
+                duration = float(
+                    score.tempo_map.beat_to_seconds(event.end_beats) - onset_seconds
+                )
             else:
                 gate_end = event.onset_beats + Fraction(str(gate_beats))
-                duration = float(score.tempo_map.beat_to_seconds(gate_end) - onset_seconds)
-            records.append({
-                **base,
-                "lane": event.voice_id,
-                "kind": f"{score.metadata.get('synth_palette', 'subtractive')}_synth_note",
-                "duration": duration,
-                "frequency": event.frequency_hz,
-                "midi_note": event.pitch,
-                "source_x": parameters.get("source_x"),
-                "source_y": parameters.get("source_y"),
-                "motif_id": parameters.get("motif_id"),
-                "motif_transform": parameters.get("motif_transform"),
-                "phrase_index": parameters.get("phrase_index"),
-                "section_name": parameters.get("section_name"),
-                "phrase_function": parameters.get("phrase_function"),
-                "synthesis_profile": parameters.get("synthesis_profile"),
-            })
+                duration = float(
+                    score.tempo_map.beat_to_seconds(gate_end) - onset_seconds
+                )
+            records.append(
+                {
+                    **base,
+                    "lane": event.voice_id,
+                    "kind": f"{score.metadata.get('synth_palette', 'subtractive')}_synth_note",
+                    "duration": duration,
+                    "frequency": event.frequency_hz,
+                    "midi_note": event.pitch,
+                    "source_x": parameters.get("source_x"),
+                    "source_y": parameters.get("source_y"),
+                    "motif_id": parameters.get("motif_id"),
+                    "motif_transform": parameters.get("motif_transform"),
+                    "phrase_index": parameters.get("phrase_index"),
+                    "section_name": parameters.get("section_name"),
+                    "phrase_function": parameters.get("phrase_function"),
+                    "synthesis_profile": parameters.get("synthesis_profile"),
+                }
+            )
             continue
 
         families = score.metadata.get("generator_families", {})
@@ -782,7 +873,8 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
             variant_index = int(parameters.get("sample_variant_index", 0))
             variant = next(
                 (
-                    item for item in variants
+                    item
+                    for item in variants
                     if int(item.get("index", -1)) == variant_index
                 ),
                 {},
@@ -800,8 +892,11 @@ def score_to_legacy_project_events(score: Score) -> list[dict[str, Any]]:
                 record["sample_features"] = dict(variant["features"])
         records.append(record)
 
-    records.sort(key=lambda item: (
-        float(item.get("time", 0.0)), str(item.get("lane", "")),
-        str(item.get("score_event_id", "")),
-    ))
+    records.sort(
+        key=lambda item: (
+            float(item.get("time", 0.0)),
+            str(item.get("lane", "")),
+            str(item.get("score_event_id", "")),
+        )
+    )
     return records

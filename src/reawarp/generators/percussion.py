@@ -13,7 +13,11 @@ import numpy as np
 
 from reawarp.config import GenerationConfig
 from reawarp.composition.patterns import pattern_for_section, relate_patterns
-from reawarp.composition.director import CompositionPlan, build_composition_plan, section_for_time
+from reawarp.composition.director import (
+    CompositionPlan,
+    build_composition_plan,
+    section_for_time,
+)
 from reawarp.core.random_streams import derive_seed
 from reawarp.mathematics.rhythms import euclidean_rhythm
 from reawarp.mathematics.sequences import fibonacci, logistic_map, primes
@@ -113,23 +117,44 @@ def _drum_section_function(name: str) -> str:
     token = name.upper()
     if any(part in token for part in ("INTRO", "SIGNAL", "ORIGIN", "SEED_OBJECT")):
         return "intro"
-    if any(part in token for part in ("FOUNDATION", "CONSTRUCTION", "ESTABLISH", "EXPOSITION")):
+    if any(
+        part in token
+        for part in ("FOUNDATION", "CONSTRUCTION", "ESTABLISH", "EXPOSITION")
+    ):
         return "establishment"
     if any(part in token for part in ("UPLIFT", "SURGE", "RAMP", "PICKUP")):
         return "uplift"
-    if any(part in token for part in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL", "CLIMAX")):
+    if any(
+        part in token for part in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL", "CLIMAX")
+    ):
         return "arrival"
     if any(part in token for part in ("NULL", "VOID", "SILENCE", "SUSPENSION")):
         return "void"
-    if any(part in token for part in ("DROP", "BREAKDOWN", "WITHDRAWAL", "EXPOSE", "DECOMPRESSION")):
+    if any(
+        part in token
+        for part in ("DROP", "BREAKDOWN", "WITHDRAWAL", "EXPOSE", "DECOMPRESSION")
+    ):
         return "drop"
     if any(part in token for part in ("CONTRAST", "COUNTER", "SCENE_B")):
         return "contrast"
     if any(part in token for part in ("RETURN", "REPRISE", "RECAP", "REASSEMBLY")):
         return "return"
-    if any(part in token for part in ("RESIDUE", "AFTERSHOCK", "AFTERIMAGE", "UNRAVEL", "CODA", "OUTRO", "FADE")):
+    if any(
+        part in token
+        for part in (
+            "RESIDUE",
+            "AFTERSHOCK",
+            "AFTERIMAGE",
+            "UNRAVEL",
+            "CODA",
+            "OUTRO",
+            "FADE",
+        )
+    ):
         return "residue"
-    if any(part in token for part in ("DEVELOP", "ORBIT", "DRIFT", "MUTATION", "EXPANSION")):
+    if any(
+        part in token for part in ("DEVELOP", "ORBIT", "DRIFT", "MUTATION", "EXPANSION")
+    ):
         return "development"
     return "continuation"
 
@@ -227,21 +252,34 @@ def build_drum_part_plan(
     plans: list[DrumSectionPlan] = []
     for section in composition_plan.sections:
         function = _drum_section_function(section.name)
+
         def family_rng(role: str) -> np.random.Generator:
             return np.random.default_rng(
-                derive_seed(config.seed, f"drum-family:{section.index}:{section.name}:{role}")
+                derive_seed(
+                    config.seed, f"drum-family:{section.index}:{section.name}:{role}"
+                )
             )
+
         kick_family = _family_for_role(
-            function, "kick", anchor_family,
-            rng=family_rng("kick"), intensity=config.drum_change_intensity,
+            function,
+            "kick",
+            anchor_family,
+            rng=family_rng("kick"),
+            intensity=config.drum_change_intensity,
         )
         snare_family = _family_for_role(
-            function, "snare", anchor_family,
-            rng=family_rng("snare"), intensity=config.drum_change_intensity,
+            function,
+            "snare",
+            anchor_family,
+            rng=family_rng("snare"),
+            intensity=config.drum_change_intensity,
         )
         hat_family = _family_for_role(
-            function, "hat", anchor_family,
-            rng=family_rng("hat"), intensity=config.drum_change_intensity,
+            function,
+            "hat",
+            anchor_family,
+            rng=family_rng("hat"),
+            intensity=config.drum_change_intensity,
         )
 
         def role_steps(role: str, family: str) -> tuple[int, ...]:
@@ -250,14 +288,20 @@ def build_drum_part_plan(
                 f"drum-section:{section.index}:{section.name}:{role}:{family}",
             )
             rng = np.random.default_rng(seed)
-            density = float(np.clip(
-                section.density * (0.55 + 0.45 * config.drum_change_intensity),
-                0.08, 1.0,
-            ))
-            variation = float(np.clip(
-                config.composition_variation * config.drum_change_intensity,
-                0.0, 1.0,
-            ))
+            density = float(
+                np.clip(
+                    section.density * (0.55 + 0.45 * config.drum_change_intensity),
+                    0.08,
+                    1.0,
+                )
+            )
+            variation = float(
+                np.clip(
+                    config.composition_variation * config.drum_change_intensity,
+                    0.0,
+                    1.0,
+                )
+            )
             return pattern_for_section(
                 family,
                 section_index=section.index,
@@ -270,30 +314,37 @@ def build_drum_part_plan(
         kick_steps = role_steps("kick", kick_family)
         snare_steps = role_steps("snare", snare_family)
         kick_steps, snare_steps = relate_patterns(
-            kick_steps, snare_steps,
+            kick_steps,
+            snare_steps,
             relationship=config.pattern_relationship,
             cycle_steps=16,
         )
         hat_steps = role_steps("hat", hat_family)
         # Hats act as the upper surface: use the role's own family but avoid
         # needless doubling of every kick accent when using complementary modes.
-        if config.pattern_relationship in {"interlock", "counter_accent", "call_response"}:
+        if config.pattern_relationship in {
+            "interlock",
+            "counter_accent",
+            "call_response",
+        }:
             hat_steps = tuple(step for step in hat_steps if step not in set(kick_steps))
         if function == "establishment":
             anchor_family = kick_family
-        plans.append(DrumSectionPlan(
-            section_index=section.index,
-            section_name=section.name,
-            start_bar=section.start_bar,
-            end_bar=section.end_bar,
-            kick_family=kick_family,
-            snare_family=snare_family,
-            hat_family=hat_family,
-            relationship=config.pattern_relationship,
-            kick_steps=tuple(sorted(set(kick_steps))),
-            snare_steps=tuple(sorted(set(snare_steps))),
-            hat_steps=tuple(sorted(set(hat_steps))),
-        ))
+        plans.append(
+            DrumSectionPlan(
+                section_index=section.index,
+                section_name=section.name,
+                start_bar=section.start_bar,
+                end_bar=section.end_bar,
+                kick_family=kick_family,
+                snare_family=snare_family,
+                hat_family=hat_family,
+                relationship=config.pattern_relationship,
+                kick_steps=tuple(sorted(set(kick_steps))),
+                snare_steps=tuple(sorted(set(snare_steps))),
+                hat_steps=tuple(sorted(set(hat_steps))),
+            )
+        )
     return tuple(plans)
 
 
@@ -309,12 +360,15 @@ def _build_section_aware_drum_events(
     cycle_bars = int(config.drum_part_cycle_bars)
     intensity = float(config.drum_change_intensity)
     function_by_section = {
-        item.section_index: _drum_section_function(item.section_name) for item in drum_plan
+        item.section_index: _drum_section_function(item.section_name)
+        for item in drum_plan
     }
     for plan in drum_plan:
         function = function_by_section[plan.section_index]
         section_rng = np.random.default_rng(
-            derive_seed(config.seed, f"drum-cycle:{plan.section_index}:{plan.section_name}")
+            derive_seed(
+                config.seed, f"drum-cycle:{plan.section_index}:{plan.section_name}"
+            )
         )
         for bar in range(plan.start_bar, plan.end_bar):
             if bar * 16 * step_seconds >= config.duration:
@@ -325,9 +379,12 @@ def _build_section_aware_drum_events(
             drift_limit = int(round(intensity * 2.0))
             drift = 0
             if cycle_index and drift_limit:
-                drift = int(round(
-                    np.sin((cycle_index + 1) * 1.61803398875 + plan.section_index) * drift_limit
-                ))
+                drift = int(
+                    round(
+                        np.sin((cycle_index + 1) * 1.61803398875 + plan.section_index)
+                        * drift_limit
+                    )
+                )
             ending_bar = bar == plan.end_bar - 1
             for role, base_steps, family in (
                 ("kick", plan.kick_steps, plan.kick_family),
@@ -335,12 +392,22 @@ def _build_section_aware_drum_events(
                 ("hat", plan.hat_steps, plan.hat_family),
             ):
                 steps = sorted({(step + drift) % 16 for step in base_steps})
-                if ending_bar and intensity > 0.35 and function in {"development", "uplift", "arrival", "contrast"}:
+                if (
+                    ending_bar
+                    and intensity > 0.35
+                    and function in {"development", "uplift", "arrival", "contrast"}
+                ):
                     # One concise transition gesture: add only one or two
                     # upper-role events to prepare the next formal state.
                     if role == "hat":
-                        fill = (13, 14, 15) if function in {"uplift", "arrival"} else (11, 15)
-                        steps = sorted(set(steps) | set(fill[:1 + int(intensity > 0.72)]))
+                        fill = (
+                            (13, 14, 15)
+                            if function in {"uplift", "arrival"}
+                            else (11, 15)
+                        )
+                        steps = sorted(
+                            set(steps) | set(fill[: 1 + int(intensity > 0.72)])
+                        )
                     elif role == "snare" and function in {"uplift", "arrival"}:
                         steps = sorted(set(steps) | {15})
 
@@ -350,41 +417,67 @@ def _build_section_aware_drum_events(
                     if time_seconds >= config.duration:
                         continue
                     if role == "kick":
-                        velocity = float(np.clip(
-                            0.50 + 0.22 * composition_plan.sections[plan.section_index].energy
-                            + (0.12 if position == 0 else 0.0)
-                            + section_rng.uniform(-0.055, 0.055),
-                            0.22, 0.92,
-                        ))
+                        velocity = float(
+                            np.clip(
+                                0.50
+                                + 0.22
+                                * composition_plan.sections[plan.section_index].energy
+                                + (0.12 if position == 0 else 0.0)
+                                + section_rng.uniform(-0.055, 0.055),
+                                0.22,
+                                0.92,
+                            )
+                        )
                         kind, pan = "synth_kick", 0.0
                     elif role == "snare":
                         anchor = position in (4, 8, 12)
-                        velocity = float(np.clip(
-                            (0.48 if anchor else 0.28)
-                            + 0.16 * composition_plan.sections[plan.section_index].energy
-                            + section_rng.uniform(-0.07, 0.07),
-                            0.12, 0.84,
-                        ))
+                        velocity = float(
+                            np.clip(
+                                (0.48 if anchor else 0.28)
+                                + 0.16
+                                * composition_plan.sections[plan.section_index].energy
+                                + section_rng.uniform(-0.07, 0.07),
+                                0.12,
+                                0.84,
+                            )
+                        )
                         kind, pan = "noise_snare", 0.0
                     else:
-                        velocity = float(np.clip(
-                            0.12 + 0.17 * composition_plan.sections[plan.section_index].instability
-                            + section_rng.uniform(-0.035, 0.035),
-                            0.06, 0.42,
-                        ))
-                        pan = float(np.clip(np.sin(absolute_step * 0.31) * 0.18, -0.24, 0.24))
+                        velocity = float(
+                            np.clip(
+                                0.12
+                                + 0.17
+                                * composition_plan.sections[
+                                    plan.section_index
+                                ].instability
+                                + section_rng.uniform(-0.035, 0.035),
+                                0.06,
+                                0.42,
+                            )
+                        )
+                        pan = float(
+                            np.clip(np.sin(absolute_step * 0.31) * 0.18, -0.24, 0.24)
+                        )
                         kind = "metal_noise"
-                    result[role].append(PercussionEvent(
-                        role, absolute_step, time_seconds, velocity, pan, kind, family
-                    ))
+                    result[role].append(
+                        PercussionEvent(
+                            role,
+                            absolute_step,
+                            time_seconds,
+                            velocity,
+                            pan,
+                            kind,
+                            family,
+                        )
+                    )
     return result
 
 
 def _mutate_break_bar(
-        hits: list[tuple[int, str, float, float, float]],
-        rng: np.random.Generator,
-        variation: float,
-        anchors: set[int],
+    hits: list[tuple[int, str, float, float, float]],
+    rng: np.random.Generator,
+    variation: float,
+    anchors: set[int],
 ) -> list[tuple[int, str, float, float, float]]:
     """Apply one or two local, grid-preserving phrase mutations."""
     result = list(hits)
@@ -399,20 +492,24 @@ def _mutate_break_bar(
     for _ in range(mutation_count):
         operation = float(rng.random())
         occupied = {item[0] for item in result}
-        movable = [
-            index for index, item in enumerate(result)
-            if item[0] not in anchors
-        ]
+        movable = [index for index, item in enumerate(result) if item[0] not in anchors]
 
         if operation < 0.52 and movable:
             # Move a single non-anchor event by one sixteenth, never off-grid.
             index = int(rng.choice(movable))
             step, kind, priority, velocity, pan = result[index]
-            destinations = [value for value in (step - 1, step + 1)
-                            if 0 <= value < 16 and value not in occupied]
+            destinations = [
+                value
+                for value in (step - 1, step + 1)
+                if 0 <= value < 16 and value not in occupied
+            ]
             if destinations:
                 result[index] = (
-                    int(rng.choice(destinations)), kind, priority, velocity, pan
+                    int(rng.choice(destinations)),
+                    kind,
+                    priority,
+                    velocity,
+                    pan,
                 )
         elif operation < 0.78 and len(result) > 4 and movable:
             # Remove one ornament, never one of the four metric anchors.
@@ -430,10 +527,10 @@ def _mutate_break_bar(
 
 
 def _build_break_events(
-        config: GenerationConfig,
-        rng: np.random.Generator,
-        step_count: int,
-        composition_plan: CompositionPlan | None = None,
+    config: GenerationConfig,
+    rng: np.random.Generator,
+    step_count: int,
+    composition_plan: CompositionPlan | None = None,
 ) -> list[PercussionEvent]:
     """Build repeated 16-step break phrases with bounded bar-end mutations."""
     style = config.break_style
@@ -446,9 +543,13 @@ def _build_break_events(
     # exact phrase template and density contract byte-for-byte.
     if composition_plan is None:
         composition_plan = build_composition_plan(
-            duration_seconds=config.duration, bpm=config.bpm, seed=config.seed,
-            structure=config.structure, energy=config.composition_energy,
-            variation=config.composition_variation, flow=config.composition_flow,
+            duration_seconds=config.duration,
+            bpm=config.bpm,
+            seed=config.seed,
+            structure=config.structure,
+            energy=config.composition_energy,
+            variation=config.composition_variation,
+            flow=config.composition_flow,
             pattern_family=config.pattern_family,
             pattern_relationship=config.pattern_relationship,
         )
@@ -509,24 +610,32 @@ def _build_break_events(
                     rng=companion_rng,
                 )
                 companion_steps, family_steps = relate_patterns(
-                    family_steps, companion_base,
+                    family_steps,
+                    companion_base,
                     relationship=config.pattern_relationship,
                     cycle_steps=16,
                 )
                 if len(family_steps) >= 2:
-                    anchors = [item for item in cycle_phrase if item[0] in {0, 4, 8, 12}]
-                    ornaments = [item for item in cycle_phrase if item[0] not in {0, 4, 8, 12}]
+                    anchors = [
+                        item for item in cycle_phrase if item[0] in {0, 4, 8, 12}
+                    ]
+                    ornaments = [
+                        item for item in cycle_phrase if item[0] not in {0, 4, 8, 12}
+                    ]
                     remapped = []
                     selected_steps = (
                         companion_steps
-                        if config.pattern_relationship in {"shadow", "call_response", "counter_accent"}
+                        if config.pattern_relationship
+                        in {"shadow", "call_response", "counter_accent"}
                         else family_steps
                     )
                     for index, item in enumerate(ornaments):
                         if index >= len(selected_steps):
                             break
                         _step, kind, priority, velocity, pan = item
-                        remapped.append((selected_steps[index], kind, priority, velocity, pan))
+                        remapped.append(
+                            (selected_steps[index], kind, priority, velocity, pan)
+                        )
                     cycle_phrase = sorted(anchors + remapped, key=lambda item: item[0])
         previous_section_index = section.index
 
@@ -536,7 +645,8 @@ def _build_break_events(
         render_hits = list(cycle_phrase or selected)
         if is_cycle_end and config.break_variation > 0.0:
             anchor_steps = {
-                step for step, _kind, priority, _velocity, _pan in template
+                step
+                for step, _kind, priority, _velocity, _pan in template
                 if priority >= 0.88
             }
             render_hits = _mutate_break_bar(
@@ -548,24 +658,26 @@ def _build_break_events(
             time_seconds = absolute_step * step_seconds
             if absolute_step >= step_count or time_seconds >= config.duration:
                 continue
-            events.append(PercussionEvent(
-                "break",
-                absolute_step,
-                time_seconds,
-                float(np.clip(base_velocity, 0.12, 1.0)),
-                float(pan),
-                kind,
-                style,
-            ))
+            events.append(
+                PercussionEvent(
+                    "break",
+                    absolute_step,
+                    time_seconds,
+                    float(np.clip(base_velocity, 0.12, 1.0)),
+                    float(pan),
+                    kind,
+                    style,
+                )
+            )
 
     return sorted(events, key=lambda event: (event.step, event.kind or ""))
 
 
 def build_percussion_events(
-        config: GenerationConfig,
-        rngs: dict[str, np.random.Generator],
-        composition_plan: CompositionPlan | None = None,
-        drum_plan: tuple[DrumSectionPlan, ...] | None = None,
+    config: GenerationConfig,
+    rngs: dict[str, np.random.Generator],
+    composition_plan: CompositionPlan | None = None,
+    drum_plan: tuple[DrumSectionPlan, ...] | None = None,
 ) -> dict[str, list[PercussionEvent]]:
     """Build related percussion lanes, optionally evolving them by formal section."""
     if composition_plan is None:
@@ -592,7 +704,9 @@ def build_percussion_events(
         step_count = int(np.ceil(config.duration / step_seconds))
         complexity = config.complexity
         lane_events: dict[str, list[PercussionEvent]] = {
-            "kick": [], "snare": [], "hat": []
+            "kick": [],
+            "snare": [],
+            "hat": [],
         }
         kick_rng, snare_rng, hat_rng = rngs["kick"], rngs["snare"], rngs["hat"]
         sparse_kick_pulses = 2 + int(round(complexity * 1.4))
@@ -604,9 +718,9 @@ def build_percussion_events(
                 continue
             bar, position = divmod(step, 16)
             kick_rotation = (bar * (1 + int(complexity * 2))) % 16
-            kick_hit = euclidean_rhythm(
-                sparse_kick_pulses, 16, rotation=kick_rotation
-            )[position]
+            kick_hit = euclidean_rhythm(sparse_kick_pulses, 16, rotation=kick_rotation)[
+                position
+            ]
             if not kick_hit and position in (3, 7, 11, 15):
                 kick_hit = bool(kick_rng.random() < 0.018 + complexity * 0.035)
             if kick_hit:
@@ -614,32 +728,47 @@ def build_percussion_events(
                 if position == 0:
                     velocity = min(0.88, velocity + 0.10)
                 lane_events["kick"].append(
-                    PercussionEvent("kick", step, time_seconds, velocity, 0.0, "synth_kick")
+                    PercussionEvent(
+                        "kick", step, time_seconds, velocity, 0.0, "synth_kick"
+                    )
                 )
             snare_rotation = 4 if bar % 2 == 0 else 12
             snare_hit = position == snare_rotation
-            ghost_snare = position in (6, 14) and snare_rng.random() < complexity * 0.025
+            ghost_snare = (
+                position in (6, 14) and snare_rng.random() < complexity * 0.025
+            )
             if snare_hit or ghost_snare:
                 velocity = float(
                     snare_rng.uniform(0.16, 0.30)
-                    if ghost_snare else snare_rng.uniform(0.38, 0.62)
+                    if ghost_snare
+                    else snare_rng.uniform(0.38, 0.62)
                 )
                 lane_events["snare"].append(
-                    PercussionEvent("snare", step, time_seconds, velocity, 0.0, "noise_snare")
+                    PercussionEvent(
+                        "snare", step, time_seconds, velocity, 0.0, "noise_snare"
+                    )
                 )
             hat_pattern = euclidean_rhythm(
                 sparse_hat_pulses, 16, rotation=(bar * 3 + 2) % 16
             )
             hat_probability = 0.015 + complexity * 0.025
-            if hat_pattern[position] and hat_rng.random() < 0.62 or hat_rng.random() < hat_probability:
+            if (
+                hat_pattern[position]
+                and hat_rng.random() < 0.62
+                or hat_rng.random() < hat_probability
+            ):
                 velocity = float(hat_rng.uniform(0.10, 0.24))
                 pan = float(np.clip(np.sin(step * 0.31) * 0.16, -0.22, 0.22))
                 lane_events["hat"].append(
-                    PercussionEvent("hat", step, time_seconds, velocity, pan, "metal_noise")
+                    PercussionEvent(
+                        "hat", step, time_seconds, velocity, pan, "metal_noise"
+                    )
                 )
 
     lane_events["break"] = _build_break_events(
-        config, rngs["break"], int(np.ceil(config.duration / config.sixteenth_seconds)),
+        config,
+        rngs["break"],
+        int(np.ceil(config.duration / config.sixteenth_seconds)),
         composition_plan,
     )
     return lane_events

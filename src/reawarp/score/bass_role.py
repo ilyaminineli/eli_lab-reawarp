@@ -13,7 +13,6 @@ from reawarp.score.sonority import generate_sonority
 from reawarp.score.time import as_fraction
 from reawarp.score.voice_leading import SonorityBoundary, SonoritySequencePlan
 
-
 _BASS_MODES = {
     "pedal",
     "kick_locked",
@@ -26,8 +25,13 @@ _KICK_RELATIONSHIPS = {"independent", "align", "avoid", "interlock"}
 _CADENCE_AVOIDANCE = {"none", "root", "repeat"}
 
 
-def _number(value: object, name: str, *, minimum: float | None = None,
-            maximum: float | None = None) -> float:
+def _number(
+    value: object,
+    name: str,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
     if isinstance(value, bool):
         raise ValueError(f"{name} must be a finite number")
     number = float(value)
@@ -50,8 +54,12 @@ def _stable_value(seed: int | str, *parts: object) -> float:
 
 def _derived_seed(seed: int | str, *parts: object) -> int:
     payload = "|".join(
-        ("reawarp:m19.4", type(seed).__name__, str(seed),
-         *(str(part) for part in parts))
+        (
+            "reawarp:m19.4",
+            type(seed).__name__,
+            str(seed),
+            *(str(part) for part in parts),
+        )
     ).encode("utf-8")
     return int.from_bytes(hashlib.blake2b(payload, digest_size=8).digest(), "big")
 
@@ -91,23 +99,27 @@ class BassRoleConfig:
             raise ValueError(f"unsupported bass role mode: {self.mode}")
         if not isinstance(self.voice_id, str) or not self.voice_id.strip():
             raise ValueError("bass voice_id cannot be empty")
-        object.__setattr__(self, "density", _number(
-            self.density, "density", minimum=0.0, maximum=1.0
-        ))
+        object.__setattr__(
+            self, "density", _number(self.density, "density", minimum=0.0, maximum=1.0)
+        )
         low = _number(self.register_min, "register_min")
         high = _number(self.register_max, "register_max")
         if low >= high:
             raise ValueError("register_min must be lower than register_max")
         object.__setattr__(self, "register_min", low)
         object.__setattr__(self, "register_max", high)
-        object.__setattr__(self, "movement_range", _number(
-            self.movement_range, "movement_range", minimum=0.0
-        ))
+        object.__setattr__(
+            self,
+            "movement_range",
+            _number(self.movement_range, "movement_range", minimum=0.0),
+        )
         relationship = self.kick_relationship
         if relationship is None:
             relationship = "align" if self.mode == "kick_locked" else "independent"
         if relationship not in _KICK_RELATIONSHIPS:
-            raise ValueError("kick_relationship must be independent, align, avoid, or interlock")
+            raise ValueError(
+                "kick_relationship must be independent, align, avoid, or interlock"
+            )
         if self.mode == "kick_locked" and relationship != "align":
             raise ValueError("kick_locked mode requires kick_relationship='align'")
         if self.mode == "pedal" and relationship != "independent":
@@ -116,8 +128,11 @@ class BassRoleConfig:
             )
         object.__setattr__(self, "kick_relationship", relationship)
         for name in (
-            "kick_tolerance_beats", "interlock_offset_beats",
-            "cycle_beats", "cycle_phase_beats", "note_duration_beats",
+            "kick_tolerance_beats",
+            "interlock_offset_beats",
+            "cycle_beats",
+            "cycle_phase_beats",
+            "note_duration_beats",
             "cadence_window_beats",
         ):
             value = as_fraction(getattr(self, name))
@@ -130,27 +145,39 @@ class BassRoleConfig:
                 raise ValueError(f"{name} cannot be negative")
             object.__setattr__(self, name, str(value))
         if (
-            isinstance(self.cycle_pulses, bool) or not isinstance(self.cycle_pulses, int)
+            isinstance(self.cycle_pulses, bool)
+            or not isinstance(self.cycle_pulses, int)
             or not 1 <= self.cycle_pulses <= 32
         ):
             raise ValueError("cycle_pulses must be an integer between 1 and 32")
         if (
-            isinstance(self.steps_per_bar, bool) or not isinstance(self.steps_per_bar, int)
+            isinstance(self.steps_per_bar, bool)
+            or not isinstance(self.steps_per_bar, int)
             or not 1 <= self.steps_per_bar <= 64
         ):
             raise ValueError("steps_per_bar must be an integer between 1 and 64")
-        object.__setattr__(self, "syncopation", _number(
-            self.syncopation, "syncopation", minimum=0.0, maximum=1.0
-        ))
+        object.__setattr__(
+            self,
+            "syncopation",
+            _number(self.syncopation, "syncopation", minimum=0.0, maximum=1.0),
+        )
         if self.cadence_avoidance not in _CADENCE_AVOIDANCE:
             raise ValueError("cadence_avoidance must be none, root, or repeat")
-        object.__setattr__(self, "cadence_avoidance_amount", _number(
-            self.cadence_avoidance_amount, "cadence_avoidance_amount",
-            minimum=0.0, maximum=1.0,
-        ))
-        object.__setattr__(self, "velocity", _number(
-            self.velocity, "velocity", minimum=0.0, maximum=1.0
-        ))
+        object.__setattr__(
+            self,
+            "cadence_avoidance_amount",
+            _number(
+                self.cadence_avoidance_amount,
+                "cadence_avoidance_amount",
+                minimum=0.0,
+                maximum=1.0,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "velocity",
+            _number(self.velocity, "velocity", minimum=0.0, maximum=1.0),
+        )
         if isinstance(self.seed, bool) or not isinstance(self.seed, (int, str)):
             raise ValueError("seed must be an integer or string")
 
@@ -185,7 +212,9 @@ class BassRoleConfig:
         allowed = set(cls.__dataclass_fields__)
         unknown = set(data) - allowed
         if unknown:
-            raise ValueError("unknown bass config field(s): " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unknown bass config field(s): " + ", ".join(sorted(unknown))
+            )
         return cls(**dict(data))
 
 
@@ -220,16 +249,21 @@ class BassRolePlan:
         events = tuple(self.events)
         if any(not isinstance(item, MusicalEvent) for item in events):
             raise ValueError("bass plan events must be MusicalEvent records")
-        if any(item.voice_id != self.config.voice_id or item.kind != "note" for item in events):
-            raise ValueError("bass plan events must be note events on its configured voice")
+        if any(
+            item.voice_id != self.config.voice_id or item.kind != "note"
+            for item in events
+        ):
+            raise ValueError(
+                "bass plan events must be note events on its configured voice"
+            )
         ids = [item.event_id for item in events]
         if len(ids) != len(set(ids)):
             raise ValueError("bass event IDs must be unique")
         if any(not math.isfinite(item.pitch or 0.0) for item in events):
             raise ValueError("bass pitches must be finite")
-        ordered = tuple(sorted(events, key=lambda item: (
-            item.onset_beats, item.event_id
-        )))
+        ordered = tuple(
+            sorted(events, key=lambda item: (item.onset_beats, item.event_id))
+        )
         kick_ids = tuple(self.kick_event_ids)
         if any(not isinstance(item, str) or not item.strip() for item in kick_ids):
             raise ValueError("kick_event_ids must contain non-empty strings")
@@ -311,7 +345,6 @@ class BassRolePlan:
         return cls.from_dict(record)
 
 
-
 def _kick_events(events: Iterable[MusicalEvent]) -> tuple[MusicalEvent, ...]:
     result = []
     for event in events:
@@ -342,7 +375,9 @@ def _anchor_for(
 
 def _event_id(seed: int | str, mode: str, index: int, onset, boundary_id: str) -> str:
     suffix = hashlib.blake2b(
-        f"{type(seed).__name__}:{seed}:{mode}:{index}:{onset}:{boundary_id}".encode("utf-8"),
+        f"{type(seed).__name__}:{seed}:{mode}:{index}:{onset}:{boundary_id}".encode(
+            "utf-8"
+        ),
         digest_size=5,
     ).hexdigest()
     return f"bass-{mode}-{index:05d}-{suffix}"
@@ -360,7 +395,9 @@ def _boundary_ends(boundaries: tuple[SonorityBoundary, ...]):
         if index + 1 < len(boundaries):
             end = min(end, starts[index + 1])
         if end <= starts[index]:
-            raise ValueError("bass boundaries must have positive, non-overlapping spans")
+            raise ValueError(
+                "bass boundaries must have positive, non-overlapping spans"
+            )
         ends.append(end)
     return tuple(starts), tuple(ends)
 
@@ -416,23 +453,26 @@ def _make_sonorities(
         generated = []
         for boundary in boundaries:
             if boundary.pitches:
-                generated.append(Sonority(
-                    sonority_id=boundary.sonority_id,
-                    onset_beats=boundary.onset_beats,
-                    duration_beats=boundary.duration_beats,
-                    pitches=boundary.pitches,
-                    bass_pitch=boundary.bass_pitch,
-                    tension=boundary.tension,
-                    transform="boundary",
-                    transform_parameters={
-                        "section_id": boundary.section_id,
-                        "phrase_id": boundary.phrase_id,
-                    },
-                ))
+                generated.append(
+                    Sonority(
+                        sonority_id=boundary.sonority_id,
+                        onset_beats=boundary.onset_beats,
+                        duration_beats=boundary.duration_beats,
+                        pitches=boundary.pitches,
+                        bass_pitch=boundary.bass_pitch,
+                        tension=boundary.tension,
+                        transform="boundary",
+                        transform_parameters={
+                            "section_id": boundary.section_id,
+                            "phrase_id": boundary.phrase_id,
+                        },
+                    )
+                )
             else:
                 seed = _derived_seed(config.seed, boundary.sonority_id)
                 generated_sonority = generate_sonority(
-                    pitch_field, tuning,
+                    pitch_field,
+                    tuning,
                     sonority_id=boundary.sonority_id,
                     onset_beats=boundary.onset_beats,
                     duration_beats=boundary.duration_beats,
@@ -455,7 +495,8 @@ def _make_sonorities(
                 () if sonority.bass_pitch is None else (sonority.bass_pitch,)
             )
             rejected = tuple(
-                pitch for pitch in checked_pitches
+                pitch
+                for pitch in checked_pitches
                 if not pitch_field.evaluate(pitch, tuning).allowed
             )
             if rejected:
@@ -481,27 +522,27 @@ def _candidates_for_boundary(
 
     def add(onset, offset, tag, source_kick_id=None, requested_duration=None):
         if _inside(onset, start, end):
-            result.append(_BassCandidate(
-                onset=onset,
-                duration=min(
-                    duration if requested_duration is None else requested_duration,
-                    end - onset,
-                ),
-                boundary_index=index,
-                pitch_offset=float(offset),
-                tag=tag,
-                source_kick_id=source_kick_id,
-                phrase_end=phrase_end,
-            ))
+            result.append(
+                _BassCandidate(
+                    onset=onset,
+                    duration=min(
+                        duration if requested_duration is None else requested_duration,
+                        end - onset,
+                    ),
+                    boundary_index=index,
+                    pitch_offset=float(offset),
+                    tag=tag,
+                    source_kick_id=source_kick_id,
+                    phrase_end=phrase_end,
+                )
+            )
 
     mode = config.mode
     if mode == "pedal":
         return result
     if mode in {"syncopated_ostinato", "melodic"}:
         step = as_fraction("4") / config.steps_per_bar
-        first_pulse = max(
-            0, math.ceil(float((start - rhythm_start) / step) - 1e-12)
-        )
+        first_pulse = max(0, math.ceil(float((start - rhythm_start) / step) - 1e-12))
         last_pulse = math.ceil(float((end - rhythm_start) / step) - 1e-12)
         offsets = (0.0, 3.0, 7.0, 5.0, 2.0, 9.0, 5.0, -2.0)
         for pulse in range(first_pulse, last_pulse):
@@ -522,9 +563,12 @@ def _candidates_for_boundary(
         )
         offsets = (7.0, 10.0)
         for onset, offset in zip(positions, offsets):
-            add(onset, offset, "punctuation", requested_duration=min(
-                duration, end - onset
-            ))
+            add(
+                onset,
+                offset,
+                "punctuation",
+                requested_duration=min(duration, end - onset),
+            )
     return result
 
 
@@ -541,8 +585,7 @@ def _apply_kick_relationship(
         return list(candidates)
     tolerance = as_fraction(config.kick_tolerance_beats)
     local_kicks = tuple(
-        event for event in kicks
-        if _inside(event.onset_beats, start, end)
+        event for event in kicks if _inside(event.onset_beats, start, end)
     )
     if config.mode == "kick_locked" or relationship == "align":
         aligned = []
@@ -554,18 +597,24 @@ def _apply_kick_relationship(
             else:
                 offset = template.pitch_offset
                 phrase_end = template.phrase_end
-            aligned.append(_BassCandidate(
-                onset=kick.onset_beats,
-                duration=min(
-                    as_fraction(config.note_duration_beats),
-                    end - kick.onset_beats,
-                ),
-                boundary_index=boundary_index,
-                pitch_offset=offset,
-                tag="kick_locked" if config.mode == "kick_locked" else "kick_aligned",
-                source_kick_id=kick.event_id,
-                phrase_end=phrase_end,
-            ))
+            aligned.append(
+                _BassCandidate(
+                    onset=kick.onset_beats,
+                    duration=min(
+                        as_fraction(config.note_duration_beats),
+                        end - kick.onset_beats,
+                    ),
+                    boundary_index=boundary_index,
+                    pitch_offset=offset,
+                    tag=(
+                        "kick_locked"
+                        if config.mode == "kick_locked"
+                        else "kick_aligned"
+                    ),
+                    source_kick_id=kick.event_id,
+                    phrase_end=phrase_end,
+                )
+            )
         return aligned
     result = []
     offset = as_fraction(config.interlock_offset_beats)
@@ -586,15 +635,17 @@ def _apply_kick_relationship(
         else:
             shifted = nearest.onset_beats + offset
             if _inside(shifted, start, end):
-                result.append(_BassCandidate(
-                    onset=shifted,
-                    duration=min(candidate.duration, end - shifted),
-                    boundary_index=candidate.boundary_index,
-                    pitch_offset=candidate.pitch_offset,
-                    tag="kick_interlock",
-                    source_kick_id=nearest.event_id,
-                    phrase_end=candidate.phrase_end,
-                ))
+                result.append(
+                    _BassCandidate(
+                        onset=shifted,
+                        duration=min(candidate.duration, end - shifted),
+                        boundary_index=candidate.boundary_index,
+                        pitch_offset=candidate.pitch_offset,
+                        tag="kick_interlock",
+                        source_kick_id=nearest.event_id,
+                        phrase_end=candidate.phrase_end,
+                    )
+                )
     return result
 
 
@@ -612,9 +663,13 @@ def _cadence_pitch(
     if config.cadence_avoidance == "repeat" and previous_phrase_end is not None:
         if math.isclose(pitch, previous_phrase_end, abs_tol=1e-7):
             pitch += max(1.0, config.movement_range * config.cadence_avoidance_amount)
-    elif config.cadence_avoidance == "root" and math.isclose(pitch, anchor, abs_tol=1e-7):
+    elif config.cadence_avoidance == "root" and math.isclose(
+        pitch, anchor, abs_tol=1e-7
+    ):
         direction = -1.0 if index % 2 else 1.0
-        pitch += direction * max(1.0, config.movement_range * config.cadence_avoidance_amount)
+        pitch += direction * max(
+            1.0, config.movement_range * config.cadence_avoidance_amount
+        )
     lower = max(config.register_min, anchor - config.movement_range)
     upper = min(config.register_max, anchor + config.movement_range)
     return min(upper, max(lower, pitch))
@@ -647,14 +702,20 @@ def plan_bass_role(
         raise ValueError("bass phrase boundaries must be in increasing beat order")
     if sequence_plan is not None:
         if sonorities is not None:
-            raise ValueError("pass either a SonoritySequencePlan or sonorities, not both")
+            raise ValueError(
+                "pass either a SonoritySequencePlan or sonorities, not both"
+            )
         sonorities = sequence_plan.sonorities
     kick_event_items = tuple(kick_events)
     if config.mode == "kick_locked" and not kick_event_items:
         raise ValueError("kick_locked mode requires kick_events from the score")
 
     sonority_items = _make_sonorities(
-        tuple(boundary_items), tuning, pitch_field, config, sonorities,
+        tuple(boundary_items),
+        tuning,
+        pitch_field,
+        config,
+        sonorities,
     )
     anchors = tuple(
         _anchor_for(boundary, sonority, config)
@@ -672,32 +733,41 @@ def plan_bass_role(
     if config.mode == "pedal":
         if (
             config.density > 0
-            and _stable_value(config.seed, "pedal", starts[0], ends[-1]) < config.density
+            and _stable_value(config.seed, "pedal", starts[0], ends[-1])
+            < config.density
         ):
             start, end = starts[0], ends[-1]
             if end > start:
-                candidates.append(_BassCandidate(
-                    onset=start, duration=end - start,
-                    boundary_index=0, pitch_offset=0.0,
-                    tag="pedal",
-                    phrase_end=phrase_ends[-1],
-                ))
+                candidates.append(
+                    _BassCandidate(
+                        onset=start,
+                        duration=end - start,
+                        boundary_index=0,
+                        pitch_offset=0.0,
+                        tag="pedal",
+                        phrase_end=phrase_ends[-1],
+                    )
+                )
     elif config.mode == "kick_locked":
-        for index, (boundary, start, end) in enumerate(zip(boundary_items, starts, ends)):
+        for index, (boundary, start, end) in enumerate(
+            zip(boundary_items, starts, ends)
+        ):
             for kick in kicks:
                 if _inside(kick.onset_beats, start, end):
-                    candidates.append(_BassCandidate(
-                        onset=kick.onset_beats,
-                        duration=min(
-                            as_fraction(config.note_duration_beats),
-                            end - kick.onset_beats,
-                        ),
-                        boundary_index=index,
-                        pitch_offset=0.0,
-                        tag="kick_locked",
-                        source_kick_id=kick.event_id,
-                        phrase_end=phrase_ends[index],
-                    ))
+                    candidates.append(
+                        _BassCandidate(
+                            onset=kick.onset_beats,
+                            duration=min(
+                                as_fraction(config.note_duration_beats),
+                                end - kick.onset_beats,
+                            ),
+                            boundary_index=index,
+                            pitch_offset=0.0,
+                            tag="kick_locked",
+                            source_kick_id=kick.event_id,
+                            phrase_end=phrase_ends[index],
+                        )
+                    )
     elif config.mode == "independent_cycle":
         cycle = as_fraction(config.cycle_beats)
         phase = as_fraction(config.cycle_phase_beats)
@@ -710,44 +780,84 @@ def plan_bass_role(
             if not _inside(onset, global_start, global_end):
                 continue
             boundary_index = next(
-                (i for i, (start, end) in enumerate(zip(starts, ends))
-                 if _inside(onset, start, end)),
+                (
+                    i
+                    for i, (start, end) in enumerate(zip(starts, ends))
+                    if _inside(onset, start, end)
+                ),
                 None,
             )
             if boundary_index is None:
                 continue
-            candidates.append(_BassCandidate(
-                onset=onset,
-                duration=min(as_fraction(config.note_duration_beats), ends[boundary_index] - onset),
-                boundary_index=boundary_index,
-                pitch_offset=(0.0, 5.0, -2.0)[cycle_index % 3],
-                tag="independent_cycle",
-                phrase_end=phrase_ends[boundary_index],
-            ))
+            candidates.append(
+                _BassCandidate(
+                    onset=onset,
+                    duration=min(
+                        as_fraction(config.note_duration_beats),
+                        ends[boundary_index] - onset,
+                    ),
+                    boundary_index=boundary_index,
+                    pitch_offset=(0.0, 5.0, -2.0)[cycle_index % 3],
+                    tag="independent_cycle",
+                    phrase_end=phrase_ends[boundary_index],
+                )
+            )
     else:
-        for index, (boundary, start, end) in enumerate(zip(boundary_items, starts, ends)):
-            candidates.extend(_candidates_for_boundary(
-                index, boundary, start, end, phrase_ends[index],
-                phrase_starts[index], anchors[index], config,
-            ))
+        for index, (boundary, start, end) in enumerate(
+            zip(boundary_items, starts, ends)
+        ):
+            candidates.extend(
+                _candidates_for_boundary(
+                    index,
+                    boundary,
+                    start,
+                    end,
+                    phrase_ends[index],
+                    phrase_starts[index],
+                    anchors[index],
+                    config,
+                )
+            )
 
     if config.mode not in {"kick_locked", "pedal"}:
         adjusted: list[_BassCandidate] = []
         for index, (start, end) in enumerate(zip(starts, ends)):
             local = [item for item in candidates if item.boundary_index == index]
-            adjusted.extend(_apply_kick_relationship(
-                local, kicks, start, end, config, index,
-            ))
+            adjusted.extend(
+                _apply_kick_relationship(
+                    local,
+                    kicks,
+                    start,
+                    end,
+                    config,
+                    index,
+                )
+            )
         candidates = adjusted
 
     retained = []
-    for index, candidate in enumerate(sorted(
-        candidates,
-        key=lambda item: (item.onset, item.boundary_index, item.tag, item.source_kick_id or ""),
-    )):
-        if config.density < 1.0 and _stable_value(
-            config.seed, candidate.onset, candidate.boundary_index, candidate.tag, index
-        ) >= config.density:
+    for index, candidate in enumerate(
+        sorted(
+            candidates,
+            key=lambda item: (
+                item.onset,
+                item.boundary_index,
+                item.tag,
+                item.source_kick_id or "",
+            ),
+        )
+    ):
+        if (
+            config.density < 1.0
+            and _stable_value(
+                config.seed,
+                candidate.onset,
+                candidate.boundary_index,
+                candidate.tag,
+                index,
+            )
+            >= config.density
+        ):
             continue
         retained.append(candidate)
 
@@ -776,12 +886,16 @@ def plan_bass_role(
             anchor = anchors[candidate.boundary_index]
             raw_pitch = anchor + candidate.pitch_offset
             phrase_end = phrase_ends[candidate.boundary_index]
-            is_phrase_end = (
-                candidate.onset >= phrase_end - as_fraction(config.cadence_window_beats)
+            is_phrase_end = candidate.onset >= phrase_end - as_fraction(
+                config.cadence_window_beats
             )
             pitch = _cadence_pitch(
-                anchor, raw_pitch, previous_phrase_end, config,
-                is_phrase_end=is_phrase_end, index=event_index,
+                anchor,
+                raw_pitch,
+                previous_phrase_end,
+                config,
+                is_phrase_end=is_phrase_end,
+                index=event_index,
             )
             pitch = min(
                 anchor + config.movement_range,
@@ -799,8 +913,11 @@ def plan_bass_role(
             if candidate.duration <= 0:
                 continue
             event_id = _event_id(
-                config.seed, config.mode, event_index,
-                candidate.onset, boundary.sonority_id,
+                config.seed,
+                config.mode,
+                event_index,
+                candidate.onset,
+                boundary.sonority_id,
             )
             params = {
                 "planner": "m19.4_bass_role",

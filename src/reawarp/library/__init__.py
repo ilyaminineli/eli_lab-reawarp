@@ -1,6 +1,10 @@
 """Searchable local sample and stem library."""
 
-from reawarp.library.features import ANALYSIS_SAMPLE_RATE, AudioFeatures, analyze_audio_file
+from reawarp.library.features import (
+    ANALYSIS_SAMPLE_RATE,
+    AudioFeatures,
+    analyze_audio_file,
+)
 from reawarp.library.store import LibraryAsset, SampleLibrary, default_database_path
 
 __all__ = [

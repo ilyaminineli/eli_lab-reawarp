@@ -5,6 +5,7 @@ musical action without rendering fades, deleting events, or introducing a
 parallel scheduler. Marker events are silent; a later workflow must explicitly
 consume a directive and preserve its provenance.
 """
+
 from __future__ import annotations
 
 import copy
@@ -26,10 +27,16 @@ from reawarp.score.time import as_fraction
 
 ENDING_SCHEMA_VERSION = 1
 ENDING_FORMAT = "eli_lab_reawarp_ending_plan"
-ENDING_STRATEGIES = frozenset({
-    "delayed_return", "transformed_reprise", "interrupted_cadence",
-    "residue", "dissolve", "hard_stop",
-})
+ENDING_STRATEGIES = frozenset(
+    {
+        "delayed_return",
+        "transformed_reprise",
+        "interrupted_cadence",
+        "residue",
+        "dissolve",
+        "hard_stop",
+    }
+)
 _ENDING_METADATA_KEY = "m30_ending_plans"
 _ENDING_FINGERPRINT_KEY = "m30_ending_plan_fingerprint"
 _ENDING_MARKER_KEY = "m30_ending_marker"
@@ -66,17 +73,20 @@ def _json_object(value: Mapping[str, Any], name: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{name} must be a JSON object")
     try:
-        return json.loads(json.dumps(
-            dict(value), sort_keys=True, ensure_ascii=False, allow_nan=False
-        ))
+        return json.loads(
+            json.dumps(dict(value), sort_keys=True, ensure_ascii=False, allow_nan=False)
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{name} must contain finite JSON-compatible values") from exc
 
 
 def _fingerprint(value: Any) -> str:
     encoded = json.dumps(
-        value, sort_keys=True, ensure_ascii=False,
-        separators=(",", ":"), allow_nan=False,
+        value,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -103,7 +113,9 @@ class EndingPlan:
 
     def __post_init__(self) -> None:
         if self.schema_version != ENDING_SCHEMA_VERSION:
-            raise ValueError(f"unsupported M30 ending schema version: {self.schema_version}")
+            raise ValueError(
+                f"unsupported M30 ending schema version: {self.schema_version}"
+            )
         object.__setattr__(self, "ending_id", _text(self.ending_id, "ending_id"))
         object.__setattr__(self, "seed_name", _text(self.seed_name, "ending seed_name"))
         strategy = str(self.strategy).strip()
@@ -124,19 +136,27 @@ class EndingPlan:
         object.__setattr__(self, "start_beats", start)
         object.__setattr__(self, "end_beats", end)
 
-        motif_id = None if self.motif_id is None else _text(self.motif_id, "ending motif_id")
+        motif_id = (
+            None if self.motif_id is None else _text(self.motif_id, "ending motif_id")
+        )
         source_section_id = (
-            None if self.source_section_id is None
+            None
+            if self.source_section_id is None
             else _text(self.source_section_id, "ending source_section_id")
         )
         expectation_id = (
-            None if self.expectation_id is None
+            None
+            if self.expectation_id is None
             else _text(self.expectation_id, "ending expectation_id")
         )
-        transformations = _unique_texts(self.transformation_ids, "ending transformation")
+        transformations = _unique_texts(
+            self.transformation_ids, "ending transformation"
+        )
         unknown = set(transformations) - TRANSFORMATIONS
         if unknown:
-            raise ValueError("unsupported ending transformations: " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unsupported ending transformations: " + ", ".join(sorted(unknown))
+            )
         retained = _unique_texts(self.retained_material_ids, "retained material ID")
         roles = _unique_texts(self.participating_roles, "participating role")
 
@@ -146,14 +166,22 @@ class EndingPlan:
         if strategy == "delayed_return" and transformations:
             raise ValueError("delayed_return cannot declare reprise transformations")
         if strategy == "transformed_reprise" and not transformations:
-            raise ValueError("transformed_reprise requires at least one explicit transformation")
+            raise ValueError(
+                "transformed_reprise requires at least one explicit transformation"
+            )
         if strategy == "interrupted_cadence" and expectation_id is None:
-            raise ValueError("interrupted_cadence requires an unresolved expectation ID")
+            raise ValueError(
+                "interrupted_cadence requires an unresolved expectation ID"
+            )
         if strategy != "interrupted_cadence" and expectation_id is not None:
             raise ValueError("expectation_id is only valid for interrupted_cadence")
         if strategy == "residue" and not retained:
             raise ValueError("residue requires at least one retained material identity")
-        if isinstance(self.seed, bool) or not isinstance(self.seed, int) or self.seed < 0:
+        if (
+            isinstance(self.seed, bool)
+            or not isinstance(self.seed, int)
+            or self.seed < 0
+        ):
             raise ValueError("ending seed must be a non-negative integer")
 
         object.__setattr__(self, "motif_id", motif_id)
@@ -162,9 +190,13 @@ class EndingPlan:
         object.__setattr__(self, "transformation_ids", transformations)
         object.__setattr__(self, "retained_material_ids", retained)
         object.__setattr__(self, "participating_roles", roles)
-        object.__setattr__(self, "parameters", _json_object(
-            {} if self.parameters is None else self.parameters, "ending parameters"
-        ))
+        object.__setattr__(
+            self,
+            "parameters",
+            _json_object(
+                {} if self.parameters is None else self.parameters, "ending parameters"
+            ),
+        )
         object.__setattr__(self, "rationale", str(self.rationale).strip())
 
     @property
@@ -242,7 +274,8 @@ class EndingDirector:
     ) -> EndingPlan:
         """Build a validated plan without adding randomness or editing the Score."""
         recent = (
-            memory if isinstance(memory, SectionMemory)
+            memory
+            if isinstance(memory, SectionMemory)
             else SectionMemory.from_dict(memory)
         )
         normalized_strategy = str(strategy).strip()
@@ -253,19 +286,31 @@ class EndingDirector:
                 raise ValueError(f"{normalized_strategy} requires a motif_id")
             last_use = recent.last_used_motif(motif_id)
             if last_use is None:
-                raise ValueError(f"ending motif is absent from recent section memory: {motif_id}")
+                raise ValueError(
+                    f"ending motif is absent from recent section memory: {motif_id}"
+                )
             opportunity = next(
-                (item for item in recent.return_opportunities if item.motif_id == motif_id),
+                (
+                    item
+                    for item in recent.return_opportunities
+                    if item.motif_id == motif_id
+                ),
                 None,
             )
             if opportunity is None:
-                raise ValueError(f"no open return opportunity remains for motif: {motif_id}")
+                raise ValueError(
+                    f"no open return opportunity remains for motif: {motif_id}"
+                )
             transformations = tuple(transformation_ids)
             if normalized_strategy == "delayed_return" and transformations:
-                raise ValueError("delayed_return cannot declare reprise transformations")
+                raise ValueError(
+                    "delayed_return cannot declare reprise transformations"
+                )
             allowed = set(opportunity.allowed_transformations)
             if allowed and not set(transformations).issubset(allowed):
-                raise ValueError("ending transformation is not permitted by the return opportunity")
+                raise ValueError(
+                    "ending transformation is not permitted by the return opportunity"
+                )
             source_section_id = opportunity.source_section_id
         else:
             transformations = tuple(transformation_ids)
@@ -274,8 +319,11 @@ class EndingDirector:
             if expectation_id is None:
                 raise ValueError("interrupted_cadence requires an expectation_id")
             expectation = next(
-                (item for item in recent.unresolved_expectations
-                 if item.expectation_id == expectation_id),
+                (
+                    item
+                    for item in recent.unresolved_expectations
+                    if item.expectation_id == expectation_id
+                ),
                 None,
             )
             if expectation is None:
@@ -284,7 +332,8 @@ class EndingDirector:
                 )
             source_section_id = next(
                 (
-                    state.section_id for state in reversed(recent.states)
+                    state.section_id
+                    for state in reversed(recent.states)
                     if any(
                         item.expectation_id == expectation_id
                         for item in state.unresolved_expectations
@@ -353,17 +402,23 @@ def ending_marker_events(plan: EndingPlan) -> tuple[MusicalEvent, ...]:
             "rationale": plan.rationale,
             "parameters": _json_object(plan.parameters or {}, "ending parameters"),
         }
-        result.append(MusicalEvent(
-            event_id=_ending_marker_event_id(plan.ending_id, phase),
-            voice_id=_ENDING_VOICE_ID,
-            onset_beats=beat,
-            duration_beats=Fraction(0),
-            kind="marker",
-            velocity=0.0,
-            articulation="marker",
-            parameters={_ENDING_MARKER_KEY: payload},
-            tags=("m30_ending", f"m30_ending:{plan.strategy}", f"m30_ending_phase:{phase}"),
-        ))
+        result.append(
+            MusicalEvent(
+                event_id=_ending_marker_event_id(plan.ending_id, phase),
+                voice_id=_ENDING_VOICE_ID,
+                onset_beats=beat,
+                duration_beats=Fraction(0),
+                kind="marker",
+                velocity=0.0,
+                articulation="marker",
+                parameters={_ENDING_MARKER_KEY: payload},
+                tags=(
+                    "m30_ending",
+                    f"m30_ending:{plan.strategy}",
+                    f"m30_ending_phase:{phase}",
+                ),
+            )
+        )
     return tuple(result)
 
 
@@ -381,11 +436,18 @@ def _validate_ending_memory(score: Score, plans: Iterable[EndingPlan]) -> None:
                     f"ending references a closed or unknown motif return: {plan.motif_id}"
                 )
             if opportunity.source_section_id != plan.source_section_id:
-                raise ValueError("ending return source section does not match SectionMemory")
+                raise ValueError(
+                    "ending return source section does not match SectionMemory"
+                )
             allowed = set(opportunity.allowed_transformations)
             if allowed and not set(plan.transformation_ids).issubset(allowed):
-                raise ValueError("ending transformation is not permitted by SectionMemory")
-        if plan.strategy == "interrupted_cadence" and plan.expectation_id not in expectations:
+                raise ValueError(
+                    "ending transformation is not permitted by SectionMemory"
+                )
+        if (
+            plan.strategy == "interrupted_cadence"
+            and plan.expectation_id not in expectations
+        ):
             raise ValueError(
                 "interrupted cadence references an expectation that is no longer unresolved"
             )
@@ -427,16 +489,18 @@ def compile_ending_plans(
 
     merged_by_id = dict(existing_by_id)
     merged_by_id.update({item.ending_id: item for item in incoming})
-    merged = tuple(sorted(
-        merged_by_id.values(),
-        key=lambda item: (item.start_beats, item.end_beats, item.ending_id),
-    ))
+    merged = tuple(
+        sorted(
+            merged_by_id.values(),
+            key=lambda item: (item.start_beats, item.end_beats, item.ending_id),
+        )
+    )
     old_marker_ids = {
-        event.event_id
-        for plan in existing
-        for event in ending_marker_events(plan)
+        event.event_id for plan in existing for event in ending_marker_events(plan)
     }
-    source_events = [event for event in score.events if event.event_id not in old_marker_ids]
+    source_events = [
+        event for event in score.events if event.event_id not in old_marker_ids
+    ]
     source_ids = {event.event_id for event in source_events}
     generated: list[MusicalEvent] = []
     for plan in merged:
@@ -480,7 +544,12 @@ def ending_plans_from_score(score: Score) -> tuple[EndingPlan, ...]:
 
 
 __all__ = [
-    "ENDING_FORMAT", "ENDING_SCHEMA_VERSION", "ENDING_STRATEGIES",
-    "EndingDirector", "EndingPlan", "compile_ending_plans",
-    "ending_marker_events", "ending_plans_from_score",
+    "ENDING_FORMAT",
+    "ENDING_SCHEMA_VERSION",
+    "ENDING_STRATEGIES",
+    "EndingDirector",
+    "EndingPlan",
+    "compile_ending_plans",
+    "ending_marker_events",
+    "ending_plans_from_score",
 ]

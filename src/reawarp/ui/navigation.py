@@ -5,13 +5,13 @@ A future sub-workspace can be registered under a path such as
 ("COMPOSE", "GENERATOR", "ADVANCED") without growing a flat tab strip. All
 workspaces continue to operate on the shared MainWindow project/session context.
 """
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
-
 
 WorkspaceEntry = tuple[str, str, int]
 WorkspaceGroup = tuple[str, Sequence[WorkspaceEntry]]

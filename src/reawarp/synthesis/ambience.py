@@ -6,12 +6,12 @@ import numpy as np
 
 
 def render_ambience(
-        frame_count: int,
-        sample_rate: int,
-        rng: np.random.Generator,
-        *,
-        root_frequency: float = 110.0,
-        amount: float = 0.16,
+    frame_count: int,
+    sample_rate: int,
+    rng: np.random.Generator,
+    *,
+    root_frequency: float = 110.0,
+    amount: float = 0.16,
 ) -> np.ndarray:
     """Render a deterministic harmonic/noise bed with slow stereo motion.
 
@@ -68,12 +68,10 @@ def render_ambience(
     bed = (tonal + coloured * 0.035) * (0.92 + 0.08 * slow_b)
 
     fade_seconds = min(1.25, max(0.08, duration * 0.22))
-    fade_in = np.sin(
-        0.5 * np.pi * np.clip(time / fade_seconds, 0.0, 1.0)
-    ) ** 2
-    fade_out = np.sin(
-        0.5 * np.pi * np.clip((duration - time) / fade_seconds, 0.0, 1.0)
-    ) ** 2
+    fade_in = np.sin(0.5 * np.pi * np.clip(time / fade_seconds, 0.0, 1.0)) ** 2
+    fade_out = (
+        np.sin(0.5 * np.pi * np.clip((duration - time) / fade_seconds, 0.0, 1.0)) ** 2
+    )
     bed *= np.minimum(fade_in, fade_out)
 
     left = bed * (0.78 + 0.07 * slow_a)

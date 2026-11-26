@@ -13,7 +13,9 @@ import numpy as np
 
 from reawarp.composition.director import build_composition_plan, section_for_time
 from reawarp.composition.motifs import (
-    build_motif_plan, build_motif_role_accents, render_motif_events,
+    build_motif_plan,
+    build_motif_role_accents,
+    render_motif_events,
 )
 from reawarp.composition.orchestration import (
     build_section_orchestration_plan,
@@ -28,7 +30,9 @@ from reawarp.core.project import ReawarpProject
 from reawarp.core.random_streams import RandomStreams, derive_seed
 from reawarp.generators.melody import build_melody_events
 from reawarp.generators.percussion import (
-    PercussionEvent, build_drum_part_plan, build_percussion_events,
+    PercussionEvent,
+    build_drum_part_plan,
+    build_percussion_events,
 )
 from reawarp.samples.io import read_sample
 from reawarp.samples.selection import select_sample_variant
@@ -67,35 +71,45 @@ class ReawarpEngine:
     VERSION = "0.8.0"
 
     def render_score(
-            self,
-            score: Score,
-            *,
-            sample_rate: int | None = None,
-            frame_count: int | None = None,
-            voice_renderers: dict[str, Any] | None = None,
-            config: GenerationConfig | None = None,
-            fx_automation: Mapping[str, Any] | None = None,
-            cancel_event: Any | None = None,
+        self,
+        score: Score,
+        *,
+        sample_rate: int | None = None,
+        frame_count: int | None = None,
+        voice_renderers: dict[str, Any] | None = None,
+        config: GenerationConfig | None = None,
+        fx_automation: Mapping[str, Any] | None = None,
+        cancel_event: Any | None = None,
     ) -> ScoreRenderResult:
         """Render a canonical score using the shared frame-accurate score core."""
         if config is not None and voice_renderers is not None:
-            raise ValueError("pass either production config or explicit voice_renderers, not both")
+            raise ValueError(
+                "pass either production config or explicit voice_renderers, not both"
+            )
         rate = (
-            int(config.sample_rate if config is not None else score.metadata.get("sample_rate", 48_000))
-            if sample_rate is None else int(sample_rate)
+            int(
+                config.sample_rate
+                if config is not None
+                else score.metadata.get("sample_rate", 48_000)
+            )
+            if sample_rate is None
+            else int(sample_rate)
         )
         fx_stem_names = tuple(score.metadata.get("render_stems", ()))
         if not fx_stem_names:
-            fx_stem_names = tuple(sorted({
-                event.voice_id for event in score.events
-                if event.voice_id != "sample_break"
-            }))
+            fx_stem_names = tuple(
+                sorted(
+                    {
+                        event.voice_id
+                        for event in score.events
+                        if event.voice_id != "sample_break"
+                    }
+                )
+            )
         if fx_automation is not None:
             from reawarp.fx_automation import attach_fx_automation_to_score
 
-            score = attach_fx_automation_to_score(
-                score, fx_automation, fx_stem_names
-            )
+            score = attach_fx_automation_to_score(score, fx_automation, fx_stem_names)
         from reawarp.fx_automation import fx_automation_registry
 
         automation_registry = fx_automation_registry(fx_stem_names)
@@ -107,7 +121,8 @@ class ReawarpEngine:
 
             render_config = (
                 replace(config, sample_rate=rate)
-                if int(config.sample_rate) != rate else config
+                if int(config.sample_rate) != rate
+                else config
             )
             sample_started = perf_counter()
             prepared_samples = prepare_score_sample_renderers(score, render_config)
@@ -124,8 +139,11 @@ class ReawarpEngine:
                     continue
 
                 def render_combined(
-                    scheduled, callback_rate, controls,
-                    _base=base_renderer, _sample=sample_renderer,
+                    scheduled,
+                    callback_rate,
+                    controls,
+                    _base=base_renderer,
+                    _sample=sample_renderer,
                 ):
                     if scheduled.event.kind == "trigger":
                         return _sample(scheduled, callback_rate, controls)
@@ -146,26 +164,31 @@ class ReawarpEngine:
             automation_registry=automation_registry,
             cancel_event=cancel_event,
         )
-        rendered_score.performance.update({
-            "sample_preparation_seconds": sample_preparation_seconds,
-            "voice_renderer_setup_seconds": voice_renderer_setup_seconds,
-            "render_score_pipeline_seconds": perf_counter() - render_pipeline_started,
-        })
+        rendered_score.performance.update(
+            {
+                "sample_preparation_seconds": sample_preparation_seconds,
+                "voice_renderer_setup_seconds": voice_renderer_setup_seconds,
+                "render_score_pipeline_seconds": perf_counter()
+                - render_pipeline_started,
+            }
+        )
         return rendered_score
 
     def plan_score(
-            self,
-            config: GenerationConfig | None = None,
-            *,
-            regenerate: str | None = None,
-            variation: int = 1,
-            **overrides: Any,
+        self,
+        config: GenerationConfig | None = None,
+        *,
+        regenerate: str | None = None,
+        variation: int = 1,
+        **overrides: Any,
     ) -> Score:
         """Plan the complete symbolic composition without rendering audio."""
         if config is None:
             config = GenerationConfig(**overrides)
         elif overrides:
-            raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
+            raise TypeError(
+                "pass either a GenerationConfig or keyword overrides, not both"
+            )
         from reawarp.core.score_generation import build_score_generation_plan
 
         return build_score_generation_plan(
@@ -173,21 +196,23 @@ class ReawarpEngine:
         ).score
 
     def generate(
-            self,
-            config: GenerationConfig | None = None,
-            *,
-            regenerate: str | None = None,
-            variation: int = 1,
-            cancel_event: Any | None = None,
-            composition_brief: Any | None = None,
-            bounded_exploration: bool = False,
-            **overrides: Any,
+        self,
+        config: GenerationConfig | None = None,
+        *,
+        regenerate: str | None = None,
+        variation: int = 1,
+        cancel_event: Any | None = None,
+        composition_brief: Any | None = None,
+        bounded_exploration: bool = False,
+        **overrides: Any,
     ) -> ReawarpProject:
         """Generate from a canonical Score, then render its scheduled events."""
         if config is None:
             config = GenerationConfig(**overrides)
         elif overrides:
-            raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
+            raise TypeError(
+                "pass either a GenerationConfig or keyword overrides, not both"
+            )
         if variation < 1:
             raise ValueError("variation must be a positive integer")
 
@@ -199,7 +224,8 @@ class ReawarpEngine:
             from reawarp.composition.brief import resolve_and_explore
 
             config, m27_resolved_intent, m27_exploration = resolve_and_explore(
-                composition_brief, config,
+                composition_brief,
+                config,
                 bounded_exploration=bool(bounded_exploration),
             )
 
@@ -228,7 +254,9 @@ class ReawarpEngine:
         )
 
         score_render_started = perf_counter()
-        rendered = self.render_score(plan.score, config=config, cancel_event=cancel_event)
+        rendered = self.render_score(
+            plan.score, config=config, cancel_event=cancel_event
+        )
         check_cancelled()
         score_render_seconds = perf_counter() - score_render_started
         canonical_score = rendered.score or plan.score
@@ -253,16 +281,17 @@ class ReawarpEngine:
         if "break" in config.sample_paths:
             required_stems.append("sample_break")
         for name in required_stems:
-            stems.setdefault(
-                name, np.zeros((frame_count, 2), dtype=np.float32)
-            )
+            stems.setdefault(name, np.zeros((frame_count, 2), dtype=np.float32))
 
         field_render_started = perf_counter()
         if config.include_texture:
             check_cancelled()
             texture_envelope = render_role_envelope(
-                "texture", frame_count, sample_rate,
-                plan.composition_plan, plan.section_orchestration,
+                "texture",
+                frame_count,
+                sample_rate,
+                plan.composition_plan,
+                plan.section_orchestration,
                 plan.transition_plan,
             )
             texture = render_noise_texture(
@@ -273,7 +302,8 @@ class ReawarpEngine:
             )
             delayed = (
                 np.concatenate((np.zeros(97, dtype=np.float32), texture[:-97]))
-                if len(texture) > 97 else texture
+                if len(texture) > 97
+                else texture
             )
             stems["noise_texture"][:, 0] += texture * texture_envelope * 0.72
             stems["noise_texture"][:, 1] += delayed * texture_envelope * 0.72
@@ -281,8 +311,11 @@ class ReawarpEngine:
         if config.include_ambience:
             check_cancelled()
             ambience_envelope = render_role_envelope(
-                "ambience", frame_count, sample_rate,
-                plan.composition_plan, plan.section_orchestration,
+                "ambience",
+                frame_count,
+                sample_rate,
+                plan.composition_plan,
+                plan.section_orchestration,
                 plan.transition_plan,
             )
             root_frequency = 55.0 * (
@@ -327,15 +360,19 @@ class ReawarpEngine:
             "frame_count": frame_count,
             "duration_seconds": frame_count / float(sample_rate),
             "seed_streams": dict(canonical_score.metadata.get("seed_streams", {})),
-            "generator_families": dict(canonical_score.metadata.get("generator_families", {})),
+            "generator_families": dict(
+                canonical_score.metadata.get("generator_families", {})
+            ),
         }
         score_metadata = dict(canonical_score.metadata)
-        score_metadata.update({
-            "render_stems": list(stems),
-            "renderer_version": renderer_version,
-            "render_provenance": render_provenance,
-            "stem_headroom_gains": stem_headroom_gains,
-        })
+        score_metadata.update(
+            {
+                "render_stems": list(stems),
+                "renderer_version": renderer_version,
+                "render_provenance": render_provenance,
+                "stem_headroom_gains": stem_headroom_gains,
+            }
+        )
         project_score = replace(canonical_score, metadata=score_metadata)
         project_events = score_to_legacy_project_events(project_score)
 
@@ -346,16 +383,30 @@ class ReawarpEngine:
             "composition_plan_seconds": composition_plan_seconds,
             "event_generation_seconds": event_generation_seconds,
             "score_render_seconds": score_render_seconds,
-            "sample_preparation_seconds": render_performance.get("sample_preparation_seconds", 0.0),
-            "voice_renderer_setup_seconds": render_performance.get("voice_renderer_setup_seconds", 0.0),
+            "sample_preparation_seconds": render_performance.get(
+                "sample_preparation_seconds", 0.0
+            ),
+            "voice_renderer_setup_seconds": render_performance.get(
+                "voice_renderer_setup_seconds", 0.0
+            ),
             "control_bus_seconds": render_performance.get("control_bus_seconds", 0.0),
-            "event_scheduling_seconds": render_performance.get("event_scheduling_seconds", 0.0),
-            "voice_callback_seconds": render_performance.get("voice_callback_seconds", 0.0),
-            "sample_trigger_callback_seconds": render_performance.get("sample_trigger_callback_seconds", 0.0),
-            "event_accumulation_seconds": render_performance.get("event_accumulation_seconds", 0.0),
+            "event_scheduling_seconds": render_performance.get(
+                "event_scheduling_seconds", 0.0
+            ),
+            "voice_callback_seconds": render_performance.get(
+                "voice_callback_seconds", 0.0
+            ),
+            "sample_trigger_callback_seconds": render_performance.get(
+                "sample_trigger_callback_seconds", 0.0
+            ),
+            "event_accumulation_seconds": render_performance.get(
+                "event_accumulation_seconds", 0.0
+            ),
             "scheduled_event_count": render_performance.get("scheduled_event_count", 0),
             "rendered_event_count": render_performance.get("rendered_event_count", 0),
-            "rendered_sample_trigger_count": render_performance.get("rendered_sample_trigger_count", 0),
+            "rendered_sample_trigger_count": render_performance.get(
+                "rendered_sample_trigger_count", 0
+            ),
             "field_render_seconds": field_render_seconds,
             "synthesis_and_buffer_seconds": synthesis_and_buffer_seconds,
             "headroom_seconds": headroom_seconds,
@@ -363,60 +414,78 @@ class ReawarpEngine:
         }
         metadata = dict(project_score.metadata)
         performance_detail = {
-            "callback_seconds_by_voice": render_performance.get("callback_seconds_by_voice", {}),
-            "callback_counts_by_voice": render_performance.get("callback_counts_by_voice", {}),
-            "callback_seconds_by_kind": render_performance.get("callback_seconds_by_kind", {}),
-            "callback_counts_by_kind": render_performance.get("callback_counts_by_kind", {}),
+            "callback_seconds_by_voice": render_performance.get(
+                "callback_seconds_by_voice", {}
+            ),
+            "callback_counts_by_voice": render_performance.get(
+                "callback_counts_by_voice", {}
+            ),
+            "callback_seconds_by_kind": render_performance.get(
+                "callback_seconds_by_kind", {}
+            ),
+            "callback_counts_by_kind": render_performance.get(
+                "callback_counts_by_kind", {}
+            ),
             "rendered_event_count": render_performance.get("rendered_event_count", 0),
-            "rendered_sample_trigger_count": render_performance.get("rendered_sample_trigger_count", 0),
+            "rendered_sample_trigger_count": render_performance.get(
+                "rendered_sample_trigger_count", 0
+            ),
         }
-        metadata.update({
-            "performance": performance,
-            "performance_detail": performance_detail,
-            "algorithm_version": self.VERSION,
-            "renderer_version": renderer_version,
-            "variation": {"stem": regenerate, "index": variation} if regenerate else None,
-            "sample_sources": sample_sources,
-            "sample_switch_summary": dict(sample_schedule.get("switch_summary", {})),
-            "synthesis_profiles": {
-                "kick": config.kick_profile,
-                "snare": config.snare_profile,
-                "hat": config.hat_profile,
-                "melody": plan.melody_profile,
-                "break": dict(plan.break_profiles),
-                "section_profiles": {
-                    role: {
-                        section.name: plan.selected_profiles[role][section.index]
-                        for section in plan.composition_plan.sections
-                    }
-                    for role in ("kick", "snare", "hat")
+        metadata.update(
+            {
+                "performance": performance,
+                "performance_detail": performance_detail,
+                "algorithm_version": self.VERSION,
+                "renderer_version": renderer_version,
+                "variation": (
+                    {"stem": regenerate, "index": variation} if regenerate else None
+                ),
+                "sample_sources": sample_sources,
+                "sample_switch_summary": dict(
+                    sample_schedule.get("switch_summary", {})
+                ),
+                "synthesis_profiles": {
+                    "kick": config.kick_profile,
+                    "snare": config.snare_profile,
+                    "hat": config.hat_profile,
+                    "melody": plan.melody_profile,
+                    "break": dict(plan.break_profiles),
+                    "section_profiles": {
+                        role: {
+                            section.name: plan.selected_profiles[role][section.index]
+                            for section in plan.composition_plan.sections
+                        }
+                        for role in ("kick", "snare", "hat")
+                    },
+                    "palette": config.synth_palette,
+                    "percussion_source_mode": config.percussion_source_mode,
+                    "percussion_hybrid_architecture": config.percussion_hybrid_architecture,
+                    "percussion_sample_mix": config.percussion_sample_mix,
+                    "drum_sample_automation": config.drum_sample_automation,
+                    "sample_bank_sizes": {
+                        role: int(record.get("bank_count", 0))
+                        for role, record in sample_sources.items()
+                    },
+                    "melody_scale": config.melody_scale,
+                    "melody_root": config.melody_root,
                 },
-                "palette": config.synth_palette,
-                "percussion_source_mode": config.percussion_source_mode,
-                "percussion_hybrid_architecture": config.percussion_hybrid_architecture,
-                "percussion_sample_mix": config.percussion_sample_mix,
+                "drum_source_mode": config.percussion_source_mode,
+                "drum_hybrid_architecture": config.percussion_hybrid_architecture,
+                "drum_sample_mix": config.percussion_sample_mix,
                 "drum_sample_automation": config.drum_sample_automation,
-                "sample_bank_sizes": {
-                    role: int(record.get("bank_count", 0))
-                    for role, record in sample_sources.items()
-                },
-                "melody_scale": config.melody_scale,
-                "melody_root": config.melody_root,
-            },
-            "drum_source_mode": config.percussion_source_mode,
-            "drum_hybrid_architecture": config.percussion_hybrid_architecture,
-            "drum_sample_mix": config.percussion_sample_mix,
-            "drum_sample_automation": config.drum_sample_automation,
-            "synth_palette": config.synth_palette,
-            "event_count": len(project_events),
-            "stem_headroom_gains": stem_headroom_gains,
-            "performance": performance,
-        })
+                "synth_palette": config.synth_palette,
+                "event_count": len(project_events),
+                "stem_headroom_gains": stem_headroom_gains,
+                "performance": performance,
+            }
+        )
         score_metadata = dict(project_score.metadata)
-        score_metadata.update({
-            "event_count": len(project_events),
-            "performance": performance,
-        })
+        score_metadata.update(
+            {
+                "event_count": len(project_events),
+                "performance": performance,
+            }
+        )
         project_score = replace(project_score, metadata=score_metadata)
 
         project = ReawarpProject(
@@ -428,23 +497,27 @@ class ReawarpEngine:
             score=project_score,
         )
         if composition_brief is not None and m27_resolved_intent is not None:
-            project.metadata.update({
-                "m27_composition_brief": composition_brief.to_dict(),
-                "m27_resolved_intent": m27_resolved_intent.to_dict(),
-                "m27_bounded_exploration": (
-                    m27_exploration.to_dict() if m27_exploration is not None else None
-                ),
-                "m27_bounded_exploration_enabled": bool(bounded_exploration),
-            })
+            project.metadata.update(
+                {
+                    "m27_composition_brief": composition_brief.to_dict(),
+                    "m27_resolved_intent": m27_resolved_intent.to_dict(),
+                    "m27_bounded_exploration": (
+                        m27_exploration.to_dict()
+                        if m27_exploration is not None
+                        else None
+                    ),
+                    "m27_bounded_exploration_enabled": bool(bounded_exploration),
+                }
+            )
         return project
 
     def generate_legacy(
-            self,
-            config: GenerationConfig | None = None,
-            *,
-            regenerate: str | None = None,
-            variation: int = 1,
-            **overrides: Any,
+        self,
+        config: GenerationConfig | None = None,
+        *,
+        regenerate: str | None = None,
+        variation: int = 1,
+        **overrides: Any,
     ) -> ReawarpProject:
         """Run the pre-M17.5 renderer for reproducibility comparisons."""
         return self._generate_legacy(
@@ -452,13 +525,13 @@ class ReawarpEngine:
         )
 
     def generate_variant(
-            self,
-            config: GenerationConfig,
-            stem: str,
-            variation: int = 1,
-            *,
-            base_project: ReawarpProject | None = None,
-            cancel_event: Any | None = None,
+        self,
+        config: GenerationConfig,
+        stem: str,
+        variation: int = 1,
+        *,
+        base_project: ReawarpProject | None = None,
+        cancel_event: Any | None = None,
     ) -> ReawarpProject:
         """Regenerate one canonical score voice and merge it into a frozen project."""
         variant = self.generate(
@@ -497,21 +570,23 @@ class ReawarpEngine:
         merged_events = score_to_legacy_project_events(merged_score)
 
         project_metadata = dict(base_project.metadata)
-        project_metadata.update({
-            "variation": {"stem": stem, "index": variation},
-            "variation_parent_seed": config.seed,
-            "stem_headroom_gains": gains,
-            "event_count": len(merged_events),
-            "seed_streams": dict(variant.metadata.get("seed_streams", {})),
-            "sample_trigger_seed_streams": dict(
-                variant.metadata.get("sample_trigger_seed_streams", {})
-            ),
-            "sample_sources": dict(variant.metadata.get("sample_sources", {})),
-            "sample_switch_summary": dict(
-                variant.metadata.get("sample_switch_summary", {})
-            ),
-            "performance": dict(variant.metadata.get("performance", {})),
-        })
+        project_metadata.update(
+            {
+                "variation": {"stem": stem, "index": variation},
+                "variation_parent_seed": config.seed,
+                "stem_headroom_gains": gains,
+                "event_count": len(merged_events),
+                "seed_streams": dict(variant.metadata.get("seed_streams", {})),
+                "sample_trigger_seed_streams": dict(
+                    variant.metadata.get("sample_trigger_seed_streams", {})
+                ),
+                "sample_sources": dict(variant.metadata.get("sample_sources", {})),
+                "sample_switch_summary": dict(
+                    variant.metadata.get("sample_switch_summary", {})
+                ),
+                "performance": dict(variant.metadata.get("performance", {})),
+            }
+        )
         return ReawarpProject(
             config=config,
             sample_rate=base_project.sample_rate,
@@ -526,17 +601,19 @@ class ReawarpEngine:
         return {"hats": "hat", "synthetic_break": "break"}.get(stem, stem)
 
     def _generate_legacy(
-            self,
-            config: GenerationConfig | None = None,
-            *,
-            regenerate: str | None = None,
-            variation: int = 1,
-            **overrides: Any,
+        self,
+        config: GenerationConfig | None = None,
+        *,
+        regenerate: str | None = None,
+        variation: int = 1,
+        **overrides: Any,
     ) -> ReawarpProject:
         if config is None:
             config = GenerationConfig(**overrides)
         elif overrides:
-            raise TypeError("pass either a GenerationConfig or keyword overrides, not both")
+            raise TypeError(
+                "pass either a GenerationConfig or keyword overrides, not both"
+            )
 
         if variation < 1:
             raise ValueError("variation must be a positive integer")
@@ -545,7 +622,12 @@ class ReawarpEngine:
             "kick": ("kick_pattern", "kick_synthesis", "kick_profile"),
             "snare": ("snare_pattern", "snare_synthesis", "snare_profile"),
             "hats": ("hat_pattern", "hat_synthesis", "hat_profile"),
-            "synthetic_break": ("break_pattern", "break_synthesis", "break_profile", "break_processing"),
+            "synthetic_break": (
+                "break_pattern",
+                "break_synthesis",
+                "break_profile",
+                "break_processing",
+            ),
             "melody": ("melody_pattern", "melody_synthesis", "melody_profile"),
             "noise_texture": ("texture_synthesis",),
             "ambience": ("ambience_synthesis",),
@@ -553,7 +635,11 @@ class ReawarpEngine:
         sample_stream_groups = {
             "sample_break": ("break_pattern", "break_processing"),
         }
-        if regenerate is not None and regenerate not in stream_groups and regenerate not in sample_stream_groups:
+        if (
+            regenerate is not None
+            and regenerate not in stream_groups
+            and regenerate not in sample_stream_groups
+        ):
             raise ValueError(f"unknown stem for regeneration: {regenerate}")
         seed_overrides = {}
         sample_seed_overrides = {}
@@ -583,6 +669,7 @@ class ReawarpEngine:
             pattern_relationship=config.pattern_relationship,
         )
         from reawarp.composition.phrase import build_phrase_directives
+
         phrase_directives = build_phrase_directives(composition_plan.sections)
         drum_plan = build_drum_part_plan(config, composition_plan)
 
@@ -596,7 +683,9 @@ class ReawarpEngine:
 
         composition_plan_seconds = perf_counter() - plan_started
         event_generation_started = perf_counter()
-        sample_streams = RandomStreams(config.seed, seed_overrides=sample_seed_overrides)
+        sample_streams = RandomStreams(
+            config.seed, seed_overrides=sample_seed_overrides
+        )
         streams = RandomStreams(config.seed, seed_overrides=seed_overrides)
         stems: dict[str, np.ndarray] = {}
         event_records: list[dict[str, Any]] = []
@@ -607,10 +696,10 @@ class ReawarpEngine:
             return audio
 
         def place_mono(
-                target: np.ndarray,
-                signal: np.ndarray,
-                start_seconds: float,
-                pan: float = 0.0,
+            target: np.ndarray,
+            signal: np.ndarray,
+            start_seconds: float,
+            pan: float = 0.0,
         ) -> None:
             start = max(0, int(round(start_seconds * sample_rate)))
             if start >= frame_count or signal.size == 0:
@@ -619,20 +708,22 @@ class ReawarpEngine:
             angle = (float(np.clip(pan, -1.0, 1.0)) + 1.0) * (math.pi / 4.0)
             left_gain, right_gain = math.cos(angle), math.sin(angle)
             mono_signal = np.asarray(signal, dtype=np.float32).reshape(-1)
-            target[start: start + count, 0] += mono_signal[:count] * left_gain
-            target[start: start + count, 1] += mono_signal[:count] * right_gain
+            target[start : start + count, 0] += mono_signal[:count] * left_gain
+            target[start : start + count, 1] += mono_signal[:count] * right_gain
 
         def place_sample(
-                target: np.ndarray,
-                sample: np.ndarray,
-                start_seconds: float,
-                velocity: float,
-                pan: float,
-                gain_scale: float = 1.0,
+            target: np.ndarray,
+            sample: np.ndarray,
+            start_seconds: float,
+            velocity: float,
+            pan: float,
+            gain_scale: float = 1.0,
         ) -> None:
             shaped = (
-                sample * float(np.clip(velocity, 0.0, 1.0))
-                * float(np.clip(gain_scale, 0.0, 2.0)) * 0.72
+                sample
+                * float(np.clip(velocity, 0.0, 1.0))
+                * float(np.clip(gain_scale, 0.0, 2.0))
+                * 0.72
             )
             place_mono(target, shaped, start_seconds, pan)
 
@@ -648,7 +739,9 @@ class ReawarpEngine:
         # The motif source uses its own named stream. Regenerating the melody
         # can vary that stem without changing the rhythmic shadow carried by hats
         # and snare responses in the other stems.
-        melody_variation_events = build_melody_events(config, streams.get("melody_pattern"))
+        melody_variation_events = build_melody_events(
+            config, streams.get("melody_pattern")
+        )
         motif_anchor_streams = RandomStreams(config.seed)
         motif_source_events = build_melody_events(
             config, motif_anchor_streams.get("motif_anchor")
@@ -664,7 +757,8 @@ class ReawarpEngine:
             render_motif_events(
                 motif_plan, bpm=config.bpm, duration_seconds=config.duration
             )
-            if motif_plan is not None else melody_variation_events
+            if motif_plan is not None
+            else melody_variation_events
         )
         if motif_plan is not None and melody_variation_events:
             # Keep motif identity/rhythm fixed while allowing an isolated melody
@@ -672,17 +766,31 @@ class ReawarpEngine:
             melody_events = [
                 replace(
                     event,
-                    velocity=float(np.clip(
-                        event.velocity * (
-                            0.90 + 0.20 * melody_variation_events[index % len(melody_variation_events)].velocity
-                        ),
-                        0.0, 1.0,
-                    )),
-                    pan=float(np.clip(
-                        event.pan * 0.86
-                        + 0.14 * melody_variation_events[index % len(melody_variation_events)].pan,
-                        -0.85, 0.85,
-                    )),
+                    velocity=float(
+                        np.clip(
+                            event.velocity
+                            * (
+                                0.90
+                                + 0.20
+                                * melody_variation_events[
+                                    index % len(melody_variation_events)
+                                ].velocity
+                            ),
+                            0.0,
+                            1.0,
+                        )
+                    ),
+                    pan=float(
+                        np.clip(
+                            event.pan * 0.86
+                            + 0.14
+                            * melody_variation_events[
+                                index % len(melody_variation_events)
+                            ].pan,
+                            -0.85,
+                            0.85,
+                        )
+                    ),
                 )
                 for index, event in enumerate(melody_events)
             ]
@@ -695,64 +803,89 @@ class ReawarpEngine:
             for accent in build_motif_role_accents(
                 motif_plan, bpm=config.bpm, duration_seconds=config.duration
             ):
-                percussion[accent.role].append(PercussionEvent(
-                    lane=accent.role,
-                    step=accent.step,
-                    time=accent.step * config.sixteenth_seconds,
-                    velocity=accent.velocity,
-                    pan=accent.pan,
-                    kind=accent.kind,
-                    pattern_style=accent.pattern_style,
-                    motif_id=accent.motif_id,
-                    motif_relation=accent.motif_relation,
-                ))
+                percussion[accent.role].append(
+                    PercussionEvent(
+                        lane=accent.role,
+                        step=accent.step,
+                        time=accent.step * config.sixteenth_seconds,
+                        velocity=accent.velocity,
+                        pan=accent.pan,
+                        kind=accent.kind,
+                        pattern_style=accent.pattern_style,
+                        motif_id=accent.motif_id,
+                        motif_relation=accent.motif_relation,
+                    )
+                )
         for role in percussion:
             percussion[role] = shape_role_events(
-                role, percussion[role], composition_plan, section_orchestration,
-                step_seconds=config.sixteenth_seconds, seed=config.seed,
+                role,
+                percussion[role],
+                composition_plan,
+                section_orchestration,
+                step_seconds=config.sixteenth_seconds,
+                seed=config.seed,
             )
 
         # Continuous role envelopes consume the same section/transition plan
         # used by note and percussion events.
         texture_envelope = render_role_envelope(
-            "texture", frame_count, sample_rate, composition_plan,
-            section_orchestration, transition_plan,
+            "texture",
+            frame_count,
+            sample_rate,
+            composition_plan,
+            section_orchestration,
+            transition_plan,
         )
         ambience_envelope = render_role_envelope(
-            "ambience", frame_count, sample_rate, composition_plan,
-            section_orchestration, transition_plan,
+            "ambience",
+            frame_count,
+            sample_rate,
+            composition_plan,
+            section_orchestration,
+            transition_plan,
         )
 
         activity_defaults = {
-            "kick": 0.78, "snare": 0.66, "hat": 0.68, "break": 0.62,
+            "kick": 0.78,
+            "snare": 0.66,
+            "hat": 0.68,
+            "break": 0.62,
         }
         phrase_shaped_percussion: dict[str, list[Any]] = {}
         for role, events in percussion.items():
             adjusted = []
             for event in events:
                 activity = role_activity_at_time(
-                    role, float(event.time), composition_plan,
-                    section_orchestration, transition_plan,
+                    role,
+                    float(event.time),
+                    composition_plan,
+                    section_orchestration,
+                    transition_plan,
                 )
                 velocity = (
                     float(event.velocity) * min(1.0, activity / activity_defaults[role])
-                    if activity > 0.0 else 0.0
+                    if activity > 0.0
+                    else 0.0
                 )
                 if velocity > 1e-7:
-                    adjusted.append(replace(
-                        event, velocity=float(np.clip(velocity, 0.0, 1.0))
-                    ))
+                    adjusted.append(
+                        replace(event, velocity=float(np.clip(velocity, 0.0, 1.0)))
+                    )
             phrase_shaped_percussion[role] = adjusted
 
         phrase_shaped_melody = []
         for event in melody_events:
             activity = role_activity_at_time(
-                "melody", float(event.time), composition_plan,
-                section_orchestration, transition_plan,
+                "melody",
+                float(event.time),
+                composition_plan,
+                section_orchestration,
+                transition_plan,
             )
             velocity = (
                 float(event.velocity) * min(1.0, activity / 0.72)
-                if activity > 0.0 else 0.0
+                if activity > 0.0
+                else 0.0
             )
             if velocity > 1e-7:
                 phrase_shaped_melody.append(
@@ -782,34 +915,48 @@ class ReawarpEngine:
 
         for role in ("kick", "snare", "hat"):
             raw_entries = (
-                [] if config.percussion_source_mode == "synth"
+                []
+                if config.percussion_source_mode == "synth"
                 else list(config.sample_banks.get(role, ()))
             )
-            if not raw_entries and config.sample_paths.get(role) and config.percussion_source_mode != "synth":
-                raw_entries = [{
-                    "path": config.sample_paths[role],
-                    "metadata": config.sample_metadata.get(role, {}),
-                    "features": {},
-                }]
+            if (
+                not raw_entries
+                and config.sample_paths.get(role)
+                and config.percussion_source_mode != "synth"
+            ):
+                raw_entries = [
+                    {
+                        "path": config.sample_paths[role],
+                        "metadata": config.sample_metadata.get(role, {}),
+                        "features": {},
+                    }
+                ]
             loaded_entries: list[dict[str, Any]] = []
             for raw_entry in raw_entries:
                 path = Path(str(raw_entry.get("path", ""))).expanduser()
                 if not path.is_file():
-                    raise FileNotFoundError(f"{role} sample-bank file does not exist: {path}")
+                    raise FileNotFoundError(
+                        f"{role} sample-bank file does not exist: {path}"
+                    )
                 audio = read_sample(path, sample_rate)
                 metadata_source = dict(raw_entry.get("metadata") or {})
                 features = dict(raw_entry.get("features") or {})
-                digest = str(raw_entry.get("sha256") or hashlib.sha256(path.read_bytes()).hexdigest())
-                loaded_entries.append({
-                    "path": str(path.resolve()),
-                    "audio": audio,
-                    "sha256": digest,
-                    "metadata": metadata_source,
-                    "features": features,
-                    "asset_id": str(raw_entry.get("asset_id") or digest[:16]),
-                    "label": str(raw_entry.get("label") or path.name),
-                    "duration_seconds": len(audio) / float(sample_rate),
-                })
+                digest = str(
+                    raw_entry.get("sha256")
+                    or hashlib.sha256(path.read_bytes()).hexdigest()
+                )
+                loaded_entries.append(
+                    {
+                        "path": str(path.resolve()),
+                        "audio": audio,
+                        "sha256": digest,
+                        "metadata": metadata_source,
+                        "features": features,
+                        "asset_id": str(raw_entry.get("asset_id") or digest[:16]),
+                        "label": str(raw_entry.get("label") or path.name),
+                        "duration_seconds": len(audio) / float(sample_rate),
+                    }
+                )
             if not loaded_entries and config.sample_paths.get(role):
                 raise ValueError(f"{role} sample bank did not produce a usable source")
             if loaded_entries:
@@ -853,23 +1000,38 @@ class ReawarpEngine:
                 section = section_for_time(composition_plan, float(event.time))
                 directive = phrase_at_time(float(event.time))
                 bar = int(np.floor(float(event.time) / max(240.0 / config.bpm, 1e-9)))
-                cycle_index = max(0, (bar - section.start_bar) // int(config.drum_part_cycle_bars))
+                cycle_index = max(
+                    0, (bar - section.start_bar) // int(config.drum_part_cycle_bars)
+                )
                 function = directive.function
                 mode = config.drum_sample_automation
                 if mode == "section":
                     key = (role, section.index, -1)
                     should_switch = function not in {
-                        "introduction", "establishment", "return", "silence", "outro"
+                        "introduction",
+                        "establishment",
+                        "return",
+                        "silence",
+                        "outro",
                     }
                 elif mode == "cycle":
                     key = (role, section.index, cycle_index)
                     should_switch = function not in {
-                        "introduction", "establishment", "return", "silence", "outro"
+                        "introduction",
+                        "establishment",
+                        "return",
+                        "silence",
+                        "outro",
                     }
                 else:
                     key = (role, section.index, cycle_index)
                     should_switch = function in {
-                        "development", "uplift", "arrival", "contrast", "transition", "false_return"
+                        "development",
+                        "uplift",
+                        "arrival",
+                        "contrast",
+                        "transition",
+                        "false_return",
                     }
                     if function in {"introduction", "establishment"}:
                         should_switch = False
@@ -915,7 +1077,9 @@ class ReawarpEngine:
             usage[str(selected_index)] = usage.get(str(selected_index), 0) + 1
             return entry
 
-        def percussion_source_levels(role: str, time_seconds: float) -> tuple[float, float]:
+        def percussion_source_levels(
+            role: str, time_seconds: float
+        ) -> tuple[float, float]:
             """Return (synth gain, sample gain) for one role/section."""
             if role not in drum_sample_banks:
                 return 1.0, 0.0
@@ -959,15 +1123,22 @@ class ReawarpEngine:
             source = source_entry["audio"]
             segment = source
             architecture = config.percussion_hybrid_architecture
-            if architecture in {"transient_body", "feature_guided"} and config.percussion_source_mode != "sample":
+            if (
+                architecture in {"transient_body", "feature_guided"}
+                and config.percussion_source_mode != "sample"
+            ):
                 transient_ms = float(config.hybrid_transient_ms)
                 if architecture == "feature_guided":
                     features = source_entry.get("features", {})
                     crest = float(features.get("crest_factor_db", 6.0))
                     transient_ms *= float(np.clip(0.72 + crest / 35.0, 0.65, 1.35))
-                transient_frames = max(8, int(round(sample_rate * transient_ms / 1000.0)))
-                segment = source[:min(len(source), transient_frames)].copy()
-                fade_frames = min(max(2, int(round(sample_rate * 0.002))), len(segment) // 2)
+                transient_frames = max(
+                    8, int(round(sample_rate * transient_ms / 1000.0))
+                )
+                segment = source[: min(len(source), transient_frames)].copy()
+                fade_frames = min(
+                    max(2, int(round(sample_rate * 0.002))), len(segment) // 2
+                )
                 if fade_frames:
                     segment[:fade_frames] *= np.linspace(
                         0.0, 1.0, fade_frames, endpoint=False, dtype=np.float32
@@ -976,8 +1147,11 @@ class ReawarpEngine:
                         1.0, 0.0, fade_frames, endpoint=False, dtype=np.float32
                     )
             place_sample(
-                target, segment, event.time,
-                event.velocity * sample_gain, event.pan,
+                target,
+                segment,
+                event.time,
+                event.velocity * sample_gain,
+                event.pan,
             )
 
         synthetic_percussion = (
@@ -1056,7 +1230,10 @@ class ReawarpEngine:
                     continue
                 choices = section_profile_options[role].get(function, auto_choices)
                 profile_rng = np.random.default_rng(
-                    derive_seed(config.seed, f"section-profile:{role}:{section.index}:{function}")
+                    derive_seed(
+                        config.seed,
+                        f"section-profile:{role}:{section.index}:{function}",
+                    )
                 )
                 selected = select_profile_name(
                     configured, catalogue, profile_rng, auto_choices=choices
@@ -1083,12 +1260,14 @@ class ReawarpEngine:
                 if (
                     role == "hat"
                     and event.motif_relation != "shadow"
-                    and streams.get("section_ornaments").random() > section.percussion_density_scale
+                    and streams.get("section_ornaments").random()
+                    > section.percussion_density_scale
                 ):
                     continue
 
                 source_entry = (
-                    None if config.percussion_source_mode == "synth"
+                    None
+                    if config.percussion_source_mode == "synth"
                     else select_role_sample(role, event)
                 )
                 synth_gain, sample_gain = percussion_source_levels(role, event.time)
@@ -1100,25 +1279,38 @@ class ReawarpEngine:
                 feature_pitch_ratio = 1.0
                 feature_velocity = 1.0
                 feature_voice: str | None = None
-                if source_entry is not None and config.percussion_hybrid_architecture == "feature_guided":
+                if (
+                    source_entry is not None
+                    and config.percussion_hybrid_architecture == "feature_guided"
+                ):
                     features = source_entry.get("features", {})
                     centroid = float(features.get("spectral_centroid_hz", 3_000.0))
                     flatness = float(features.get("spectral_flatness", 0.35))
                     onset_density = float(features.get("onset_density_per_second", 4.0))
-                    brightness = float(np.clip(
-                        np.log(max(100.0, centroid) / 100.0) / np.log(160.0), 0.0, 1.0
-                    ))
+                    brightness = float(
+                        np.clip(
+                            np.log(max(100.0, centroid) / 100.0) / np.log(160.0),
+                            0.0,
+                            1.0,
+                        )
+                    )
                     transient_density = float(np.clip(onset_density / 12.0, 0.0, 1.0))
-                    feature_pitch_ratio = float(2.0 ** ((brightness - 0.5) * 4.0 / 12.0))
-                    feature_velocity = float(np.clip(
-                        0.88 + 0.18 * transient_density, 0.84, 1.08
-                    ))
+                    feature_pitch_ratio = float(
+                        2.0 ** ((brightness - 0.5) * 4.0 / 12.0)
+                    )
+                    feature_velocity = float(
+                        np.clip(0.88 + 0.18 * transient_density, 0.84, 1.08)
+                    )
                     if role == "kick":
                         feature_voice = "dry_thump" if flatness >= 0.30 else "soft_kick"
                     elif role == "snare":
-                        feature_voice = "muted_rim" if flatness < 0.28 else "paper_snare"
+                        feature_voice = (
+                            "muted_rim" if flatness < 0.28 else "paper_snare"
+                        )
                     else:
-                        feature_voice = "metal_tick" if centroid >= 5_500.0 else "noise_hat"
+                        feature_voice = (
+                            "metal_tick" if centroid >= 5_500.0 else "noise_hat"
+                        )
                     guidance = {
                         "spectral_centroid_hz": centroid,
                         "spectral_flatness": float(np.clip(flatness, 0.0, 1.0)),
@@ -1130,19 +1322,26 @@ class ReawarpEngine:
                     }
 
                 if synth_gain > 1e-7:
-                    velocity = float(np.clip(
-                        event.velocity * synth_gain * feature_velocity, 0.0, 1.0
-                    ))
+                    velocity = float(
+                        np.clip(
+                            event.velocity * synth_gain * feature_velocity, 0.0, 1.0
+                        )
+                    )
                     if role == "kick":
                         if synthetic_percussion:
                             voice = feature_voice or (
-                                "soft_kick" if config.percussion_synthesis == "minimal" else "dry_thump"
+                                "soft_kick"
+                                if config.percussion_synthesis == "minimal"
+                                else "dry_thump"
                             )
                             signal = render_synthetic_percussion(
                                 voice,
-                                sample_rate, synthesis_rng,
-                                velocity=velocity, duration=0.19,
-                                pitch_hz=KICK_PROFILES[profile].end_frequency * feature_pitch_ratio,
+                                sample_rate,
+                                synthesis_rng,
+                                velocity=velocity,
+                                duration=0.19,
+                                pitch_hz=KICK_PROFILES[profile].end_frequency
+                                * feature_pitch_ratio,
                             )
                         else:
                             signal = render_kick(
@@ -1151,13 +1350,18 @@ class ReawarpEngine:
                     elif role == "snare":
                         if synthetic_percussion:
                             voice = feature_voice or (
-                                "paper_snare" if config.percussion_synthesis == "minimal" else "muted_rim"
+                                "paper_snare"
+                                if config.percussion_synthesis == "minimal"
+                                else "muted_rim"
                             )
                             signal = render_synthetic_percussion(
                                 voice,
-                                sample_rate, synthesis_rng,
-                                velocity=velocity, duration=0.17,
-                                pitch_hz=SNARE_PROFILES[profile].body_frequency * feature_pitch_ratio,
+                                sample_rate,
+                                synthesis_rng,
+                                velocity=velocity,
+                                duration=0.17,
+                                pitch_hz=SNARE_PROFILES[profile].body_frequency
+                                * feature_pitch_ratio,
                             )
                         else:
                             signal = render_snare(
@@ -1166,13 +1370,18 @@ class ReawarpEngine:
                     else:
                         if synthetic_percussion:
                             voice = feature_voice or (
-                                "noise_hat" if config.percussion_synthesis == "minimal" else "metal_tick"
+                                "noise_hat"
+                                if config.percussion_synthesis == "minimal"
+                                else "metal_tick"
                             )
                             signal = render_synthetic_percussion(
                                 voice,
-                                sample_rate, synthesis_rng,
-                                velocity=velocity, duration=0.085,
-                                pitch_hz=HAT_PROFILES[profile].partials[0][0] * feature_pitch_ratio,
+                                sample_rate,
+                                synthesis_rng,
+                                velocity=velocity,
+                                duration=0.085,
+                                pitch_hz=HAT_PROFILES[profile].partials[0][0]
+                                * feature_pitch_ratio,
                             )
                         else:
                             signal = render_hat(
@@ -1195,8 +1404,12 @@ class ReawarpEngine:
                     "sample_variant_index": (
                         next(
                             (
-                                index for index, entry in enumerate(drum_sample_banks.get(role, []))
-                                if source_entry is not None and entry["asset_id"] == source_entry["asset_id"]
+                                index
+                                for index, entry in enumerate(
+                                    drum_sample_banks.get(role, [])
+                                )
+                                if source_entry is not None
+                                and entry["asset_id"] == source_entry["asset_id"]
                             ),
                             None,
                         )
@@ -1207,8 +1420,13 @@ class ReawarpEngine:
                     record["sample_metadata"] = {
                         key: metadata[key]
                         for key in (
-                            "provider", "role", "relative_path", "source_name",
-                            "family", "articulation", "asset_type",
+                            "provider",
+                            "role",
+                            "relative_path",
+                            "source_name",
+                            "family",
+                            "articulation",
+                            "asset_type",
                         )
                         if key in metadata
                     }
@@ -1224,30 +1442,39 @@ class ReawarpEngine:
                 event_records.append(record)
         for role, bank in drum_sample_banks.items():
             sample_manifest[role]["trigger_count"] = sum(
-                1 for event in event_records
+                1
+                for event in event_records
                 if event.get("lane") == role
                 and event.get("source_mix", {}).get("sample_gain", 0.0) > 0.0
             )
             sample_manifest[role]["switch_points"] = sample_switch_history[role]
             sample_manifest[role]["variant_usage"] = sample_variant_usage[role]
-            sample_manifest[role]["final_variant_count"] = len({
-                event.get("sample_source", {}).get("asset_id")
-                for event in event_records
-                if event.get("lane") == role and event.get("sample_source")
-            })
+            sample_manifest[role]["final_variant_count"] = len(
+                {
+                    event.get("sample_source", {}).get("asset_id")
+                    for event in event_records
+                    if event.get("lane") == role and event.get("sample_source")
+                }
+            )
 
         break_profile_rng = streams.get("break_profile")
         break_profiles = {
             "kick": select_profile_name(
-                config.kick_profile, KICK_PROFILES, break_profile_rng,
+                config.kick_profile,
+                KICK_PROFILES,
+                break_profile_rng,
                 auto_choices=AUTO_KICK_PROFILES,
             ),
             "snare": select_profile_name(
-                config.snare_profile, SNARE_PROFILES, break_profile_rng,
+                config.snare_profile,
+                SNARE_PROFILES,
+                break_profile_rng,
                 auto_choices=AUTO_SNARE_PROFILES,
             ),
             "hat": select_profile_name(
-                config.hat_profile, HAT_PROFILES, break_profile_rng,
+                config.hat_profile,
+                HAT_PROFILES,
+                break_profile_rng,
                 auto_choices=AUTO_HAT_PROFILES,
             ),
         }
@@ -1260,8 +1487,11 @@ class ReawarpEngine:
             if event.kind != "kick" and section.density < 0.16:
                 continue
             break_activity = role_activity_at_time(
-                "break", event.time, composition_plan,
-                section_orchestration, transition_plan,
+                "break",
+                event.time,
+                composition_plan,
+                section_orchestration,
+                transition_plan,
             )
             if break_activity <= 1e-7:
                 continue
@@ -1282,12 +1512,20 @@ class ReawarpEngine:
             elif event.kind == "snare":
                 profile = break_profiles["snare"]
                 signal = render_snare(
-                    sample_rate, break_rng, velocity * 0.78, duration=0.22, profile=profile
+                    sample_rate,
+                    break_rng,
+                    velocity * 0.78,
+                    duration=0.22,
+                    profile=profile,
                 )
             else:
                 profile = break_profiles["hat"]
                 signal = render_hat(
-                    sample_rate, break_rng, velocity * 0.9, duration=0.075, profile=profile
+                    sample_rate,
+                    break_rng,
+                    velocity * 0.9,
+                    duration=0.075,
+                    profile=profile,
                 )
             place_mono(break_stem, signal, event.time, event.pan)
             record = event.to_dict()
@@ -1322,32 +1560,45 @@ class ReawarpEngine:
                 effective_frequency = event.frequency * (
                     2.0 ** (intent.register_semitones / 12.0)
                 )
-                melodic_instability = float(np.clip(
-                    0.62 * config.arrangement_instability
-                    + 0.38 * section.instability,
-                    0.0, 1.0,
-                ))
+                melodic_instability = float(
+                    np.clip(
+                        0.62 * config.arrangement_instability
+                        + 0.38 * section.instability,
+                        0.0,
+                        1.0,
+                    )
+                )
                 if config.synth_palette == "subtractive":
                     signal = render_subtractive_note(
-                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
-                        duration=event.duration, velocity=event.velocity,
-                        profile=melody_profile, brightness=intent.brightness,
+                        effective_frequency,
+                        sample_rate,
+                        streams.get("melody_synthesis"),
+                        duration=event.duration,
+                        velocity=event.velocity,
+                        profile=melody_profile,
+                        brightness=intent.brightness,
                         instability=melodic_instability,
                     )
                 else:
                     signal = render_extended_note(
-                        effective_frequency, sample_rate, streams.get("melody_synthesis"),
-                        duration=event.duration, velocity=event.velocity,
-                        palette=config.synth_palette, brightness=intent.brightness,
+                        effective_frequency,
+                        sample_rate,
+                        streams.get("melody_synthesis"),
+                        duration=event.duration,
+                        velocity=event.velocity,
+                        palette=config.synth_palette,
+                        brightness=intent.brightness,
                         instability=melodic_instability,
                     )
                 place_mono(melody_stem, signal, event.time, event.pan)
                 record = event.to_dict()
-                record.update({
-                    "lane": "melody",
-                    "kind": f"{config.synth_palette}_synth_note",
-                    "synthesis_profile": melody_profile,
-                })
+                record.update(
+                    {
+                        "lane": "melody",
+                        "kind": f"{config.synth_palette}_synth_note",
+                        "synthesis_profile": melody_profile,
+                    }
+                )
                 event_records.append(record)
 
         if config.include_texture:
@@ -1360,24 +1611,27 @@ class ReawarpEngine:
             )
             delayed = (
                 np.concatenate((np.zeros(97, dtype=np.float32), texture[:-97]))
-                if len(texture) > 97 else texture
+                if len(texture) > 97
+                else texture
             )
             texture_gain = texture_envelope
             texture_stem[:, 0] += texture * texture_gain * 0.72
             texture_stem[:, 1] += delayed * texture_gain * 0.72
-            event_records.append({
-                "lane": "noise_texture",
-                "time": 0.0,
-                "duration": config.duration,
-                "kind": "coloured_noise",
-            })
+            event_records.append(
+                {
+                    "lane": "noise_texture",
+                    "time": 0.0,
+                    "duration": config.duration,
+                    "kind": "coloured_noise",
+                }
+            )
 
         if config.include_ambience:
             ambience_stem = new_stem("ambience")
             # Keep the ambience pitch anchor independent of the melody lane,
             # so regenerating melody cannot alter an unrelated stem.
             root_frequency = 55.0 * (
-                    2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
+                2.0 ** ((derive_seed(config.seed, "ambience_root") % 24) / 12.0)
             )
             ambience_stem[:] = render_ambience(
                 frame_count,
@@ -1387,14 +1641,16 @@ class ReawarpEngine:
                 amount=config.ambience_level,
             )
             ambience_stem *= ambience_envelope[:, None]
-            event_records.append({
-                "lane": "ambience",
-                "time": 0.0,
-                "duration": config.duration,
-                "kind": "harmonic_ambient_bed",
-                "root_frequency": root_frequency,
-                "amount": config.ambience_level,
-            })
+            event_records.append(
+                {
+                    "lane": "ambience",
+                    "time": 0.0,
+                    "duration": config.duration,
+                    "kind": "harmonic_ambient_bed",
+                    "root_frequency": root_frequency,
+                    "amount": config.ambience_level,
+                }
+            )
 
         for role, sample_path in config.sample_paths.items():
             if role in {"kick", "snare", "hat"}:
@@ -1428,26 +1684,38 @@ class ReawarpEngine:
             triggers = percussion[role]
             if role == "kick":
                 triggers = [
-                    event for event in triggers
+                    event
+                    for event in triggers
                     if section_for_time(composition_plan, event.time).kick
                 ]
             elif role == "break":
                 triggers = [
-                    event for event in triggers
+                    event
+                    for event in triggers
                     if (
                         section_for_time(composition_plan, event.time).kick
                         if event.kind == "kick"
-                        else section_for_time(composition_plan, event.time).density >= 0.16
+                        else section_for_time(composition_plan, event.time).density
+                        >= 0.16
                     )
                 ]
             elif role == "snare":
-                triggers = [event for event in triggers if
-                            section_for_time(composition_plan, event.time).density >= 0.14 or event.velocity >= 0.70]
+                triggers = [
+                    event
+                    for event in triggers
+                    if section_for_time(composition_plan, event.time).density >= 0.14
+                    or event.velocity >= 0.70
+                ]
             elif role == "hat":
                 sample_ornaments = sample_streams.get("section_ornaments")
-                triggers = [event for event in triggers if
-                            sample_ornaments.random() <= section_for_time(composition_plan,
-                                                                          event.time).percussion_density_scale]
+                triggers = [
+                    event
+                    for event in triggers
+                    if sample_ornaments.random()
+                    <= section_for_time(
+                        composition_plan, event.time
+                    ).percussion_density_scale
+                ]
             slice_ranges: list[tuple[int, int]] = []
             source_bars = 1
             if role == "break":
@@ -1457,8 +1725,12 @@ class ReawarpEngine:
                 slice_ranges = [(item.start, item.end) for item in detected]
                 if len(slice_ranges) < 2:
                     # Smooth/tonal files still need a usable rhythmic slicing grid.
-                    requested = min(config.break_slice_count, max(2, len(sample) // 128))
-                    boundaries = np.linspace(0, len(sample), requested + 1).round().astype(int)
+                    requested = min(
+                        config.break_slice_count, max(2, len(sample) // 128)
+                    )
+                    boundaries = (
+                        np.linspace(0, len(sample), requested + 1).round().astype(int)
+                    )
                     slice_ranges = [
                         (int(left), int(right))
                         for left, right in zip(boundaries[:-1], boundaries[1:])
@@ -1485,7 +1757,9 @@ class ReawarpEngine:
                     # mutations change event positions without random clip overlap.
                     bar_frames = max(1, int(round(sample_rate * 240.0 / config.bpm)))
                     source_bars = max(1, int(round(len(sample) / bar_frames)))
-                    source_slot = ((event.step // 16) % source_bars) * 16 + (event.step % 16)
+                    source_slot = ((event.step // 16) % source_bars) * 16 + (
+                        event.step % 16
+                    )
                     slice_index = min(
                         len(slice_ranges) - 1,
                         int(source_slot * len(slice_ranges) / (source_bars * 16)),
@@ -1496,9 +1770,11 @@ class ReawarpEngine:
                     # This keeps the imported break lane rhythmically articulated
                     # even when the detected source region has a long decay.
                     if trigger_index + 1 < len(ordered_triggers):
-                        next_start = int(round(
-                            ordered_triggers[trigger_index + 1].time * sample_rate
-                        ))
+                        next_start = int(
+                            round(
+                                ordered_triggers[trigger_index + 1].time * sample_rate
+                            )
+                        )
                         current_start = int(round(event.time * sample_rate))
                         max_length = max(1, next_start - current_start)
                         segment = segment[:max_length]
@@ -1514,19 +1790,25 @@ class ReawarpEngine:
                         )
                         segment[:fade_frames] *= fade_in
                         segment[-fade_frames:] *= fade_out
-                    place_sample(sample_stem, segment, event.time, event.velocity, event.pan)
-                    record.update({
-                        "slice_index": slice_index,
-                        "source_frame_start": frame_start,
-                        "source_frame_end": frame_end,
-                        "rendered_frames": int(len(segment)),
-                        "trimmed_to_next_trigger": (
+                    place_sample(
+                        sample_stem, segment, event.time, event.velocity, event.pan
+                    )
+                    record.update(
+                        {
+                            "slice_index": slice_index,
+                            "source_frame_start": frame_start,
+                            "source_frame_end": frame_end,
+                            "rendered_frames": int(len(segment)),
+                            "trimmed_to_next_trigger": (
                                 trigger_index + 1 < len(ordered_triggers)
                                 and len(segment) < frame_end - frame_start
-                        ),
-                    })
+                            ),
+                        }
+                    )
                 else:
-                    place_sample(sample_stem, sample, event.time, event.velocity, event.pan)
+                    place_sample(
+                        sample_stem, sample, event.time, event.velocity, event.pan
+                    )
                 event_records.append(record)
 
             sample_manifest[role] = {
@@ -1559,21 +1841,38 @@ class ReawarpEngine:
         headroom_seconds = perf_counter() - headroom_started
 
         event_records.sort(
-            key=lambda event: (float(event.get("time", 0.0)), str(event.get("lane", "")))
+            key=lambda event: (
+                float(event.get("time", 0.0)),
+                str(event.get("lane", "")),
+            )
         )
         metadata = {
             "algorithm_version": self.VERSION,
-            "variation": {"stem": regenerate, "index": variation} if regenerate else None,
+            "variation": (
+                {"stem": regenerate, "index": variation} if regenerate else None
+            ),
             "seed_streams": {
                 name: streams.seed_for(name)
                 for name in (
-                    "kick_pattern", "snare_pattern", "hat_pattern", "break_pattern",
-                    "kick_synthesis", "snare_synthesis", "hat_synthesis", "break_synthesis",
-                    "kick_profile", "snare_profile", "hat_profile", "break_profile",
+                    "kick_pattern",
+                    "snare_pattern",
+                    "hat_pattern",
+                    "break_pattern",
+                    "kick_synthesis",
+                    "snare_synthesis",
+                    "hat_synthesis",
+                    "break_synthesis",
+                    "kick_profile",
+                    "snare_profile",
+                    "hat_profile",
+                    "break_profile",
                     "section_ornaments",
                     "break_processing",
-                    "melody_pattern", "melody_synthesis", "melody_profile",
-                    "texture_synthesis", "ambience_synthesis",
+                    "melody_pattern",
+                    "melody_synthesis",
+                    "melody_profile",
+                    "texture_synthesis",
+                    "ambience_synthesis",
                 )
             },
             "sample_trigger_seed_streams": {
@@ -1597,8 +1896,8 @@ class ReawarpEngine:
                 "melody": (
                     f"persistent {motif_plan.anchor.motif_id} motif + section transformations + "
                     f"{config.synth_palette} synthesis palette"
-                    if motif_plan is not None else
-                    f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette"
+                    if motif_plan is not None
+                    else f"3:5 Lissajous curve + logistic-map contour + {config.synth_palette} synthesis palette"
                 ),
                 "texture": "coloured noise with low-frequency amplitude modulation",
                 "ambience": "harmonic partial cloud + filtered noise + slow stereo drift",
@@ -1613,8 +1912,21 @@ class ReawarpEngine:
                 "hat": config.hat_profile,
                 "melody": melody_profile,
                 "palette": config.synth_palette,
-                "available_palettes": ["hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"],
-                "extended_melody_voices": ["inharmonic_mallet", "metallic_fm", "dark_formant", "soft_spectral_pad"],
+                "available_palettes": [
+                    "hybrid",
+                    "fm",
+                    "additive",
+                    "modal",
+                    "inharmonic",
+                    "granular",
+                    "physical",
+                ],
+                "extended_melody_voices": [
+                    "inharmonic_mallet",
+                    "metallic_fm",
+                    "dark_formant",
+                    "soft_spectral_pad",
+                ],
                 "catalogue_counts": {
                     "kick": len(KICK_PROFILES),
                     "snare": len(SNARE_PROFILES),
@@ -1669,7 +1981,8 @@ class ReawarpEngine:
             "break_rhythm": {
                 "style": next(
                     (
-                        event.pattern_style for event in percussion["break"]
+                        event.pattern_style
+                        for event in percussion["break"]
                         if event.pattern_style is not None
                     ),
                     config.break_style,

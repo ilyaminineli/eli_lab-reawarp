@@ -17,7 +17,9 @@ def _json_copy(value: dict[str, Any]) -> dict[str, Any]:
     try:
         return json.loads(json.dumps(value, ensure_ascii=False, allow_nan=False))
     except (TypeError, ValueError) as exc:
-        raise ValueError("event parameters must contain JSON-compatible finite values") from exc
+        raise ValueError(
+            "event parameters must contain JSON-compatible finite values"
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +58,7 @@ class MusicalEvent:
         if self.pitch is not None and not math.isfinite(float(self.pitch)):
             raise ValueError("pitch must be finite")
         if self.frequency_hz is not None and (
-                not math.isfinite(float(self.frequency_hz)) or self.frequency_hz <= 0
+            not math.isfinite(float(self.frequency_hz)) or self.frequency_hz <= 0
         ):
             raise ValueError("frequency_hz must be positive and finite")
         if self.kind == "note" and self.pitch is None and self.frequency_hz is None:
@@ -73,9 +75,13 @@ class MusicalEvent:
             raise ValueError("articulation cannot be empty")
         object.__setattr__(self, "onset_beats", onset)
         object.__setattr__(self, "duration_beats", duration)
-        object.__setattr__(self, "pitch", None if self.pitch is None else float(self.pitch))
         object.__setattr__(
-            self, "frequency_hz", None if self.frequency_hz is None else float(self.frequency_hz)
+            self, "pitch", None if self.pitch is None else float(self.pitch)
+        )
+        object.__setattr__(
+            self,
+            "frequency_hz",
+            None if self.frequency_hz is None else float(self.frequency_hz),
         )
         object.__setattr__(self, "velocity", float(self.velocity))
         object.__setattr__(self, "parameters", _json_copy(dict(self.parameters)))
@@ -116,7 +122,9 @@ class MusicalEvent:
             kind=str(data.get("kind", "note")),
             pitch=None if data.get("pitch") is None else float(data["pitch"]),
             frequency_hz=(
-                None if data.get("frequency_hz") is None else float(data["frequency_hz"])
+                None
+                if data.get("frequency_hz") is None
+                else float(data["frequency_hz"])
             ),
             velocity=float(data.get("velocity", 0.8)),
             articulation=str(data.get("articulation", "default")),
@@ -142,7 +150,12 @@ class AutomationPoint:
         if not math.isfinite(float(self.value)):
             raise ValueError("automation value must be finite")
         if self.interpolation_to_next not in {
-            None, "step", "linear", "smooth", "cubic", "exponential"
+            None,
+            "step",
+            "linear",
+            "smooth",
+            "cubic",
+            "exponential",
         }:
             raise ValueError("unsupported per-point automation interpolation")
         object.__setattr__(self, "at", position)
@@ -178,7 +191,13 @@ class AutomationLane:
             raise ValueError("automation target_id cannot be empty")
         if self.time_basis not in {"beats", "seconds", "frames"}:
             raise ValueError("automation time_basis must be beats, seconds, or frames")
-        if self.interpolation not in {"step", "linear", "smooth", "cubic", "exponential"}:
+        if self.interpolation not in {
+            "step",
+            "linear",
+            "smooth",
+            "cubic",
+            "exponential",
+        }:
             raise ValueError("unsupported automation interpolation")
         points = tuple(self.points)
         if not points:
@@ -190,11 +209,18 @@ class AutomationLane:
             if loop <= 0:
                 raise ValueError("automation loop_length must be positive")
             object.__setattr__(self, "loop_length", loop)
-        if not math.isfinite(float(self.smoothing_seconds)) or self.smoothing_seconds < 0:
+        if (
+            not math.isfinite(float(self.smoothing_seconds))
+            or self.smoothing_seconds < 0
+        ):
             raise ValueError("smoothing_seconds must be finite and non-negative")
         if not math.isfinite(float(self.hysteresis)) or self.hysteresis < 0:
             raise ValueError("hysteresis must be finite and non-negative")
-        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+        if (
+            self.minimum is not None
+            and self.maximum is not None
+            and self.minimum > self.maximum
+        ):
             raise ValueError("automation minimum cannot exceed maximum")
         if self.scope not in {"global", "section", "role", "event"}:
             raise ValueError("automation scope must be global, section, role, or event")
@@ -219,14 +245,17 @@ class AutomationLane:
         if self.loop_length is not None:
             position %= self.loop_length
         if position < self.points[0].at:
-            value = self.points[0].value if before_first is None else float(before_first)
+            value = (
+                self.points[0].value if before_first is None else float(before_first)
+            )
         elif position == self.points[0].at:
             value = self.points[0].value
         elif position >= self.points[-1].at:
             value = self.points[-1].value
         else:
             segment = next(
-                i for i in range(len(self.points) - 1)
+                i
+                for i in range(len(self.points) - 1)
                 if self.points[i].at <= position <= self.points[i + 1].at
             )
             left, right = self.points[segment], self.points[segment + 1]
@@ -244,23 +273,32 @@ class AutomationLane:
                     value = left.value + (right.value - left.value) * t
                 else:
                     sign = 1.0 if left.value > 0 else -1.0
-                    value = sign * abs(left.value) * (
-                            abs(right.value) / abs(left.value)
-                    ) ** t
+                    value = (
+                        sign
+                        * abs(left.value)
+                        * (abs(right.value) / abs(left.value)) ** t
+                    )
             else:
                 previous = self.points[segment - 1] if segment > 0 else left
                 following = (
                     self.points[segment + 2]
-                    if segment + 2 < len(self.points) else right
+                    if segment + 2 < len(self.points)
+                    else right
                 )
                 span = float(right.at - left.at)
                 tangent_left = (
-                    (right.value - previous.value) / float(right.at - previous.at) * span
-                    if previous.at != left.at else right.value - left.value
+                    (right.value - previous.value)
+                    / float(right.at - previous.at)
+                    * span
+                    if previous.at != left.at
+                    else right.value - left.value
                 )
                 tangent_right = (
-                    (following.value - left.value) / float(following.at - left.at) * span
-                    if following.at != right.at else right.value - left.value
+                    (following.value - left.value)
+                    / float(following.at - left.at)
+                    * span
+                    if following.at != right.at
+                    else right.value - left.value
                 )
                 t2, t3 = t * t, t * t * t
                 h00 = 2 * t3 - 3 * t2 + 1
@@ -268,8 +306,10 @@ class AutomationLane:
                 h01 = -2 * t3 + 3 * t2
                 h11 = t3 - t2
                 value = (
-                        h00 * left.value + h10 * tangent_left
-                        + h01 * right.value + h11 * tangent_right
+                    h00 * left.value
+                    + h10 * tangent_left
+                    + h01 * right.value
+                    + h11 * tangent_right
                 )
         if self.minimum is not None:
             value = max(float(self.minimum), value)
@@ -310,7 +350,8 @@ class AutomationLane:
             time_basis=str(data.get("time_basis", "beats")),
             interpolation=str(data.get("interpolation", "linear")),
             loop_length=(
-                None if data.get("loop_length") is None
+                None
+                if data.get("loop_length") is None
                 else as_fraction(str(data["loop_length"]))
             ),
             smoothing_seconds=float(data.get("smoothing_seconds", 0.0)),

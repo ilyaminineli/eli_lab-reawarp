@@ -23,20 +23,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
-    index = commands.add_parser("index", help="index a file, directory, or exported project")
+    index = commands.add_parser(
+        "index", help="index a file, directory, or exported project"
+    )
     index.add_argument("path", type=Path)
 
-    search = commands.add_parser("search", help="search by name, role, tags, or audio similarity")
-    search.add_argument("--query", help="substring in file name, path, tags, or metadata")
-    search.add_argument("--type", dest="asset_type", choices=("sample", "stem", "master"))
+    search = commands.add_parser(
+        "search", help="search by name, role, tags, or audio similarity"
+    )
+    search.add_argument(
+        "--query", help="substring in file name, path, tags, or metadata"
+    )
+    search.add_argument(
+        "--type", dest="asset_type", choices=("sample", "stem", "master")
+    )
     search.add_argument("--role", help="asset role, e.g. kick, snare, melody, ambience")
-    search.add_argument("--tag", action="append", default=[], help="required tag (repeatable)")
-    search.add_argument("--similar-to", help="asset ID or indexed file path to compare against")
+    search.add_argument(
+        "--tag", action="append", default=[], help="required tag (repeatable)"
+    )
+    search.add_argument(
+        "--similar-to", help="asset ID or indexed file path to compare against"
+    )
     search.add_argument("--limit", type=int, default=20)
 
-    collections = commands.add_parser("collections", help="manage named asset collections")
-    collection_commands = collections.add_subparsers(dest="collection_command", required=True)
-    create = collection_commands.add_parser("create", help="create or update a collection")
+    collections = commands.add_parser(
+        "collections", help="manage named asset collections"
+    )
+    collection_commands = collections.add_subparsers(
+        dest="collection_command", required=True
+    )
+    create = collection_commands.add_parser(
+        "create", help="create or update a collection"
+    )
     create.add_argument("name")
     create.add_argument("--description", default="")
     collection_commands.add_parser("list", help="list collections")
@@ -45,12 +63,18 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("asset_ids", nargs="+")
     show = collection_commands.add_parser("show", help="show assets in a collection")
     show.add_argument("name")
-    remove = collection_commands.add_parser("remove", help="remove assets from a collection")
+    remove = collection_commands.add_parser(
+        "remove", help="remove assets from a collection"
+    )
     remove.add_argument("name")
     remove.add_argument("asset_ids", nargs="+")
 
-    genealogy = commands.add_parser("genealogy", help="show all variants in a project family")
-    genealogy.add_argument("family_id", help="family ID returned when indexing project.json")
+    genealogy = commands.add_parser(
+        "genealogy", help="show all variants in a project family"
+    )
+    genealogy.add_argument(
+        "family_id", help="family ID returned when indexing project.json"
+    )
     return parser
 
 
@@ -76,8 +100,15 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "search":
-            if not args.query and not args.similar_to and not args.role and not args.tag:
-                parser.error("provide --query, --similar-to, --role, or at least one --tag")
+            if (
+                not args.query
+                and not args.similar_to
+                and not args.role
+                and not args.tag
+            ):
+                parser.error(
+                    "provide --query, --similar-to, --role, or at least one --tag"
+                )
             results = library.search(
                 query=args.query,
                 asset_type=args.asset_type,
@@ -89,7 +120,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             for asset in results:
                 similarity = (
                     f" similarity={asset.similarity:.3f}"
-                    if asset.similarity is not None else ""
+                    if asset.similarity is not None
+                    else ""
                 )
                 role = f" role={asset.role}" if asset.role else ""
                 print(
@@ -119,7 +151,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             return
 
         if args.command == "genealogy":
-            print(json.dumps(library.genealogy(args.family_id), indent=2, ensure_ascii=False))
+            print(
+                json.dumps(
+                    library.genealogy(args.family_id), indent=2, ensure_ascii=False
+                )
+            )
 
 
 if __name__ == "__main__":

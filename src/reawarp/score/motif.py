@@ -35,7 +35,9 @@ class MotifResolutionRecord:
 
     def __post_init__(self) -> None:
         if not self.motif_id or not self.section_name or not self.operation:
-            raise ValueError("motif resolution record requires motif, section, and operation IDs")
+            raise ValueError(
+                "motif resolution record requires motif, section, and operation IDs"
+            )
         if not math.isfinite(float(self.pitch_offset)):
             raise ValueError("motif pitch_offset must be finite")
         preserved = tuple(self.preserved_dimensions)
@@ -43,15 +45,21 @@ class MotifResolutionRecord:
         if len(preserved) != len(set(preserved)) or len(changed) != len(set(changed)):
             raise ValueError("motif identity dimensions must be unique")
         if set(preserved) & set(changed):
-            raise ValueError("a motif identity dimension cannot be both preserved and changed")
+            raise ValueError(
+                "a motif identity dimension cannot be both preserved and changed"
+            )
         if set(preserved) | set(changed) != set(MOTIF_IDENTITY_DIMENSIONS):
             raise ValueError("motif identity contract must declare all six dimensions")
-        object.__setattr__(self, "preserved_dimensions", tuple(
-            item for item in MOTIF_IDENTITY_DIMENSIONS if item in preserved
-        ))
-        object.__setattr__(self, "changed_dimensions", tuple(
-            item for item in MOTIF_IDENTITY_DIMENSIONS if item in changed
-        ))
+        object.__setattr__(
+            self,
+            "preserved_dimensions",
+            tuple(item for item in MOTIF_IDENTITY_DIMENSIONS if item in preserved),
+        )
+        object.__setattr__(
+            self,
+            "changed_dimensions",
+            tuple(item for item in MOTIF_IDENTITY_DIMENSIONS if item in changed),
+        )
         object.__setattr__(self, "pitch_offset", float(self.pitch_offset))
 
     def to_dict(self) -> dict[str, object]:
@@ -74,14 +82,20 @@ class MotifResolutionRecord:
             section_index=int(data.get("section_index", 0)),
             section_name=str(data.get("section_name", "")),
             operation=str(data.get("operation", "repeat")),
-            preserved_dimensions=tuple(str(x) for x in data.get("preserved_dimensions", ())),
-            changed_dimensions=tuple(str(x) for x in data.get("changed_dimensions", ())),
+            preserved_dimensions=tuple(
+                str(x) for x in data.get("preserved_dimensions", ())
+            ),
+            changed_dimensions=tuple(
+                str(x) for x in data.get("changed_dimensions", ())
+            ),
             source_sonority_id=(
-                None if data.get("source_sonority_id") is None
+                None
+                if data.get("source_sonority_id") is None
                 else str(data["source_sonority_id"])
             ),
             target_sonority_id=(
-                None if data.get("target_sonority_id") is None
+                None
+                if data.get("target_sonority_id") is None
                 else str(data["target_sonority_id"])
             ),
             pitch_offset=float(data.get("pitch_offset", 0.0)),
@@ -129,9 +143,11 @@ class MotifResolutionPlan:
         if len(event_ids) != len(set(event_ids)):
             raise ValueError("motif resolution event IDs must be unique")
         object.__setattr__(self, "records", tuple(self.records))
-        object.__setattr__(self, "events", tuple(sorted(
-            events, key=lambda item: (item.onset_beats, item.event_id)
-        )))
+        object.__setattr__(
+            self,
+            "events",
+            tuple(sorted(events, key=lambda item: (item.onset_beats, item.event_id))),
+        )
 
     def to_dict(self, *, include_events: bool = True) -> dict[str, object]:
         data: dict[str, object] = {
@@ -186,10 +202,12 @@ class MotifResolutionPlan:
         previous_record = score.metadata.get("motif_resolution", {})
         previous_ids = set(
             previous_record.get("event_ids", ())
-            if isinstance(previous_record, dict) else ()
+            if isinstance(previous_record, dict)
+            else ()
         )
         retained = tuple(
-            event for event in score.events
+            event
+            for event in score.events
             if not (
                 replace_existing
                 and event.event_id in previous_ids
@@ -301,21 +319,20 @@ def resolve_motif_plan_to_score(
         target_anchor = None
         if sonority is not None:
             if not isinstance(sonority, Sonority):
-                raise ValueError("sonorities_by_section values must be Sonority objects")
+                raise ValueError(
+                    "sonorities_by_section values must be Sonority objects"
+                )
             target_anchor = (
                 sonority.bass_pitch
                 if sonority.bass_pitch is not None
                 else min(sonority.pitches)
             )
         pitch_offset = (
-            0.0 if target_anchor is None
-            else float(target_anchor) - anchor_coordinate
+            0.0 if target_anchor is None else float(target_anchor) - anchor_coordinate
         )
 
         base_contract = motif_identity_contract(instance.operation)
-        preserved = set(
-            instance.preserved_dimensions or base_contract["preserved"]
-        )
+        preserved = set(instance.preserved_dimensions or base_contract["preserved"])
         if abs(pitch_offset) > 1e-9:
             preserved.discard("register")
         preserved_dimensions = tuple(
@@ -324,22 +341,25 @@ def resolve_motif_plan_to_score(
         changed_dimensions = tuple(
             item for item in MOTIF_IDENTITY_DIMENSIONS if item not in preserved
         )
-        records.append(MotifResolutionRecord(
-            motif_id=instance.motif_id,
-            section_index=instance.section_index,
-            section_name=instance.section_name,
-            operation=(
-                instance.operation if sonority is None
-                else f"{instance.operation}+sonority_anchor"
-            ),
-            preserved_dimensions=preserved_dimensions,
-            changed_dimensions=changed_dimensions,
-            source_sonority_id=(
-                None if sonority is None else sonority.source_sonority_id
-            ),
-            target_sonority_id=None if sonority is None else sonority.sonority_id,
-            pitch_offset=pitch_offset,
-        ))
+        records.append(
+            MotifResolutionRecord(
+                motif_id=instance.motif_id,
+                section_index=instance.section_index,
+                section_name=instance.section_name,
+                operation=(
+                    instance.operation
+                    if sonority is None
+                    else f"{instance.operation}+sonority_anchor"
+                ),
+                preserved_dimensions=preserved_dimensions,
+                changed_dimensions=changed_dimensions,
+                source_sonority_id=(
+                    None if sonority is None else sonority.source_sonority_id
+                ),
+                target_sonority_id=None if sonority is None else sonority.sonority_id,
+                pitch_offset=pitch_offset,
+            )
+        )
 
         section_start = _beat_at_bar(score.meter_map, instance.start_bar)
         section_end = _beat_at_bar(score.meter_map, instance.end_bar)
@@ -390,24 +410,29 @@ def resolve_motif_plan_to_score(
                     parameters["target_sonority_id"] = sonority.sonority_id
                     if sonority.source_sonority_id is not None:
                         parameters["source_sonority_id"] = sonority.source_sonority_id
-                events.append(MusicalEvent(
-                    event_id=event_id,
-                    voice_id=resolved_voice,
-                    onset_beats=onset,
-                    duration_beats=duration,
-                    kind="note",
-                    pitch=pitch,
-                    frequency_hz=frequency,
-                    velocity=float(note.velocity),
-                    articulation=note.articulation,
-                    parameters=parameters,
-                    tags=("motif", "m19.5", instance.operation),
-                    source_id=instance.motif_id,
-                    seed=int.from_bytes(hashlib.blake2b(
-                        event_id.encode("utf-8"), digest_size=4
-                    ).digest(), "big"),
-                    tuning_id=score.tuning_id,
-                ))
+                events.append(
+                    MusicalEvent(
+                        event_id=event_id,
+                        voice_id=resolved_voice,
+                        onset_beats=onset,
+                        duration_beats=duration,
+                        kind="note",
+                        pitch=pitch,
+                        frequency_hz=frequency,
+                        velocity=float(note.velocity),
+                        articulation=note.articulation,
+                        parameters=parameters,
+                        tags=("motif", "m19.5", instance.operation),
+                        source_id=instance.motif_id,
+                        seed=int.from_bytes(
+                            hashlib.blake2b(
+                                event_id.encode("utf-8"), digest_size=4
+                            ).digest(),
+                            "big",
+                        ),
+                        tuning_id=score.tuning_id,
+                    )
+                )
             cursor += phrase_period
             phrase_index += 1
 

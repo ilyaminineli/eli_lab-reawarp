@@ -1,10 +1,19 @@
 """Reusable stem mixer row widget."""
+
 from __future__ import annotations
 
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSlider, QToolButton, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QToolButton,
+    QWidget,
+)
 
 
 class StemRow(QFrame):
@@ -12,7 +21,9 @@ class StemRow(QFrame):
     regenerate = Signal(str)
     changed = Signal()
 
-    def __init__(self, name: str, can_regenerate: bool, parent: QWidget | None = None) -> None:
+    def __init__(
+        self, name: str, can_regenerate: bool, parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.name = name
         self.can_regenerate = can_regenerate
@@ -38,7 +49,9 @@ class StemRow(QFrame):
         layout.addWidget(self.gain)
         self.gain_label = QLabel("1.00")
         self.gain_label.setFixedWidth(38)
-        self.gain.valueChanged.connect(lambda value: self.gain_label.setText(f"{value / 100:.2f}"))
+        self.gain.valueChanged.connect(
+            lambda value: self.gain_label.setText(f"{value / 100:.2f}")
+        )
         layout.addWidget(self.gain_label)
 
         layout.addWidget(QLabel("PAN"))
@@ -74,7 +87,9 @@ class StemRow(QFrame):
         self.regen = QPushButton("REGENERATE")
         self.regen.setEnabled(can_regenerate)
         if not can_regenerate:
-            self.regen.setToolTip("This source layer cannot be regenerated procedurally.")
+            self.regen.setToolTip(
+                "This source layer cannot be regenerated procedurally."
+            )
         self.regen.clicked.connect(lambda: self.regenerate.emit(self.name))
         layout.addWidget(self.regen)
         layout.addStretch(1)

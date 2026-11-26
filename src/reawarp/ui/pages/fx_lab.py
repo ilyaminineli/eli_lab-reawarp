@@ -74,7 +74,9 @@ class FxLabPage(QWidget):
         outer_layout.setSpacing(0)
         self.content_scroll = QScrollArea()
         self.content_scroll.setWidgetResizable(True)
-        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.content_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         content = QWidget()
         layout = QVBoxLayout(content)
         layout.setContentsMargins(14, 14, 14, 14)
@@ -354,7 +356,9 @@ class FxLabPage(QWidget):
         self._mark_custom()
         item = self.stage_list.item(row)
         if item is not None:
-            item.setText(f"{row + 1:02d}  /  {str(self._stages[row]['type']).upper()}  ·  edited")
+            item.setText(
+                f"{row + 1:02d}  /  {str(self._stages[row]['type']).upper()}  ·  edited"
+            )
         self._invalidate_result()
 
     def _update_stage_buttons(self) -> None:
@@ -388,7 +392,10 @@ class FxLabPage(QWidget):
         target = row + int(direction)
         if not 0 <= row < len(self._stages) or not 0 <= target < len(self._stages):
             return
-        self._stages[row], self._stages[target] = self._stages[target], self._stages[row]
+        self._stages[row], self._stages[target] = (
+            self._stages[target],
+            self._stages[row],
+        )
         self._mark_custom()
         self._refresh_stage_list(selected=target)
         self._invalidate_result()
@@ -608,9 +615,7 @@ class FxLabPage(QWidget):
     def _set_result_available(self, available: bool) -> None:
         self.play_result_button.setEnabled(available)
         self.save_button.setEnabled(available)
-        self.apply_chain_button.setEnabled(
-            available and self._project_stem is not None
-        )
+        self.apply_chain_button.setEnabled(available and self._project_stem is not None)
 
     def _play_source(self) -> None:
         if self.source_audio is None:

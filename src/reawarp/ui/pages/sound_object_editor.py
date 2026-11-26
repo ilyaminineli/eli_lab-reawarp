@@ -1,4 +1,5 @@
 """M31 graphical editor over the existing M21 sound-object model."""
+
 from __future__ import annotations
 
 from dataclasses import replace
@@ -7,13 +8,28 @@ from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPushButton, QSpinBox, QSplitter, QVBoxLayout, QWidget,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSpinBox,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.synthesis.sound_object import (
-    LAYER_ROLES, SoundObjectLayer, SoundObjectPatch, sound_object_editor_model,
+    LAYER_ROLES,
+    SoundObjectLayer,
+    SoundObjectPatch,
+    sound_object_editor_model,
 )
 from reawarp.ui.widgets.audio_preview import AudioPreview
 
@@ -152,8 +168,10 @@ class SoundObjectEditorPage(QWidget):
         self.cancel_button = QPushButton("CANCEL")
         self.cancel_button.clicked.connect(self.cancelRequested.emit)
         for button in (
-            self.audition_layer_button, self.audition_object_button,
-            self.play_button, self.cancel_button,
+            self.audition_layer_button,
+            self.audition_object_button,
+            self.play_button,
+            self.cancel_button,
         ):
             actions.addWidget(button)
         audition_layout.addLayout(actions)
@@ -164,8 +182,16 @@ class SoundObjectEditorPage(QWidget):
             self.output_rate.addItem(f"{rate:,} Hz", rate)
         self.target_role = QComboBox()
         for role in (
-            "texture", "kick", "snare", "hat", "percussion",
-            "bass", "lead", "melody", "ambience", "fx",
+            "texture",
+            "kick",
+            "snare",
+            "hat",
+            "percussion",
+            "bass",
+            "lead",
+            "melody",
+            "ambience",
+            "fx",
         ):
             self.target_role.addItem(role.upper(), role)
         self.print_button = QPushButton("PRINT TO NEW WAV ASSET…")
@@ -187,12 +213,16 @@ class SoundObjectEditorPage(QWidget):
         root.addWidget(audition, 2)
         self.set_busy(False)
 
-    def set_patches(self, patches: list[SoundObjectPatch] | tuple[SoundObjectPatch, ...]) -> None:
+    def set_patches(
+        self, patches: list[SoundObjectPatch] | tuple[SoundObjectPatch, ...]
+    ) -> None:
         selected = self._patch.patch_id if self._patch is not None else None
         self._patches = {item.patch_id: item for item in patches}
         self._loading = True
         self.patch_picker.clear()
-        for patch_id, patch in sorted(self._patches.items(), key=lambda pair: pair[1].name.casefold()):
+        for patch_id, patch in sorted(
+            self._patches.items(), key=lambda pair: pair[1].name.casefold()
+        ):
             self.patch_picker.addItem(patch.name, patch_id)
         index = self.patch_picker.findData(selected) if selected else -1
         if index < 0 and self.patch_picker.count():
@@ -220,7 +250,9 @@ class SoundObjectEditorPage(QWidget):
             self.name.setText(identity["name"])
             self.processing_id.setText(identity["processing_identity_id"])
             self.sample_rate.setText(f'{model["clock"]["sample_rate_hz"]:,} Hz')
-            self.version.setText(f'{identity["patch_id"]} · schema {model["schema_version"]}')
+            self.version.setText(
+                f'{identity["patch_id"]} · schema {model["schema_version"]}'
+            )
             for item in self._patch.layers:
                 row = QListWidgetItem(f"{item.role.upper()}  /  {item.layer_id}")
                 row.setData(Qt.ItemDataRole.UserRole, item.layer_id)
@@ -238,7 +270,9 @@ class SoundObjectEditorPage(QWidget):
         if self._loading or self._patch is None or index < 0:
             return
         layer_id = self.layer_picker.item(index).data(Qt.ItemDataRole.UserRole)
-        item = next((value for value in self._patch.layers if value.layer_id == layer_id), None)
+        item = next(
+            (value for value in self._patch.layers if value.layer_id == layer_id), None
+        )
         if item is not None:
             self._load_layer(item)
 
@@ -264,15 +298,21 @@ class SoundObjectEditorPage(QWidget):
         if row >= 0:
             item = layers[row]
             envelope = replace(
-                item.envelope, attack_seconds=self.attack.value(),
-                decay_seconds=self.decay.value(), sustain_level=self.sustain.value(),
+                item.envelope,
+                attack_seconds=self.attack.value(),
+                decay_seconds=self.decay.value(),
+                sustain_level=self.sustain.value(),
                 release_seconds=self.release.value(),
             )
             layers[row] = replace(
-                item, role=str(self.layer_role.currentData()),
-                start_frame=self.start_frame.value(), end_frame=self.end_frame.value(),
-                source_start_frame=self.source_start.value(), gain=self.gain.value(),
-                pan=self.pan.value(), envelope=envelope,
+                item,
+                role=str(self.layer_role.currentData()),
+                start_frame=self.start_frame.value(),
+                end_frame=self.end_frame.value(),
+                source_start_frame=self.source_start.value(),
+                gain=self.gain.value(),
+                pan=self.pan.value(),
+                envelope=envelope,
             )
         return replace(
             self._patch,
@@ -304,7 +344,9 @@ class SoundObjectEditorPage(QWidget):
 
     def _import_source(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Import sound-object source", "",
+            self,
+            "Import sound-object source",
+            "",
             "Audio files (*.wav *.flac *.aiff *.aif *.ogg)",
         )
         if path:
@@ -321,13 +363,17 @@ class SoundObjectEditorPage(QWidget):
                 if not path.casefold().endswith(".wav"):
                     path += ".wav"
                 self.printRequested.emit(
-                    patch, path, int(self.output_rate.currentData()),
+                    patch,
+                    path,
+                    int(self.output_rate.currentData()),
                     str(self.target_role.currentData()),
                 )
         except Exception as exc:
             self.set_status(f"Cannot prepare sound-object print: {exc}")
 
-    def set_preview(self, audio: Any, sample_rate: int, *, label: str = "Rendered preview") -> None:
+    def set_preview(
+        self, audio: Any, sample_rate: int, *, label: str = "Rendered preview"
+    ) -> None:
         import numpy as np
 
         self._preview_audio = np.asarray(audio, dtype=np.float32).copy()
@@ -345,8 +391,12 @@ class SoundObjectEditorPage(QWidget):
 
     def set_busy(self, busy: bool) -> None:
         for widget in (
-            self.new_button, self.refresh_button, self.save_button,
-            self.audition_layer_button, self.audition_object_button, self.print_button,
+            self.new_button,
+            self.refresh_button,
+            self.save_button,
+            self.audition_layer_button,
+            self.audition_object_button,
+            self.print_button,
         ):
             widget.setEnabled(not busy)
         self.cancel_button.setEnabled(busy)

@@ -1,4 +1,5 @@
 """Offline routing renders and role-combination audition exports."""
+
 from __future__ import annotations
 
 import argparse
@@ -11,8 +12,11 @@ import numpy as np
 
 from reawarp.export.wav import write_wav
 from reawarp.fx_automation import (
-    attach_fx_automation_to_score, fx_automation_registry,
-    load_fx_automation, normalise_fx_automation, save_fx_automation,
+    attach_fx_automation_to_score,
+    fx_automation_registry,
+    load_fx_automation,
+    normalise_fx_automation,
+    save_fx_automation,
 )
 from reawarp.score.model import Score
 from reawarp.score.render import build_score_control_bus
@@ -33,7 +37,7 @@ def _sum_buffers(buffers: Mapping[str, np.ndarray]) -> np.ndarray:
     result = np.zeros((frames, 2), dtype=np.float32)
     for audio in buffers.values():
         value = np.asarray(audio, dtype=np.float32)
-        result[:len(value)] += value
+        result[: len(value)] += value
     return result
 
 
@@ -77,8 +81,12 @@ def _write_render(
     direct_mix = _sum_buffers(processed)
     return_mix = _sum_buffers(returns)
     analysis_frames = max(len(direct_mix), len(return_mix))
-    direct_aligned = np.pad(direct_mix, ((0, analysis_frames - len(direct_mix)), (0, 0)))
-    return_aligned = np.pad(return_mix, ((0, analysis_frames - len(return_mix)), (0, 0)))
+    direct_aligned = np.pad(
+        direct_mix, ((0, analysis_frames - len(direct_mix)), (0, 0))
+    )
+    return_aligned = np.pad(
+        return_mix, ((0, analysis_frames - len(return_mix)), (0, 0))
+    )
     direct_rms = _rms(direct_aligned)
     return_rms = _rms(return_aligned)
     peak = float(np.max(np.abs(master))) if master.size else 0.0
@@ -111,18 +119,30 @@ def main() -> None:
         description="Render role-aware per-stem FX routing and beat automation offline.",
     )
     parser.add_argument(
-        "project", type=Path,
+        "project",
+        type=Path,
         help="generated project directory containing project.json and stems/",
     )
     parser.add_argument(
-        "--routing", type=Path,
+        "--routing",
+        type=Path,
         help="routing JSON; if omitted, a conservative starter file is created",
     )
-    parser.add_argument("--automation", type=Path, help="optional beat-based FX automation JSON")
-    parser.add_argument("--output", type=Path, default=Path("output/routed"), help="destination directory")
-    parser.add_argument("--validate", action="store_true", help="validate routing/automation and exit")
     parser.add_argument(
-        "--audition-matrix", action="store_true",
+        "--automation", type=Path, help="optional beat-based FX automation JSON"
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("output/routed"),
+        help="destination directory",
+    )
+    parser.add_argument(
+        "--validate", action="store_true", help="validate routing/automation and exit"
+    )
+    parser.add_argument(
+        "--audition-matrix",
+        action="store_true",
         help="render percussion, melody, ambience, and combined role comparisons",
     )
     args = parser.parse_args()
@@ -142,12 +162,15 @@ def main() -> None:
             raise SystemExit("Output must be outside the source project directory.")
 
     if args.audition_matrix and args.routing is not None:
-        raise SystemExit("--audition-matrix creates its own routing profiles; omit --routing")
+        raise SystemExit(
+            "--audition-matrix creates its own routing profiles; omit --routing"
+        )
 
     try:
         automation = (
             load_fx_automation(args.automation, names)
-            if args.automation is not None else normalise_fx_automation(None, names)
+            if args.automation is not None
+            else normalise_fx_automation(None, names)
         )
         if args.audition_matrix:
             routings = build_role_audition_matrix(names)
@@ -159,7 +182,9 @@ def main() -> None:
                 if args.validate:
                     raise SystemExit("--routing is required with --validate")
                 routing_path = args.output / "fx_routing.json"
-                save_fx_routing(routing_path, role_aware_fx_routing(names), names, sample_rate)
+                save_fx_routing(
+                    routing_path, role_aware_fx_routing(names), names, sample_rate
+                )
             routings = {"custom": load_fx_routing(routing_path, names, sample_rate)}
     except SystemExit:
         raise
@@ -176,7 +201,9 @@ def main() -> None:
     try:
         import soundfile as sf
     except ImportError as exc:
-        raise SystemExit('SoundFile required: python -m pip install -e ".[pyo]"') from exc
+        raise SystemExit(
+            'SoundFile required: python -m pip install -e ".[pyo]"'
+        ) from exc
 
     attention_gestures = ()
     controls = None
@@ -221,21 +248,31 @@ def main() -> None:
     for profile_name, routing in routings.items():
         try:
             processed, metadata = render_fx_routing(
-                stems, sample_rate, routing,
+                stems,
+                sample_rate,
+                routing,
                 bpm=bpm,
                 automation=automation if controls is None else None,
                 controls=controls,
                 attention_gestures=attention_gestures,
             )
         except Exception as exc:
-            raise SystemExit(f"FX routing render failed for {profile_name}: {exc}") from exc
+            raise SystemExit(
+                f"FX routing render failed for {profile_name}: {exc}"
+            ) from exc
         returns = metadata.pop("bus_returns_audio")
         destination = (
             args.output / profile_name if args.audition_matrix else args.output
         )
         analysis = _write_render(
-            destination, stems, processed, returns, metadata,
-            routing, automation, sample_rate,
+            destination,
+            stems,
+            processed,
+            returns,
+            metadata,
+            routing,
+            automation,
+            sample_rate,
         )
         report["profiles"][profile_name] = analysis
         print(
@@ -249,7 +286,9 @@ def main() -> None:
         (args.output / "audition_report.json").write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
-        print("Audition matrix exported. RMS ratios are signal measurements; use listening to judge masking and musical fit.")
+        print(
+            "Audition matrix exported. RMS ratios are signal measurements; use listening to judge masking and musical fit."
+        )
 
 
 if __name__ == "__main__":

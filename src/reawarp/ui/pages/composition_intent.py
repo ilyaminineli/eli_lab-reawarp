@@ -4,6 +4,7 @@ The widget authors a CompositionBrief and declarative mutation permissions. It
 contains no renderer or project state; MainWindow compiles the brief against the
 current GenerationConfig before generation or when applying it to a loaded project.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -39,10 +40,16 @@ from reawarp.composition.brief import (
 )
 from reawarp.composition.brief import FIELD_SCOPE
 
-
 MATERIAL_FUNCTIONS = {"A": "anchor", "B": "response", "C": "destabiliser"}
 ROLE_ORDER = (
-    "kick", "snare", "hat", "break", "melody", "texture", "ambience", "percussion",
+    "kick",
+    "snare",
+    "hat",
+    "break",
+    "melody",
+    "texture",
+    "ambience",
+    "percussion",
 )
 MUTATION_LABELS = {
     "arrangement_density": "Arrangement density",
@@ -92,17 +99,25 @@ class CompositionIntentEditor(QGroupBox):
         self.brief_id.setPlaceholderText("Stable brief ID")
         form.addRow("Brief ID", self.brief_id)
         self.artistic_question = QLineEdit()
-        self.artistic_question.setPlaceholderText("What tension or question holds this piece together?")
+        self.artistic_question.setPlaceholderText(
+            "What tension or question holds this piece together?"
+        )
         form.addRow("Artistic question", self.artistic_question)
         self.listening_mode = QLineEdit()
-        self.listening_mode.setPlaceholderText("e.g. close listening, movement, spatial study")
+        self.listening_mode.setPlaceholderText(
+            "e.g. close listening, movement, spatial study"
+        )
         form.addRow("Listening mode", self.listening_mode)
 
         materials_group = QGroupBox("MATERIAL VOCABULARY  /  A · B · C")
         materials_layout = QFormLayout(materials_group)
         self.material_labels: dict[str, QLineEdit] = {}
         self.material_roles: dict[str, QComboBox] = {}
-        for material_id, label in (("A", "Anchor"), ("B", "Response"), ("C", "Destabiliser")):
+        for material_id, label in (
+            ("A", "Anchor"),
+            ("B", "Response"),
+            ("C", "Destabiliser"),
+        ):
             row = QWidget()
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
@@ -119,7 +134,14 @@ class CompositionIntentEditor(QGroupBox):
         anchor_group = QGroupBox("ANCHOR")
         anchor_form = QFormLayout(anchor_group)
         self.anchor_kind = QComboBox()
-        for value in ("none", "pulse", "motif", "sound_object", "role", "spatial_feature"):
+        for value in (
+            "none",
+            "pulse",
+            "motif",
+            "sound_object",
+            "role",
+            "spatial_feature",
+        ):
             self.anchor_kind.addItem(value.replace("_", " ").title(), value)
         anchor_form.addRow("Anchor kind", self.anchor_kind)
         self.anchor_material = QComboBox()
@@ -137,7 +159,9 @@ class CompositionIntentEditor(QGroupBox):
         contrast_group = QGroupBox("CONTRAST + ENDING")
         contrast_form = QFormLayout(contrast_group)
         self.contrast_label = QLineEdit()
-        self.contrast_label.setPlaceholderText("Optional contrast to preserve or develop")
+        self.contrast_label.setPlaceholderText(
+            "Optional contrast to preserve or develop"
+        )
         contrast_form.addRow("Target contrast", self.contrast_label)
         self.contrast_dimensions = QLineEdit()
         self.contrast_dimensions.setPlaceholderText("e.g. rhythm, timbre, register")
@@ -149,7 +173,9 @@ class CompositionIntentEditor(QGroupBox):
         self.ending_preserve = QComboBox()
         self.ending_preserve.addItem("No named material", "")
         for material_id in ("A", "B", "C"):
-            self.ending_preserve.addItem(f"Preserve material {material_id}", material_id)
+            self.ending_preserve.addItem(
+                f"Preserve material {material_id}", material_id
+            )
         contrast_form.addRow("Retain at ending", self.ending_preserve)
         form.addRow(contrast_group)
         self.notes = QLineEdit()
@@ -223,7 +249,9 @@ class CompositionIntentEditor(QGroupBox):
         self.mutation_checks: dict[str, QCheckBox] = {}
         names = sorted(FIELD_SCOPE, key=lambda item: (FIELD_SCOPE[item], item))
         for index, field_name in enumerate(names):
-            label = MUTATION_LABELS.get(field_name, field_name.replace("_", " ").title())
+            label = MUTATION_LABELS.get(
+                field_name, field_name.replace("_", " ").title()
+            )
             checkbox = QCheckBox(label)
             checkbox.setToolTip(
                 f"{FIELD_SCOPE[field_name].title()} scope · {field_name}"
@@ -242,7 +270,9 @@ class CompositionIntentEditor(QGroupBox):
         root.addWidget(mutation_group)
 
         footer = QHBoxLayout()
-        self.status = QLabel("Brief is optional. Legacy projects are never assigned an inferred brief.")
+        self.status = QLabel(
+            "Brief is optional. Legacy projects are never assigned an inferred brief."
+        )
         self.status.setWordWrap(True)
         self.status.setObjectName("muted")
         footer.addWidget(self.status, 1)
@@ -255,7 +285,9 @@ class CompositionIntentEditor(QGroupBox):
         self._loaded_contract_fields: frozenset[str] = frozenset()
 
     @staticmethod
-    def _number(minimum: float, maximum: float, value: float, decimals: int) -> QDoubleSpinBox:
+    def _number(
+        minimum: float, maximum: float, value: float, decimals: int
+    ) -> QDoubleSpinBox:
         control = QDoubleSpinBox()
         control.setRange(minimum, maximum)
         control.setDecimals(decimals)
@@ -277,7 +309,8 @@ class CompositionIntentEditor(QGroupBox):
 
     def selected_mutation_fields(self) -> tuple[str, ...]:
         return tuple(
-            field_name for field_name, checkbox in self.mutation_checks.items()
+            field_name
+            for field_name, checkbox in self.mutation_checks.items()
             if checkbox.isChecked()
         )
 
@@ -308,16 +341,20 @@ class CompositionIntentEditor(QGroupBox):
                 continue
             role = str(self.material_roles[material_id].currentData() or "")
             family = family_by_role.get(role)
-            source_ids = tuple(
-                asset.reference_id for asset in family.assets
-            ) if family is not None else ()
-            materials.append(MaterialIdentity(
-                material_id=material_id,
-                label=label,
-                function=MATERIAL_FUNCTIONS[material_id],
-                role=role,
-                source_asset_ids=source_ids,
-            ))
+            source_ids = (
+                tuple(asset.reference_id for asset in family.assets)
+                if family is not None
+                else ()
+            )
+            materials.append(
+                MaterialIdentity(
+                    material_id=material_id,
+                    label=label,
+                    function=MATERIAL_FUNCTIONS[material_id],
+                    role=role,
+                    source_asset_ids=source_ids,
+                )
+            )
 
         anchor_kind = str(self.anchor_kind.currentData())
         if anchor_kind == "none":
@@ -329,8 +366,10 @@ class CompositionIntentEditor(QGroupBox):
             if not (material_id or role or description):
                 description = f"Preserve the identity of the {anchor_kind.replace('_', ' ')} anchor."
             anchor = AnchorSpec(
-                kind=anchor_kind, material_id=material_id,
-                role=role, description=description,
+                kind=anchor_kind,
+                material_id=material_id,
+                role=role,
+                description=description,
             )
 
         ending_mode = str(self.ending_mode.currentData())
@@ -343,14 +382,17 @@ class CompositionIntentEditor(QGroupBox):
         contrasts = ()
         if contrast:
             dimensions = tuple(
-                item.strip() for item in self.contrast_dimensions.text().split(",")
+                item.strip()
+                for item in self.contrast_dimensions.text().split(",")
                 if item.strip()
             )
-            contrasts = (ContrastTarget(
-                label=contrast,
-                material_ids=tuple(item.material_id for item in materials),
-                dimensions=dimensions,
-            ),)
+            contrasts = (
+                ContrastTarget(
+                    label=contrast,
+                    material_ids=tuple(item.material_id for item in materials),
+                    dimensions=dimensions,
+                ),
+            )
 
         fields = self.selected_mutation_fields()
         if self.exploration_enabled() and not fields:
@@ -367,15 +409,19 @@ class CompositionIntentEditor(QGroupBox):
             bpm_mode="explore" if "bpm" in selected else "preserve",
             duration_mode="explore" if "duration" in selected else "preserve",
             form_mode=(
-                "explore" if {"structure", "composition_flow"} & selected else "preserve"
+                "explore"
+                if {"structure", "composition_flow"} & selected
+                else "preserve"
             ),
             bpm_bounds=(
                 (self.bpm_min.value(), self.bpm_max.value())
-                if "bpm" in selected else (60.0, 220.0)
+                if "bpm" in selected
+                else (60.0, 220.0)
             ),
             duration_bounds=(
                 (self.duration_min.value(), self.duration_max.value())
-                if "duration" in selected else (5.0, 180.0)
+                if "duration" in selected
+                else (5.0, 180.0)
             ),
         )
         scale = str(self.pitch_scale.currentText())
@@ -389,8 +435,11 @@ class CompositionIntentEditor(QGroupBox):
             pitch_world=PitchWorld(
                 scale=scale if self._pitch_world_explicit else "chromatic",
                 root=root if self._pitch_world_explicit else 0,
-                tuning_id=(self.tuning_id.text().strip() or "12tet")
-                if self._pitch_world_explicit else "12tet",
+                tuning_id=(
+                    (self.tuning_id.text().strip() or "12tet")
+                    if self._pitch_world_explicit
+                    else "12tet"
+                ),
             ),
             pitch_world_explicit=self._pitch_world_explicit,
             source_families=source_families,
@@ -411,9 +460,16 @@ class CompositionIntentEditor(QGroupBox):
         by_id = {item.material_id: item for item in brief.materials}
         for material_id in ("A", "B", "C"):
             material = by_id.get(material_id)
-            self.material_labels[material_id].setText(material.label if material else "")
+            self.material_labels[material_id].setText(
+                material.label if material else ""
+            )
             self.material_roles[material_id].setCurrentIndex(
-                max(0, self.material_roles[material_id].findData(material.role if material else ""))
+                max(
+                    0,
+                    self.material_roles[material_id].findData(
+                        material.role if material else ""
+                    ),
+                )
             )
         self.anchor_kind.setCurrentIndex(
             max(0, self.anchor_kind.findData(brief.anchor.kind))
@@ -430,13 +486,20 @@ class CompositionIntentEditor(QGroupBox):
         )
         self.contrast_dimensions.setText(
             ", ".join(brief.target_contrasts[0].dimensions)
-            if brief.target_contrasts else ""
+            if brief.target_contrasts
+            else ""
         )
         self.ending_mode.setCurrentIndex(
             max(0, self.ending_mode.findData(brief.ending_intent.mode))
         )
-        preserve = brief.ending_intent.preserve_material_ids[0] if brief.ending_intent.preserve_material_ids else ""
-        self.ending_preserve.setCurrentIndex(max(0, self.ending_preserve.findData(preserve)))
+        preserve = (
+            brief.ending_intent.preserve_material_ids[0]
+            if brief.ending_intent.preserve_material_ids
+            else ""
+        )
+        self.ending_preserve.setCurrentIndex(
+            max(0, self.ending_preserve.findData(preserve))
+        )
         self.notes.setText(brief.notes)
         self.pitch_scale.setCurrentText(brief.pitch_world.scale)
         self.pitch_root.setCurrentIndex(
@@ -447,7 +510,8 @@ class CompositionIntentEditor(QGroupBox):
         for checkbox in self.mutation_checks.values():
             checkbox.setChecked(False)
         fields = {
-            field_name for contract in brief.mutation_contracts
+            field_name
+            for contract in brief.mutation_contracts
             for field_name in contract.mutable_fields
         }
         for field_name in fields:

@@ -4,6 +4,7 @@ The functions in this module inspect buffers without modifying them. Metrics are
 descriptive rather than perceptual: they can expose clipping, non-finite values,
 alignment errors, and level differences, but cannot judge musical quality.
 """
+
 from __future__ import annotations
 
 import math

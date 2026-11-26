@@ -1,17 +1,31 @@
 """M33 arrangement editor: manual phrase assembly, edit history and finishing gates."""
+
 from __future__ import annotations
 
 from typing import Any
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFormLayout, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QPushButton, QSplitter,
-    QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp.composition.arrangement import (
-    CHECKLIST_ITEMS, ArrangementClip, ArrangementPlan, arrangement_timeline,
+    CHECKLIST_ITEMS,
+    ArrangementClip,
+    ArrangementPlan,
+    arrangement_timeline,
 )
 from reawarp.composition.endings import ending_plans_from_score
 from reawarp.composition.phrases import PhrasePlan
@@ -77,8 +91,11 @@ class ArrangementEditorPage(QWidget):
         self.branch_button.clicked.connect(self.branchRequested.emit)
         self.revert_button.clicked.connect(self.revertRequested.emit)
         for button in (
-            self.create_button, self.undo_button, self.redo_button,
-            self.branch_button, self.revert_button,
+            self.create_button,
+            self.undo_button,
+            self.redo_button,
+            self.branch_button,
+            self.revert_button,
         ):
             toolbar.addWidget(button)
         toolbar.addStretch(1)
@@ -163,7 +180,9 @@ class ArrangementEditorPage(QWidget):
         edit.addRow(self.exchange_button)
 
         self.candidate = QComboBox()
-        self.candidate.setToolTip("M28 candidate from the source phrase selected in Phrase Workbench.")
+        self.candidate.setToolTip(
+            "M28 candidate from the source phrase selected in Phrase Workbench."
+        )
         self.replace_button = QPushButton("REPLACE WITH SELECTED CANDIDATE")
         self.replace_button.clicked.connect(self._replace)
         edit.addRow("M28 candidate", self.candidate)
@@ -205,7 +224,9 @@ class ArrangementEditorPage(QWidget):
         for key in CHECKLIST_ITEMS:
             check = QCheckBox(labels[key])
             check.toggled.connect(
-                lambda checked, item=key: self.checklistChanged.emit(item, bool(checked))
+                lambda checked, item=key: self.checklistChanged.emit(
+                    item, bool(checked)
+                )
             )
             self.checks[key] = check
             checklist_layout.addWidget(check)
@@ -216,7 +237,9 @@ class ArrangementEditorPage(QWidget):
         split.setStretchFactor(1, 2)
         root.addWidget(split, 1)
 
-        self.status = QLabel("Create an arrangement after defining phrase spans in Phrase Workbench.")
+        self.status = QLabel(
+            "Create an arrangement after defining phrase spans in Phrase Workbench."
+        )
         self.status.setObjectName("muted")
         self.status.setWordWrap(True)
         root.addWidget(self.status)
@@ -253,7 +276,8 @@ class ArrangementEditorPage(QWidget):
                     state = " · CUE"
                 section = (
                     f" · section {item['section_id']}"
-                    if kind == "phrase" and item.get("section_id") else ""
+                    if kind == "phrase" and item.get("section_id")
+                    else ""
                 )
                 label = (
                     f"{item['start_beats']}–{item['end_beats']}  "
@@ -304,7 +328,9 @@ class ArrangementEditorPage(QWidget):
             check.setEnabled(self._plan is not None)
             check.blockSignals(False)
 
-    def _item_selected(self, item: QListWidgetItem | None, _previous: QListWidgetItem | None) -> None:
+    def _item_selected(
+        self, item: QListWidgetItem | None, _previous: QListWidgetItem | None
+    ) -> None:
         if item is None:
             self._selected_item_id = None
             self._selected_kind = None
@@ -325,8 +351,14 @@ class ArrangementEditorPage(QWidget):
         elif self._score is not None:
             cue_start = ""
             if self._selected_kind == "transition":
-                cue = next((x for x in transition_plans_from_score(self._score)
-                            if x.transition_id == self._selected_item_id), None)
+                cue = next(
+                    (
+                        x
+                        for x in transition_plans_from_score(self._score)
+                        if x.transition_id == self._selected_item_id
+                    ),
+                    None,
+                )
                 cue_start = str(cue.start_beats) if cue else ""
                 if cue is not None:
                     self.transition_source.setCurrentIndex(
@@ -336,8 +368,14 @@ class ArrangementEditorPage(QWidget):
                         self.transition_target.findData(cue.target_phrase_id)
                     )
             elif self._selected_kind == "ending":
-                cue = next((x for x in ending_plans_from_score(self._score)
-                            if x.ending_id == self._selected_item_id), None)
+                cue = next(
+                    (
+                        x
+                        for x in ending_plans_from_score(self._score)
+                        if x.ending_id == self._selected_item_id
+                    ),
+                    None,
+                )
                 cue_start = str(cue.start_beats) if cue else ""
             self.cue_start.setText(cue_start)
 
@@ -351,7 +389,9 @@ class ArrangementEditorPage(QWidget):
         if self._score is not None:
             try:
                 for phrase in PhrasePlan.from_score(self._score).phrases:
-                    label = f"{phrase.phrase_id} · {phrase.start_beats}–{phrase.end_beats}"
+                    label = (
+                        f"{phrase.phrase_id} · {phrase.start_beats}–{phrase.end_beats}"
+                    )
                     self.transition_source.addItem(label, phrase.phrase_id)
                     self.transition_target.addItem(label, phrase.phrase_id)
             except ValueError:
@@ -396,20 +436,34 @@ class ArrangementEditorPage(QWidget):
 
     def _duplicate(self) -> None:
         if self._selected_kind == "phrase" and self._selected_item_id:
-            self.duplicateRequested.emit(self._selected_item_id, self.duplicate_at.text().strip())
+            self.duplicateRequested.emit(
+                self._selected_item_id, self.duplicate_at.text().strip()
+            )
 
     def _trim(self) -> None:
         if self._selected_kind == "phrase" and self._selected_item_id:
             self.trimRequested.emit(
-                self._selected_item_id, self.trim_start.text().strip(), self.trim_end.text().strip()
+                self._selected_item_id,
+                self.trim_start.text().strip(),
+                self.trim_end.text().strip(),
             )
 
     def _reorder(self, delta: int) -> None:
-        if self._selected_kind != "phrase" or self._selected_item_id is None or self._plan is None:
+        if (
+            self._selected_kind != "phrase"
+            or self._selected_item_id is None
+            or self._plan is None
+        ):
             return
         ordered = list(self._plan.clips)
-        index = next((i for i, item in enumerate(ordered)
-                      if item.clip_id == self._selected_item_id), -1)
+        index = next(
+            (
+                i
+                for i, item in enumerate(ordered)
+                if item.clip_id == self._selected_item_id
+            ),
+            -1,
+        )
         target = index + delta
         if 0 <= target < len(ordered):
             self.reorderRequested.emit(self._selected_item_id, target)
@@ -422,7 +476,8 @@ class ArrangementEditorPage(QWidget):
     def _exchange(self) -> None:
         if self._selected_kind == "phrase" and self._selected_item_id:
             self.exchangeRequested.emit(
-                self._selected_item_id, self.layer_source.text().strip(),
+                self._selected_item_id,
+                self.layer_source.text().strip(),
                 self.layer_target.text().strip(),
             )
 
@@ -443,9 +498,13 @@ class ArrangementEditorPage(QWidget):
         if not self._selected_item_id:
             return
         if self._selected_kind == "transition":
-            self.moveTransitionRequested.emit(self._selected_item_id, self.cue_start.text().strip())
+            self.moveTransitionRequested.emit(
+                self._selected_item_id, self.cue_start.text().strip()
+            )
         elif self._selected_kind == "ending":
-            self.moveEndingRequested.emit(self._selected_item_id, self.cue_start.text().strip())
+            self.moveEndingRequested.emit(
+                self._selected_item_id, self.cue_start.text().strip()
+            )
 
     def _refresh_controls(self) -> None:
         has_plan = self._plan is not None
@@ -454,34 +513,44 @@ class ArrangementEditorPage(QWidget):
         is_cue = self._selected_kind in {"transition", "ending"}
         frozen = bool(clip and clip.frozen)
         self.create_button.setEnabled(self._score is not None and not has_plan)
-        self.undo_button.setEnabled(has_plan and bool(
-            self._score.metadata[ "m33_arrangement" ].get("edit_history")
-        ))
-        self.redo_button.setEnabled(has_plan and bool(
-            self._score.metadata[ "m33_arrangement" ].get("redo_history")
-        ))
+        self.undo_button.setEnabled(
+            has_plan
+            and bool(self._score.metadata["m33_arrangement"].get("edit_history"))
+        )
+        self.redo_button.setEnabled(
+            has_plan
+            and bool(self._score.metadata["m33_arrangement"].get("redo_history"))
+        )
         self.branch_button.setEnabled(has_plan)
         self.revert_button.setEnabled(has_plan)
         self.move_button.setEnabled(is_phrase)
         self.duplicate_button.setEnabled(is_phrase)
         self.trim_button.setEnabled(is_phrase and not frozen)
-        self.earlier_button.setEnabled(is_phrase and self._plan is not None and len(self._plan.clips) > 1)
-        self.later_button.setEnabled(is_phrase and self._plan is not None and len(self._plan.clips) > 1)
+        self.earlier_button.setEnabled(
+            is_phrase and self._plan is not None and len(self._plan.clips) > 1
+        )
+        self.later_button.setEnabled(
+            is_phrase and self._plan is not None and len(self._plan.clips) > 1
+        )
         self.mute_button.setEnabled(is_phrase)
         self.mute_button.setText("UNMUTE" if clip and clip.muted else "MUTE")
         self.freeze_button.setEnabled(is_phrase and not frozen)
         self.print_button.setEnabled(is_phrase and not (clip and clip.muted))
         self.exchange_button.setEnabled(is_phrase and not frozen)
-        self.replace_button.setEnabled(is_phrase and not frozen and self.candidate.count() > 0)
+        self.replace_button.setEnabled(
+            is_phrase and not frozen and self.candidate.count() > 0
+        )
         self.move_cue_button.setEnabled(is_cue)
         self.cue_start.setEnabled(is_cue)
         is_transition = self._selected_kind == "transition"
         self.transition_source.setEnabled(is_transition)
         self.transition_target.setEnabled(is_transition)
         self.relink_button.setEnabled(
-            is_transition and self.transition_source.count() > 0
+            is_transition
+            and self.transition_source.count() > 0
             and self.transition_target.count() > 0
-            and self.transition_source.currentData() != self.transition_target.currentData()
+            and self.transition_source.currentData()
+            != self.transition_target.currentData()
         )
         for check in self.checks.values():
             check.setEnabled(has_plan)

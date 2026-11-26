@@ -25,10 +25,7 @@ def _candidate_score(
     vocabulary_weight: float,
     interval_weight: float,
 ) -> float:
-    score = (
-        stability_weight * candidate.stability
-        - tension_weight * candidate.tension
-    )
+    score = stability_weight * candidate.stability - tension_weight * candidate.tension
     if candidate.in_pitch_collection:
         score += vocabulary_weight
     if candidate.in_allowed_intervals:
@@ -78,9 +75,17 @@ def generate_sonority(
         raise ValueError("sonority_id cannot be empty")
     if isinstance(seed, bool) or not isinstance(seed, (int, str)):
         raise ValueError("seed must be an integer or string")
-    if isinstance(voice_count, bool) or not isinstance(voice_count, int) or not 1 <= voice_count <= 8:
+    if (
+        isinstance(voice_count, bool)
+        or not isinstance(voice_count, int)
+        or not 1 <= voice_count <= 8
+    ):
         raise ValueError("voice_count must be an integer between 1 and 8")
-    if isinstance(beam_width, bool) or not isinstance(beam_width, int) or not 1 <= beam_width <= 512:
+    if (
+        isinstance(beam_width, bool)
+        or not isinstance(beam_width, int)
+        or not 1 <= beam_width <= 512
+    ):
         raise ValueError("beam_width must be an integer between 1 and 512")
 
     low = _finite(minimum_pitch, "minimum_pitch")
@@ -95,8 +100,7 @@ def generate_sonority(
         "interval_weight": _finite(interval_weight, "interval_weight"),
     }
     max_gap = (
-        None if maximum_spacing is None
-        else _finite(maximum_spacing, "maximum_spacing")
+        None if maximum_spacing is None else _finite(maximum_spacing, "maximum_spacing")
     )
     if low > high:
         raise ValueError("minimum_pitch cannot exceed maximum_pitch")
@@ -132,8 +136,7 @@ def generate_sonority(
         raise ValueError("pitch field produced no candidates in the requested register")
 
     scored = [
-        (candidate, _candidate_score(candidate, **weights))
-        for candidate in candidates
+        (candidate, _candidate_score(candidate, **weights)) for candidate in candidates
     ]
     states: list[tuple[tuple[PitchCandidate, ...], float]] = [((), 0.0)]
     for _voice in range(voice_count):
@@ -214,7 +217,9 @@ def _transformed(
         duration_beats=source.duration_beats,
         pitches=tuple(sorted(_finite(value, "transformed pitch") for value in pitches)),
         bass_pitch=(
-            source.bass_pitch if bass_pitch is None else _finite(bass_pitch, "bass_pitch")
+            source.bass_pitch
+            if bass_pitch is None
+            else _finite(bass_pitch, "bass_pitch")
         ),
         tension=source.tension,
         transform=transform,
@@ -246,8 +251,11 @@ def rotate_sonority(
     if bass is not None and count:
         bass += tuning.divisions_per_period
     return _transformed(
-        source, sonority_id=sonority_id, pitches=shifted,
-        transform="rotate", parameters={"steps": steps, "period_steps": tuning.divisions_per_period},
+        source,
+        sonority_id=sonority_id,
+        pitches=shifted,
+        transform="rotate",
+        parameters={"steps": steps, "period_steps": tuning.divisions_per_period},
         bass_pitch=bass,
     )
 
@@ -262,9 +270,11 @@ def transpose_sonority(
     interval = _finite(interval_steps, "interval_steps")
     bass = None if source.bass_pitch is None else source.bass_pitch + interval
     return _transformed(
-        source, sonority_id=sonority_id,
+        source,
+        sonority_id=sonority_id,
         pitches=tuple(value + interval for value in source.pitches),
-        transform="transpose", parameters={"interval_steps": interval},
+        transform="transpose",
+        parameters={"interval_steps": interval},
         bass_pitch=bass,
     )
 
@@ -277,14 +287,13 @@ def invert_sonority(
 ) -> Sonority:
     """Reflect every pitch around an explicit pitch-coordinate axis."""
     axis = _finite(axis_pitch, "axis_pitch")
-    bass = (
-        None if source.bass_pitch is None
-        else 2.0 * axis - source.bass_pitch
-    )
+    bass = None if source.bass_pitch is None else 2.0 * axis - source.bass_pitch
     return _transformed(
-        source, sonority_id=sonority_id,
+        source,
+        sonority_id=sonority_id,
         pitches=tuple(2.0 * axis - value for value in source.pitches),
-        transform="invert", parameters={"axis_pitch": axis},
+        transform="invert",
+        parameters={"axis_pitch": axis},
         bass_pitch=bass,
     )
 
@@ -304,22 +313,24 @@ def expand_contract_sonority(
         _finite(centre_pitch, "centre_pitch")
         if centre_pitch is not None
         else (
-            source.bass_pitch if source.bass_pitch is not None
+            source.bass_pitch
+            if source.bass_pitch is not None
             else sum(source.pitches) / len(source.pitches)
         )
     )
     pitches = tuple(centre + (value - centre) * scale for value in source.pitches)
     bass = (
-        None if source.bass_pitch is None
+        None
+        if source.bass_pitch is None
         else centre + (source.bass_pitch - centre) * scale
     )
     transform = (
-        "expand" if scale > 1.0
-        else "contract" if scale < 1.0
-        else "interval_scale"
+        "expand" if scale > 1.0 else "contract" if scale < 1.0 else "interval_scale"
     )
     return _transformed(
-        source, sonority_id=sonority_id, pitches=pitches,
+        source,
+        sonority_id=sonority_id,
+        pitches=pitches,
         transform=transform,
         parameters={"factor": scale, "centre_pitch": centre},
         bass_pitch=bass,
@@ -339,7 +350,8 @@ def displace_register(
     shift = period_count * tuning.divisions_per_period
     bass = None if source.bass_pitch is None else source.bass_pitch + shift
     return _transformed(
-        source, sonority_id=sonority_id,
+        source,
+        sonority_id=sonority_id,
         pitches=tuple(value + shift for value in source.pitches),
         transform="register_displacement",
         parameters={
@@ -361,13 +373,14 @@ def derive_spectral_sonority(
     """Derive pitches from partial ratios using the tuning's period mapping."""
     ratios = tuple(_finite(value, "partial ratio") for value in partial_ratios)
     if not ratios or any(value <= 0 for value in ratios):
-        raise ValueError("partial_ratios must be a non-empty sequence of positive values")
+        raise ValueError(
+            "partial_ratios must be a non-empty sequence of positive values"
+        )
     base = (
         _finite(base_pitch, "base_pitch")
         if base_pitch is not None
         else (
-            source.bass_pitch if source.bass_pitch is not None
-            else min(source.pitches)
+            source.bass_pitch if source.bass_pitch is not None else min(source.pitches)
         )
     )
     pitches = tuple(
@@ -375,7 +388,9 @@ def derive_spectral_sonority(
         for ratio in ratios
     )
     return _transformed(
-        source, sonority_id=sonority_id, pitches=pitches,
+        source,
+        sonority_id=sonority_id,
+        pitches=pitches,
         transform="spectral_derive",
         parameters={
             "base_pitch": base,
@@ -405,7 +420,9 @@ def replace_sonority_voice(
     previous = updated[voice_index]
     updated[voice_index] = replacement
     return _transformed(
-        source, sonority_id=sonority_id, pitches=updated,
+        source,
+        sonority_id=sonority_id,
+        pitches=updated,
         transform="replace_voice",
         parameters={
             "voice_index": voice_index,

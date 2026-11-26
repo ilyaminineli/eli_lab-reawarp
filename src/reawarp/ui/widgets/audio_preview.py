@@ -76,8 +76,12 @@ class AudioPreview(QWidget):
         layout.addStretch(1)
         return panel
 
-    def set_audio(self, audio: np.ndarray | None, sample_rate: int = 48_000,
-                  markers: list[int] | None = None) -> None:
+    def set_audio(
+        self,
+        audio: np.ndarray | None,
+        sample_rate: int = 48_000,
+        markers: list[int] | None = None,
+    ) -> None:
         self.waveform_min.setData([], [])
         self.waveform_max.setData([], [])
         for marker in self.marker_items:
@@ -106,13 +110,19 @@ class AudioPreview(QWidget):
 
         stride = max(1, int(np.ceil(len(mono) / 12_000)))
         offsets = np.arange(0, len(mono), stride, dtype=np.int64)
-        self.waveform_min.setData(offsets / sample_rate, np.minimum.reduceat(mono, offsets))
-        self.waveform_max.setData(offsets / sample_rate, np.maximum.reduceat(mono, offsets))
+        self.waveform_min.setData(
+            offsets / sample_rate, np.minimum.reduceat(mono, offsets)
+        )
+        self.waveform_max.setData(
+            offsets / sample_rate, np.maximum.reduceat(mono, offsets)
+        )
         self.waveform.setXRange(0.0, max(self._duration, 0.01), padding=0)
         for frame in markers or []:
             if 0 < frame < len(mono):
                 line = pg.InfiniteLine(
-                    pos=frame / float(sample_rate), angle=90, movable=False,
+                    pos=frame / float(sample_rate),
+                    angle=90,
+                    movable=False,
                     pen=pg.mkPen("#d89b55", width=1, style=Qt.PenStyle.DashLine),
                 )
                 self.waveform.addItem(line)
@@ -126,7 +136,9 @@ class AudioPreview(QWidget):
         signal = np.pad(mono, (0, max(0, fft_size - len(mono))))
         frames = np.lib.stride_tricks.sliding_window_view(signal, fft_size)[::hop]
         window = np.hanning(fft_size).astype(np.float32)
-        magnitude = np.abs(np.fft.rfft(frames * window[None, :], axis=1)).astype(np.float32)
+        magnitude = np.abs(np.fft.rfft(frames * window[None, :], axis=1)).astype(
+            np.float32
+        )
         decibels = 20.0 * np.log10(np.maximum(magnitude, 1e-7))
         maximum = float(np.max(decibels))
         decibels = np.clip(decibels, maximum - 80.0, maximum)

@@ -40,6 +40,7 @@ class CancellableRenderWorker(QRunnable):
     The operation receives a threading.Event and should check it at safe
     boundaries (for example between stems, buses and expensive DSP calls).
     """
+
     def __init__(self, operation: Callable[[object], object]) -> None:
         super().__init__()
         import threading

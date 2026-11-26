@@ -1,4 +1,5 @@
 """Persistent musical motifs and deterministic cross-role phrase transformations."""
+
 from __future__ import annotations
 
 import hashlib
@@ -54,10 +55,12 @@ class Motif:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "motif_id": self.motif_id, "role": self.role,
+            "motif_id": self.motif_id,
+            "role": self.role,
             "source_section": self.source_section,
             "source_start_bar": self.source_start_bar,
-            "phrase_bars": self.phrase_bars, "pitch_center": self.pitch_center,
+            "phrase_bars": self.phrase_bars,
+            "pitch_center": self.pitch_center,
             "notes": [note.to_dict() for note in self.notes],
         }
 
@@ -91,10 +94,14 @@ class MotifInstance:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "motif_id": self.motif_id, "section_index": self.section_index,
-            "section_name": self.section_name, "function": self.function,
-            "start_bar": self.start_bar, "end_bar": self.end_bar,
-            "operation": self.operation, "operations": list(self.operations),
+            "motif_id": self.motif_id,
+            "section_index": self.section_index,
+            "section_name": self.section_name,
+            "function": self.function,
+            "start_bar": self.start_bar,
+            "end_bar": self.end_bar,
+            "operation": self.operation,
+            "operations": list(self.operations),
             "phrase_steps": self.phrase_steps,
             "notes": [note.to_dict() for note in self.notes],
             "preserved_dimensions": list(self.preserved_dimensions),
@@ -130,7 +137,8 @@ class MotifPlan:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": 1, "anchor": self.anchor.to_dict(),
+            "schema_version": 1,
+            "anchor": self.anchor.to_dict(),
             "instances": [instance.to_dict() for instance in self.instances],
         }
 
@@ -171,15 +179,49 @@ MOTIF_IDENTITY_DIMENSIONS = (
 )
 
 _MOTIF_IDENTITY_BY_OPERATION = {
-    "repeat": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
-    "return": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
-    "displacement": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "repeat": (
+        "contour",
+        "interval_profile",
+        "rhythm",
+        "register",
+        "articulation",
+        "timbre",
+    ),
+    "return": (
+        "contour",
+        "interval_profile",
+        "rhythm",
+        "register",
+        "articulation",
+        "timbre",
+    ),
+    "displacement": (
+        "contour",
+        "interval_profile",
+        "rhythm",
+        "register",
+        "articulation",
+        "timbre",
+    ),
     "fragmentation": ("articulation", "timbre"),
-    "augmentation": ("contour", "interval_profile", "register", "articulation", "timbre"),
+    "augmentation": (
+        "contour",
+        "interval_profile",
+        "register",
+        "articulation",
+        "timbre",
+    ),
     "diminution": ("contour", "interval_profile", "register", "articulation", "timbre"),
     "inversion": ("rhythm", "articulation", "timbre"),
     "retrograde": ("register", "articulation", "timbre"),
-    "rhythmic_shadow": ("contour", "interval_profile", "rhythm", "register", "articulation", "timbre"),
+    "rhythmic_shadow": (
+        "contour",
+        "interval_profile",
+        "rhythm",
+        "register",
+        "articulation",
+        "timbre",
+    ),
     "call_response": ("articulation", "timbre"),
     "dissolve": ("articulation", "timbre"),
 }
@@ -196,7 +238,8 @@ def motif_identity_contract(operation: str) -> dict[str, tuple[str, ...]]:
     except KeyError as exc:
         raise ValueError(f"unknown motif transformation: {operation}") from exc
     changed = tuple(
-        dimension for dimension in MOTIF_IDENTITY_DIMENSIONS
+        dimension
+        for dimension in MOTIF_IDENTITY_DIMENSIONS
         if dimension not in preserved
     )
     return {"preserved": preserved, "changed": changed}
@@ -213,11 +256,11 @@ def _stable_index(seed: int | str, section_index: int, purpose: str, count: int)
 
 
 def _extract_anchor_motif(
-        melody_events: Sequence[Any],
-        sections: Sequence[Any],
-        phrase_directives: Sequence[Any],
-        bpm: float,
-        seed: int | str,
+    melody_events: Sequence[Any],
+    sections: Sequence[Any],
+    phrase_directives: Sequence[Any],
+    bpm: float,
+    seed: int | str,
 ) -> Motif | None:
     if not melody_events or bpm <= 0:
         return None
@@ -229,17 +272,30 @@ def _extract_anchor_motif(
         start_step = start_bar * 16
         end_step = start_step + phrase_bars * 16
         selected = sorted(
-            (event for event in melody_events if start_step <= int(event.step) < end_step),
+            (
+                event
+                for event in melody_events
+                if start_step <= int(event.step) < end_step
+            ),
             key=lambda event: (int(event.step), int(event.midi_note)),
         )
         if len(selected) < 2:
             continue
         function = str(getattr(directives.get(int(section.index)), "function", ""))
-        priority = 3 if function == "establishment" else (
-            2 if str(section.motif_mode) == "present" else 1
+        priority = (
+            3
+            if function == "establishment"
+            else (2 if str(section.motif_mode) == "present" else 1)
         )
-        windows.append(((priority, len(selected), -start_bar), section, start_bar,
-                        phrase_bars, selected))
+        windows.append(
+            (
+                (priority, len(selected), -start_bar),
+                section,
+                start_bar,
+                phrase_bars,
+                selected,
+            )
+        )
 
     if windows:
         _rank, source_section, start_bar, phrase_bars, selected = max(
@@ -247,7 +303,9 @@ def _extract_anchor_motif(
         )
         source_name = str(source_section.name)
     else:
-        ordered = sorted(melody_events, key=lambda event: (int(event.step), int(event.midi_note)))
+        ordered = sorted(
+            melody_events, key=lambda event: (int(event.step), int(event.midi_note))
+        )
         if len(ordered) < 2:
             return None
         start_bar = int(ordered[0].step) // 16
@@ -255,7 +313,9 @@ def _extract_anchor_motif(
             1, min(2, int(math.ceil((int(ordered[-1].step) - start_bar * 16 + 1) / 16)))
         )
         end_step = start_bar * 16 + phrase_bars * 16
-        selected = [event for event in ordered if start_bar * 16 <= int(event.step) < end_step]
+        selected = [
+            event for event in ordered if start_bar * 16 <= int(event.step) < end_step
+        ]
         if len(selected) < 2:
             selected = ordered[:8]
             start_bar = int(selected[0].step) // 16
@@ -274,7 +334,9 @@ def _extract_anchor_motif(
             source_x=float(getattr(event, "source_x", 0.0)),
             source_y=float(getattr(event, "source_y", 0.0)),
             articulation=str(getattr(event, "articulation", "default")),
-            timbre=str(getattr(event, "timbre", getattr(event, "synthesis_profile", "default"))),
+            timbre=str(
+                getattr(event, "timbre", getattr(event, "synthesis_profile", "default"))
+            ),
         )
         for event in selected
         if 0 <= int(event.step) - start_bar * 16 < phrase_steps
@@ -283,26 +345,33 @@ def _extract_anchor_motif(
     if not notes:
         return None
     if len(notes) > 12:
-        indexes = sorted({
-            int(round(index * (len(notes) - 1) / 11))
-            for index in range(12)
-        })
+        indexes = sorted(
+            {int(round(index * (len(notes) - 1) / 11)) for index in range(12)}
+        )
         notes = [notes[index] for index in indexes]
     pitches = sorted(note.midi_note for note in notes)
     pitch_center = int(round(pitches[len(pitches) // 2]))
     identity_payload = {
-        "seed": str(seed), "source_section": source_name,
-        "start_bar": start_bar, "phrase_bars": phrase_bars,
+        "seed": str(seed),
+        "source_section": source_name,
+        "start_bar": start_bar,
+        "phrase_bars": phrase_bars,
         "notes": [note.to_dict() for note in notes],
     }
     digest = hashlib.blake2s(
-        json.dumps(identity_payload, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+        json.dumps(identity_payload, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        ),
         digest_size=6,
     ).hexdigest()
     return Motif(
-        motif_id=f"motif-{digest}", role="melody", source_section=source_name,
-        source_start_bar=start_bar, phrase_bars=phrase_bars,
-        pitch_center=pitch_center, notes=tuple(notes),
+        motif_id=f"motif-{digest}",
+        role="melody",
+        source_section=source_name,
+        source_start_bar=start_bar,
+        phrase_bars=phrase_bars,
+        pitch_center=pitch_center,
+        notes=tuple(notes),
     )
 
 
@@ -338,8 +407,7 @@ def transform_motif_with_identity(
         ]
     elif operation == "inversion":
         notes = [
-            replace(n, midi_note=2 * motif.pitch_center - n.midi_note)
-            for n in source
+            replace(n, midi_note=2 * motif.pitch_center - n.midi_note) for n in source
         ]
     elif operation == "retrograde":
         notes = [
@@ -358,13 +426,15 @@ def transform_motif_with_identity(
             local = note.step % half
             notes.append(replace(note, step=local))
             if local + half < phrase_steps:
-                notes.append(replace(
-                    note,
-                    step=local + half,
-                    midi_note=2 * motif.pitch_center - note.midi_note,
-                    velocity=note.velocity * 0.78,
-                    pan=-note.pan,
-                ))
+                notes.append(
+                    replace(
+                        note,
+                        step=local + half,
+                        midi_note=2 * motif.pitch_center - note.midi_note,
+                        velocity=note.velocity * 0.78,
+                        pan=-note.pan,
+                    )
+                )
     else:  # dissolve
         notes = [
             replace(
@@ -408,7 +478,11 @@ def _operation_for_section(section: Any, directive: Any, seed: int | str) -> str
     if function == "contrast":
         return "call_response"
     if function in {"silence", "outro", "residue"} or mode == "dissolve":
-        return "dissolve" if function in {"residue", "outro"} or mode == "dissolve" else "fragmentation"
+        return (
+            "dissolve"
+            if function in {"residue", "outro"} or mode == "dissolve"
+            else "fragmentation"
+        )
     if mode == "present":
         return "repeat"
     if mode == "fragment":
@@ -418,18 +492,26 @@ def _operation_for_section(section: Any, directive: Any, seed: int | str) -> str
     if mode == "rhythmic" or function == "uplift":
         return "diminution" if function == "uplift" else "rhythmic_shadow"
     if mode == "develop" or function == "development":
-        options = ("displacement", "retrograde", "inversion", "augmentation", "rhythmic_shadow")
-        return options[_stable_index(seed, int(section.index), "development", len(options))]
+        options = (
+            "displacement",
+            "retrograde",
+            "inversion",
+            "augmentation",
+            "rhythmic_shadow",
+        )
+        return options[
+            _stable_index(seed, int(section.index), "development", len(options))
+        ]
     return "repeat"
 
 
 def build_motif_plan(
-        melody_events: Sequence[Any],
-        composition_plan: Any,
-        phrase_directives: Sequence[Any],
-        *,
-        bpm: float,
-        seed: int | str,
+    melody_events: Sequence[Any],
+    composition_plan: Any,
+    phrase_directives: Sequence[Any],
+    *,
+    bpm: float,
+    seed: int | str,
 ) -> MotifPlan | None:
     """Extract one stable source phrase and transform it within every section."""
     anchor = _extract_anchor_motif(
@@ -443,25 +525,30 @@ def build_motif_plan(
         directive = directives.get(int(section.index))
         operation = _operation_for_section(section, directive, seed)
         notes, phrase_steps, contract = transform_motif_with_identity(anchor, operation)
-        instances.append(MotifInstance(
-            motif_id=anchor.motif_id,
-            section_index=int(section.index),
-            section_name=str(section.name),
-            function=str(getattr(directive, "function", "continuation")),
-            start_bar=int(section.start_bar), end_bar=int(section.end_bar),
-            operation=operation, operations=(operation,),
-            phrase_steps=phrase_steps, notes=notes,
-            preserved_dimensions=contract["preserved"],
-            changed_dimensions=contract["changed"],
-        ))
+        instances.append(
+            MotifInstance(
+                motif_id=anchor.motif_id,
+                section_index=int(section.index),
+                section_name=str(section.name),
+                function=str(getattr(directive, "function", "continuation")),
+                start_bar=int(section.start_bar),
+                end_bar=int(section.end_bar),
+                operation=operation,
+                operations=(operation,),
+                phrase_steps=phrase_steps,
+                notes=notes,
+                preserved_dimensions=contract["preserved"],
+                changed_dimensions=contract["changed"],
+            )
+        )
     return MotifPlan(anchor=anchor, instances=tuple(instances))
 
 
 def render_motif_events(
-        plan: MotifPlan,
-        *,
-        bpm: float,
-        duration_seconds: float,
+    plan: MotifPlan,
+    *,
+    bpm: float,
+    duration_seconds: float,
 ) -> list[Any]:
     """Repeat each transformed motif inside its section on the shared 16th grid."""
     from reawarp.generators.melody import MelodyEvent, midi_to_frequency
@@ -485,31 +572,38 @@ def render_motif_events(
                     continue
                 duration = max(step_seconds * 0.35, note.duration_steps * step_seconds)
                 duration = min(
-                    duration, duration_seconds - time_seconds,
+                    duration,
+                    duration_seconds - time_seconds,
                     (end_step - absolute_step) * step_seconds,
                 )
                 if duration <= 0:
                     continue
-                result.append(MelodyEvent(
-                    step=absolute_step, time=time_seconds,
-                    frequency=midi_to_frequency(note.midi_note),
-                    midi_note=note.midi_note, duration=duration,
-                    velocity=note.velocity, pan=note.pan,
-                    source_x=note.source_x, source_y=note.source_y,
-                    motif_id=instance.motif_id,
-                    motif_transform=instance.operation,
-                    phrase_index=phrase_index,
-                ))
+                result.append(
+                    MelodyEvent(
+                        step=absolute_step,
+                        time=time_seconds,
+                        frequency=midi_to_frequency(note.midi_note),
+                        midi_note=note.midi_note,
+                        duration=duration,
+                        velocity=note.velocity,
+                        pan=note.pan,
+                        source_x=note.source_x,
+                        source_y=note.source_y,
+                        motif_id=instance.motif_id,
+                        motif_transform=instance.operation,
+                        phrase_index=phrase_index,
+                    )
+                )
             cursor += period
             phrase_index += 1
     return sorted(result, key=lambda event: (event.step, event.midi_note))
 
 
 def build_motif_role_accents(
-        plan: MotifPlan,
-        *,
-        bpm: float,
-        duration_seconds: float,
+    plan: MotifPlan,
+    *,
+    bpm: float,
+    duration_seconds: float,
 ) -> tuple[MotifAccent, ...]:
     """Derive quiet hat shadows and snare call/response answers from the motif."""
     if bpm <= 0:
@@ -532,21 +626,33 @@ def build_motif_role_accents(
                     step = start_step + cursor + note.step + 2
                     if step < end_step and ("hat", step) not in seen:
                         seen.add(("hat", step))
-                        accents.append(MotifAccent(
-                            "hat", step, _clip(note.velocity * 0.22, 0.04, 0.24),
-                            _clip(note.pan * 0.65, -0.45, 0.45),
-                            "motif_shadow", "motif_shadow",
-                            instance.motif_id, "shadow",
-                        ))
+                        accents.append(
+                            MotifAccent(
+                                "hat",
+                                step,
+                                _clip(note.velocity * 0.22, 0.04, 0.24),
+                                _clip(note.pan * 0.65, -0.45, 0.45),
+                                "motif_shadow",
+                                "motif_shadow",
+                                instance.motif_id,
+                                "shadow",
+                            )
+                        )
                 if instance.operation == "call_response" and index % 2 == 0:
                     step = start_step + cursor + note.step + max(4, period // 2)
                     if step < end_step and ("snare", step) not in seen:
                         seen.add(("snare", step))
-                        accents.append(MotifAccent(
-                            "snare", step, _clip(note.velocity * 0.19, 0.035, 0.20),
-                            _clip(-note.pan * 0.5, -0.35, 0.35),
-                            "motif_response", "motif_response",
-                            instance.motif_id, "response",
-                        ))
+                        accents.append(
+                            MotifAccent(
+                                "snare",
+                                step,
+                                _clip(note.velocity * 0.19, 0.035, 0.20),
+                                _clip(-note.pan * 0.5, -0.35, 0.35),
+                                "motif_response",
+                                "motif_response",
+                                instance.motif_id,
+                                "response",
+                            )
+                        )
             cursor += period
     return tuple(sorted(accents, key=lambda item: (item.step, item.role)))

@@ -48,14 +48,23 @@ class Score:
             raise ValueError("tuning_id cannot be empty")
         if not math.isfinite(float(self.tuning_reference_pitch)):
             raise ValueError("tuning reference pitch must be finite")
-        if not math.isfinite(float(self.tuning_reference_frequency_hz)) or self.tuning_reference_frequency_hz <= 0:
+        if (
+            not math.isfinite(float(self.tuning_reference_frequency_hz))
+            or self.tuning_reference_frequency_hz <= 0
+        ):
             raise ValueError("tuning reference frequency must be positive")
-        if isinstance(self.tuning_divisions_per_period, bool) or not isinstance(self.tuning_divisions_per_period, int) or self.tuning_divisions_per_period < 1:
+        if (
+            isinstance(self.tuning_divisions_per_period, bool)
+            or not isinstance(self.tuning_divisions_per_period, int)
+            or self.tuning_divisions_per_period < 1
+        ):
             raise ValueError("tuning divisions per period must be positive")
         try:
             tuning_period_ratio = float(self.tuning_period_ratio)
         except (TypeError, ValueError) as exc:
-            raise ValueError("tuning period ratio must be finite and greater than one") from exc
+            raise ValueError(
+                "tuning period ratio must be finite and greater than one"
+            ) from exc
         if not math.isfinite(tuning_period_ratio) or tuning_period_ratio <= 1.0:
             raise ValueError("tuning period ratio must be finite and greater than one")
         object.__setattr__(self, "tuning_period_ratio", tuning_period_ratio)
@@ -64,9 +73,16 @@ class Score:
         if len(ids) != len(set(ids)):
             raise ValueError("event_id values must be unique within a score")
         object.__setattr__(self, "ppq", int(self.ppq))
-        object.__setattr__(self, "events", tuple(sorted(
-            events, key=lambda item: (item.onset_beats, item.voice_id, item.event_id)
-        )))
+        object.__setattr__(
+            self,
+            "events",
+            tuple(
+                sorted(
+                    events,
+                    key=lambda item: (item.onset_beats, item.voice_id, item.event_id),
+                )
+            ),
+        )
         automation = tuple(self.automation)
         lane_keys = [(lane.target_id, lane.scope, lane.scope_id) for lane in automation]
         if len(lane_keys) != len(set(lane_keys)):
@@ -79,9 +95,9 @@ class Score:
         if harmonic_context is not None:
             if not isinstance(harmonic_context, dict):
                 raise ValueError("harmonic_context must be an object or None")
-            harmonic_context = json.loads(json.dumps(
-                harmonic_context, ensure_ascii=False, allow_nan=False
-            ))
+            harmonic_context = json.loads(
+                json.dumps(harmonic_context, ensure_ascii=False, allow_nan=False)
+            )
             from reawarp.score.pitch import PitchField
 
             mode = str(harmonic_context.get("mode", "chromatic"))
@@ -89,12 +105,24 @@ class Score:
                 raise ValueError(f"unsupported harmonic context mode: {mode}")
             for key in ("pitch_collection", "allowed_intervals"):
                 values = harmonic_context.get(key, [])
-                if not isinstance(values, list) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in values):
-                    raise ValueError(f"harmonic_context {key} must be a list of finite numbers")
+                if not isinstance(values, list) or any(
+                    not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))
+                    for value in values
+                ):
+                    raise ValueError(
+                        f"harmonic_context {key} must be a list of finite numbers"
+                    )
             for key in ("stability_weights", "tension_weights"):
                 values = harmonic_context.get(key, {})
-                if not isinstance(values, dict) or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in values.values()):
-                    raise ValueError(f"harmonic_context {key} must map labels to finite numbers")
+                if not isinstance(values, dict) or any(
+                    not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))
+                    for value in values.values()
+                ):
+                    raise ValueError(
+                        f"harmonic_context {key} must map labels to finite numbers"
+                    )
             try:
                 PitchField.from_score_context(harmonic_context)
             except (TypeError, ValueError, OverflowError) as exc:
@@ -102,14 +130,17 @@ class Score:
         raw_sonorities = tuple(self.sonorities)
         if any(not isinstance(item, dict) for item in raw_sonorities):
             raise ValueError("each sonority must be an object")
-        sonorities = tuple(json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False)) for item in raw_sonorities)
+        sonorities = tuple(
+            json.loads(json.dumps(item, ensure_ascii=False, allow_nan=False))
+            for item in raw_sonorities
+        )
         sonority_plan = self.sonority_plan
         if sonority_plan is not None:
             if not isinstance(sonority_plan, dict):
                 raise ValueError("sonority_plan must be an object or None")
-            sonority_plan = json.loads(json.dumps(
-                sonority_plan, ensure_ascii=False, allow_nan=False
-            ))
+            sonority_plan = json.loads(
+                json.dumps(sonority_plan, ensure_ascii=False, allow_nan=False)
+            )
             if sonority_plan.get("format") != "eli_lab_reawarp_sonority_sequence_plan":
                 raise ValueError("unsupported sonority_plan format")
             if int(sonority_plan.get("schema_version", 1)) != 1:
@@ -119,17 +150,24 @@ class Score:
                 not isinstance(item, dict) for item in planned_boundaries
             ):
                 raise ValueError("sonority_plan boundaries must be a list of objects")
-            planned_ids = [str(item.get("sonority_id", "")) for item in planned_boundaries]
+            planned_ids = [
+                str(item.get("sonority_id", "")) for item in planned_boundaries
+            ]
             score_ids = [str(item.get("sonority_id", "")) for item in sonorities]
             if planned_ids and planned_ids != score_ids:
-                raise ValueError("sonority_plan boundary IDs must match Score.sonorities order")
+                raise ValueError(
+                    "sonority_plan boundary IDs must match Score.sonorities order"
+                )
         orchestration_plan = self.orchestration_plan
         if orchestration_plan is not None:
             from reawarp.score.orchestration_intent import OrchestrationPlan
+
             if not isinstance(orchestration_plan, dict):
                 raise ValueError("orchestration_plan must be an object or None")
             try:
-                payload = json.loads(json.dumps(orchestration_plan, ensure_ascii=False, allow_nan=False))
+                payload = json.loads(
+                    json.dumps(orchestration_plan, ensure_ascii=False, allow_nan=False)
+                )
                 orchestration_plan = OrchestrationPlan.from_dict(payload).to_dict()
             except (TypeError, ValueError, KeyError, OverflowError) as exc:
                 raise ValueError(f"invalid orchestration_plan: {exc}") from exc
@@ -137,19 +175,23 @@ class Score:
         if bass_plan is not None:
             if not isinstance(bass_plan, dict):
                 raise ValueError("bass_plan must be an object or None")
-            bass_plan = json.loads(json.dumps(
-                bass_plan, ensure_ascii=False, allow_nan=False
-            ))
+            bass_plan = json.loads(
+                json.dumps(bass_plan, ensure_ascii=False, allow_nan=False)
+            )
             if bass_plan.get("format") != "eli_lab_reawarp_bass_role_plan":
                 raise ValueError("unsupported bass_plan format")
             if int(bass_plan.get("schema_version", 1)) != 1:
                 raise ValueError("unsupported bass_plan schema version")
             bass_config = bass_plan.get("config")
             bass_boundaries = bass_plan.get("boundaries")
-            if not isinstance(bass_config, dict) or not isinstance(
-                bass_boundaries, list
-            ) or any(not isinstance(item, dict) for item in bass_boundaries):
-                raise ValueError("bass_plan requires a config object and boundary objects")
+            if (
+                not isinstance(bass_config, dict)
+                or not isinstance(bass_boundaries, list)
+                or any(not isinstance(item, dict) for item in bass_boundaries)
+            ):
+                raise ValueError(
+                    "bass_plan requires a config object and boundary objects"
+                )
             boundary_ids = [
                 str(item.get("sonority_id", "")) for item in bass_boundaries
             ]
@@ -175,8 +217,10 @@ class Score:
                 )
             expected_voice = str(bass_config.get("voice_id", "bass"))
             bass_events = [event for event in events if event.event_id in set(bass_ids)]
-            if any(event.voice_id != expected_voice or event.kind != "note"
-                   for event in bass_events):
+            if any(
+                event.voice_id != expected_voice or event.kind != "note"
+                for event in bass_events
+            ):
                 raise ValueError("bass_plan event IDs must reference its note voice")
             kick_ids = bass_plan.get("kick_event_ids", [])
             if (
@@ -184,33 +228,51 @@ class Score:
                 or any(not isinstance(value, str) or not value for value in kick_ids)
                 or len(kick_ids) != len(set(kick_ids))
             ):
-                raise ValueError("bass_plan kick_event_ids must be unique non-empty strings")
+                raise ValueError(
+                    "bass_plan kick_event_ids must be unique non-empty strings"
+                )
             event_by_id = {event.event_id: event for event in events}
             for kick_id in kick_ids:
                 kick = event_by_id.get(kick_id)
                 if kick is None or kick.kind != "hit":
-                    raise ValueError("bass_plan kick provenance must reference Score hit events")
+                    raise ValueError(
+                        "bass_plan kick provenance must reference Score hit events"
+                    )
                 if not (
                     kick.voice_id.casefold() == "kick"
                     or str(kick.parameters.get("source_kind", "")).casefold() == "kick"
                     or "kick" in {tag.casefold() for tag in kick.tags}
                 ):
-                    raise ValueError("bass_plan kick provenance references a non-kick event")
+                    raise ValueError(
+                        "bass_plan kick provenance references a non-kick event"
+                    )
         sonority_ids = [str(item.get("sonority_id", "")) for item in sonorities]
-        if any(not value for value in sonority_ids) or len(sonority_ids) != len(set(sonority_ids)):
+        if any(not value for value in sonority_ids) or len(sonority_ids) != len(
+            set(sonority_ids)
+        ):
             raise ValueError("sonorities require unique non-empty sonority_id values")
         for item in sonorities:
             from reawarp.score.time import as_fraction
+
             start = as_fraction(item.get("onset_beats", 0))
             duration = as_fraction(item.get("duration_beats", 1))
             if start < 0 or duration <= 0:
-                raise ValueError("sonority onset must be non-negative and duration positive")
+                raise ValueError(
+                    "sonority onset must be non-negative and duration positive"
+                )
             pitches = item.get("pitches", [])
-            if not isinstance(pitches, list) or not pitches or any(
-                not isinstance(value, (int, float)) or not math.isfinite(float(value))
-                for value in pitches
+            if (
+                not isinstance(pitches, list)
+                or not pitches
+                or any(
+                    not isinstance(value, (int, float))
+                    or not math.isfinite(float(value))
+                    for value in pitches
+                )
             ):
-                raise ValueError("sonority pitches must be a non-empty list of finite pitch coordinates")
+                raise ValueError(
+                    "sonority pitches must be a non-empty list of finite pitch coordinates"
+                )
             bass_pitch = item.get("bass_pitch")
             if bass_pitch is not None and (
                 not isinstance(bass_pitch, (int, float))
@@ -218,7 +280,9 @@ class Score:
             ):
                 raise ValueError("sonority bass_pitch must be finite or None")
             tension = item.get("tension", 0.0)
-            if not isinstance(tension, (int, float)) or not math.isfinite(float(tension)):
+            if not isinstance(tension, (int, float)) or not math.isfinite(
+                float(tension)
+            ):
                 raise ValueError("sonority tension must be finite")
             transform = item.get("transform", "original")
             if not isinstance(transform, str) or not transform.strip():
@@ -227,7 +291,9 @@ class Score:
             if source_id is not None and (
                 not isinstance(source_id, str) or not source_id.strip()
             ):
-                raise ValueError("sonority source_sonority_id must be a non-empty string")
+                raise ValueError(
+                    "sonority source_sonority_id must be a non-empty string"
+                )
             parameters = item.get("transform_parameters", {})
             if not isinstance(parameters, dict):
                 raise ValueError("sonority transform_parameters must be an object")
@@ -236,8 +302,11 @@ class Score:
         modulations = tuple(self.modulations)
         modulation_keys = [
             (
-                item.source_id, item.destination_target_id, item.retrigger,
-                item.scope, item.scope_id,
+                item.source_id,
+                item.destination_target_id,
+                item.retrigger,
+                item.scope,
+                item.scope_id,
             )
             for item in modulations
         ]
@@ -257,17 +326,18 @@ class Score:
         object.__setattr__(self, "sonority_plan", sonority_plan)
         object.__setattr__(self, "bass_plan", bass_plan)
         object.__setattr__(self, "orchestration_plan", orchestration_plan)
-        object.__setattr__(self, "metadata", json.loads(json.dumps(
-            self.metadata, ensure_ascii=False, allow_nan=False
-        )))
+        object.__setattr__(
+            self,
+            "metadata",
+            json.loads(json.dumps(self.metadata, ensure_ascii=False, allow_nan=False)),
+        )
 
     @property
     def duration_beats(self):
         event_end = max((event.end_beats for event in self.events), default=0)
         automation_end = max(
             (
-                lane.points[-1].at if lane.time_basis == "beats"
-                else 0
+                lane.points[-1].at if lane.time_basis == "beats" else 0
                 for lane in self.automation
             ),
             default=0,
@@ -284,8 +354,13 @@ class Score:
         orchestration_end = Fraction(0)
         if self.orchestration_plan is not None:
             from reawarp.score.orchestration_intent import OrchestrationPlan
-            orchestration_end = OrchestrationPlan.from_dict(self.orchestration_plan).duration_beats
-        return max(event_end, automation_end, source_end, sonority_end, orchestration_end)
+
+            orchestration_end = OrchestrationPlan.from_dict(
+                self.orchestration_plan
+            ).duration_beats
+        return max(
+            event_end, automation_end, source_end, sonority_end, orchestration_end
+        )
 
     def beat_to_seconds(self, beat) -> float:
         return self.tempo_map.beat_to_seconds(beat)
@@ -310,7 +385,9 @@ class Score:
             },
             "events": [event.to_dict() for event in self.events],
             "automation": [lane.to_dict() for lane in self.automation],
-            "automation_sources": [source.to_dict() for source in self.automation_sources],
+            "automation_sources": [
+                source.to_dict() for source in self.automation_sources
+            ],
             "modulations": [item.to_dict() for item in self.modulations],
             "harmonic_context": self.harmonic_context,
             "sonorities": list(self.sonorities),
@@ -328,13 +405,20 @@ class Score:
         return cls(
             title=str(data.get("title", "Untitled Reawarp Score")),
             ppq=int(data.get("ppq", 960)),
-            tempo_map=TempoMap.from_dict(data.get("tempo_map", [
-                {"at_beats": "0", "bpm": 120.0, "interpolation_to_next": "step"}
-            ])),
-            meter_map=MeterMap.from_dict(data.get("meter_map", [
-                {"at_beats": "0", "numerator": 4, "denominator": 4}
-            ])),
-            events=tuple(MusicalEvent.from_dict(item) for item in data.get("events", [])),
+            tempo_map=TempoMap.from_dict(
+                data.get(
+                    "tempo_map",
+                    [{"at_beats": "0", "bpm": 120.0, "interpolation_to_next": "step"}],
+                )
+            ),
+            meter_map=MeterMap.from_dict(
+                data.get(
+                    "meter_map", [{"at_beats": "0", "numerator": 4, "denominator": 4}]
+                )
+            ),
+            events=tuple(
+                MusicalEvent.from_dict(item) for item in data.get("events", [])
+            ),
             automation=tuple(
                 AutomationLane.from_dict(item) for item in data.get("automation", [])
             ),
@@ -386,11 +470,11 @@ class Score:
         return project_to_score(project, title=title)
 
     def export_midi(
-            self,
-            path: str | Path,
-            *,
-            ticks_per_beat: int | None = None,
-            tempo_ramp_resolution: str = "1/4",
+        self,
+        path: str | Path,
+        *,
+        ticks_per_beat: int | None = None,
+        tempo_ramp_resolution: str = "1/4",
     ) -> Path:
         from reawarp.score.midi import score_to_midi
 

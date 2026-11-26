@@ -18,53 +18,106 @@ import numpy as np
 from PySide6.QtCore import Qt, QTimer, QThreadPool, QEvent
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFormLayout, QFrame,
-    QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMainWindow, QMenu,
-    QMessageBox, QProgressBar, QPushButton, QScrollArea, QSlider, QSpinBox,
-    QSystemTrayIcon, QStackedWidget, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSlider,
+    QSpinBox,
+    QSystemTrayIcon,
+    QStackedWidget,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
 from reawarp.composition.arrangement import (
-    ARRANGEMENT_METADATA_KEY, ArrangementPlan, branch_arrangement,
-    clip_score_for_render, create_arrangement, duplicate_clip, exchange_clip_layer,
-    freeze_clip, move_clip, move_ending, move_transition, record_print,
+    ARRANGEMENT_METADATA_KEY,
+    ArrangementPlan,
+    branch_arrangement,
+    clip_score_for_render,
+    create_arrangement,
+    duplicate_clip,
+    exchange_clip_layer,
+    freeze_clip,
+    move_clip,
+    move_ending,
+    move_transition,
+    record_print,
     relink_transition,
-    redo_arrangement_edit, reorder_clip, replace_clip_with_candidate,
-    revert_to_generation, set_checklist_item, set_clip_muted, trim_clip,
+    redo_arrangement_edit,
+    reorder_clip,
+    replace_clip_with_candidate,
+    revert_to_generation,
+    set_checklist_item,
+    set_clip_muted,
+    trim_clip,
     undo_arrangement_edit,
 )
 from reawarp.composition.phrases import (
-    PhrasePlan, PhraseSpan, MotifIdentity, MotifFamily,
-    build_phrase_candidate_batch, branch_phrase_candidate,
-    freeze_phrase_candidate, restore_phrase_base, phrase_context_events,
+    PhrasePlan,
+    PhraseSpan,
+    MotifIdentity,
+    MotifFamily,
+    build_phrase_candidate_batch,
+    branch_phrase_candidate,
+    freeze_phrase_candidate,
+    restore_phrase_base,
+    phrase_context_events,
 )
 from reawarp.export.project_archive import export_project_package
 from reawarp.export.wav import write_wav
 from reawarp.fx_routing import (
-    build_fx_variation_routings, match_audition_level, measure_signal,
-    render_fx_routing, render_master_with_returns,
+    build_fx_variation_routings,
+    match_audition_level,
+    measure_signal,
+    render_fx_routing,
+    render_master_with_returns,
 )
 from reawarp.fx_automation import (
-    attach_fx_automation_to_score, fx_automation_registry,
+    attach_fx_automation_to_score,
+    fx_automation_registry,
 )
 from reawarp.score.render import build_score_control_bus
 from reawarp.score.orchestration_intent import OrchestrationPlan
 from reawarp.score.attention import (
-    apply_attention_gesture, build_attention_translation_check,
-    record_attention_review, reconcile_attention_gestures,
+    apply_attention_gesture,
+    build_attention_translation_check,
+    record_attention_review,
+    reconcile_attention_gestures,
     remove_attention_gesture,
 )
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
-    classify_sample_role, default_sample_for_role, discover_bundled_samples,
+    classify_sample_role,
+    default_sample_for_role,
+    discover_bundled_samples,
     sample_library_counts,
 )
 from reawarp.mathematics.theory import ROOT_NAMES, SCALE_STEPS
 from reawarp.synthesis.profiles import (
-    HAT_PROFILES, KICK_PROFILES, MELODY_PROFILES, SNARE_PROFILES,
+    HAT_PROFILES,
+    KICK_PROFILES,
+    MELODY_PROFILES,
+    SNARE_PROFILES,
     SUBTRACTIVE_VOICES,
 )
 from reawarp.transforms import BREAK_TRANSFORMS, auto_slice
@@ -85,12 +138,21 @@ from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
 from reawarp.ui.widgets.stem_row import StemRow
 from reawarp.ui.workers import CancellableRenderWorker
+
 logger = logging.getLogger("reawarp.ui")
 
 from reawarp.variations import (
-    VariationBatch, VariationBatchService, VariationCandidate, VariationCandidateRecord, VariationRequest,
-    build_listening_set, clone_project, matched_ab, project_audio,
-    project_fingerprint, variation_session_metadata,
+    VariationBatch,
+    VariationBatchService,
+    VariationCandidate,
+    VariationCandidateRecord,
+    VariationRequest,
+    build_listening_set,
+    clone_project,
+    matched_ab,
+    project_audio,
+    project_fingerprint,
+    variation_session_metadata,
 )
 
 
@@ -214,23 +276,28 @@ class MainWindow(QMainWindow):
         self.variation_page = VariationBrowserPage(self)
         self.variation_page.batchRequested.connect(self._start_variation_batch)
         self.variation_page.cancelRequested.connect(self._cancel_variation_batch)
-        self.variation_page.candidateSelected.connect(self._variation_candidate_selected)
+        self.variation_page.candidateSelected.connect(
+            self._variation_candidate_selected
+        )
         self.variation_page.candidateAction.connect(self._variation_candidate_action)
         self.variation_page.notesChanged.connect(self._variation_notes_changed)
         self.variation_page.compareRequested.connect(self._variation_compare)
         self.variation_page.listeningSetRequested.connect(self._variation_listening_set)
         self.variation_page.auditionRequested.connect(self._variation_audition)
         self.variation_page.loadProjectRequested.connect(self._load_variation_project)
-        self.variation_page.listeningItemRequested.connect(self._variation_listening_item)
+        self.variation_page.listeningItemRequested.connect(
+            self._variation_listening_item
+        )
         self.variation_page.m32ContextRequested.connect(self._m32_context_requested)
         self.variation_page.m32DecisionRequested.connect(self._m32_decision_requested)
         self.variation_page.m32ReportRequested.connect(self._m32_report_requested)
         self.variation_page.m32AnalysisToggled.connect(self._m32_analysis_toggled)
 
-
         self.phrase_workbench = PhraseWorkbenchPage(self)
         self.phrase_workbench.phraseSaveRequested.connect(self._phrase_save_requested)
-        self.phrase_workbench.phraseDeleteRequested.connect(self._phrase_delete_requested)
+        self.phrase_workbench.phraseDeleteRequested.connect(
+            self._phrase_delete_requested
+        )
         self.phrase_workbench.batchRequested.connect(self._phrase_batch_requested)
         self.phrase_workbench.freezeRequested.connect(self._phrase_freeze_requested)
         self.phrase_workbench.branchRequested.connect(self._phrase_branch_requested)
@@ -259,21 +326,37 @@ class MainWindow(QMainWindow):
         self.arrangement_page.undoRequested.connect(self._m33_undo_requested)
         self.arrangement_page.redoRequested.connect(self._m33_redo_requested)
         self.arrangement_page.printRequested.connect(self._m33_print_requested)
-        self.arrangement_page.moveTransitionRequested.connect(self._m33_move_transition_requested)
-        self.arrangement_page.moveEndingRequested.connect(self._m33_move_ending_requested)
+        self.arrangement_page.moveTransitionRequested.connect(
+            self._m33_move_transition_requested
+        )
+        self.arrangement_page.moveEndingRequested.connect(
+            self._m33_move_ending_requested
+        )
         self.arrangement_page.relinkTransitionRequested.connect(
             self._m33_relink_transition_requested
         )
         self.arrangement_page.checklistChanged.connect(self._m33_checklist_changed)
-        self.sound_object_page.createRequested.connect(self._sound_object_create_requested)
-        self.sound_object_page.refreshRequested.connect(self._refresh_sound_object_targets)
+        self.sound_object_page.createRequested.connect(
+            self._sound_object_create_requested
+        )
+        self.sound_object_page.refreshRequested.connect(
+            self._refresh_sound_object_targets
+        )
         self.sound_object_page.saveRequested.connect(self._sound_object_save_requested)
-        self.sound_object_page.auditionRequested.connect(self._sound_object_audition_requested)
-        self.sound_object_page.printRequested.connect(self._sound_object_print_requested)
+        self.sound_object_page.auditionRequested.connect(
+            self._sound_object_audition_requested
+        )
+        self.sound_object_page.printRequested.connect(
+            self._sound_object_print_requested
+        )
         self.sound_object_page.playRequested.connect(self._sound_object_play_requested)
-        self.sound_object_page.cancelRequested.connect(self._sound_object_cancel_requested)
+        self.sound_object_page.cancelRequested.connect(
+            self._sound_object_cancel_requested
+        )
         self.attention_map_page.planChanged.connect(self._attention_plan_changed)
-        self.attention_map_page.reviewRequested.connect(self._attention_review_requested)
+        self.attention_map_page.reviewRequested.connect(
+            self._attention_review_requested
+        )
         self.attention_map_page.translationCheckRequested.connect(
             self._attention_translation_check_requested
         )
@@ -289,42 +372,122 @@ class MainWindow(QMainWindow):
         # code/tests that query the number of workspace pages.
         self.tabs = self.workspace_stack
         for workspace in (
-            generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
-            self.variation_page, self.phrase_workbench, self.attention_map_page,
-            self.sound_object_page, self.arrangement_page,
+            generator_page,
+            break_page,
+            mixer_page,
+            self.fx_lab_page,
+            self.library_page,
+            self.variation_page,
+            self.phrase_workbench,
+            self.attention_map_page,
+            self.sound_object_page,
+            self.arrangement_page,
         ):
             self.workspace_stack.addWidget(workspace)
 
         self._workspace_info = [
             ("GENERATOR", "Define form, rhythm, synthesis and source material."),
-            ("BREAK LAB", "Analyse, transform and reuse break material in the composition."),
+            (
+                "BREAK LAB",
+                "Analyse, transform and reuse break material in the composition.",
+            ),
             ("STEM MIXER", "Shape the relationships between generated musical roles."),
-            ("FX LAB", "Build reusable non-destructive processing chains and compare results."),
-            ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
-            ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
-            ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
-            ("ATTENTION MAP", "Shape figure/ground roles, inspect overlaps and test mono/low-volume translation."),
-            ("SOUND OBJECT WORKSHOP", "Edit hybrid sound objects, audition aligned layers and print lineage-backed assets."),
-            ("ARRANGEMENT EDITOR", "Assemble frozen phrases, edit the form, print selected objects and finish the track."),
+            (
+                "FX LAB",
+                "Build reusable non-destructive processing chains and compare results.",
+            ),
+            (
+                "LIBRARY",
+                "Find, organise and reuse the sounds and variations in your Reawarp ecosystem.",
+            ),
+            (
+                "VARIATION BROWSER",
+                "Generate comparable candidates, audition matched A/B and preserve selection lineage.",
+            ),
+            (
+                "PHRASE WORKBENCH",
+                "Develop Score-native phrases, compare deterministic candidates and audition in context.",
+            ),
+            (
+                "ATTENTION MAP",
+                "Shape figure/ground roles, inspect overlaps and test mono/low-volume translation.",
+            ),
+            (
+                "SOUND OBJECT WORKSHOP",
+                "Edit hybrid sound objects, audition aligned layers and print lineage-backed assets.",
+            ),
+            (
+                "ARRANGEMENT EDITOR",
+                "Assemble frozen phrases, edit the form, print selected objects and finish the track.",
+            ),
         ]
         self.navigator = WorkspaceNavigator(
             [
-                ("COMPOSE", [
-                    ("Generator", "Create the composition plan and its coordinated sound sources.", 0),
-                    ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
-                    ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
-                    ("Phrase Workbench", "Develop phrase grammar, motif lineage and contextual candidates.", 6),
-                    ("Arrangement", "Arrange frozen phrases, edit M30 cues and prepare the final package.", 9),
-                    ("Attention Map", "Assign foreground, midground, background and semantic orchestral roles.", 7),
-                ]),
-                ("PRODUCE", [
-                    ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
-                    ("FX Lab", "Design and audition reusable offline effect chains.", 3),
-                ]),
-                ("ASSETS", [
-                    ("Library", "Browse and organise reusable samples, stems and variations.", 4),
-                    ("Sound Objects", "Edit transient/body/tail layers and print reusable assets with full source lineage.", 8),
-                ]),
+                (
+                    "COMPOSE",
+                    [
+                        (
+                            "Generator",
+                            "Create the composition plan and its coordinated sound sources.",
+                            0,
+                        ),
+                        (
+                            "Break Lab",
+                            "Transform source breaks for use by the composition engine.",
+                            1,
+                        ),
+                        (
+                            "Variations",
+                            "Batch-generate candidates and compare them before choosing.",
+                            5,
+                        ),
+                        (
+                            "Phrase Workbench",
+                            "Develop phrase grammar, motif lineage and contextual candidates.",
+                            6,
+                        ),
+                        (
+                            "Arrangement",
+                            "Arrange frozen phrases, edit M30 cues and prepare the final package.",
+                            9,
+                        ),
+                        (
+                            "Attention Map",
+                            "Assign foreground, midground, background and semantic orchestral roles.",
+                            7,
+                        ),
+                    ],
+                ),
+                (
+                    "PRODUCE",
+                    [
+                        (
+                            "Stem Mixer",
+                            "Balance generated roles and shared processing returns.",
+                            2,
+                        ),
+                        (
+                            "FX Lab",
+                            "Design and audition reusable offline effect chains.",
+                            3,
+                        ),
+                    ],
+                ),
+                (
+                    "ASSETS",
+                    [
+                        (
+                            "Library",
+                            "Browse and organise reusable samples, stems and variations.",
+                            4,
+                        ),
+                        (
+                            "Sound Objects",
+                            "Edit transient/body/tail layers and print reusable assets with full source lineage.",
+                            8,
+                        ),
+                    ],
+                ),
             ]
         )
         self.navigator.workspaceSelected.connect(self._set_workspace)
@@ -340,7 +503,9 @@ class MainWindow(QMainWindow):
         title_row.addStretch(1)
         self.project_context = QLabel()
         self.project_context.setObjectName("projectContext")
-        self.project_context.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.project_context.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+        )
         title_row.addWidget(self.project_context)
         header_layout.addLayout(title_row)
         self.workspace_description = QLabel()
@@ -418,7 +583,9 @@ class MainWindow(QMainWindow):
         form.addRow("Tempo / BPM", self.bpm)
         self.duration = QDoubleSpinBox()
         self.duration.setRange(5, 180)
-        self.duration.setToolTip("Offline composition duration, up to 180 seconds (3 minutes).")
+        self.duration.setToolTip(
+            "Offline composition duration, up to 180 seconds (3 minutes)."
+        )
         self.duration.setDecimals(1)
         self.duration.setSingleStep(0.5)
         self.duration.setValue(24)
@@ -458,21 +625,26 @@ class MainWindow(QMainWindow):
         form.addRow("Drum evolution", self.drum_change_intensity)
         self.drum_part_cycle_bars = QComboBox()
         for bars in (1, 2, 4):
-            self.drum_part_cycle_bars.addItem(f"{bars} bar" if bars == 1 else f"{bars} bars", bars)
+            self.drum_part_cycle_bars.addItem(
+                f"{bars} bar" if bars == 1 else f"{bars} bars", bars
+            )
         self.drum_part_cycle_bars.setCurrentIndex(1)
         form.addRow("Drum phrase cycle", self.drum_part_cycle_bars)
         self.composition_energy = QDoubleSpinBox()
         self.composition_energy.setRange(0.0, 1.0)
         self.composition_energy.setSingleStep(0.05)
         self.composition_energy.setValue(0.62)
-        self.composition_energy.setToolTip("Composition energy is not master output gain.")
+        self.composition_energy.setToolTip(
+            "Composition energy is not master output gain."
+        )
         form.addRow("Composition energy", self.composition_energy)
         self.composition_variation = QDoubleSpinBox()
         self.composition_variation.setRange(0.0, 1.0)
         self.composition_variation.setSingleStep(0.05)
         self.composition_variation.setValue(0.45)
         self.composition_variation.setToolTip(
-            "Changes section proportions and bounded macro values, not hit probability.")
+            "Changes section proportions and bounded macro values, not hit probability."
+        )
         form.addRow("Structural variation", self.composition_variation)
 
         self.complexity = QSlider(Qt.Orientation.Horizontal)
@@ -496,7 +668,7 @@ class MainWindow(QMainWindow):
         randomize.setFixedWidth(36)
         randomize.setToolTip("Generate a new reproducible seed")
         randomize.clicked.connect(
-            lambda: self.seed.setText(str(secrets.randbelow(2 ** 31 - 1) + 1))
+            lambda: self.seed.setText(str(secrets.randbelow(2**31 - 1) + 1))
         )
         seed_row.addWidget(randomize)
         seed_widget = QWidget()
@@ -524,13 +696,15 @@ class MainWindow(QMainWindow):
             0.55, "Controls the amount of activity in kick, snare and break roles."
         )
         self.rhythmic_syncopation = axis_control(
-            0.52, "Controls off-grid tension and the prominence of upper rhythmic shadows."
+            0.52,
+            "Controls off-grid tension and the prominence of upper rhythmic shadows.",
         )
         self.arrangement_instability = axis_control(
             0.40, "Controls how far texture and section-level rhythmic details drift."
         )
         self.melodic_activity = axis_control(
-            0.62, "Controls melodic entrances and note activity independently of drum density."
+            0.62,
+            "Controls melodic entrances and note activity independently of drum density.",
         )
         self.melody_register_semitones = QSpinBox()
         self.melody_register_semitones.setRange(-24, 24)
@@ -539,10 +713,12 @@ class MainWindow(QMainWindow):
             "Offsets the motif's register by semitones; section shifts remain phrase-aware."
         )
         self.tonal_brightness = axis_control(
-            0.55, "Sets the tonal brightness target independently of composition energy."
+            0.55,
+            "Sets the tonal brightness target independently of composition energy.",
         )
         self.spatial_intent = axis_control(
-            0.52, "Controls the space/ambience intention independently of brightness and density."
+            0.52,
+            "Controls the space/ambience intention independently of brightness and density.",
         )
         for label, control in (
             ("Arrangement density", self.arrangement_density),
@@ -586,7 +762,11 @@ class MainWindow(QMainWindow):
             role: discover_bundled_samples(role=role)
             for role in ("kick", "snare", "hat")
         }
-        for role, label in (("kick", "Kick source"), ("snare", "Snare source"), ("hat", "Hat / cymbal")):
+        for role, label in (
+            ("kick", "Kick source"),
+            ("snare", "Snare source"),
+            ("hat", "Hat / cymbal"),
+        ):
             row = QWidget()
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
@@ -606,7 +786,9 @@ class MainWindow(QMainWindow):
             browse_sample.setFixedWidth(34)
             browse_sample.setToolTip(f"Choose a custom {role} sample")
             browse_sample.clicked.connect(
-                lambda _checked=False, selected_role=role: self._choose_drum_sample(selected_role)
+                lambda _checked=False, selected_role=role: self._choose_drum_sample(
+                    selected_role
+                )
             )
             row_layout.addWidget(browse_sample)
             source_form.addRow(label, row)
@@ -623,14 +805,18 @@ class MainWindow(QMainWindow):
 
         automation_group = QGroupBox("DRUM PART AUTOMATION")
         automation_form = QFormLayout(automation_group)
-        self.auto_drum_sample_switching = QCheckBox("Switch sample parts through the track")
+        self.auto_drum_sample_switching = QCheckBox(
+            "Switch sample parts through the track"
+        )
         self.auto_drum_sample_switching.setChecked(True)
         self.auto_drum_sample_switching.setToolTip(
             "Selects among the available samples for each role at section or phrase-cycle boundaries. "
             "Returns recall the established opening sample."
         )
         automation_form.addRow(self.auto_drum_sample_switching)
-        self.include_indexed_library_samples = QCheckBox("Include indexed Library assets")
+        self.include_indexed_library_samples = QCheckBox(
+            "Include indexed Library assets"
+        )
         self.include_indexed_library_samples.setChecked(True)
         self.include_indexed_library_samples.setToolTip(
             "Adds indexed audio with matching kick/snare/hat roles or recognizable file/folder names to the role banks."
@@ -660,9 +846,13 @@ class MainWindow(QMainWindow):
         self.percussion_source_mode.addItem("SAMPLE ONLY", "sample")
         hybrid_form.addRow("Source mode", self.percussion_source_mode)
         self.percussion_hybrid_architecture = QComboBox()
-        self.percussion_hybrid_architecture.addItem("TRANSIENT SAMPLE + SYNTH BODY", "transient_body")
+        self.percussion_hybrid_architecture.addItem(
+            "TRANSIENT SAMPLE + SYNTH BODY", "transient_body"
+        )
         self.percussion_hybrid_architecture.addItem("PARALLEL FULL LAYERS", "layered")
-        self.percussion_hybrid_architecture.addItem("FEATURE-GUIDED HYBRID", "feature_guided")
+        self.percussion_hybrid_architecture.addItem(
+            "FEATURE-GUIDED HYBRID", "feature_guided"
+        )
         self.percussion_hybrid_architecture.setToolTip(
             "Transient/body mode uses the sample onset and synthesized body. Parallel mode blends full layers. "
             "Feature-guided mode steers synthesized brightness, pitch and transient energy from the selected asset's analysis."
@@ -695,7 +885,18 @@ class MainWindow(QMainWindow):
         self.melody_profile.addItems(["auto", *MELODY_PROFILES.keys()])
         profile_form.addRow("Melody voice", self.melody_profile)
         self.synth_palette = QComboBox()
-        self.synth_palette.addItems(["subtractive", "hybrid", "fm", "additive", "modal", "inharmonic", "granular", "physical"])
+        self.synth_palette.addItems(
+            [
+                "subtractive",
+                "hybrid",
+                "fm",
+                "additive",
+                "modal",
+                "inharmonic",
+                "granular",
+                "physical",
+            ]
+        )
         self.synth_palette.setToolTip(
             "Select the lead synthesis family. Experimental families retain the NumPy reference renderer."
         )
@@ -722,7 +923,9 @@ class MainWindow(QMainWindow):
         groove = QGroupBox("BREAK RHYTHM GRAMMAR")
         groove_form = QFormLayout(groove)
         self.break_style = QComboBox()
-        self.break_style.addItems(["broken_funk", "half_time", "straight", "sparse", "auto"])
+        self.break_style.addItems(
+            ["broken_funk", "half_time", "straight", "sparse", "auto"]
+        )
         groove_form.addRow("Pattern", self.break_style)
         self.break_density = QDoubleSpinBox()
         self.break_density.setRange(0.0, 1.0)
@@ -800,7 +1003,11 @@ class MainWindow(QMainWindow):
         self.open_mixer_button.clicked.connect(lambda: self._set_workspace(2))
         self.open_fx_button.clicked.connect(lambda: self._set_workspace(3))
         self.open_library_button.clicked.connect(lambda: self._set_workspace(4))
-        for action in (self.open_mixer_button, self.open_fx_button, self.open_library_button):
+        for action in (
+            self.open_mixer_button,
+            self.open_fx_button,
+            self.open_library_button,
+        ):
             action.setEnabled(False)
             workflow_row.addWidget(action)
         workflow_row.addStretch(1)
@@ -820,7 +1027,9 @@ class MainWindow(QMainWindow):
         action_title = QLabel("GENERATE A TRACK")
         action_title.setObjectName("sectionTitle")
         action_copy.addWidget(action_title)
-        action_flow = QLabel("FORM  →  DRUM PARTS  →  SAMPLE LIBRARY  →  SYNTHESIS  →  RENDER")
+        action_flow = QLabel(
+            "FORM  →  DRUM PARTS  →  SAMPLE LIBRARY  →  SYNTHESIS  →  RENDER"
+        )
         action_flow.setObjectName("muted")
         action_copy.addWidget(action_flow)
         action_layout.addLayout(action_copy, 1)
@@ -880,8 +1089,8 @@ class MainWindow(QMainWindow):
 
     def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason in (
-                QSystemTrayIcon.ActivationReason.Trigger,
-                QSystemTrayIcon.ActivationReason.DoubleClick,
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
         ):
             self._restore_from_tray()
 
@@ -898,8 +1107,12 @@ class MainWindow(QMainWindow):
         if self._tray_icon is not None:
             self._tray_icon.hide()
         workers = (
-            self._worker, self._export_worker, self._variation_batch_worker,
-            self._variation_compare_worker, self._fx_worker, self._fx_variation_worker,
+            self._worker,
+            self._export_worker,
+            self._variation_batch_worker,
+            self._variation_compare_worker,
+            self._fx_worker,
+            self._fx_variation_worker,
             self._m32_worker,
         )
         for worker in workers:
@@ -1152,28 +1365,40 @@ class MainWindow(QMainWindow):
         self.fx_routing_editor = FXRoutingEditor()
         self.fx_routing_editor.changed.connect(self._refresh_routing)
         self.fx_routing_editor.auditionRequested.connect(self._audition_fx_component)
-        self.fx_routing_editor.mixerStateRequested.connect(self._apply_routing_mixer_state)
+        self.fx_routing_editor.mixerStateRequested.connect(
+            self._apply_routing_mixer_state
+        )
         self.fx_routing_editor.preRenderRequested.connect(self._pre_render_channel_fx)
         self.fx_routing_editor.variationsRequested.connect(self._generate_fx_variations)
-        self.fx_routing_editor.variationAuditionRequested.connect(self._audition_fx_variation)
+        self.fx_routing_editor.variationAuditionRequested.connect(
+            self._audition_fx_variation
+        )
         self.fx_routing_editor.variationApplyRequested.connect(self._apply_fx_variation)
         routing_scroll = QScrollArea()
         routing_scroll.setWidgetResizable(True)
-        routing_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        routing_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         routing_scroll.setWidget(self.fx_routing_editor)
 
         self.fx_automation_editor = FXAutomationEditor()
         self.fx_automation_editor.changed.connect(self._refresh_routing)
         automation_scroll = QScrollArea()
         automation_scroll.setWidgetResizable(True)
-        automation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        automation_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         automation_scroll.setWidget(self.fx_automation_editor)
 
         self.score_automation_editor = ScoreAutomationEditor()
-        self.score_automation_editor.applyRequested.connect(self._apply_score_automation)
+        self.score_automation_editor.applyRequested.connect(
+            self._apply_score_automation
+        )
         score_automation_scroll = QScrollArea()
         score_automation_scroll.setWidgetResizable(True)
-        score_automation_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        score_automation_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         score_automation_scroll.setWidget(self.score_automation_editor)
 
         self.fx_workspace_tabs.addTab(routing_scroll, "ROUTING")
@@ -1236,7 +1461,9 @@ class MainWindow(QMainWindow):
 
     def _choose_break_sample(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select a break sample", str(Path.cwd()),
+            self,
+            "Select a break sample",
+            str(Path.cwd()),
             "Audio files (*.wav *.flac *.aiff *.aif *.ogg);;All files (*.*)",
         )
         if not path:
@@ -1256,7 +1483,9 @@ class MainWindow(QMainWindow):
         if self._break_audio is None:
             self.break_analysis_summary.setText("Choose a break sample to analyze it.")
             return
-        slices = auto_slice(self._break_audio, 48_000, max_slices=self.slice_count.value())
+        slices = auto_slice(
+            self._break_audio, 48_000, max_slices=self.slice_count.value()
+        )
         markers = [item.start for item in slices[1:]]
         self.break_preview.set_audio(self._break_audio, 48_000, markers)
         self.break_analysis_summary.setText(
@@ -1266,9 +1495,12 @@ class MainWindow(QMainWindow):
 
     def _read_config(self) -> GenerationConfig:
         seed_text = self.seed.text().strip() or "20261123"
-        seed: int | str = int(seed_text) if seed_text.lstrip("-+").isdigit() else seed_text
+        seed: int | str = (
+            int(seed_text) if seed_text.lstrip("-+").isdigit() else seed_text
+        )
         transforms = tuple(
-            name for name, checkbox in self.break_transform_checks.items()
+            name
+            for name, checkbox in self.break_transform_checks.items()
             if checkbox.isChecked()
         )
         sample_paths: dict[str, str] = {}
@@ -1282,11 +1514,13 @@ class MainWindow(QMainWindow):
         if self.include_indexed_library_samples.isChecked():
             try:
                 from reawarp.library.store import SampleLibrary
+
                 with SampleLibrary() as library:
                     indexed_assets = library.search(asset_type="sample", limit=500)
             except Exception as exc:
                 self.statusBar().showMessage(
-                    f"Indexed Library bank unavailable; using bundled samples only: {exc}", 8000
+                    f"Indexed Library bank unavailable; using bundled samples only: {exc}",
+                    8000,
                 )
 
         indexed_by_path = {
@@ -1310,14 +1544,16 @@ class MainWindow(QMainWindow):
                 return
             entry_metadata = dict(metadata or {})
             entry_metadata.setdefault("role", role)
-            entries.append({
-                "path": str(path),
-                "label": label or path.name,
-                "asset_id": asset_id or path.name,
-                "sha256": sha256,
-                "metadata": entry_metadata,
-                "features": dict(features or {}),
-            })
+            entries.append(
+                {
+                    "path": str(path),
+                    "label": label or path.name,
+                    "asset_id": asset_id or path.name,
+                    "sha256": sha256,
+                    "metadata": entry_metadata,
+                    "features": dict(features or {}),
+                }
+            )
 
         for role, selector in self.sample_selectors.items():
             selected_path = selector.currentData()
@@ -1328,19 +1564,26 @@ class MainWindow(QMainWindow):
             selected_indexed = indexed_by_path.get(selected_resolved)
             matching = next(
                 (
-                    asset for asset in self.sample_library.get(role, [])
+                    asset
+                    for asset in self.sample_library.get(role, [])
                     if str(Path(asset.path).expanduser().resolve()) == selected_resolved
                 ),
                 None,
             )
             anchor_metadata = {
-                "provider": "indexed_library" if selected_indexed else (
-                    "bundled_sample_library" if matching else "custom_sample"
+                "provider": (
+                    "indexed_library"
+                    if selected_indexed
+                    else ("bundled_sample_library" if matching else "custom_sample")
                 ),
                 "relative_path": (
-                    str(Path(selected_indexed.path).name) if selected_indexed
-                    else matching.relative_path if matching
-                    else Path(selected_resolved).name
+                    str(Path(selected_indexed.path).name)
+                    if selected_indexed
+                    else (
+                        matching.relative_path
+                        if matching
+                        else Path(selected_resolved).name
+                    )
                 ),
                 "role": role,
                 "source_name": Path(selected_resolved).name,
@@ -1366,10 +1609,16 @@ class MainWindow(QMainWindow):
                     resolved = str(asset.path.expanduser().resolve())
                     indexed = indexed_by_path.get(resolved)
                     add_bank_entry(
-                        bank, resolved, role,
+                        bank,
+                        resolved,
+                        role,
                         label=asset.label,
                         metadata={
-                            "provider": "indexed_bundled" if indexed else "bundled_sample_library",
+                            "provider": (
+                                "indexed_bundled"
+                                if indexed
+                                else "bundled_sample_library"
+                            ),
                             "relative_path": asset.relative_path,
                             "role": role,
                             "source_name": asset.path.name,
@@ -1391,7 +1640,9 @@ class MainWindow(QMainWindow):
                         if detected_role != role:
                             continue
                         add_bank_entry(
-                            bank, resolved, role,
+                            bank,
+                            resolved,
+                            role,
                             label=asset.file_name,
                             metadata={
                                 "provider": "indexed_library",
@@ -1428,7 +1679,9 @@ class MainWindow(QMainWindow):
             synth_palette=self.synth_palette.currentText(),
             percussion_synthesis=self.percussion_synthesis.currentText(),
             percussion_source_mode=str(self.percussion_source_mode.currentData()),
-            percussion_hybrid_architecture=str(self.percussion_hybrid_architecture.currentData()),
+            percussion_hybrid_architecture=str(
+                self.percussion_hybrid_architecture.currentData()
+            ),
             percussion_sample_mix=self.percussion_sample_mix.value(),
             hybrid_transient_ms=self.hybrid_transient_ms.value(),
             melody_scale=self.melody_scale.currentText(),
@@ -1454,7 +1707,8 @@ class MainWindow(QMainWindow):
             sample_banks=sample_banks,
             drum_sample_automation=(
                 str(self.drum_sample_automation.currentData())
-                if self.auto_drum_sample_switching.isChecked() else "fixed"
+                if self.auto_drum_sample_switching.isChecked()
+                else "fixed"
             ),
             kick_profile=self.kick_profile.currentText(),
             snare_profile=self.snare_profile.currentText(),
@@ -1485,7 +1739,7 @@ class MainWindow(QMainWindow):
         duration = float(self.duration.value())
         try:
             base = self._read_config()
-            seed = secrets.randbelow(2 ** 31 - 1) + 1
+            seed = secrets.randbelow(2**31 - 1) + 1
             config = random_generation_config(base, seed=seed)
             config = replace(config, bpm=bpm, duration=duration)
             self._apply_config_to_controls(config)
@@ -1537,9 +1791,12 @@ class MainWindow(QMainWindow):
             max(0, self.percussion_source_mode.findData(config.percussion_source_mode))
         )
         self.percussion_hybrid_architecture.setCurrentIndex(
-            max(0, self.percussion_hybrid_architecture.findData(
-                config.percussion_hybrid_architecture
-            ))
+            max(
+                0,
+                self.percussion_hybrid_architecture.findData(
+                    config.percussion_hybrid_architecture
+                ),
+            )
         )
         self.percussion_sample_mix.setValue(config.percussion_sample_mix)
         self.hybrid_transient_ms.setValue(config.hybrid_transient_ms)
@@ -1577,7 +1834,9 @@ class MainWindow(QMainWindow):
             bounded_exploration = False
             if self.composition_intent_editor.has_user_content():
                 brief = self.composition_intent_editor.build_brief(config)
-                bounded_exploration = self.composition_intent_editor.exploration_enabled()
+                bounded_exploration = (
+                    self.composition_intent_editor.exploration_enabled()
+                )
         except Exception as exc:
             self._show_error(f"Could not compile composition intent: {exc}")
             return
@@ -1602,17 +1861,21 @@ class MainWindow(QMainWindow):
         try:
             brief = self.composition_intent_editor.build_brief(self.project.config)
             if not self.composition_intent_editor.has_user_content():
-                raise ValueError("Enter an artistic question, material, anchor, ending or mutation permission first.")
+                raise ValueError(
+                    "Enter an artistic question, material, anchor, ending or mutation permission first."
+                )
             from reawarp.composition.brief import resolve_composition_brief
 
             resolved = resolve_composition_brief(brief, self.project.config)
             metadata = copy.deepcopy(self.project.metadata)
-            metadata.update({
-                "m27_composition_brief": brief.to_dict(),
-                "m27_resolved_intent": resolved.to_dict(),
-                "m27_bounded_exploration": None,
-                "m27_bounded_exploration_enabled": False,
-            })
+            metadata.update(
+                {
+                    "m27_composition_brief": brief.to_dict(),
+                    "m27_resolved_intent": resolved.to_dict(),
+                    "m27_bounded_exploration": None,
+                    "m27_bounded_exploration_enabled": False,
+                }
+            )
             self.project.metadata = metadata
             self.composition_intent_editor.set_status(
                 "Brief and mutation permissions attached to the current project. "
@@ -1691,6 +1954,7 @@ class MainWindow(QMainWindow):
         if ARRANGEMENT_METADATA_KEY in score.metadata:
             arrangement = ArrangementPlan.from_score(score)
             from reawarp.composition.endings import ending_plans_from_score
+
             end_beats = max(
                 [item.end_beats for item in arrangement.clips]
                 + [item.end_beats for item in ending_plans_from_score(score)]
@@ -1698,9 +1962,12 @@ class MainWindow(QMainWindow):
             )
             required_seconds = float(score.beat_to_seconds(end_beats))
             if required_seconds > 180.0:
-                raise ValueError("M33 arrangement exceeds the supported 180-second offline render limit")
+                raise ValueError(
+                    "M33 arrangement exceeds the supported 180-second offline render limit"
+                )
             render_config = replace(
-                project.config, duration=max(project.config.duration, required_seconds, 5.0)
+                project.config,
+                duration=max(project.config.duration, required_seconds, 5.0),
             )
         rendered = ReawarpEngine().render_score(
             score, config=render_config, cancel_event=cancel_event
@@ -1715,18 +1982,23 @@ class MainWindow(QMainWindow):
             stems[name] = padded
         aliases = {"hat": "hats", "break": "synthetic_break"}
         event_voices = {
-            event.voice_id for event in canonical_score.events
+            event.voice_id
+            for event in canonical_score.events
             if event.kind not in {"control", "marker"}
         }
-        event_voices.update(str(item) for item in render_event_voices if str(item).strip())
+        event_voices.update(
+            str(item) for item in render_event_voices if str(item).strip()
+        )
         empty = np.zeros((rendered.frame_count, 2), dtype=np.float32)
         peak_ceiling = 10.0 ** (-1.0 / 20.0)
         for voice_id in sorted(event_voices):
             name = aliases.get(voice_id, voice_id)
             audio = rendered.stems.get(voice_id)
-            updated = empty.copy() if audio is None else np.asarray(
-                audio, dtype=np.float32
-            ).copy()
+            updated = (
+                empty.copy()
+                if audio is None
+                else np.asarray(audio, dtype=np.float32).copy()
+            )
             peak = float(np.max(np.abs(updated))) if updated.size else 0.0
             if peak > peak_ceiling:
                 updated *= peak_ceiling / peak
@@ -1735,11 +2007,10 @@ class MainWindow(QMainWindow):
         automation_summary = {
             "source_count": len(canonical_score.automation_sources),
             "modulation_count": len(canonical_score.modulations),
-            "control_targets": sorted({
-                lane.target_id for lane in canonical_score.automation
-            } | {
-                item.destination_target_id for item in canonical_score.modulations
-            }),
+            "control_targets": sorted(
+                {lane.target_id for lane in canonical_score.automation}
+                | {item.destination_target_id for item in canonical_score.modulations}
+            ),
             "renderer": "ScoreRenderer",
             "event_backed_voices_re_rendered": sorted(event_voices),
             "whole_field_layers_preserved": [
@@ -1752,10 +2023,13 @@ class MainWindow(QMainWindow):
         score_metadata["render_stems"] = list(stems)
         score_metadata["sample_rate"] = project.sample_rate
         score_metadata["frame_count"] = rendered.frame_count
-        score_metadata["duration_seconds"] = rendered.frame_count / float(project.sample_rate)
+        score_metadata["duration_seconds"] = rendered.frame_count / float(
+            project.sample_rate
+        )
         controlled_score = replace(canonical_score, metadata=score_metadata)
         if ARRANGEMENT_METADATA_KEY in controlled_score.metadata:
             from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+
             controlled_score = refresh_arrangement_fingerprint(controlled_score)
         project_metadata = dict(project.metadata)
         project_metadata["m18_score_automation"] = automation_summary
@@ -1768,7 +2042,6 @@ class MainWindow(QMainWindow):
             score=controlled_score,
         )
 
-
     def _m33_refresh_score_workspaces(self, score) -> None:
         self.score_automation_editor.set_score(score)
         self.phrase_workbench.set_score(score)
@@ -1780,7 +2053,8 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
             or self._pending_export_destination is not None
         ):
@@ -1794,13 +2068,18 @@ class MainWindow(QMainWindow):
         if render:
             base_project = self.project
             render_metadata = dict(updated.metadata)
-            render_metadata["m33_render_event_voices"] = sorted({
-                event.voice_id for event in current.events
-                if event.kind not in {"control", "marker"}
-            } | {
-                event.voice_id for event in updated.events
-                if event.kind not in {"control", "marker"}
-            })
+            render_metadata["m33_render_event_voices"] = sorted(
+                {
+                    event.voice_id
+                    for event in current.events
+                    if event.kind not in {"control", "marker"}
+                }
+                | {
+                    event.voice_id
+                    for event in updated.events
+                    if event.kind not in {"control", "marker"}
+                }
+            )
             updated = replace(updated, metadata=render_metadata)
             self._m33_preserve_candidates = True
             self._run_render(
@@ -1820,11 +2099,14 @@ class MainWindow(QMainWindow):
             self.arrangement_page.set_status("Generate or load a project first.")
             return
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
             or self._pending_export_destination is not None
         ):
-            self.arrangement_page.set_status("Wait for the current background operation to finish.")
+            self.arrangement_page.set_status(
+                "Wait for the current background operation to finish."
+            )
             return
         try:
             updated = action(self.project.to_score())
@@ -1835,7 +2117,8 @@ class MainWindow(QMainWindow):
 
     def _m33_create_requested(self) -> None:
         self._m33_apply_edit(
-            create_arrangement, "Creating the M33 arrangement from the current phrase plan…",
+            create_arrangement,
+            "Creating the M33 arrangement from the current phrase plan…",
             render=False,
         )
 
@@ -1896,39 +2179,48 @@ class MainWindow(QMainWindow):
 
     def _m33_branch_requested(self) -> None:
         self._m33_apply_edit(
-            branch_arrangement, "Branching the current arrangement without changing source events.",
+            branch_arrangement,
+            "Branching the current arrangement without changing source events.",
             render=False,
         )
 
     def _m33_revert_requested(self) -> None:
         self._m33_apply_edit(
-            revert_to_generation, "Restoring the preserved generation Score and rebuilding its audio…",
+            revert_to_generation,
+            "Restoring the preserved generation Score and rebuilding its audio…",
         )
 
     def _m33_undo_requested(self) -> None:
         self._m33_apply_edit(
-            undo_arrangement_edit, "Undoing the last arrangement edit and rerendering the Score…",
+            undo_arrangement_edit,
+            "Undoing the last arrangement edit and rerendering the Score…",
         )
 
     def _m33_redo_requested(self) -> None:
         self._m33_apply_edit(
-            redo_arrangement_edit, "Redoing the arrangement edit and rerendering the Score…",
+            redo_arrangement_edit,
+            "Redoing the arrangement edit and rerendering the Score…",
         )
 
     def _m33_move_transition_requested(self, transition_id: str, beat: str) -> None:
         self._m33_apply_edit(
             lambda score: move_transition(score, transition_id, beat),
-            f"Moving M30 transition cue {transition_id}.", render=False,
+            f"Moving M30 transition cue {transition_id}.",
+            render=False,
         )
 
     def _m33_move_ending_requested(self, ending_id: str, beat: str) -> None:
         self._m33_apply_edit(
             lambda score: move_ending(score, ending_id, beat),
-            f"Moving M30 ending cue {ending_id}.", render=False,
+            f"Moving M30 ending cue {ending_id}.",
+            render=False,
         )
 
     def _m33_relink_transition_requested(
-        self, transition_id: str, source_phrase_id: str, target_phrase_id: str,
+        self,
+        transition_id: str,
+        source_phrase_id: str,
+        target_phrase_id: str,
     ) -> None:
         self._m33_apply_edit(
             lambda score: relink_transition(
@@ -1950,11 +2242,14 @@ class MainWindow(QMainWindow):
             self.arrangement_page.set_status("Generate or load a project first.")
             return
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
             or self._pending_export_destination is not None
         ):
-            self.arrangement_page.set_status("Wait for the current background operation to finish.")
+            self.arrangement_page.set_status(
+                "Wait for the current background operation to finish."
+            )
             return
         try:
             score = self.project.to_score()
@@ -1963,8 +2258,12 @@ class MainWindow(QMainWindow):
             clip_score = clip_score_for_render(score, clip_id)
             start_seconds = float(score.beat_to_seconds(clip.start_beats))
             end_seconds = float(score.beat_to_seconds(clip.end_beats))
-            frame_start = max(0, int(np.floor(start_seconds * self.project.sample_rate)))
-            frame_end = max(frame_start + 1, int(np.ceil(end_seconds * self.project.sample_rate)))
+            frame_start = max(
+                0, int(np.floor(start_seconds * self.project.sample_rate))
+            )
+            frame_end = max(
+                frame_start + 1, int(np.ceil(end_seconds * self.project.sample_rate))
+            )
         except Exception as exc:
             self.arrangement_page.set_status(f"Could not prepare print: {exc}")
             return
@@ -1991,7 +2290,9 @@ class MainWindow(QMainWindow):
                 duration=max(project.config.duration, end_seconds + 0.01),
             )
             rendered = ReawarpEngine().render_score(
-                clip_score, config=config, frame_count=frame_end,
+                clip_score,
+                config=config,
+                frame_count=frame_end,
                 cancel_event=cancel_event,
             )
             if cancel_event.is_set():
@@ -2005,13 +2306,16 @@ class MainWindow(QMainWindow):
             left = min(frame_start, len(rendered_mix))
             right = min(frame_end, len(rendered_mix))
             if right > left:
-                mixed[:right - left] = rendered_mix[left:right, :2]
+                mixed[: right - left] = rendered_mix[left:right, :2]
             output_path = Path(destination).expanduser()
             write_wav(output_path, mixed, sample_rate, bit_depth=24)
             digest = hashlib.sha256(output_path.read_bytes()).hexdigest()
             return {
-                "clip_id": clip_id, "revision": revision, "path": str(output_path),
-                "sha256": digest, "sample_rate": sample_rate,
+                "clip_id": clip_id,
+                "revision": revision,
+                "path": str(output_path),
+                "sha256": digest,
+                "sample_rate": sample_rate,
                 "frame_count": len(mixed),
             }
 
@@ -2047,8 +2351,11 @@ class MainWindow(QMainWindow):
             if plan.revision != result["revision"]:
                 raise ValueError("arrangement changed while print was running")
             updated = record_print(
-                self.project.to_score(), result["clip_id"], path=result["path"],
-                sha256=result["sha256"], sample_rate=result["sample_rate"],
+                self.project.to_score(),
+                result["clip_id"],
+                path=result["path"],
+                sha256=result["sha256"],
+                sample_rate=result["sample_rate"],
                 frame_count=result["frame_count"],
             )
             self.project.score = updated
@@ -2069,7 +2376,8 @@ class MainWindow(QMainWindow):
         self._m33_print_pending = None
         detail = str(message)
         self.arrangement_page.set_status(
-            "Arrangement print cancelled." if detail.startswith("CANCELLED:")
+            "Arrangement print cancelled."
+            if detail.startswith("CANCELLED:")
             else f"Arrangement print failed: {detail.splitlines()[0]}"
         )
         if self._worker is None and self._export_worker is None:
@@ -2105,12 +2413,22 @@ class MainWindow(QMainWindow):
         try:
             start = Fraction(str(payload.get("start_beats", "0")))
             end = Fraction(str(payload.get("end_beats", "0")))
-            motif_ids = tuple(str(item).strip() for item in payload.get("motif_ids", ()) if str(item).strip())
-            roles = tuple(str(item).strip() for item in payload.get("roles", ()) if str(item).strip())
+            motif_ids = tuple(
+                str(item).strip()
+                for item in payload.get("motif_ids", ())
+                if str(item).strip()
+            )
+            roles = tuple(
+                str(item).strip()
+                for item in payload.get("roles", ())
+                if str(item).strip()
+            )
             event_ids = tuple(
-                event.event_id for event in score.events
+                event.event_id
+                for event in score.events
                 if event.kind not in {"control", "marker"}
-                and event.onset_beats >= start and event.end_beats <= end
+                and event.onset_beats >= start
+                and event.end_beats <= end
             )
             function = str(payload.get("function", "continuation")).strip()
             custom_function = payload.get("custom_function")
@@ -2132,14 +2450,14 @@ class MainWindow(QMainWindow):
             family_ids = {item.family_id for item in families}
             for motif_id in motif_ids:
                 if motif_id not in family_ids:
-                    families.append(MotifFamily(
-                        family_id=motif_id,
-                        versions=(MotifIdentity(motif_id),),
-                    ))
+                    families.append(
+                        MotifFamily(
+                            family_id=motif_id,
+                            versions=(MotifIdentity(motif_id),),
+                        )
+                    )
                     family_ids.add(motif_id)
-            phrases = [
-                item for item in plan.phrases if item.phrase_id != phrase_id
-            ]
+            phrases = [item for item in plan.phrases if item.phrase_id != phrase_id]
             phrases.append(phrase)
             updated = PhrasePlan(
                 phrases=tuple(phrases),
@@ -2167,7 +2485,9 @@ class MainWindow(QMainWindow):
             )
             return
         if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
-            self.phrase_workbench.set_error("Restore this frozen phrase before deleting it.")
+            self.phrase_workbench.set_error(
+                "Restore this frozen phrase before deleting it."
+            )
             return
         plan = self._phrase_plan_for_score(score)
         phrases = tuple(item for item in plan.phrases if item.phrase_id != phrase_id)
@@ -2177,7 +2497,9 @@ class MainWindow(QMainWindow):
         families = tuple(
             item for item in plan.motif_families if item.family_id in used_families
         )
-        updated = PhrasePlan(phrases=phrases, motif_families=families).attach_to_score(score)
+        updated = PhrasePlan(phrases=phrases, motif_families=families).attach_to_score(
+            score
+        )
         self.project.score = updated
         self._phrase_candidates.clear()
         self.phrase_workbench.set_score(updated)
@@ -2231,7 +2553,9 @@ class MainWindow(QMainWindow):
         self._phrase_batch_worker = worker
         worker.signals.finished.connect(self._phrase_batch_finished)
         worker.signals.error.connect(
-            lambda message, requested=epoch: self._phrase_batch_failed((requested, message))
+            lambda message, requested=epoch: self._phrase_batch_failed(
+                (requested, message)
+            )
         )
         QThreadPool.globalInstance().start(worker)
         self.phrase_workbench.set_error(
@@ -2264,7 +2588,9 @@ class MainWindow(QMainWindow):
         self._phrase_batch_worker = worker
         worker.signals.finished.connect(self._phrase_batch_finished)
         worker.signals.error.connect(
-            lambda message, requested=epoch: self._phrase_batch_failed((requested, message))
+            lambda message, requested=epoch: self._phrase_batch_failed(
+                (requested, message)
+            )
         )
         QThreadPool.globalInstance().start(worker)
         self.phrase_workbench.set_error(
@@ -2275,14 +2601,14 @@ class MainWindow(QMainWindow):
         self._phrase_batch_worker = None
         self.phrase_workbench.set_batch_busy(False)
         if not isinstance(result, tuple) or len(result) != 2:
-            self.phrase_workbench.set_error("Phrase candidate worker returned an invalid result.")
+            self.phrase_workbench.set_error(
+                "Phrase candidate worker returned an invalid result."
+            )
             return
         epoch, batch = result
         if epoch != self._phrase_batch_epoch:
             return
-        self._phrase_candidates = {
-            item.candidate_id: item for item in batch.candidates
-        }
+        self._phrase_candidates = {item.candidate_id: item for item in batch.candidates}
         self.phrase_workbench.set_candidates(list(batch.candidates))
         self.arrangement_page.set_candidates(list(batch.candidates))
         self.phrase_workbench.set_error(
@@ -2301,7 +2627,9 @@ class MainWindow(QMainWindow):
         if str(message).startswith("CANCELLED:"):
             self.phrase_workbench.set_error("Phrase candidate generation cancelled.")
         else:
-            self.phrase_workbench.set_error(f"Phrase candidate generation failed: {message}")
+            self.phrase_workbench.set_error(
+                f"Phrase candidate generation failed: {message}"
+            )
 
     def _phrase_freeze_requested(self, candidate_id: str, selection_note: str) -> None:
         if self.project is None:
@@ -2390,7 +2718,9 @@ class MainWindow(QMainWindow):
             self.phrase_workbench.set_error("Select a candidate before auditioning it.")
             return
         project = self.project
-        score = candidate.candidate_score if target == "candidate" else project.to_score()
+        score = (
+            candidate.candidate_score if target == "candidate" else project.to_score()
+        )
         sample_rate = int(project.sample_rate)
         self._phrase_audition_epoch += 1
         epoch = self._phrase_audition_epoch
@@ -2402,7 +2732,8 @@ class MainWindow(QMainWindow):
             plan = PhrasePlan.from_score(score)
             ordered = list(plan.phrases)
             phrase_index = next(
-                index for index, item in enumerate(ordered)
+                index
+                for index, item in enumerate(ordered)
                 if item.phrase_id == phrase_id
             )
             phrase = ordered[phrase_index]
@@ -2413,7 +2744,8 @@ class MainWindow(QMainWindow):
             elif context == "after_predecessor":
                 start_beat = (
                     ordered[phrase_index - 1].start_beats
-                    if phrase_index > 0 else phrase.start_beats
+                    if phrase_index > 0
+                    else phrase.start_beats
                 )
                 end_beat = phrase.end_beats
                 selected_events = contexts["after_predecessor"]
@@ -2421,7 +2753,8 @@ class MainWindow(QMainWindow):
                 start_beat = phrase.start_beats
                 end_beat = (
                     ordered[phrase_index + 1].end_beats
-                    if phrase_index + 1 < len(ordered) else phrase.end_beats
+                    if phrase_index + 1 < len(ordered)
+                    else phrase.end_beats
                 )
                 selected_events = contexts["before_successor"]
             else:
@@ -2438,7 +2771,9 @@ class MainWindow(QMainWindow):
             start_frame = min(start_frame, frame_count)
             if frame_count <= start_frame:
                 return (
-                    epoch, np.zeros((0, 2), dtype=np.float32), sample_rate,
+                    epoch,
+                    np.zeros((0, 2), dtype=np.float32),
+                    sample_rate,
                     f"{target.upper()} · {context.replace('_', ' ').upper()} · outside rendered project",
                 )
             if not selected_events:
@@ -2477,14 +2812,18 @@ class MainWindow(QMainWindow):
         self._phrase_audition_worker = worker
         worker.signals.finished.connect(self._phrase_audition_finished)
         worker.signals.error.connect(
-            lambda message, requested=epoch: self._phrase_audition_failed((requested, message))
+            lambda message, requested=epoch: self._phrase_audition_failed(
+                (requested, message)
+            )
         )
         QThreadPool.globalInstance().start(worker)
 
     def _phrase_audition_finished(self, result: object) -> None:
         self._phrase_audition_worker = None
         if not isinstance(result, tuple) or len(result) != 4:
-            self.phrase_workbench.set_audition_busy(False, "Phrase audition returned an invalid result.")
+            self.phrase_workbench.set_audition_busy(
+                False, "Phrase audition returned an invalid result."
+            )
             return
         epoch, audio, sample_rate, message = result
         if epoch != self._phrase_audition_epoch:
@@ -2512,23 +2851,35 @@ class MainWindow(QMainWindow):
         if detail.startswith("CANCELLED:"):
             self.phrase_workbench.set_audition_busy(False, "Phrase audition cancelled.")
         else:
-            self.phrase_workbench.set_audition_busy(False, f"Phrase audition failed: {detail}")
-
+            self.phrase_workbench.set_audition_busy(
+                False, f"Phrase audition failed: {detail}"
+            )
 
     def _phrase_compare_requested(self, candidate_id: str, context: str) -> None:
         if self.project is None:
-            self.phrase_workbench.set_error("Load or generate a project before comparing phrases.")
+            self.phrase_workbench.set_error(
+                "Load or generate a project before comparing phrases."
+            )
             return
-        if self._phrase_audition_worker is not None or self._phrase_compare_worker is not None:
-            self.phrase_workbench.set_error("Another phrase render is already in progress.")
+        if (
+            self._phrase_audition_worker is not None
+            or self._phrase_compare_worker is not None
+        ):
+            self.phrase_workbench.set_error(
+                "Another phrase render is already in progress."
+            )
             return
         phrase_id = self.phrase_workbench.selected_phrase_id
         candidate = self._phrase_candidates.get(candidate_id)
         if not phrase_id or candidate is None:
-            self.phrase_workbench.set_error("Select a phrase and one of its candidates before comparing.")
+            self.phrase_workbench.set_error(
+                "Select a phrase and one of its candidates before comparing."
+            )
             return
         if candidate.phrase_id != phrase_id:
-            self.phrase_workbench.set_error("The selected candidate belongs to a different phrase.")
+            self.phrase_workbench.set_error(
+                "The selected candidate belongs to a different phrase."
+            )
             return
 
         project = self.project
@@ -2539,21 +2890,27 @@ class MainWindow(QMainWindow):
             candidate_plan = PhrasePlan.from_score(candidate_score)
             base_ordered = list(base_plan.phrases)
             base_index = next(
-                index for index, phrase in enumerate(base_ordered)
+                index
+                for index, phrase in enumerate(base_ordered)
                 if phrase.phrase_id == phrase_id
             )
             base_phrase = base_ordered[base_index]
             candidate_phrase = next(
-                phrase for phrase in candidate_plan.phrases
+                phrase
+                for phrase in candidate_plan.phrases
                 if phrase.phrase_id == phrase_id
             )
             if (
                 base_phrase.start_beats != candidate_phrase.start_beats
                 or base_phrase.end_beats != candidate_phrase.end_beats
             ):
-                raise ValueError("candidate phrase boundaries differ from the current source")
+                raise ValueError(
+                    "candidate phrase boundaries differ from the current source"
+                )
             if set(base_phrase.event_ids) != set(candidate.source_event_ids):
-                raise ValueError("candidate source events no longer match the current phrase")
+                raise ValueError(
+                    "candidate source events no longer match the current phrase"
+                )
             if context not in {"solo", "after_predecessor", "before_successor"}:
                 raise ValueError(f"unsupported phrase comparison context: {context}")
         except (ValueError, StopIteration) as exc:
@@ -2565,14 +2922,16 @@ class MainWindow(QMainWindow):
         elif context == "after_predecessor":
             start_beat = (
                 base_ordered[base_index - 1].start_beats
-                if base_index > 0 else base_phrase.start_beats
+                if base_index > 0
+                else base_phrase.start_beats
             )
             end_beat = base_phrase.end_beats
         else:
             start_beat = base_phrase.start_beats
             end_beat = (
                 base_ordered[base_index + 1].end_beats
-                if base_index + 1 < len(base_ordered) else base_phrase.end_beats
+                if base_index + 1 < len(base_ordered)
+                else base_phrase.end_beats
             )
 
         sample_rate = int(project.sample_rate)
@@ -2594,7 +2953,9 @@ class MainWindow(QMainWindow):
             end_frame = max(start_frame + 1, timing.beat_to_frame(end_beat))
             frame_count = min(int(project.frame_count), end_frame)
             if frame_count <= start_frame:
-                raise ValueError("selected phrase context lies outside the rendered project")
+                raise ValueError(
+                    "selected phrase context lies outside the rendered project"
+                )
 
             def render_context(score, events):
                 if cancel_event.is_set():
@@ -2626,7 +2987,9 @@ class MainWindow(QMainWindow):
                 ).copy()
 
             base_context = phrase_context_events(base_score, phrase_id)[context]
-            candidate_context = phrase_context_events(candidate_score, phrase_id)[context]
+            candidate_context = phrase_context_events(candidate_score, phrase_id)[
+                context
+            ]
             reference_audio = render_context(base_score, base_context)
             candidate_audio = render_context(candidate_score, candidate_context)
             if cancel_event.is_set():
@@ -2646,8 +3009,9 @@ class MainWindow(QMainWindow):
         self._phrase_compare_worker = worker
         worker.signals.finished.connect(self._phrase_compare_finished)
         worker.signals.error.connect(
-            lambda message, requested=epoch, requested_signature=signature:
-                self._phrase_compare_failed((requested, requested_signature, message))
+            lambda message, requested=epoch, requested_signature=signature: self._phrase_compare_failed(
+                (requested, requested_signature, message)
+            )
         )
         QThreadPool.globalInstance().start(worker)
 
@@ -2689,12 +3053,17 @@ class MainWindow(QMainWindow):
         if not isinstance(payload, tuple) or len(payload) != 3:
             return
         epoch, signature, message = payload
-        if epoch != self._phrase_compare_epoch or signature != self._phrase_compare_signature:
+        if (
+            epoch != self._phrase_compare_epoch
+            or signature != self._phrase_compare_signature
+        ):
             return
         self._phrase_compare_worker = None
         detail = str(message)
         if detail.startswith("CANCELLED:"):
-            self.phrase_workbench.set_comparison_busy(False, "Phrase comparison cancelled.")
+            self.phrase_workbench.set_comparison_busy(
+                False, "Phrase comparison cancelled."
+            )
         else:
             self.phrase_workbench.set_comparison_busy(
                 False, f"Phrase comparison failed: {detail}"
@@ -2703,7 +3072,9 @@ class MainWindow(QMainWindow):
     def _phrase_comparison_audition_requested(self, key: str) -> None:
         audio = self.phrase_workbench.comparison_audio(key)
         if audio is None:
-            self.phrase_workbench.set_error("Render a phrase comparison before playing A/B/Δ.")
+            self.phrase_workbench.set_error(
+                "Render a phrase comparison before playing A/B/Δ."
+            )
             return
         try:
             self.player.stop()
@@ -2718,10 +3089,10 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.phrase_workbench.set_error(f"Audio output unavailable: {exc}")
 
-
     def _attention_plan_changed(self, payload: dict[str, Any]) -> None:
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
         ):
             self.attention_map_page.set_error(
@@ -2729,7 +3100,9 @@ class MainWindow(QMainWindow):
             )
             return
         if self.project is None:
-            self.attention_map_page.set_error("Generate or load a composition before editing attention.")
+            self.attention_map_page.set_error(
+                "Generate or load a composition before editing attention."
+            )
             return
         try:
             plan = OrchestrationPlan.from_dict(payload)
@@ -2749,7 +3122,10 @@ class MainWindow(QMainWindow):
                 updated, plan.attention
             )
             if ARRANGEMENT_METADATA_KEY in updated.metadata:
-                from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+                from reawarp.composition.arrangement import (
+                    refresh_arrangement_fingerprint,
+                )
+
                 updated = refresh_arrangement_fingerprint(updated)
             self.project.score = updated
             self.project.metadata = {
@@ -2788,7 +3164,8 @@ class MainWindow(QMainWindow):
             )
             return
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
         ):
             self.attention_map_page.set_error(
@@ -2830,7 +3207,8 @@ class MainWindow(QMainWindow):
             )
             return
         if (
-            self._worker is not None or self._export_worker is not None
+            self._worker is not None
+            or self._export_worker is not None
             or self._m33_print_worker is not None
         ):
             self.attention_map_page.set_error(
@@ -2878,7 +3256,10 @@ class MainWindow(QMainWindow):
                 notes=str(payload.get("notes", "")),
             )
             if ARRANGEMENT_METADATA_KEY in updated.metadata:
-                from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+                from reawarp.composition.arrangement import (
+                    refresh_arrangement_fingerprint,
+                )
+
                 updated = refresh_arrangement_fingerprint(updated)
             self.project.score = updated
             self.project.metadata = {
@@ -2888,7 +3269,9 @@ class MainWindow(QMainWindow):
                 ),
             }
         except Exception as exc:
-            self.attention_map_page.set_error(f"Could not record attention review: {exc}")
+            self.attention_map_page.set_error(
+                f"Could not record attention review: {exc}"
+            )
             return
         self.attention_map_page.set_score(updated)
         if hasattr(self, "arrangement_page"):
@@ -2900,7 +3283,9 @@ class MainWindow(QMainWindow):
 
     def _attention_translation_check_requested(self, mode: str) -> None:
         if self.project is None:
-            self.attention_map_page.set_error("Generate or load a composition before translation checks.")
+            self.attention_map_page.set_error(
+                "Generate or load a composition before translation checks."
+            )
             return
         try:
             source = self.project.render_master()
@@ -2952,7 +3337,9 @@ class MainWindow(QMainWindow):
             return
         self._clear_variation_session()
         self._run_render(
-            lambda cancel_event: ReawarpProject.load(directory, cancel_event=cancel_event),
+            lambda cancel_event: ReawarpProject.load(
+                directory, cancel_event=cancel_event
+            ),
             "Loading project, candidates and listening history…",
         )
 
@@ -2964,7 +3351,9 @@ class MainWindow(QMainWindow):
         self._variation_origin_project = origin
         self._variation_base_project = origin
         if "branch_base" in saved:
-            self._variation_branch_base = clone_project(saved["branch_base"], readonly=True)
+            self._variation_branch_base = clone_project(
+                saved["branch_base"], readonly=True
+            )
         session = project.metadata.get("m23_variations", {})
         self._variation_active_candidate_id = session.get("active_candidate_id")
         for key, candidate_project in saved.items():
@@ -2987,10 +3376,15 @@ class MainWindow(QMainWindow):
         stored_listening = project.metadata.get("m32_listening_session")
         if isinstance(stored_listening, dict):
             from reawarp.listening import validate_listening_session
+
             try:
                 self._m32_session = validate_listening_session(stored_listening)
-                self.variation_page.set_m32_report_notes(self._m32_session["human_notes"])
-                self.variation_page.set_m32_status("Restored the saved M32 listening session.")
+                self.variation_page.set_m32_report_notes(
+                    self._m32_session["human_notes"]
+                )
+                self.variation_page.set_m32_status(
+                    "Restored the saved M32 listening session."
+                )
             except ValueError:
                 self._m32_session = None
         self.variation_page.set_candidates(
@@ -3001,15 +3395,18 @@ class MainWindow(QMainWindow):
     def _refresh_sound_object_targets(self) -> None:
         try:
             from reawarp.library.store import SampleLibrary
+
             with SampleLibrary() as library:
                 patches = library.search_sound_objects(limit=256)
-            self.variation_page.set_sound_objects([
-                (patch.patch_id, patch.name) for patch in patches
-            ])
+            self.variation_page.set_sound_objects(
+                [(patch.patch_id, patch.name) for patch in patches]
+            )
             if hasattr(self, "sound_object_page"):
                 self.sound_object_page.set_patches(patches)
         except Exception as exc:
-            self.statusBar().showMessage(f"Sound-object catalogue unavailable: {exc}", 6000)
+            self.statusBar().showMessage(
+                f"Sound-object catalogue unavailable: {exc}", 6000
+            )
 
     def _sound_object_worker_start(self, operation, on_success) -> None:
         if self._sound_object_worker is not None:
@@ -3074,7 +3471,8 @@ class MainWindow(QMainWindow):
                 patch, layer_id or None, cancel
             ),
             lambda result: self.sound_object_page.set_preview(
-                result.audio, patch.sample_rate,
+                result.audio,
+                patch.sample_rate,
                 label=(f"Layer {layer_id}" if layer_id else "Full object"),
             ),
         )
@@ -3100,7 +3498,9 @@ class MainWindow(QMainWindow):
         def operation(cancel_event):
             with SampleLibrary() as library:
                 return print_sound_object_to_asset(
-                    patch, library, output_path,
+                    patch,
+                    library,
+                    output_path,
                     target_sample_rate=sample_rate,
                     target_role=target_role,
                     cancel_event=cancel_event,
@@ -3126,11 +3526,17 @@ class MainWindow(QMainWindow):
     def _sound_object_cancel_requested(self) -> None:
         if self._sound_object_worker is not None:
             self._sound_object_worker.cancel()
-            self.sound_object_page.set_status("Cancellation requested; current safe step will finish.")
+            self.sound_object_page.set_status(
+                "Cancellation requested; current safe step will finish."
+            )
 
     def _render_sound_object_candidate(
-        self, base: ReawarpProject, index: int, variation_seed: int,
-        request: VariationRequest, cancel_event: object,
+        self,
+        base: ReawarpProject,
+        index: int,
+        variation_seed: int,
+        request: VariationRequest,
+        cancel_event: object,
     ) -> ReawarpProject:
         """Render deterministic M21 patch variations as non-destructive project stems."""
         from pathlib import Path
@@ -3139,12 +3545,17 @@ class MainWindow(QMainWindow):
         from reawarp.library.store import SampleLibrary
         from reawarp.samples.io import read_sample
         from reawarp.synthesis.sound_object import (
-            HybridVoiceRenderer, SoundObjectPatch, TransformationRecord,
-            derive_sound_object_seed, resample_audio_non_destructive,
+            HybridVoiceRenderer,
+            SoundObjectPatch,
+            TransformationRecord,
+            derive_sound_object_seed,
+            resample_audio_non_destructive,
         )
 
         if not request.targets:
-            raise ValueError("select at least one sound-object patch from the local library")
+            raise ValueError(
+                "select at least one sound-object patch from the local library"
+            )
         stems = {
             name: np.asarray(audio, dtype=np.float32).copy()
             for name, audio in base.stems.items()
@@ -3162,7 +3573,8 @@ class MainWindow(QMainWindow):
                     required_frames = max(
                         (
                             layer.source_start_frame + layer.frame_count
-                            for layer in patch.layers if layer.source_id == source.source_id
+                            for layer in patch.layers
+                            if layer.source_id == source.source_id
                         ),
                         default=patch.duration_frames,
                     )
@@ -3173,7 +3585,10 @@ class MainWindow(QMainWindow):
                                 raise KeyError(
                                     f"sound-object source asset not indexed: {source.asset_id}"
                                 )
-                            if asset.sha256.casefold() != str(source.asset_sha256).casefold():
+                            if (
+                                asset.sha256.casefold()
+                                != str(source.asset_sha256).casefold()
+                            ):
                                 raise ValueError(
                                     f"source hash changed for sound-object asset {source.asset_id}"
                                 )
@@ -3182,9 +3597,14 @@ class MainWindow(QMainWindow):
                             source_path = Path(str(source.uri))
                             digest = hashlib.sha256()
                             with source_path.open("rb") as handle:
-                                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                                for block in iter(
+                                    lambda: handle.read(1024 * 1024), b""
+                                ):
                                     digest.update(block)
-                            if digest.hexdigest().casefold() != str(source.asset_sha256).casefold():
+                            if (
+                                digest.hexdigest().casefold()
+                                != str(source.asset_sha256).casefold()
+                            ):
                                 raise ValueError(
                                     f"source hash changed for sound-object URI {source.uri}"
                                 )
@@ -3197,9 +3617,7 @@ class MainWindow(QMainWindow):
                         frames = required_frames
                         time = np.arange(frames, dtype=np.float64) / patch.sample_rate
                         model = str(source.source_model or "").casefold()
-                        frequency = float(
-                            patch.pitch_model.get("frequency_hz", 220.0)
-                        )
+                        frequency = float(patch.pitch_model.get("frequency_hz", 220.0))
                         noise = rng.normal(0.0, 1.0, frames)
                         if "impulse" in model or "noise" in model:
                             decay = 18.0 if "impulse" in model else 5.0
@@ -3227,7 +3645,9 @@ class MainWindow(QMainWindow):
                     )
 
                 rng = np.random.default_rng(
-                    derive_sound_object_seed(variation_seed, patch.patch_id, "m23-variation")
+                    derive_sound_object_seed(
+                        variation_seed, patch.patch_id, "m23-variation"
+                    )
                 )
                 updated_layers = []
                 for layer in patch.layers:
@@ -3236,30 +3656,44 @@ class MainWindow(QMainWindow):
                     release_scale = float(rng.uniform(0.86, 1.14))
                     envelope = replace(
                         layer.envelope,
-                        decay_seconds=float(np.clip(
-                            layer.envelope.decay_seconds * decay_scale, 0.0, 30.0
-                        )),
-                        release_seconds=float(np.clip(
-                            layer.envelope.release_seconds * release_scale, 0.0, 30.0
-                        )),
+                        decay_seconds=float(
+                            np.clip(
+                                layer.envelope.decay_seconds * decay_scale, 0.0, 30.0
+                            )
+                        ),
+                        release_seconds=float(
+                            np.clip(
+                                layer.envelope.release_seconds * release_scale,
+                                0.0,
+                                30.0,
+                            )
+                        ),
                     )
-                    updated_layers.append(replace(
-                        layer,
-                        gain=float(np.clip(layer.gain * gain_scale, 0.0, 4.0)),
-                        envelope=envelope,
-                    ))
+                    updated_layers.append(
+                        replace(
+                            layer,
+                            gain=float(np.clip(layer.gain * gain_scale, 0.0, 4.0)),
+                            envelope=envelope,
+                        )
+                    )
                 spectrum = copy.deepcopy(patch.spectrum)
                 for partial in spectrum.get("partials", []):
-                    partial["gain"] = float(np.clip(
-                        float(partial.get("gain", 1.0)) * rng.uniform(0.84, 1.16),
-                        0.0, 4.0,
-                    ))
+                    partial["gain"] = float(
+                        np.clip(
+                            float(partial.get("gain", 1.0)) * rng.uniform(0.84, 1.16),
+                            0.0,
+                            4.0,
+                        )
+                    )
                 modulation = copy.deepcopy(patch.modulation)
                 if modulation and "depth" in modulation:
-                    modulation["depth"] = float(np.clip(
-                        float(modulation["depth"]) * rng.uniform(0.8, 1.2),
-                        0.0, 1.0,
-                    ))
+                    modulation["depth"] = float(
+                        np.clip(
+                            float(modulation["depth"]) * rng.uniform(0.8, 1.2),
+                            0.0,
+                            1.0,
+                        )
+                    )
                 processing_id = f"{patch.processing_identity_id}:m23:{variation_seed}"
                 transform = TransformationRecord(
                     operation="m23_seeded_hybrid_variation",
@@ -3271,12 +3705,18 @@ class MainWindow(QMainWindow):
                         "envelope_release_range": [0.86, 1.14],
                     },
                     preserved_dimensions=(
-                        "source_identity", "source_hashes", "layer_roles",
-                        "phase_groups", "pitch_model",
+                        "source_identity",
+                        "source_hashes",
+                        "layer_roles",
+                        "phase_groups",
+                        "pitch_model",
                     ),
                     changed_dimensions=(
-                        "processing_identity", "layer_gain", "envelope",
-                        "spectral_partial_gain", "modulation_depth",
+                        "processing_identity",
+                        "layer_gain",
+                        "envelope",
+                        "spectral_partial_gain",
+                        "modulation_depth",
                     ),
                 )
                 variant_patch = replace(
@@ -3289,42 +3729,50 @@ class MainWindow(QMainWindow):
                     transformations=patch.transformations + (transform,),
                 )
                 rendered = HybridVoiceRenderer().render(
-                    variant_patch, source_audio,
+                    variant_patch,
+                    source_audio,
                     frame_count=variant_patch.duration_frames,
                 )
                 rendered_audio = rendered.audio
                 if patch.sample_rate != base.sample_rate:
                     rendered_audio, resample_record = resample_audio_non_destructive(
-                        rendered_audio, patch.sample_rate, base.sample_rate,
+                        rendered_audio,
+                        patch.sample_rate,
+                        base.sample_rate,
                         seed=int(variation_seed),
                     )
                     variant_patch = replace(
                         variant_patch,
-                        transformations=variant_patch.transformations + (resample_record,),
+                        transformations=variant_patch.transformations
+                        + (resample_record,),
                     )
                 if len(rendered_audio) > base.frame_count:
                     raise ValueError(
                         f"sound-object patch {patch.name!r} exceeds project duration"
                     )
-                safe_patch_id = re.sub(r"[^A-Za-z0-9_-]+", "_", patch.patch_id).strip("_")
+                safe_patch_id = re.sub(r"[^A-Za-z0-9_-]+", "_", patch.patch_id).strip(
+                    "_"
+                )
                 stem_name = f"sound_object_{safe_patch_id or 'patch'}"
                 if stem_name in stems and stem_name not in request.targets:
                     stem_name = f"{stem_name}_{index:02d}"
                 audio = np.zeros((base.frame_count, 2), dtype=np.float32)
-                audio[:len(rendered_audio)] = rendered_audio
+                audio[: len(rendered_audio)] = rendered_audio
                 stems[stem_name] = audio
-                variants.append({
-                    "patch_id": patch.patch_id,
-                    "name": patch.name,
-                    "source_identity_id": patch.source_identity_id,
-                    "source_hashes": list(patch.source_hashes),
-                    "original_processing_identity_id": patch.processing_identity_id,
-                    "processing_identity_id": variant_patch.processing_identity_id,
-                    "seed": variation_seed,
-                    "stem": stem_name,
-                    "patch": variant_patch.to_dict(),
-                    "diagnostics": rendered.diagnostics,
-                })
+                variants.append(
+                    {
+                        "patch_id": patch.patch_id,
+                        "name": patch.name,
+                        "source_identity_id": patch.source_identity_id,
+                        "source_hashes": list(patch.source_hashes),
+                        "original_processing_identity_id": patch.processing_identity_id,
+                        "processing_identity_id": variant_patch.processing_identity_id,
+                        "seed": variation_seed,
+                        "stem": stem_name,
+                        "patch": variant_patch.to_dict(),
+                        "diagnostics": rendered.diagnostics,
+                    }
+                )
 
         score = base.to_score()
         score_metadata = copy.deepcopy(score.metadata)
@@ -3344,7 +3792,9 @@ class MainWindow(QMainWindow):
 
     def _start_variation_batch(self, payload: dict[str, Any]) -> None:
         if self.project is None:
-            self.statusBar().showMessage("Generate or load a project before creating variations.")
+            self.statusBar().showMessage(
+                "Generate or load a project before creating variations."
+            )
             return
         if self._worker is not None or self._variation_batch_worker is not None:
             return
@@ -3366,11 +3816,14 @@ class MainWindow(QMainWindow):
 
         def operation(cancel_event):
             batch = VariationBatchService().generate_batch(
-                base, request, parent_candidate_id=parent_candidate_id,
+                base,
+                request,
+                parent_candidate_id=parent_candidate_id,
                 cancel_event=cancel_event,
                 sound_object_renderer=(
                     self._render_sound_object_candidate
-                    if request.mode == "sound_object" else None
+                    if request.mode == "sound_object"
+                    else None
                 ),
             )
             return epoch, batch
@@ -3389,11 +3842,14 @@ class MainWindow(QMainWindow):
     def _cancel_variation_batch(self) -> None:
         if self._variation_batch_worker is not None:
             self._variation_batch_worker.cancel()
-            self.statusBar().showMessage("Cancellation requested · the active render will stop at a safe boundary.")
+            self.statusBar().showMessage(
+                "Cancellation requested · the active render will stop at a safe boundary."
+            )
 
     def _variation_batch_finished(self, result: object) -> None:
         if (
-            not isinstance(result, tuple) or len(result) != 2
+            not isinstance(result, tuple)
+            or len(result) != 2
             or result[0] != self._variation_session_epoch
             or not isinstance(result[1], VariationBatch)
         ):
@@ -3404,12 +3860,15 @@ class MainWindow(QMainWindow):
         for candidate in result.candidates:
             self._variation_candidates[candidate.record.candidate_id] = candidate
         records = [item.record for item in self._variation_candidates.values()]
-        selected = result.candidates[-1].record.candidate_id if result.candidates else None
+        selected = (
+            result.candidates[-1].record.candidate_id if result.candidates else None
+        )
         self.variation_page.set_candidates(records, selected_id=selected)
         self.statusBar().showMessage(
             f"Variation batch complete · {len(result.candidates)} candidate(s) · source project remains frozen.",
             8000,
         )
+
     def _variation_batch_failed(self, payload: object) -> None:
         if not isinstance(payload, tuple) or len(payload) != 2:
             return
@@ -3459,14 +3918,17 @@ class MainWindow(QMainWindow):
             self._variation_active_candidate_id = candidate_id
             self._render_finished(clone_project(candidate.project))
         if action == "branched":
-            self._variation_branch_base = clone_project(candidate.project, readonly=True)
+            self._variation_branch_base = clone_project(
+                candidate.project, readonly=True
+            )
             self._variation_parent_candidate_id = candidate_id
         self.variation_page.set_candidates(
             [item.record for item in self._variation_candidates.values()],
             selected_id=candidate_id,
         )
         self.statusBar().showMessage(
-            f"{candidate.record.label} · {candidate.record.selection_state.upper()}", 6000
+            f"{candidate.record.label} · {candidate.record.selection_state.upper()}",
+            6000,
         )
 
     def _variation_notes_changed(self, candidate_id: str, notes: str) -> None:
@@ -3499,26 +3961,33 @@ class MainWindow(QMainWindow):
             else self._variation_origin_project
         )
         if reference_project is None:
-            reference_project = self._variation_branch_base or self._variation_base_project
+            reference_project = (
+                self._variation_branch_base or self._variation_base_project
+            )
         if reference_project is None:
             return
         stage = str(self.variation_page.compare_stage.currentData() or "dry_master")
         stem = self._variation_candidate_stem(candidate)
         if stage == "dry_master":
-            left, right = project_audio(reference_project), project_audio(candidate.project)
+            left, right = project_audio(reference_project), project_audio(
+                candidate.project
+            )
             try:
                 self._show_variation_comparison(
                     matched_ab(left, right, sample_rate=reference_project.sample_rate)
                 )
             except Exception as exc:
-                self.statusBar().showMessage(f"Could not compare candidates: {exc}", 8000)
+                self.statusBar().showMessage(
+                    f"Could not compare candidates: {exc}", 8000
+                )
             return
         if stage == "dry_stem":
             if stem is None:
                 return
             right = project_audio(candidate.project, stem=stem)
             left = (
-                np.zeros_like(right) if stem not in reference_project.stems
+                np.zeros_like(right)
+                if stem not in reference_project.stems
                 else project_audio(reference_project, stem=stem)
             )
             try:
@@ -3526,7 +3995,9 @@ class MainWindow(QMainWindow):
                     matched_ab(left, right, sample_rate=reference_project.sample_rate)
                 )
             except Exception as exc:
-                self.statusBar().showMessage(f"Could not compare candidates: {exc}", 8000)
+                self.statusBar().showMessage(
+                    f"Could not compare candidates: {exc}", 8000
+                )
             return
 
         if self._variation_compare_worker is not None:
@@ -3570,7 +4041,9 @@ class MainWindow(QMainWindow):
                 )
                 controls = None
                 if (
-                    score.automation or score.automation_sources or score.modulations
+                    score.automation
+                    or score.automation_sources
+                    or score.modulations
                     or attention_gestures
                 ):
                     if legacy_automation:
@@ -3578,15 +4051,20 @@ class MainWindow(QMainWindow):
                             score, legacy_automation, tuple(project.stems)
                         )
                     controls = build_score_control_bus(
-                        score, project.sample_rate,
-                        automation_registry=fx_automation_registry(tuple(project.stems)),
+                        score,
+                        project.sample_rate,
+                        automation_registry=fx_automation_registry(
+                            tuple(project.stems)
+                        ),
                     )
                 dry_stems = {
                     name: np.asarray(audio, dtype=np.float32).copy()
                     for name, audio in project.stems.items()
                 }
                 processed, metadata = render_fx_routing(
-                    dry_stems, project.sample_rate, routing,
+                    dry_stems,
+                    project.sample_rate,
+                    routing,
                     bpm=project.config.bpm,
                     automation=legacy_automation if controls is None else None,
                     controls=controls,
@@ -3602,10 +4080,14 @@ class MainWindow(QMainWindow):
         self._variation_compare_worker = worker
         worker.signals.finished.connect(self._variation_compare_finished)
         worker.signals.error.connect(
-            lambda message, requested=signature: self._variation_compare_failed((requested, message))
+            lambda message, requested=signature: self._variation_compare_failed(
+                (requested, message)
+            )
         )
         QThreadPool.globalInstance().start(worker)
-        self.statusBar().showMessage(f"Rendering matched comparison · {stage.replace('.', ' ').upper()}…")
+        self.statusBar().showMessage(
+            f"Rendering matched comparison · {stage.replace('.', ' ').upper()}…"
+        )
 
     def _show_variation_comparison(self, result: dict[str, Any]) -> None:
         self._variation_ab_buffers = {
@@ -3614,7 +4096,9 @@ class MainWindow(QMainWindow):
             "difference": result["difference"],
         }
         self.variation_page.set_comparison(
-            result["reference"], result["candidate"], result["difference"],
+            result["reference"],
+            result["candidate"],
+            result["difference"],
             int(result["sample_rate"]),
         )
         report = result["difference_meter"]
@@ -3625,7 +4109,10 @@ class MainWindow(QMainWindow):
         )
 
     def _variation_compare_finished(self, result: object) -> None:
-        if not isinstance(result, dict) or result.get("signature") != self._variation_compare_signature:
+        if (
+            not isinstance(result, dict)
+            or result.get("signature") != self._variation_compare_signature
+        ):
             return
         self._variation_compare_worker = None
         candidate_id, stage = result["signature"]
@@ -3638,7 +4125,9 @@ class MainWindow(QMainWindow):
             else self._variation_origin_project
         )
         if reference_project is None:
-            reference_project = self._variation_branch_base or self._variation_base_project
+            reference_project = (
+                self._variation_branch_base or self._variation_base_project
+            )
         if reference_project is None:
             return
         stem = self._variation_candidate_stem(candidate)
@@ -3658,7 +4147,8 @@ class MainWindow(QMainWindow):
                 return audition["returns"][stage.split(".", 1)[1]]
             if stage == "master":
                 return render_master_with_returns(
-                    processed, metadata.get("bus_returns_audio", {}),
+                    processed,
+                    metadata.get("bus_returns_audio", {}),
                     master_wet=float(metadata.get("master_wet", 1.0)),
                 )
             raise ValueError(f"unsupported comparison stage: {stage}")
@@ -3669,7 +4159,9 @@ class MainWindow(QMainWindow):
                 matched_ab(left, right, sample_rate=reference_project.sample_rate)
             )
         except Exception as exc:
-            self.statusBar().showMessage(f"Could not compare routing stages: {exc}", 8000)
+            self.statusBar().showMessage(
+                f"Could not compare routing stages: {exc}", 8000
+            )
 
     def _variation_compare_failed(self, payload: object) -> None:
         if not isinstance(payload, tuple) or len(payload) != 2:
@@ -3682,12 +4174,13 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"Variation comparison failed: {message}", 10000)
 
-
     def _variation_listening_set(self, preset: str) -> None:
         candidate_id = self.variation_page.selected_candidate_id
         selected = self._variation_candidates.get(candidate_id or "")
-        project = selected.project if selected is not None else (
-            self._variation_branch_base or self._variation_base_project
+        project = (
+            selected.project
+            if selected is not None
+            else (self._variation_branch_base or self._variation_base_project)
         )
         if project is None:
             return
@@ -3713,25 +4206,37 @@ class MainWindow(QMainWindow):
             return
         self._variation_ab_buffers["listening"] = audio
         sample_rate = (
-            self._variation_candidates.get(self.variation_page.selected_candidate_id or "").project.sample_rate
+            self._variation_candidates.get(
+                self.variation_page.selected_candidate_id or ""
+            ).project.sample_rate
             if self.variation_page.selected_candidate_id in self._variation_candidates
-            else (self._variation_base_project.sample_rate if self._variation_base_project else 48_000)
+            else (
+                self._variation_base_project.sample_rate
+                if self._variation_base_project
+                else 48_000
+            )
         )
         self.variation_page.set_listening_audio(audio, sample_rate)
 
     def _variation_audition(self, source: str) -> None:
         audio = self._variation_ab_buffers.get(source)
         if audio is None:
-            self.statusBar().showMessage("Run a matched comparison or choose a listening set first.")
+            self.statusBar().showMessage(
+                "Run a matched comparison or choose a listening set first."
+            )
             return
-        project = self._variation_branch_base or self._variation_base_project or self.project
+        project = (
+            self._variation_branch_base or self._variation_base_project or self.project
+        )
         if project is None:
             return
         if source == "listening":
             # M32 stores a playback-level copy already; do not apply another hidden level match.
             audio = np.asarray(audio, dtype=np.float32).copy()
         try:
-            self.player.start(audio, project.sample_rate, device=self.output_device.currentData())
+            self.player.start(
+                audio, project.sample_rate, device=self.output_device.currentData()
+            )
         except Exception as exc:
             self.statusBar().showMessage(f"Could not audition comparison: {exc}", 8000)
 
@@ -3740,7 +4245,9 @@ class MainWindow(QMainWindow):
         candidate = self._variation_candidates.get(candidate_id or "")
         if candidate is not None:
             return candidate.project, candidate_id
-        project = self._variation_branch_base or self._variation_base_project or self.project
+        project = (
+            self._variation_branch_base or self._variation_base_project or self.project
+        )
         return project, None
 
     def _m32_persist_session(self, session: dict[str, Any]) -> None:
@@ -3768,7 +4275,8 @@ class MainWindow(QMainWindow):
             if candidate_id:
                 candidate_ids = tuple(dict.fromkeys((*candidate_ids, candidate_id)))
             existing = new_listening_session(
-                base, candidate_ids=candidate_ids,
+                base,
+                candidate_ids=candidate_ids,
                 analysis_enabled=self._m32_analysis_enabled,
             )
         elif candidate_id and candidate_id not in existing.get("candidate_ids", []):
@@ -3780,7 +4288,8 @@ class MainWindow(QMainWindow):
     def _m32_analysis_toggled(self, enabled: bool) -> None:
         self._m32_analysis_enabled = bool(enabled)
         self.variation_page.set_m32_status(
-            "Technical analysis enabled." if enabled
+            "Technical analysis enabled."
+            if enabled
             else "Technical analysis disabled. No measurements or warnings will be generated."
         )
         if self._m32_session is not None:
@@ -3791,23 +4300,32 @@ class MainWindow(QMainWindow):
     def _m32_context_requested(self, payload: dict[str, Any]) -> None:
         from reawarp.composition.phrases import PhrasePlan
         from reawarp.listening import (
-            analyse_audio, analyse_project, apply_playback_level,
-            build_contextual_audition_set, record_session_event,
+            analyse_audio,
+            analyse_project,
+            apply_playback_level,
+            build_contextual_audition_set,
+            record_session_event,
             audio_fingerprint,
         )
 
         project, candidate_id = self._m32_active_project()
         if project is None:
-            self.variation_page.set_m32_status("Generate or load a project before evaluating it.")
+            self.variation_page.set_m32_status(
+                "Generate or load a project before evaluating it."
+            )
             return
         context = str(payload.get("context", "full_track"))
-        analysis_enabled = bool(payload.get("analysis_enabled", self._m32_analysis_enabled))
+        analysis_enabled = bool(
+            payload.get("analysis_enabled", self._m32_analysis_enabled)
+        )
         phrase_choices = []
         try:
             plan = PhrasePlan.from_score(project.to_score())
             phrase_choices = [
                 (item.phrase_id, f"{item.phrase_id} · {item.function.upper()}")
-                for item in sorted(plan.phrases, key=lambda item: (item.start_beats, item.end_beats))
+                for item in sorted(
+                    plan.phrases, key=lambda item: (item.start_beats, item.end_beats)
+                )
             ]
         except (ValueError, TypeError):
             pass
@@ -3818,7 +4336,9 @@ class MainWindow(QMainWindow):
         session = self._m32_ensure_session(project, candidate_id)
         if self._m32_worker is not None:
             self._m32_worker.cancel()
-        self.variation_page.set_m32_status(f"Preparing {context.replace('_', ' ').upper()} audition…")
+        self.variation_page.set_m32_status(
+            f"Preparing {context.replace('_', ' ').upper()} audition…"
+        )
         self.variation_page.m32_build_button.setEnabled(False)
         project_snapshot = clone_project(project, readonly=True)
         roles = tuple(str(item) for item in payload.get("roles", ()))
@@ -3846,7 +4366,9 @@ class MainWindow(QMainWindow):
             playback, level_record = apply_playback_level(
                 result.audio, level_dbfs=target_level
             )
-            project_analysis = analyse_project(project_snapshot, enabled=analysis_enabled)
+            project_analysis = analyse_project(
+                project_snapshot, enabled=analysis_enabled
+            )
             audition_analysis = analyse_audio(
                 result.audio, project_snapshot.sample_rate, enabled=analysis_enabled
             )
@@ -3875,30 +4397,48 @@ class MainWindow(QMainWindow):
             self._m32_current_result = audition
             self._variation_listening_buffers[audition.label] = result["playback"]
             self.variation_page.set_listening_items(self._variation_listening_buffers)
-            self.variation_page.set_listening_audio(result["playback"], project_snapshot.sample_rate)
+            self.variation_page.set_listening_audio(
+                result["playback"], project_snapshot.sample_rate
+            )
             self._variation_ab_buffers["listening"] = result["playback"]
             self._m32_analysis_enabled = result["analysis_enabled"]
-            session_value = self._m32_ensure_session(project_snapshot, result["candidate_id"])
+            session_value = self._m32_ensure_session(
+                project_snapshot, result["candidate_id"]
+            )
             session_value = record_session_event(
                 session_value, "audition_transforms", audition.transform.to_dict()
             )
             session_value = record_session_event(
                 session_value, "level_checks", result["level_record"]
             )
-            if audition.transform.operation in {"role_subtraction", "invariance_removal_probe"}:
+            if audition.transform.operation in {
+                "role_subtraction",
+                "invariance_removal_probe",
+            }:
                 session_value = record_session_event(
-                    session_value, "subtraction_history",
-                    {"transform": audition.transform.to_dict(), "decision": "unreviewed"},
+                    session_value,
+                    "subtraction_history",
+                    {
+                        "transform": audition.transform.to_dict(),
+                        "decision": "unreviewed",
+                    },
                 )
             if audition.transform.operation == "invariance_removal_probe":
                 session_value = record_session_event(
-                    session_value, "invariance_trials",
+                    session_value,
+                    "invariance_trials",
                     {
                         **audition.transform.to_dict(),
                         "human_identity_survives": payload.get("identity_survives"),
-                        "identity_label": result["result"].transform.parameters.get("identity_label"),
-                        "anchor_roles": result["result"].transform.parameters.get("anchor_roles", []),
-                        "removed_roles": result["result"].transform.parameters.get("removed_roles", []),
+                        "identity_label": result["result"].transform.parameters.get(
+                            "identity_label"
+                        ),
+                        "anchor_roles": result["result"].transform.parameters.get(
+                            "anchor_roles", []
+                        ),
+                        "removed_roles": result["result"].transform.parameters.get(
+                            "removed_roles", []
+                        ),
                     },
                 )
             session_value["technical_analysis"] = result["project_analysis"]
@@ -3915,13 +4455,21 @@ class MainWindow(QMainWindow):
 
             if audition.audio.shape == project_snapshot.render_master().shape:
                 from reawarp.listening import ListeningEditHistory
+
                 fingerprint = project_fingerprint(project_snapshot)
-                if self._m32_history is None or self._m32_history_fingerprint != fingerprint:
+                if (
+                    self._m32_history is None
+                    or self._m32_history_fingerprint != fingerprint
+                ):
                     self._m32_history = ListeningEditHistory(
-                        project_snapshot.render_master(), sample_rate=project_snapshot.sample_rate
+                        project_snapshot.render_master(),
+                        sample_rate=project_snapshot.sample_rate,
                     )
                     self._m32_history_fingerprint = fingerprint
-                if audition.transform.operation in {"role_subtraction", "invariance_removal_probe"}:
+                if audition.transform.operation in {
+                    "role_subtraction",
+                    "invariance_removal_probe",
+                }:
                     self._m32_history.push(audition.audio, audition.transform)
 
         def failed(message):
@@ -3930,7 +4478,9 @@ class MainWindow(QMainWindow):
             self._m32_worker = None
             self.variation_page.m32_build_button.setEnabled(True)
             if not str(message).startswith("CANCELLED:"):
-                self.variation_page.set_m32_status(f"Critical listening audition failed: {message}")
+                self.variation_page.set_m32_status(
+                    f"Critical listening audition failed: {message}"
+                )
                 self.statusBar().showMessage(f"M32 audition failed: {message}", 9000)
 
         worker.signals.finished.connect(finished)
@@ -3940,11 +4490,15 @@ class MainWindow(QMainWindow):
     def _m32_decision_requested(self, decision: str) -> None:
         from dataclasses import replace as dataclass_replace
         from reawarp.listening import (
-            apply_playback_level, audio_fingerprint, record_session_event,
+            apply_playback_level,
+            audio_fingerprint,
+            record_session_event,
         )
 
         if self._m32_current_result is None or self._m32_session is None:
-            self.variation_page.set_m32_status("Build an audition pass before keeping or restoring it.")
+            self.variation_page.set_m32_status(
+                "Build an audition pass before keeping or restoring it."
+            )
             return
         if decision == "keep":
             transform = dataclass_replace(
@@ -3958,9 +4512,8 @@ class MainWindow(QMainWindow):
                     pass
             collection = (
                 "subtraction_history"
-                if self._m32_current_result.transform.operation in {
-                    "role_subtraction", "invariance_removal_probe"
-                }
+                if self._m32_current_result.transform.operation
+                in {"role_subtraction", "invariance_removal_probe"}
                 else "audition_transforms"
             )
             session = record_session_event(self._m32_session, collection, record)
@@ -3974,10 +4527,12 @@ class MainWindow(QMainWindow):
             if project is None:
                 return
             reversible_operation = self._m32_current_result.transform.operation in {
-                "role_subtraction", "invariance_removal_probe"
+                "role_subtraction",
+                "invariance_removal_probe",
             }
             if (
-                reversible_operation and self._m32_history is not None
+                reversible_operation
+                and self._m32_history is not None
                 and self._m32_history.can_undo
             ):
                 restored = self._m32_history.undo()
@@ -3990,7 +4545,8 @@ class MainWindow(QMainWindow):
             self.variation_page.set_listening_audio(playback, project.sample_rate)
             self._variation_ab_buffers["listening"] = playback
             session = record_session_event(
-                self._m32_session, "subtraction_history",
+                self._m32_session,
+                "subtraction_history",
                 {
                     "decision": "restored",
                     "restored_audio_sha256": audio_fingerprint(restored),
@@ -4005,9 +4561,12 @@ class MainWindow(QMainWindow):
 
     def _m32_report_requested(self, notes: dict[str, Any]) -> None:
         from reawarp.listening import update_human_notes
+
         project, candidate_id = self._m32_active_project()
         if project is None:
-            self.variation_page.set_m32_status("Generate or load a project before saving report notes.")
+            self.variation_page.set_m32_status(
+                "Generate or load a project before saving report notes."
+            )
             return
         session = self._m32_ensure_session(project, candidate_id)
         session = update_human_notes(session, notes)
@@ -4038,7 +4597,8 @@ class MainWindow(QMainWindow):
             self._variation_sync_candidate(candidate)
             variation_projects[candidate_id] = candidate.project
         session = variation_session_metadata(
-            origin, self._variation_candidates,
+            origin,
+            self._variation_candidates,
             active_candidate_id=self._variation_active_candidate_id,
         )
         session["active_branch_fingerprint"] = branch_fingerprint
@@ -4047,7 +4607,9 @@ class MainWindow(QMainWindow):
         metadata["m23_active_candidate_id"] = self._variation_active_candidate_id
         metadata["m23_project_fingerprint"] = origin_fingerprint
         metadata["m23_variations"] = session
-        return replace(self.project, metadata=metadata, variation_candidates=variation_projects)
+        return replace(
+            self.project, metadata=metadata, variation_candidates=variation_projects
+        )
 
     def _regenerate_stem(self, name: str) -> None:
         if self.project is None:
@@ -4058,7 +4620,10 @@ class MainWindow(QMainWindow):
         base_project = self.project
         self._run_render(
             lambda cancel_event: ReawarpEngine().generate_variant(
-                config, name, variation, base_project=base_project,
+                config,
+                name,
+                variation,
+                base_project=base_project,
                 cancel_event=cancel_event,
             ),
             f"Regenerating {name} · variation {variation}…",
@@ -4103,8 +4668,12 @@ class MainWindow(QMainWindow):
     def _set_busy(self, busy: bool, message: str = "") -> None:
         self.generate_button.setEnabled(not busy)
         self.progress.setVisible(busy)
-        self.cancel_background_button.setVisible(busy or self._export_worker is not None)
-        self.cancel_background_button.setEnabled(busy or self._export_worker is not None)
+        self.cancel_background_button.setVisible(
+            busy or self._export_worker is not None
+        )
+        self.cancel_background_button.setEnabled(
+            busy or self._export_worker is not None
+        )
         for row in self._mix_rows.values():
             row.regen.setEnabled(not busy and row.can_regenerate)
         self.header_state.setText("RENDERING…" if busy else "OFFLINE RENDER ENGINE")
@@ -4119,7 +4688,9 @@ class MainWindow(QMainWindow):
             return
         previous_names = tuple(self.project.stems) if self.project is not None else ()
         previous_routing = self.fx_routing_editor.routing() if previous_names else None
-        previous_automation = self.fx_automation_editor.automation() if previous_names else None
+        previous_automation = (
+            self.fx_automation_editor.automation() if previous_names else None
+        )
         project_routing = result.metadata.get("project_fx_routing")
         project_automation = result.metadata.get("project_fx_automation")
         self.player.stop()
@@ -4177,10 +4748,15 @@ class MainWindow(QMainWindow):
         stored_listening = result.metadata.get("m32_listening_session")
         if isinstance(stored_listening, dict):
             from reawarp.listening import validate_listening_session
+
             try:
                 self._m32_session = validate_listening_session(stored_listening)
-                self.variation_page.set_m32_report_notes(self._m32_session["human_notes"])
-                self.variation_page.set_m32_status("Loaded saved M32 critical-listening notes.")
+                self.variation_page.set_m32_report_notes(
+                    self._m32_session["human_notes"]
+                )
+                self.variation_page.set_m32_status(
+                    "Loaded saved M32 critical-listening notes."
+                )
             except ValueError:
                 self._m32_session = None
         else:
@@ -4195,7 +4771,9 @@ class MainWindow(QMainWindow):
         self.preview_source.setEnabled(True)
         self.play_button.setEnabled(True)
         self.stop_button.setEnabled(True)
-        self.fx_routing_editor.set_stems(list(result.stems), result.sample_rate, result.config.bpm)
+        self.fx_routing_editor.set_stems(
+            list(result.stems), result.sample_rate, result.config.bpm
+        )
         self.fx_automation_editor.set_project(list(result.stems), result.config.bpm)
         if isinstance(project_routing, dict):
             self.fx_routing_editor.set_routing(project_routing)
@@ -4253,7 +4831,8 @@ class MainWindow(QMainWindow):
             if details.get("bank_count", 0)
         )
         switch_timeline = " | ".join(
-            f"{role.upper()}: " + ", ".join(
+            f"{role.upper()}: "
+            + ", ".join(
                 f"{item.get('section', '?')} → {item.get('label', item.get('to_index', '?'))}"
                 for item in details.get("switch_points", [])
             )
@@ -4279,7 +4858,8 @@ class MainWindow(QMainWindow):
         role_line = " | ".join(
             f"{item.get('section_name', '?')}:"
             + "/".join(
-                str(role.get("role", "")) for role in item.get("roles", [])
+                str(role.get("role", ""))
+                for role in item.get("roles", [])
                 if role.get("active")
             )
             for item in result.metadata.get("section_orchestration", [])
@@ -4290,7 +4870,11 @@ class MainWindow(QMainWindow):
             f"seed {result.config.seed} · algorithm {result.metadata.get('algorithm_version', '?')}\n"
             f"PHRASES: {phrase_line or 'n/a'}"
             + (f"\nFORM MAP: {phrase_detail}" if phrase_detail else "")
-            + (f"\nDRUM EVOLUTION: {drum_line}" if drum_line else "\nDRUM EVOLUTION: static mode")
+            + (
+                f"\nDRUM EVOLUTION: {drum_line}"
+                if drum_line
+                else "\nDRUM EVOLUTION: static mode"
+            )
             + (f"\nDRUM TIMBRES: {profile_line}" if profile_line else "")
             + f"\nSOURCE ENGINE: {source_line}"
             + (f"\nMOTIF: {motif_id} · {motif_line}" if motif_id else "")
@@ -4298,7 +4882,11 @@ class MainWindow(QMainWindow):
             + (f"\nTRANSITIONS: {transition_line}" if transition_line else "")
             + (f"\nSAMPLE BANKS: {bank_summary}" if bank_summary else "")
             + (f"\nSAMPLE SWITCHES: {switch_timeline}" if switch_timeline else "")
-            + (f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}" if loaded_sources else "")
+            + (
+                f"\nSAMPLE MATERIAL: {', '.join(loaded_sources)}"
+                if loaded_sources
+                else ""
+            )
         )
         self.statusBar().showMessage(
             f"Render complete — {len(result.events)} events, {len(result.stems)} aligned stems",
@@ -4315,7 +4903,9 @@ class MainWindow(QMainWindow):
             return
         # Workers print the complete traceback; keep the dialog concise so the
         # error can be copied from the terminal instead of a giant modal.
-        first_line = str(message).splitlines()[0] if str(message) else "Unknown render error"
+        first_line = (
+            str(message).splitlines()[0] if str(message) else "Unknown render error"
+        )
         self._show_error(first_line + "\n\nFull traceback was printed in the terminal.")
 
     def _show_error(self, message: str) -> None:
@@ -4333,8 +4923,14 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         supported = {
-            "kick", "snare", "hats", "synthetic_break", "melody",
-            "noise_texture", "ambience", "sample_break",
+            "kick",
+            "snare",
+            "hats",
+            "synthetic_break",
+            "melody",
+            "noise_texture",
+            "ambience",
+            "sample_break",
         }
         for name in self.project.stems:
             row = StemRow(name, name in supported)
@@ -4381,11 +4977,15 @@ class MainWindow(QMainWindow):
         self, stem_name: str, stages: object, wet: float, tail_seconds: float
     ) -> None:
         if self.project is None:
-            self.statusBar().showMessage("Generate or load a project before assigning a stem insert.")
+            self.statusBar().showMessage(
+                "Generate or load a project before assigning a stem insert."
+            )
             return
         try:
             self.fx_routing_editor.set_custom_insert(
-                stem_name, list(stages), wet=float(wet),
+                stem_name,
+                list(stages),
+                wet=float(wet),
                 tail_seconds=float(tail_seconds),
             )
         except Exception as exc:
@@ -4414,10 +5014,14 @@ class MainWindow(QMainWindow):
     def _pre_render_channel_fx(self) -> None:
         """Explicitly pre-render all current stem inserts and shared returns."""
         if self.project is None:
-            self.statusBar().showMessage("Generate or load a composition before pre-rendering FX.")
+            self.statusBar().showMessage(
+                "Generate or load a composition before pre-rendering FX."
+            )
             return
         if self._fx_worker is not None:
-            self.statusBar().showMessage("Channel FX are already rendering in the background.")
+            self.statusBar().showMessage(
+                "Channel FX are already rendering in the background."
+            )
             return
         if self._ensure_routing_render():
             self.statusBar().showMessage(
@@ -4433,7 +5037,9 @@ class MainWindow(QMainWindow):
     def _generate_fx_variations(self, count: int, variation_seed: int) -> None:
         """Render deterministic role-aware FX alternatives from the frozen project."""
         if self.project is None:
-            self.statusBar().showMessage("Generate or load a composition before making FX variations.")
+            self.statusBar().showMessage(
+                "Generate or load a composition before making FX variations."
+            )
             return
         if self._fx_worker is not None:
             self.statusBar().showMessage(
@@ -4449,18 +5055,21 @@ class MainWindow(QMainWindow):
         score = project.to_score()
         legacy_automation = copy.deepcopy(self.fx_automation_editor.automation())
         stem_names = tuple(project.stems)
-        attention_gestures = tuple(
-            score.metadata.get("m29_attention_gestures", ())
-        )
+        attention_gestures = tuple(score.metadata.get("m29_attention_gestures", ()))
         controls = None
         if (
-            score.automation or score.automation_sources or score.modulations
+            score.automation
+            or score.automation_sources
+            or score.modulations
             or attention_gestures
         ):
             if legacy_automation:
-                score = attach_fx_automation_to_score(score, legacy_automation, stem_names)
+                score = attach_fx_automation_to_score(
+                    score, legacy_automation, stem_names
+                )
             controls = build_score_control_bus(
-                score, project.sample_rate,
+                score,
+                project.sample_rate,
                 automation_registry=fx_automation_registry(stem_names),
             )
         base_routing = copy.deepcopy(self.fx_routing_editor.routing())
@@ -4487,7 +5096,9 @@ class MainWindow(QMainWindow):
 
         def operation(cancel_event):
             candidates = build_fx_variation_routings(
-                stem_names, sample_rate, base_routing,
+                stem_names,
+                sample_rate,
+                base_routing,
                 project_context=project_context,
                 variation_seed=int(variation_seed),
                 count=int(count),
@@ -4498,7 +5109,9 @@ class MainWindow(QMainWindow):
                 if cancel_event.is_set():
                     raise RuntimeError("FX variation render cancelled")
                 processed, metadata = render_fx_routing(
-                    dry_stems, sample_rate, candidate["routing"],
+                    dry_stems,
+                    sample_rate,
+                    candidate["routing"],
                     bpm=bpm,
                     automation=legacy_automation if controls is None else None,
                     controls=controls,
@@ -4508,21 +5121,26 @@ class MainWindow(QMainWindow):
                 )
                 returns = metadata.pop("bus_returns_audio", {})
                 master = render_master_with_returns(
-                    processed, returns,
+                    processed,
+                    returns,
                     master_wet=float(candidate["routing"]["master_wet"]),
                 )
                 cache_path = cache_dir / f"{candidate['candidate_id']}.npy"
                 np.save(cache_path, master, allow_pickle=False)
-                rendered_records.append({
-                    "candidate_id": candidate["candidate_id"],
-                    "label": candidate["label"],
-                    "description": candidate["description"],
-                    "seed": candidate["seed"],
-                    "routing": candidate["routing"],
-                    "cache_path": str(cache_path),
-                    "master_metrics": measure_signal(master, sample_rate=sample_rate),
-                    "render_meters": metadata.get("meters", {}),
-                })
+                rendered_records.append(
+                    {
+                        "candidate_id": candidate["candidate_id"],
+                        "label": candidate["label"],
+                        "description": candidate["description"],
+                        "seed": candidate["seed"],
+                        "routing": candidate["routing"],
+                        "cache_path": str(cache_path),
+                        "master_metrics": measure_signal(
+                            master, sample_rate=sample_rate
+                        ),
+                        "render_meters": metadata.get("meters", {}),
+                    }
+                )
                 del master, processed, returns, metadata
             return {
                 "signature": signature,
@@ -4546,7 +5164,9 @@ class MainWindow(QMainWindow):
         self._fx_variation_worker = None
         self.fx_routing_editor.generate_variations_button.setEnabled(True)
         if not isinstance(result, dict):
-            self._fx_variations_failed("FX variation worker returned an invalid result.")
+            self._fx_variations_failed(
+                "FX variation worker returned an invalid result."
+            )
             return
         signature = str(result.get("signature", ""))
         if (
@@ -4563,10 +5183,12 @@ class MainWindow(QMainWindow):
         self._fx_variation_renders = {
             str(item["candidate_id"]): item for item in result.get("records", [])
         }
-        self.fx_routing_editor.set_variation_choices([
-            (candidate_id, str(item["label"]))
-            for candidate_id, item in self._fx_variation_renders.items()
-        ])
+        self.fx_routing_editor.set_variation_choices(
+            [
+                (candidate_id, str(item["label"]))
+                for candidate_id, item in self._fx_variation_renders.items()
+            ]
+        )
         self.statusBar().showMessage(
             f"{len(self._fx_variation_renders)} FX alternatives pre-rendered. "
             "Play a variant, then USE ROUTE to make it the active Stem Mixer setting.",
@@ -4584,7 +5206,7 @@ class MainWindow(QMainWindow):
         elif "pyo" in detail.casefold() or "portaudio" in detail.casefold():
             self.statusBar().showMessage(
                 f"FX variation render needs the optional Pyo backend. Install with "
-                f"python -m pip install -e \".[pyo]\" · {detail}",
+                f'python -m pip install -e ".[pyo]" · {detail}',
                 12000,
             )
         else:
@@ -4609,13 +5231,15 @@ class MainWindow(QMainWindow):
                 )
             self.player.stop()
             self.player.start(
-                audio, self.project.sample_rate,
+                audio,
+                self.project.sample_rate,
                 device=self.output_device.currentData(),
             )
             self.play_button.setText("PAUSE")
             suffix = (
                 f" · audition RMS {match_report['output_rms_dbfs']:.1f} dBFS"
-                if match_report is not None else ""
+                if match_report is not None
+                else ""
             )
             self.statusBar().showMessage(
                 f"Auditioning {record['label']}{suffix}; production routing and dry stems are unchanged.",
@@ -4661,12 +5285,17 @@ class MainWindow(QMainWindow):
             "score_automation": (
                 {
                     "lanes": [lane.to_dict() for lane in score.automation],
-                    "sources": [source.to_dict() for source in score.automation_sources],
+                    "sources": [
+                        source.to_dict() for source in score.automation_sources
+                    ],
                     "modulations": [item.to_dict() for item in score.modulations],
                 }
-                if score is not None else None
+                if score is not None
+                else None
             ),
-            "bpm": float(self.project.config.bpm) if self.project is not None else 120.0,
+            "bpm": (
+                float(self.project.config.bpm) if self.project is not None else 120.0
+            ),
         }
         encoded = json.dumps(payload, sort_keys=True, default=str)
         return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
@@ -4687,12 +5316,12 @@ class MainWindow(QMainWindow):
         score = self.project.to_score()
         legacy_automation = self.fx_automation_editor.automation()
         stem_names = tuple(self.project.stems)
-        attention_gestures = tuple(
-            score.metadata.get("m29_attention_gestures", ())
-        )
+        attention_gestures = tuple(score.metadata.get("m29_attention_gestures", ()))
         controls = None
         if (
-            score.automation or score.automation_sources or score.modulations
+            score.automation
+            or score.automation_sources
+            or score.modulations
             or attention_gestures
         ):
             if legacy_automation:
@@ -4766,7 +5395,8 @@ class MainWindow(QMainWindow):
     def _fx_render_finished(self, result: object) -> None:
         if not isinstance(result, dict):
             self._fx_render_failed(
-                self._fx_pending_signature or "", "FX worker returned an invalid result."
+                self._fx_pending_signature or "",
+                "FX worker returned an invalid result.",
             )
             return
         signature = str(result.get("signature", ""))
@@ -4799,7 +5429,8 @@ class MainWindow(QMainWindow):
                 self.retry_fx_button.setEnabled(False)
             logger.info(
                 "FX routing render complete: %d processed stems; rendered returns=%s",
-                len(self._fx_processed_stems), metadata.get("rendered_returns", []),
+                len(self._fx_processed_stems),
+                metadata.get("rendered_returns", []),
             )
             self.statusBar().showMessage(
                 "Role-aware inserts and SPACE/ECHO returns are ready.", 5000
@@ -4821,8 +5452,14 @@ class MainWindow(QMainWindow):
         self._fx_worker = None
         self._fx_pending_signature = None
         cancelled = str(message).startswith("CANCELLED:")
-        current_signature = self._routing_signature() if self.project is not None else ""
-        if not cancelled and signature == current_signature and self.project is not None:
+        current_signature = (
+            self._routing_signature() if self.project is not None else ""
+        )
+        if (
+            not cancelled
+            and signature == current_signature
+            and self.project is not None
+        ):
             self._fx_processed_stems = {
                 name: np.asarray(audio, dtype=np.float32).copy()
                 for name, audio in self.project.stems.items()
@@ -4835,7 +5472,9 @@ class MainWindow(QMainWindow):
                 "fallback": "dry_source_stems",
             }
             self.fx_routing_editor.set_meter_report({})
-            logger.error("FX routing render failed; dry source stems retained:\n%s", message)
+            logger.error(
+                "FX routing render failed; dry source stems retained:\n%s", message
+            )
             if hasattr(self, "fx_render_state"):
                 self.fx_render_state.setText("FX FAILED · DRY FALLBACK")
                 self.fx_render_state.setToolTip(str(message))
@@ -4871,7 +5510,9 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         if not self._ensure_routing_render():
-            self.statusBar().showMessage("FX audition will be available when routing finishes.", 5000)
+            self.statusBar().showMessage(
+                "FX audition will be available when routing finishes.", 5000
+            )
             return
         audio = None
         if stage == "master":
@@ -4890,7 +5531,9 @@ class MainWindow(QMainWindow):
             bus = stage.split(".", 1)[1]
             audio = self._fx_audition_audio.get("sends", {}).get(stem, {}).get(bus)
         if audio is None or not len(audio):
-            self.statusBar().showMessage("This route has no rendered contribution to audition.", 5000)
+            self.statusBar().showMessage(
+                "This route has no rendered contribution to audition.", 5000
+            )
             return
         audition_audio = np.asarray(audio, dtype=np.float32)
         match_report = None
@@ -4909,7 +5552,8 @@ class MainWindow(QMainWindow):
             self.preview_source.setCurrentIndex(0)
             suffix = (
                 f" · matched {match_report['output_rms_dbfs']:.1f} dBFS RMS"
-                if match_report is not None else ""
+                if match_report is not None
+                else ""
             )
             self.statusBar().showMessage(
                 f"Auditioning {stage.upper()} · {stem}{suffix}", 5000
@@ -4964,15 +5608,19 @@ class MainWindow(QMainWindow):
         active_sends = self._fx_routing_metadata.get("active_send_stems_by_bus", {})
         solo_active = any(row.solo.isChecked() for row in self._mix_rows.values())
         audible = {
-            name for name, row in self._mix_rows.items()
+            name
+            for name, row in self._mix_rows.items()
             if not row.mute.isChecked() and (not solo_active or row.solo.isChecked())
         }
         audible_returns = {
-            bus: audio for bus, audio in self._fx_bus_returns.items()
+            bus: audio
+            for bus, audio in self._fx_bus_returns.items()
             if set(active_sends.get(bus, ())).intersection(audible)
         }
         master = render_master_with_returns(
-            mixed, audible_returns, master_wet=float(routing["master_wet"]),
+            mixed,
+            audible_returns,
+            master_wet=float(routing["master_wet"]),
         )
         meters = self._fx_routing_metadata.setdefault("meters", {})
         meters["master"] = measure_signal(master, sample_rate=self.project.sample_rate)
@@ -4987,12 +5635,11 @@ class MainWindow(QMainWindow):
         # that audio playable rather than making the transport appear broken.
         if self._fx_routing_metadata.get("fallback") == "dry_source_stems":
             if selection == "master":
-                dry = {
-                    name: self._processed_stem(name)
-                    for name in self.project.stems
-                }
+                dry = {name: self._processed_stem(name) for name in self.project.stems}
                 return render_master_with_returns(
-                    dry, {}, master_wet=float(self.fx_routing_editor.routing()["master_wet"])
+                    dry,
+                    {},
+                    master_wet=float(self.fx_routing_editor.routing()["master_wet"]),
                 )
             if selection in self.project.stems:
                 return self._processed_stem(selection)
@@ -5010,9 +5657,8 @@ class MainWindow(QMainWindow):
         if self.project is not None and hasattr(self, "fx_routing_editor"):
             states = {
                 name: {
-                    "gain_db": 20.0 * float(
-                        np.log10(max(row.gain.value() / 100.0, 0.001))
-                    ),
+                    "gain_db": 20.0
+                    * float(np.log10(max(row.gain.value() / 100.0, 0.001))),
                     "pan": row.pan.value() / 100.0,
                     "mute": row.mute.isChecked(),
                     "solo": row.solo.isChecked(),
@@ -5025,9 +5671,13 @@ class MainWindow(QMainWindow):
     def _apply_preview_refresh(self) -> None:
         audio = self._current_preview_audio()
         if audio is None and self.project is not None and self._fx_worker is not None:
-            self.statusBar().showMessage("FX routing is rendering; current playback is retained.", 3000)
+            self.statusBar().showMessage(
+                "FX routing is rendering; current playback is retained.", 3000
+            )
             return
-        self.preview.set_audio(audio, self.project.sample_rate if self.project else 48_000)
+        self.preview.set_audio(
+            audio, self.project.sample_rate if self.project else 48_000
+        )
         if self.player.is_playing:
             if audio is None or not self.player.replace_audio(audio):
                 self.player.stop()
@@ -5112,12 +5762,18 @@ class MainWindow(QMainWindow):
             return
 
         score_title = str(self.project.to_score().title or "Reawarp")
-        slug = "".join(
-            character if character.isascii() and (
-                character.isalnum() or character in "-_"
-            ) else "-"
-            for character in score_title
-        ).strip("-_") or "Reawarp"
+        slug = (
+            "".join(
+                (
+                    character
+                    if character.isascii()
+                    and (character.isalnum() or character in "-_")
+                    else "-"
+                )
+                for character in score_title
+            ).strip("-_")
+            or "Reawarp"
+        )
         destination = Path(export_parent) / f"{slug}_Reawarp_Export"
         suffix = 2
         while destination.exists():
@@ -5207,7 +5863,9 @@ class MainWindow(QMainWindow):
         if self._worker is None:
             self.cancel_background_button.setEnabled(False)
             self.cancel_background_button.setVisible(False)
-        self.statusBar().showMessage(f"Exported Reawarp delivery folder to {result}", 10000)
+        self.statusBar().showMessage(
+            f"Exported Reawarp delivery folder to {result}", 10000
+        )
 
     def _export_failed(self, message: str) -> None:
         self._export_worker = None

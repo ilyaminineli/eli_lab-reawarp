@@ -1,4 +1,5 @@
 """Bounded, serializable section memory for M30 composition planning."""
+
 from __future__ import annotations
 
 import copy
@@ -21,9 +22,16 @@ SECTION_MEMORY_FINGERPRINT_KEY = "m30_section_memory_fingerprint"
 DEFAULT_SECTION_MEMORY_CAPACITY = 12
 MAX_SECTION_MEMORY_CAPACITY = 64
 
-EXPECTATION_KINDS = frozenset({
-    "motif_return", "resolution", "cadence", "handoff", "contrast", "other",
-})
+EXPECTATION_KINDS = frozenset(
+    {
+        "motif_return",
+        "resolution",
+        "cadence",
+        "handoff",
+        "contrast",
+        "other",
+    }
+)
 
 
 def _text(value: Any, field: str) -> str:
@@ -95,7 +103,9 @@ class TrajectorySummary:
         ):
             raise ValueError("trajectory sample_count must be a positive integer")
         for name in ("start", "mean", "end", "minimum", "maximum"):
-            object.__setattr__(self, name, _unit(getattr(self, name), f"trajectory {name}"))
+            object.__setattr__(
+                self, name, _unit(getattr(self, name), f"trajectory {name}")
+            )
         try:
             deviation = float(self.standard_deviation)
         except (TypeError, ValueError, OverflowError) as exc:
@@ -103,7 +113,9 @@ class TrajectorySummary:
                 "trajectory standard_deviation must be finite and non-negative"
             ) from exc
         if not math.isfinite(deviation) or deviation < 0.0 or deviation > 1.0:
-            raise ValueError("trajectory standard_deviation must be finite and in [0, 1]")
+            raise ValueError(
+                "trajectory standard_deviation must be finite and in [0, 1]"
+            )
         if self.minimum > self.maximum:
             raise ValueError("trajectory minimum cannot exceed maximum")
         if not (
@@ -167,13 +179,19 @@ class MemoryExpectation:
     description: str = ""
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "expectation_id", _text(self.expectation_id, "expectation_id"))
+        object.__setattr__(
+            self, "expectation_id", _text(self.expectation_id, "expectation_id")
+        )
         kind = _text(self.kind, "expectation kind")
         if kind not in EXPECTATION_KINDS:
             raise ValueError(f"unsupported expectation kind: {kind}")
         object.__setattr__(self, "kind", kind)
-        object.__setattr__(self, "subject_id", _text(self.subject_id, "expectation subject_id"))
-        object.__setattr__(self, "opened_at_beats", _beat(self.opened_at_beats, "expectation beat"))
+        object.__setattr__(
+            self, "subject_id", _text(self.subject_id, "expectation subject_id")
+        )
+        object.__setattr__(
+            self, "opened_at_beats", _beat(self.opened_at_beats, "expectation beat")
+        )
         object.__setattr__(self, "description", str(self.description).strip())
 
     def to_dict(self) -> dict[str, Any]:
@@ -210,7 +228,9 @@ class ReturnOpportunity:
     def __post_init__(self) -> None:
         object.__setattr__(self, "motif_id", _text(self.motif_id, "return motif_id"))
         object.__setattr__(
-            self, "source_section_id", _text(self.source_section_id, "return source_section_id")
+            self,
+            "source_section_id",
+            _text(self.source_section_id, "return source_section_id"),
         )
         object.__setattr__(self, "reason", str(self.reason).strip())
         if self.source_version is not None and (
@@ -220,13 +240,16 @@ class ReturnOpportunity:
         ):
             raise ValueError("return source_version must be a positive integer or None")
         object.__setattr__(
-            self, "transformation_ids",
+            self,
+            "transformation_ids",
             _unique_texts(self.transformation_ids, "return transformation_id"),
         )
         allowed = _unique_texts(self.allowed_transformations, "allowed transformation")
         unknown = set(allowed) - TRANSFORMATIONS
         if unknown:
-            raise ValueError("unsupported return transformations: " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unsupported return transformations: " + ", ".join(sorted(unknown))
+            )
         object.__setattr__(self, "allowed_transformations", allowed)
 
     def to_dict(self) -> dict[str, Any]:
@@ -289,12 +312,17 @@ class SectionState:
                 self, field_name, _unique_texts(getattr(self, field_name), field_name)
             )
         transformations = tuple(
-            item if isinstance(item, MotifTransformation)
-            else MotifTransformation.from_dict(item)
+            (
+                item
+                if isinstance(item, MotifTransformation)
+                else MotifTransformation.from_dict(item)
+            )
             for item in self.transformations
         )
         if any(item.motif_id not in self.motif_ids for item in transformations):
-            raise ValueError("section transformation history must reference a section motif")
+            raise ValueError(
+                "section transformation history must reference a section motif"
+            )
         object.__setattr__(self, "transformations", transformations)
         for field_name in ("energy", "density"):
             value = getattr(self, field_name)
@@ -302,7 +330,11 @@ class SectionState:
                 value = TrajectorySummary.from_dict(value)
             object.__setattr__(self, field_name, value)
         expectations = tuple(
-            item if isinstance(item, MemoryExpectation) else MemoryExpectation.from_dict(item)
+            (
+                item
+                if isinstance(item, MemoryExpectation)
+                else MemoryExpectation.from_dict(item)
+            )
             for item in self.unresolved_expectations
         )
         expectation_ids = [item.expectation_id for item in expectations]
@@ -314,19 +346,31 @@ class SectionState:
         ):
             raise ValueError("an expectation must open within its section")
         object.__setattr__(self, "unresolved_expectations", expectations)
-        resolved = _unique_texts(self.resolved_expectation_ids, "resolved expectation_id")
+        resolved = _unique_texts(
+            self.resolved_expectation_ids, "resolved expectation_id"
+        )
         if set(resolved) & set(expectation_ids):
-            raise ValueError("an expectation cannot be opened and resolved in the same section")
+            raise ValueError(
+                "an expectation cannot be opened and resolved in the same section"
+            )
         object.__setattr__(self, "resolved_expectation_ids", resolved)
         opportunities = tuple(
-            item if isinstance(item, ReturnOpportunity) else ReturnOpportunity.from_dict(item)
+            (
+                item
+                if isinstance(item, ReturnOpportunity)
+                else ReturnOpportunity.from_dict(item)
+            )
             for item in self.return_opportunities
         )
         if any(item.source_section_id != self.section_id for item in opportunities):
-            raise ValueError("return opportunities must identify their owning source section")
+            raise ValueError(
+                "return opportunities must identify their owning source section"
+            )
         opportunity_ids = [item.motif_id for item in opportunities]
         if len(opportunity_ids) != len(set(opportunity_ids)):
-            raise ValueError("a section may declare only one return opportunity per motif")
+            raise ValueError(
+                "a section may declare only one return opportunity per motif"
+            )
         object.__setattr__(self, "return_opportunities", opportunities)
         object.__setattr__(self, "rationale", str(self.rationale).strip())
 
@@ -371,11 +415,13 @@ class SectionState:
                 for item in data.get("transformations", ())
             ),
             energy=(
-                None if data.get("energy") is None
+                None
+                if data.get("energy") is None
                 else TrajectorySummary.from_dict(data["energy"])
             ),
             density=(
-                None if data.get("density") is None
+                None
+                if data.get("density") is None
                 else TrajectorySummary.from_dict(data["density"])
             ),
             unresolved_expectations=tuple(
@@ -425,10 +471,14 @@ class SectionMemory:
         expectation_ids: set[str] = set()
         for state in states:
             if previous is not None and state.start_beats < previous.end_beats:
-                raise ValueError("section memory states must be chronological and non-overlapping")
+                raise ValueError(
+                    "section memory states must be chronological and non-overlapping"
+                )
             opened = {item.expectation_id for item in state.unresolved_expectations}
             if expectation_ids & opened:
-                raise ValueError("expectation IDs must be unique within the memory window")
+                raise ValueError(
+                    "expectation IDs must be unique within the memory window"
+                )
             expectation_ids.update(opened)
             previous = state
         object.__setattr__(self, "states", states)
@@ -443,8 +493,11 @@ class SectionMemory:
         if not isinstance(state, SectionState):
             state = SectionState.from_dict(state)
         existing_index = next(
-            (index for index, item in enumerate(self.states)
-             if item.section_id == state.section_id),
+            (
+                index
+                for index, item in enumerate(self.states)
+                if item.section_id == state.section_id
+            ),
             None,
         )
         if existing_index is not None:
@@ -459,11 +512,13 @@ class SectionMemory:
             ):
                 raise ValueError("a section revision cannot change its beat boundaries")
             if state.revision <= existing.revision:
-                raise ValueError("a section revision must have a higher revision number")
+                raise ValueError(
+                    "a section revision must have a higher revision number"
+                )
             return replace(self, states=self.states[:-1] + (state,))
         if self.states and state.start_beats < self.states[-1].end_beats:
             raise ValueError("new section must follow the most recent section")
-        return replace(self, states=(self.states + (state,))[-self.capacity:])
+        return replace(self, states=(self.states + (state,))[-self.capacity :])
 
     record = append
 
@@ -479,8 +534,11 @@ class SectionMemory:
             return self.states[-1]
         target = _text(section_id, "section_id")
         index = next(
-            (position for position, item in enumerate(self.states)
-             if item.section_id == target),
+            (
+                position
+                for position, item in enumerate(self.states)
+                if item.section_id == target
+            ),
             None,
         )
         if index is None:
@@ -550,7 +608,11 @@ class SectionMemory:
 
             plan = PhrasePlan.from_score(score)
             phrase_lookup = {
-                item.phrase_id: (item.start_beats, item.end_beats, item.parent_section_id)
+                item.phrase_id: (
+                    item.start_beats,
+                    item.end_beats,
+                    item.parent_section_id,
+                )
                 for item in plan.phrases
             }
         elif score.orchestration_plan is not None:
@@ -573,7 +635,10 @@ class SectionMemory:
                     raise ValueError(
                         f"phrase {phrase_id!r} falls outside section {state.section_id!r}"
                     )
-                if parent_section_id is not None and parent_section_id != state.section_id:
+                if (
+                    parent_section_id is not None
+                    and parent_section_id != state.section_id
+                ):
                     raise ValueError(
                         f"phrase {phrase_id!r} belongs to section {parent_section_id!r}, "
                         f"not {state.section_id!r}"

@@ -31,12 +31,24 @@ class VoiceLeadingWeights:
 
     def __post_init__(self) -> None:
         for name in (
-            "motion", "leap", "common_tone_bonus", "crossing", "leap_threshold",
-            "register_crossing", "target_role", "contrary_motion", "oblique_motion",
-            "parallel_motion", "deliberate_crossing_bonus",
+            "motion",
+            "leap",
+            "common_tone_bonus",
+            "crossing",
+            "leap_threshold",
+            "register_crossing",
+            "target_role",
+            "contrary_motion",
+            "oblique_motion",
+            "parallel_motion",
+            "deliberate_crossing_bonus",
         ):
             value = getattr(self, name)
-            if isinstance(value, bool) or not math.isfinite(float(value)) or float(value) < 0:
+            if (
+                isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or float(value) < 0
+            ):
                 raise ValueError(f"{name} must be finite and non-negative")
 
     def to_dict(self) -> dict[str, float]:
@@ -59,13 +71,23 @@ class VoiceLeadingWeights:
         if not isinstance(data, dict):
             raise ValueError("voice-leading weights must be an object")
         allowed = {
-            "motion", "leap", "common_tone_bonus", "crossing", "leap_threshold",
-            "register_crossing", "target_role", "contrary_motion", "oblique_motion",
-            "parallel_motion", "deliberate_crossing_bonus",
+            "motion",
+            "leap",
+            "common_tone_bonus",
+            "crossing",
+            "leap_threshold",
+            "register_crossing",
+            "target_role",
+            "contrary_motion",
+            "oblique_motion",
+            "parallel_motion",
+            "deliberate_crossing_bonus",
         }
         unknown = set(data) - allowed
         if unknown:
-            raise ValueError("unknown voice-leading weight(s): " + ", ".join(sorted(unknown)))
+            raise ValueError(
+                "unknown voice-leading weight(s): " + ", ".join(sorted(unknown))
+            )
         return cls(**{key: value for key, value in data.items()})
 
 
@@ -99,14 +121,19 @@ def assign_voice_leading(
     source = tuple(float(value) for value in source_pitches)
     target = tuple(float(value) for value in target_pitches)
     if not source or len(source) != len(target):
-        raise ValueError("voice-leading requires equal, non-empty source and target voices")
+        raise ValueError(
+            "voice-leading requires equal, non-empty source and target voices"
+        )
     if len(source) > 8:
-        raise ValueError("voice-leading currently supports up to eight simultaneous voices")
+        raise ValueError(
+            "voice-leading currently supports up to eight simultaneous voices"
+        )
     if any(not math.isfinite(value) for value in (*source, *target)):
         raise ValueError("voice-leading pitches must be finite")
     if maximum_leap is not None and (
         isinstance(maximum_leap, bool)
-        or not math.isfinite(float(maximum_leap)) or maximum_leap < 0
+        or not math.isfinite(float(maximum_leap))
+        or maximum_leap < 0
     ):
         raise ValueError("maximum_leap must be finite and non-negative")
     if (
@@ -124,11 +151,12 @@ def assign_voice_leading(
     for assignment in itertools.permutations(range(len(target))):
         assigned_targets = tuple(target[target_index] for target_index in assignment)
         deltas = tuple(
-            assigned_targets[index] - source[index]
-            for index in range(len(source))
+            assigned_targets[index] - source[index] for index in range(len(source))
         )
         distances = tuple(abs(delta) for delta in deltas)
-        if maximum_leap is not None and any(distance > maximum_leap for distance in distances):
+        if maximum_leap is not None and any(
+            distance > maximum_leap for distance in distances
+        ):
             continue
 
         crossed = tuple(
@@ -136,23 +164,23 @@ def assign_voice_leading(
             for left in range(len(source))
             for right in range(left + 1, len(source))
             if (
-                (source[left] - source[right] > 1e-9
-                 and assigned_targets[left] - assigned_targets[right] < -1e-9)
-                or
-                (source[left] - source[right] < -1e-9
-                 and assigned_targets[left] - assigned_targets[right] > 1e-9)
+                (
+                    source[left] - source[right] > 1e-9
+                    and assigned_targets[left] - assigned_targets[right] < -1e-9
+                )
+                or (
+                    source[left] - source[right] < -1e-9
+                    and assigned_targets[left] - assigned_targets[right] > 1e-9
+                )
             )
         )
         if not allow_crossing and crossed:
             continue
         motion_cost = weights.motion * sum(distances)
         leap_cost = weights.leap * sum(
-            max(0.0, distance - weights.leap_threshold) ** 2
-            for distance in distances
+            max(0.0, distance - weights.leap_threshold) ** 2 for distance in distances
         )
-        common_tones = sum(
-            distance <= common_tone_tolerance for distance in distances
-        )
+        common_tones = sum(distance <= common_tone_tolerance for distance in distances)
         common_cost = -weights.common_tone_bonus * common_tones
         crossing_cost = weights.crossing * len(crossed)
         components = {

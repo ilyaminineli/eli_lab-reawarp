@@ -24,13 +24,15 @@ def primes(count: int) -> list[int]:
         raise ValueError("count cannot be negative")
     if count == 0:
         return []
-    limit = max(16, int(count * (math.log(count + 1) + math.log(math.log(count + 2)))) + 16)
+    limit = max(
+        16, int(count * (math.log(count + 1) + math.log(math.log(count + 2)))) + 16
+    )
     while True:
         sieve = np.ones(limit + 1, dtype=bool)
         sieve[:2] = False
         for number in range(2, int(math.sqrt(limit)) + 1):
             if sieve[number]:
-                sieve[number * number:: number] = False
+                sieve[number * number :: number] = False
         result = np.flatnonzero(sieve).tolist()
         if len(result) >= count:
             return [int(value) for value in result[:count]]
@@ -38,10 +40,10 @@ def primes(count: int) -> list[int]:
 
 
 def logistic_map(
-        count: int,
-        r: float = 3.91,
-        x0: float = 0.217,
-        transient: int = 32,
+    count: int,
+    r: float = 3.91,
+    x0: float = 0.217,
+    transient: int = 32,
 ) -> np.ndarray:
     """Generate a bounded logistic-map trajectory in [0, 1]."""
     if count < 0:
@@ -60,10 +62,10 @@ def logistic_map(
 
 
 def lissajous(
-        count: int,
-        a: int = 3,
-        b: int = 5,
-        phase: float = math.pi / 3.0,
+    count: int,
+    a: int = 3,
+    b: int = 5,
+    phase: float = math.pi / 3.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return normalized x/y coordinates sampled along a Lissajous curve."""
     if count < 0:
@@ -75,7 +77,9 @@ def lissajous(
     return np.sin(a * t + phase), np.sin(b * t)
 
 
-def modular_sequence(count: int, modulus: int, multiplier: int = 5, offset: int = 1) -> list[int]:
+def modular_sequence(
+    count: int, modulus: int, multiplier: int = 5, offset: int = 1
+) -> list[int]:
     if count < 0:
         raise ValueError("count cannot be negative")
     if modulus < 1:
@@ -84,12 +88,12 @@ def modular_sequence(count: int, modulus: int, multiplier: int = 5, offset: int 
 
 
 def random_walk(
-        count: int,
-        rng: np.random.Generator,
-        start: float = 0.5,
-        step_size: float = 0.18,
-        lower: float = 0.0,
-        upper: float = 1.0,
+    count: int,
+    rng: np.random.Generator,
+    start: float = 0.5,
+    step_size: float = 0.18,
+    lower: float = 0.0,
+    upper: float = 1.0,
 ) -> np.ndarray:
     if count < 0:
         raise ValueError("count cannot be negative")

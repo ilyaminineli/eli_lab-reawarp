@@ -59,7 +59,9 @@ def read_sample(path: str | Path, target_sample_rate: int) -> np.ndarray:
         audio = audio.mean(axis=1)
     except ImportError:
         if source.suffix.lower() != ".wav":
-            raise ValueError("non-WAV sample import requires the optional soundfile package")
+            raise ValueError(
+                "non-WAV sample import requires the optional soundfile package"
+            )
         audio, source_rate = _read_pcm_wave(source)
 
     if audio.size == 0:
@@ -80,7 +82,9 @@ def read_sample(path: str | Path, target_sample_rate: int) -> np.ndarray:
             if len(resampled) >= new_length:
                 audio = resampled[:new_length]
             else:
-                audio = np.pad(resampled, (0, new_length - len(resampled))).astype(np.float32)
+                audio = np.pad(resampled, (0, new_length - len(resampled))).astype(
+                    np.float32
+                )
         except ImportError:
             # NumPy remains the mandatory baseline; SciPy is an optional,
             # higher-quality polyphase anti-aliasing resampler.

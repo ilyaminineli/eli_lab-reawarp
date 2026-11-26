@@ -1,4 +1,5 @@
 """Oversampled, FIR-reconstructed nonlinear waveshaping reference processors."""
+
 from __future__ import annotations
 
 import math
@@ -7,11 +8,17 @@ from typing import Any
 
 import numpy as np
 
-from reawarp.dsp._stft import audio_channels, finite_range, restore_shape, signal_diagnostics
+from reawarp.dsp._stft import (
+    audio_channels,
+    finite_range,
+    restore_shape,
+    signal_diagnostics,
+)
 
 
 class NonlinearResult:
     __slots__ = ("audio", "diagnostics")
+
     def __init__(self, audio: np.ndarray, diagnostics: dict[str, Any]):
         self.audio = audio
         self.diagnostics = diagnostics
@@ -35,11 +42,13 @@ def _filter_aligned(audio: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     output = np.empty_like(audio, dtype=np.float64)
     for channel in range(channels):
         filtered = np.convolve(audio[:, channel], kernel, mode="full")
-        output[:, channel] = filtered[delay:delay + len(audio)]
+        output[:, channel] = filtered[delay : delay + len(audio)]
     return output
 
 
-def _shape(signal: np.ndarray, shape: str, drive: float, clip_level: float) -> np.ndarray:
+def _shape(
+    signal: np.ndarray, shape: str, drive: float, clip_level: float
+) -> np.ndarray:
     driven = signal * drive
     if shape == "tanh":
         return np.tanh(driven)
@@ -75,7 +84,11 @@ def oversampled_waveshaper(
     renderer; output file alignment therefore remains zero-latency.
     """
     source, was_vector = audio_channels(audio, "input audio")
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
     if isinstance(oversample, bool) or oversample not in {1, 2, 4, 8}:
@@ -86,18 +99,31 @@ def oversampled_waveshaper(
     gain = finite_range(drive, "drive", 0.01, 32.0)
     threshold = finite_range(clip_level, "clip_level", 0.01, 4.0)
     out_gain = finite_range(output_gain, "output_gain", 0.0, 4.0)
-    if isinstance(taps_per_phase, bool) or not isinstance(taps_per_phase, int) or not 8 <= taps_per_phase <= 64:
+    if (
+        isinstance(taps_per_phase, bool)
+        or not isinstance(taps_per_phase, int)
+        or not 8 <= taps_per_phase <= 64
+    ):
         raise ValueError("taps_per_phase must be an integer between 8 and 64")
     started = time.perf_counter()
     if bypass or amount == 0.0 or len(source) == 0:
         output = restore_shape(source.copy(), was_vector)
-        return NonlinearResult(output, {
-            "module": "m24.4.oversampled_nonlinear", "algorithm": "bypass", "bypass": True,
-            "sample_rate": rate, "input_frames": len(source), "output_frames": len(source),
-            "tail_frames": 0, "latency_frames": 0, "oversample": oversample,
-            "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(output),
-        })
+        return NonlinearResult(
+            output,
+            {
+                "module": "m24.4.oversampled_nonlinear",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "input_frames": len(source),
+                "output_frames": len(source),
+                "tail_frames": 0,
+                "latency_frames": 0,
+                "oversample": oversample,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(output),
+            },
+        )
 
     if oversample == 1:
         high_rate = source.astype(np.float64)
@@ -107,7 +133,9 @@ def oversampled_waveshaper(
         filter_length = 1
     else:
         kernel = _fir_lowpass(oversample, taps_per_phase)
-        upsampled = np.zeros((len(source) * oversample, source.shape[1]), dtype=np.float64)
+        upsampled = np.zeros(
+            (len(source) * oversample, source.shape[1]), dtype=np.float64
+        )
         upsampled[::oversample] = source
         high_rate = _filter_aligned(upsampled, kernel * oversample)
         shaped = _shape(high_rate, shape, gain, threshold)
@@ -118,19 +146,34 @@ def oversampled_waveshaper(
     output = source.astype(np.float64) * (1.0 - amount) + processed * amount
     output = restore_shape(output, was_vector)
     diagnostics = {
-        "module": "m24.4.oversampled_nonlinear", "algorithm": "kaiser_sinc_oversample_shape_decimate",
-        "bypass": False, "sample_rate": rate, "shape": shape, "drive": gain,
-        "oversample": oversample, "internal_sample_rate": rate * oversample,
+        "module": "m24.4.oversampled_nonlinear",
+        "algorithm": "kaiser_sinc_oversample_shape_decimate",
+        "bypass": False,
+        "sample_rate": rate,
+        "shape": shape,
+        "drive": gain,
+        "oversample": oversample,
+        "internal_sample_rate": rate * oversample,
         "clip_level": threshold if shape == "hard_clip" else None,
-        "output_gain": out_gain, "wet": amount,
-        "anti_alias_filter": "kaiser_windowed_sinc" if oversample > 1 else "disabled_native_rate",
+        "output_gain": out_gain,
+        "wet": amount,
+        "anti_alias_filter": (
+            "kaiser_windowed_sinc" if oversample > 1 else "disabled_native_rate"
+        ),
         "anti_alias_cutoff_hz": rate / 2.0 if oversample > 1 else None,
         "anti_alias_filter_taps": filter_length,
         "kaiser_beta": 8.6 if oversample > 1 else None,
-        "fir_group_delay_high_rate_samples_per_stage": (filter_length - 1) // 2 if oversample > 1 else 0,
-        "delay_compensated": True, "latency_frames": 0, "tail_frames": 0,
-        "input_frames": len(source), "output_frames": len(output),
-        "estimated_working_bytes": int(source.nbytes * (oversample + 5) + high_rate.nbytes + shaped.nbytes),
+        "fir_group_delay_high_rate_samples_per_stage": (
+            (filter_length - 1) // 2 if oversample > 1 else 0
+        ),
+        "delay_compensated": True,
+        "latency_frames": 0,
+        "tail_frames": 0,
+        "input_frames": len(source),
+        "output_frames": len(output),
+        "estimated_working_bytes": int(
+            source.nbytes * (oversample + 5) + high_rate.nbytes + shaped.nbytes
+        ),
         "processing_seconds": time.perf_counter() - started,
         **signal_diagnostics(output),
     }

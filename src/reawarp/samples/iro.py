@@ -5,6 +5,7 @@ sonicpi_eli_lab. This module reads their manifests in place, validates relative
 paths and optional SHA-256 hashes, and exposes typed asset records without
 copying, renaming or rewriting source audio.
 """
+
 from __future__ import annotations
 
 import csv
@@ -124,7 +125,9 @@ def _asset(
         sample_rate=int(sample_rate) if sample_rate else None,
         channels=int(channels) if channels else None,
         duration_seconds=float(duration_seconds) if duration_seconds else None,
-        source_feature_index=int(source_feature_index) if source_feature_index is not None else None,
+        source_feature_index=(
+            int(source_feature_index) if source_feature_index is not None else None
+        ),
         seed=int(seed) if seed is not None else None,
         midi_note=int(midi_note) if midi_note is not None else None,
         metadata=dict(metadata or {}),
@@ -142,13 +145,13 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     drum_map = _load_json(DRUM_PACK / "drum-map.json") or {}
     midi_by_role: dict[str, int] = {}
     for instrument in drum_map.get("instruments", []):
-        midi_by_role[str(instrument.get("name", ""))] = int(instrument.get("midi_note", 0))
+        midi_by_role[str(instrument.get("name", ""))] = int(
+            instrument.get("midi_note", 0)
+        )
 
     flat_index = _read_csv_rows(DRUM_PACK / "drum-kit-index.csv")
     source_index = _read_csv_rows(DRUM_PACK / "source-assets-index.csv")
-    source_by_path = {
-        str(item.get("path", "")): item for item in source_index
-    }
+    source_by_path = {str(item.get("path", "")): item for item in source_index}
     records: list[IROAsset] = []
     for item in flat_index:
         relative = str(item.get("file", ""))
@@ -170,7 +173,8 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
             seed=211,
             source_feature_index=(
                 int(source["source_feature_index"])
-                if source.get("source_feature_index") not in (None, "") else None
+                if source.get("source_feature_index") not in (None, "")
+                else None
             ),
             midi_note=midi_by_role.get(role),
             metadata={
@@ -188,10 +192,16 @@ def load_drum_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
                 "reused_existing_output": item.get("reused_existing_output"),
             },
         )
-        if verify_hashes and asset.available and asset.sha256 and _sha256(asset.path) != asset.sha256:
+        if (
+            verify_hashes
+            and asset.available
+            and asset.sha256
+            and _sha256(asset.path) != asset.sha256
+        ):
             raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
         records.append(asset)
     return records
+
 
 def load_sound_fx_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Read release-driven long events and loops without flattening families."""
@@ -245,13 +255,18 @@ def load_sound_fx_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
         records.append(asset)
     return records
 
+
 def load_sound_lab_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Read IRO one-shots, loops and stems from the compact sound-lab manifest."""
     manifest = _load_json(SOUND_LAB_PACK / "sound-pack.json")
     if manifest is None:
         return []
     records: list[IROAsset] = []
-    for key, role in (("one_shots", "one_shot"), ("loops", "rendered_loop"), ("stems", "rendered_stem")):
+    for key, role in (
+        ("one_shots", "one_shot"),
+        ("loops", "rendered_loop"),
+        ("stems", "rendered_stem"),
+    ):
         for item in manifest.get(key, []):
             relative = str(item.get("file", item.get("path", "")))
             if not relative:
@@ -319,14 +334,25 @@ def load_entity_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
                     "description": item.get("description", ""),
                 },
             )
-            if verify_hashes and asset.available and asset.sha256 and _sha256(asset.path) != asset.sha256:
+            if (
+                verify_hashes
+                and asset.available
+                and asset.sha256
+                and _sha256(asset.path) != asset.sha256
+            ):
                 raise ValueError(f"IRO SHA-256 mismatch: {asset.relative_path}")
             records.append(asset)
     return records
 
+
 def load_iro_assets(*, verify_hashes: bool = False) -> list[IROAsset]:
     """Collect every supported IRO asset pack; preserve pack/family identity."""
-    loaders = (load_drum_assets, load_sound_fx_assets, load_sound_lab_assets, load_entity_assets)
+    loaders = (
+        load_drum_assets,
+        load_sound_fx_assets,
+        load_sound_lab_assets,
+        load_entity_assets,
+    )
     result: list[IROAsset] = []
     for loader in loaders:
         result.extend(loader(verify_hashes=verify_hashes))
@@ -343,8 +369,10 @@ def resolve_iro_sample(
 ) -> IROAsset:
     """Resolve an IRO drum asset deterministically by role and optional facets."""
     candidates = [
-        item for item in load_drum_assets()
-        if item.available and item.role == role
+        item
+        for item in load_drum_assets()
+        if item.available
+        and item.role == role
         and (family is None or item.family == family)
         and (articulation is None or item.articulation == articulation)
         and (variant is None or int((item.metadata or {}).get("variant", 0)) == variant)
@@ -405,9 +433,19 @@ def search_iro_assets(
             continue
         if pack and item.pack != pack:
             continue
-        if needle and needle not in " ".join(
-            (item.relative_path, item.role, item.family, item.articulation, item.pack)
-        ).lower():
+        if (
+            needle
+            and needle
+            not in " ".join(
+                (
+                    item.relative_path,
+                    item.role,
+                    item.family,
+                    item.articulation,
+                    item.pack,
+                )
+            ).lower()
+        ):
             continue
         result.append(item)
     return result

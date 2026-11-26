@@ -28,11 +28,11 @@ def reverse_audio(audio: np.ndarray) -> np.ndarray:
 
 
 def rearrange_slices(
-        audio: np.ndarray,
-        boundaries: list[int] | tuple[int, ...],
-        *,
-        order: list[int] | tuple[int, ...] | None = None,
-        rng: np.random.Generator | None = None,
+    audio: np.ndarray,
+    boundaries: list[int] | tuple[int, ...],
+    *,
+    order: list[int] | tuple[int, ...] | None = None,
+    rng: np.random.Generator | None = None,
 ) -> np.ndarray:
     """Rearrange transient slices while preserving the exact total frame count."""
     from reawarp.transforms.analysis import slice_audio
@@ -54,11 +54,11 @@ def rearrange_slices(
 
 
 def stutter(
-        audio: np.ndarray,
-        *,
-        repeats: int = 4,
-        start: int = 0,
-        end: int | None = None,
+    audio: np.ndarray,
+    *,
+    repeats: int = 4,
+    start: int = 0,
+    end: int | None = None,
 ) -> np.ndarray:
     """Repeat a selected segment inside its original time slot."""
     samples, mono = _audio_2d(audio)
@@ -72,19 +72,21 @@ def stutter(
     segment = samples[start:end]
     grain_length = max(1, int(math.ceil(len(segment) / repeats)))
     grain = segment[:grain_length]
-    repeated = np.tile(grain, (int(math.ceil(len(segment) / len(grain))), 1))[: len(segment)]
+    repeated = np.tile(grain, (int(math.ceil(len(segment) / len(grain))), 1))[
+        : len(segment)
+    ]
     result = samples.copy()
     result[start:end] = repeated
     return _restore(result, mono)
 
 
 def dropout(
-        audio: np.ndarray,
-        *,
-        probability: float = 0.18,
-        block_ms: float = 45.0,
-        sample_rate: int = 48_000,
-        rng: np.random.Generator,
+    audio: np.ndarray,
+    *,
+    probability: float = 0.18,
+    block_ms: float = 45.0,
+    sample_rate: int = 48_000,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Mute randomly selected short blocks, retaining the source duration."""
     samples, mono = _audio_2d(audio)
@@ -96,17 +98,17 @@ def dropout(
     result = samples.copy()
     for start in range(0, len(result), block):
         if rng.random() < probability:
-            result[start: start + block] = 0.0
+            result[start : start + block] = 0.0
     return _restore(result, mono)
 
 
 def gate_audio(
-        audio: np.ndarray,
-        sample_rate: int,
-        *,
-        rate_hz: float = 8.0,
-        duty: float = 0.62,
-        fade_ms: float = 2.0,
+    audio: np.ndarray,
+    sample_rate: int,
+    *,
+    rate_hz: float = 8.0,
+    duty: float = 0.62,
+    fade_ms: float = 2.0,
 ) -> np.ndarray:
     """Apply a periodic, softly edged amplitude gate."""
     samples, mono = _audio_2d(audio)
@@ -136,12 +138,15 @@ def _phase_vocoder(samples: np.ndarray, factor: float) -> np.ndarray:
         target = max(1, int(round(frame_count * factor)))
         old = np.linspace(0.0, 1.0, frame_count)
         new = np.linspace(0.0, 1.0, target)
-        return np.column_stack([
-            np.interp(new, old, samples[:, channel]) for channel in range(samples.shape[1])
-        ]).astype(np.float32)
+        return np.column_stack(
+            [
+                np.interp(new, old, samples[:, channel])
+                for channel in range(samples.shape[1])
+            ]
+        ).astype(np.float32)
 
     power = min(11, int(math.floor(math.log2(min(frame_count, 2048)))))
-    fft_size = max(64, 2 ** power)
+    fft_size = max(64, 2**power)
     hop = max(16, fft_size // 4)
     pad = fft_size // 2
     mode = "reflect" if frame_count > 1 else "edge"
@@ -151,9 +156,9 @@ def _phase_vocoder(samples: np.ndarray, factor: float) -> np.ndarray:
     if required > len(padded):
         padded = np.pad(padded, ((0, required - len(padded)), (0, 0)))
     window = np.hanning(fft_size + 1)[:-1].astype(np.float64)
-    frames = np.stack([
-        padded[index * hop: index * hop + fft_size] for index in range(n_frames)
-    ])
+    frames = np.stack(
+        [padded[index * hop : index * hop + fft_size] for index in range(n_frames)]
+    )
     spectrum = np.fft.rfft(frames * window[None, :, None], axis=1)
     time_steps = np.arange(0.0, n_frames - 1.0, 1.0 / factor)
     if len(time_steps) == 0:
@@ -183,11 +188,11 @@ def _phase_vocoder(samples: np.ndarray, factor: float) -> np.ndarray:
     for index, spectrum_frame in enumerate(output_frames):
         frame = np.fft.irfft(spectrum_frame, n=fft_size, axis=0).real
         start = index * hop
-        output[start: start + fft_size] += frame * window[:, None]
-        normalizer[start: start + fft_size] += window * window
+        output[start : start + fft_size] += frame * window[:, None]
+        normalizer[start : start + fft_size] += window * window
     valid = normalizer > 1e-8
     output[valid] /= normalizer[valid, None]
-    trimmed = output[pad: pad + output_length]
+    trimmed = output[pad : pad + output_length]
     if len(trimmed) < output_length:
         trimmed = np.pad(trimmed, ((0, output_length - len(trimmed)), (0, 0)))
     return trimmed.astype(np.float32)
@@ -215,10 +220,12 @@ def pitch_shift(audio: np.ndarray, semitones: float) -> np.ndarray:
     source_positions = np.arange(intermediate_length, dtype=np.float64) * ratio
     source_positions = np.clip(source_positions, 0.0, max(0, len(samples) - 1))
     original_positions = np.arange(len(samples), dtype=np.float64)
-    resampled = np.column_stack([
-        np.interp(source_positions, original_positions, samples[:, channel])
-        for channel in range(samples.shape[1])
-    ]).astype(np.float32)
+    resampled = np.column_stack(
+        [
+            np.interp(source_positions, original_positions, samples[:, channel])
+            for channel in range(samples.shape[1])
+        ]
+    ).astype(np.float32)
     shifted = _phase_vocoder(resampled, len(samples) / intermediate_length)
     if len(shifted) > len(samples):
         shifted = shifted[: len(samples)]
@@ -228,13 +235,13 @@ def pitch_shift(audio: np.ndarray, semitones: float) -> np.ndarray:
 
 
 def granular_resynthesis(
-        audio: np.ndarray,
-        sample_rate: int,
-        *,
-        grain_size_ms: float = 80.0,
-        density: float = 1.5,
-        jitter: float = 0.35,
-        rng: np.random.Generator,
+    audio: np.ndarray,
+    sample_rate: int,
+    *,
+    grain_size_ms: float = 80.0,
+    density: float = 1.5,
+    jitter: float = 0.35,
+    rng: np.random.Generator,
 ) -> np.ndarray:
     """Resynthesize a same-length buffer from overlapping, jittered source grains."""
     samples, mono = _audio_2d(audio)
@@ -258,20 +265,22 @@ def granular_resynthesis(
         indices = (source_start + np.arange(grain)) % length
         count = min(grain, length - out_start)
         local_window = window[:count]
-        output[out_start: out_start + count] += samples[indices[:count]] * local_window[:, None]
-        weight[out_start: out_start + count] += local_window
+        output[out_start : out_start + count] += (
+            samples[indices[:count]] * local_window[:, None]
+        )
+        weight[out_start : out_start + count] += local_window
     valid = weight > 1e-7
     output[valid] /= weight[valid, None]
     return _restore(output, mono)
 
 
 def spectral_freeze(
-        audio: np.ndarray,
-        sample_rate: int,
-        *,
-        position: float = 0.25,
-        mix: float = 1.0,
-        window_ms: float = 120.0,
+    audio: np.ndarray,
+    sample_rate: int,
+    *,
+    position: float = 0.25,
+    mix: float = 1.0,
+    window_ms: float = 120.0,
 ) -> np.ndarray:
     """Hold one selected spectral frame across the source duration."""
     samples, mono = _audio_2d(audio)
@@ -285,7 +294,7 @@ def spectral_freeze(
     size = min(length, max(32, int(round(sample_rate * window_ms / 1000.0))))
     center = int(round((length - 1) * position))
     start = max(0, min(length - size, center - size // 2))
-    frame = samples[start: start + size].copy()
+    frame = samples[start : start + size].copy()
     if len(frame) < size:
         frame = np.pad(frame, ((0, size - len(frame)), (0, 0)))
     window = np.hanning(size + 1)[:-1]
@@ -296,8 +305,8 @@ def spectral_freeze(
     weights = np.zeros(length, dtype=np.float64)
     for out_start in range(0, length, hop):
         count = min(size, length - out_start)
-        held[out_start: out_start + count] += frozen[:count] * window[:count, None]
-        weights[out_start: out_start + count] += window[:count] ** 2
+        held[out_start : out_start + count] += frozen[:count] * window[:count, None]
+        weights[out_start : out_start + count] += window[:count] ** 2
     valid = weights > 1e-8
     held[valid] /= weights[valid, None]
     result = samples * (1.0 - mix) + held * mix

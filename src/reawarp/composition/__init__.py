@@ -18,27 +18,50 @@ from reawarp.composition.motifs import (
     transform_motif,
 )
 from reawarp.composition.phrases import (
-    PhraseBoundary, PhraseSpan, PhrasePlan, MotifIdentity, MotifFamily,
-    MotifTransformation, PhraseCandidate, PhraseCandidateBatch,
-    build_phrase_candidate_batch, freeze_phrase_candidate,
-    restore_phrase_base, branch_phrase_candidate, continue_evolving,
+    PhraseBoundary,
+    PhraseSpan,
+    PhrasePlan,
+    MotifIdentity,
+    MotifFamily,
+    MotifTransformation,
+    PhraseCandidate,
+    PhraseCandidateBatch,
+    build_phrase_candidate_batch,
+    freeze_phrase_candidate,
+    restore_phrase_base,
+    branch_phrase_candidate,
+    continue_evolving,
     phrase_context_events,
 )
 from reawarp.composition.perceptual import build_perceptual_orchestration_plan
 from reawarp.composition.transitions import (
-    TransitionPhase, TransitionPlan, compile_transition_plans,
-    transition_marker_events, transition_plans_from_score,
-    TransitionActuation, transition_actuation_at,
+    TransitionPhase,
+    TransitionPlan,
+    compile_transition_plans,
+    transition_marker_events,
+    transition_plans_from_score,
+    TransitionActuation,
+    transition_actuation_at,
 )
 from reawarp.composition.endings import (
-    ENDING_STRATEGIES, EndingDirector, EndingPlan, compile_ending_plans,
-    ending_marker_events, ending_plans_from_score,
+    ENDING_STRATEGIES,
+    EndingDirector,
+    EndingPlan,
+    compile_ending_plans,
+    ending_marker_events,
+    ending_plans_from_score,
 )
 from reawarp.composition.section_memory import (
-    DEFAULT_SECTION_MEMORY_CAPACITY, EXPECTATION_KINDS,
-    MAX_SECTION_MEMORY_CAPACITY, MemoryExpectation, ReturnOpportunity,
-    SectionMemory, SectionState, TrajectorySummary,
-    attach_section_memory, section_memory_from_score,
+    DEFAULT_SECTION_MEMORY_CAPACITY,
+    EXPECTATION_KINDS,
+    MAX_SECTION_MEMORY_CAPACITY,
+    MemoryExpectation,
+    ReturnOpportunity,
+    SectionMemory,
+    SectionState,
+    TrajectorySummary,
+    attach_section_memory,
+    section_memory_from_score,
 )
 from reawarp.composition.orchestration import (
     ROLE_NAMES,
@@ -54,12 +77,23 @@ from reawarp.composition.orchestration import (
 )
 
 __all__ = [
-    "BRIEF_SCHEMA_VERSION", "CompositionBrief", "MutationContract",
-    "MaterialIdentity", "SourceAssetReference", "SourceFamily", "AnchorSpec",
-    "PitchWorld", "ContrastTarget", "EndingIntent", "TempoFormPolicy",
-    "ResolvedCompositionIntent", "BoundedExplorationResult",
-    "source_families_from_config", "resolve_composition_brief",
-    "quick_mutation_contracts", "bounded_explore_generation_config",
+    "BRIEF_SCHEMA_VERSION",
+    "CompositionBrief",
+    "MutationContract",
+    "MaterialIdentity",
+    "SourceAssetReference",
+    "SourceFamily",
+    "AnchorSpec",
+    "PitchWorld",
+    "ContrastTarget",
+    "EndingIntent",
+    "TempoFormPolicy",
+    "ResolvedCompositionIntent",
+    "BoundedExplorationResult",
+    "source_families_from_config",
+    "resolve_composition_brief",
+    "quick_mutation_contracts",
+    "bounded_explore_generation_config",
     "resolve_and_explore",
     "PhraseBoundary",
     "PhraseSpan",
@@ -114,9 +148,15 @@ __all__ = [
     "shape_role_events",
     "section_for_time",
     "transform_motif",
-    "ENDING_STRATEGIES", "EndingDirector", "EndingPlan", "compile_ending_plans",
-    "ending_marker_events", "ending_plans_from_score",
-    "TransitionActuation", "transition_actuation_at",]
+    "ENDING_STRATEGIES",
+    "EndingDirector",
+    "EndingPlan",
+    "compile_ending_plans",
+    "ending_marker_events",
+    "ending_plans_from_score",
+    "TransitionActuation",
+    "transition_actuation_at",
+]
 
 
 # M27 exports are lazy to avoid a cycle: config imports submodules from this

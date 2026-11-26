@@ -4,6 +4,7 @@ The detector always reads an immutable source stem before inserts and faders.
 Its gain envelope is applied to a different target stem before that target's
 insert and sends. This is a one-way control relationship, not a signal graph.
 """
+
 from __future__ import annotations
 
 import math
@@ -76,25 +77,53 @@ class SidechainRoute:
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> "SidechainRoute":
         allowed = {
-            "route_id", "source_stem", "target_stem", "detector_mode",
-            "threshold_db", "ratio", "max_reduction_db", "attack_ms",
-            "release_ms", "hysteresis_db", "control_rate_hz",
+            "route_id",
+            "source_stem",
+            "target_stem",
+            "detector_mode",
+            "threshold_db",
+            "ratio",
+            "max_reduction_db",
+            "attack_ms",
+            "release_ms",
+            "hysteresis_db",
+            "control_rate_hz",
         }
         unknown = set(value) - allowed
         if unknown:
-            raise ValueError("unknown sidechain field(s): " + ", ".join(sorted(map(str, unknown))))
+            raise ValueError(
+                "unknown sidechain field(s): " + ", ".join(sorted(map(str, unknown)))
+            )
         return cls(
             route_id=str(value.get("route_id", "")),
             source_stem=str(value.get("source_stem", "")),
             target_stem=str(value.get("target_stem", "")),
             detector_mode=str(value.get("detector_mode", "peak")),
-            threshold_db=_number(value.get("threshold_db", -24.0), "sidechain threshold_db", -96.0, 0.0),
+            threshold_db=_number(
+                value.get("threshold_db", -24.0), "sidechain threshold_db", -96.0, 0.0
+            ),
             ratio=_number(value.get("ratio", 8.0), "sidechain ratio", 1.0, 20.0),
-            max_reduction_db=_number(value.get("max_reduction_db", 9.0), "sidechain max_reduction_db", 0.0, 24.0),
-            attack_ms=_number(value.get("attack_ms", 2.0), "sidechain attack_ms", 0.1, 500.0),
-            release_ms=_number(value.get("release_ms", 120.0), "sidechain release_ms", 1.0, 5_000.0),
-            hysteresis_db=_number(value.get("hysteresis_db", 1.5), "sidechain hysteresis_db", 0.0, 24.0),
-            control_rate_hz=_number(value.get("control_rate_hz", 1_000.0), "sidechain control_rate_hz", 50.0, 2_000.0),
+            max_reduction_db=_number(
+                value.get("max_reduction_db", 9.0),
+                "sidechain max_reduction_db",
+                0.0,
+                24.0,
+            ),
+            attack_ms=_number(
+                value.get("attack_ms", 2.0), "sidechain attack_ms", 0.1, 500.0
+            ),
+            release_ms=_number(
+                value.get("release_ms", 120.0), "sidechain release_ms", 1.0, 5_000.0
+            ),
+            hysteresis_db=_number(
+                value.get("hysteresis_db", 1.5), "sidechain hysteresis_db", 0.0, 24.0
+            ),
+            control_rate_hz=_number(
+                value.get("control_rate_hz", 1_000.0),
+                "sidechain control_rate_hz",
+                50.0,
+                2_000.0,
+            ),
         )
 
 
@@ -121,9 +150,13 @@ def normalise_sidechain_routes(
             raise ValueError(f"duplicate sidechain route_id: {route.route_id}")
         seen.add(route.route_id)
         if route.source_stem not in names:
-            raise ValueError(f"sidechain {route.route_id!r} references unknown source stem {route.source_stem!r}")
+            raise ValueError(
+                f"sidechain {route.route_id!r} references unknown source stem {route.source_stem!r}"
+            )
         if route.target_stem not in names:
-            raise ValueError(f"sidechain {route.route_id!r} references unknown target stem {route.target_stem!r}")
+            raise ValueError(
+                f"sidechain {route.route_id!r} references unknown target stem {route.target_stem!r}"
+            )
         if route.control_rate_hz > float(sample_rate):
             raise ValueError("sidechain control_rate_hz cannot exceed the sample rate")
         result.append(route.to_dict())
@@ -144,7 +177,11 @@ def render_sidechain_gain_envelope(
     smoothing and threshold hysteresis are applied to the requested reduction;
     linear interpolation then produces a sample-aligned gain curve.
     """
-    route = settings if isinstance(settings, SidechainRoute) else SidechainRoute.from_mapping(settings)
+    route = (
+        settings
+        if isinstance(settings, SidechainRoute)
+        else SidechainRoute.from_mapping(settings)
+    )
     if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
         raise ValueError("sidechain sample_rate must be positive")
     if isinstance(frames, bool) or int(frames) < 0:
@@ -159,7 +196,9 @@ def render_sidechain_gain_envelope(
     if source.ndim != 2 or source.shape[1] not in {1, 2}:
         raise ValueError("sidechain source audio must be mono or stereo")
     if len(source) != frames:
-        raise ValueError("sidechain source and target stems must have the same frame count")
+        raise ValueError(
+            "sidechain source and target stems must have the same frame count"
+        )
     if not np.isfinite(source).all():
         raise ValueError("sidechain source audio contains non-finite samples")
     if frames == 0 or route.max_reduction_db <= 0.0:
@@ -179,7 +218,9 @@ def render_sidechain_gain_envelope(
     padded_frames = block_count * hop
     if padded_frames != frames:
         source = np.pad(source, ((0, padded_frames - frames), (0, 0)))
-    blocks = source.reshape(block_count, hop, source.shape[1]).astype(np.float64, copy=False)
+    blocks = source.reshape(block_count, hop, source.shape[1]).astype(
+        np.float64, copy=False
+    )
     if route.detector_mode == "peak":
         levels = np.max(np.abs(blocks), axis=(1, 2))
     else:
@@ -232,7 +273,9 @@ def render_sidechain_gain_envelope(
         "max_reduction_db": float(np.max(reduction)) if len(reduction) else 0.0,
         "mean_reduction_db": float(np.mean(reduction)) if len(reduction) else 0.0,
         "active_fraction": float(np.mean(active)) if len(active) else 0.0,
-        "detector_peak_dbfs": float(np.max(detector_db)) if len(detector_db) else -240.0,
+        "detector_peak_dbfs": (
+            float(np.max(detector_db)) if len(detector_db) else -240.0
+        ),
         "control_rate_hz_actual": float(sample_rate / hop),
     }
     return np.ascontiguousarray(gain, dtype=np.float32), summary

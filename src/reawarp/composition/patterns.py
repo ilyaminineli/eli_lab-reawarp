@@ -1,4 +1,5 @@
 """Structure-aware pattern grammar and motif transformation utilities."""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
@@ -45,11 +46,23 @@ PATTERN_FAMILIES: dict[str, tuple[int, ...]] = {
     "broken_regularity": (0, 4, 7, 8, 12, 15),
 }
 
-PATTERN_RELATIONSHIPS = ("unison", "interlock", "shadow", "call_response", "counter_accent")
+PATTERN_RELATIONSHIPS = (
+    "unison",
+    "interlock",
+    "shadow",
+    "call_response",
+    "counter_accent",
+)
 
 MOTIF_TRANSFORMS = (
-    "identity", "retrograde", "inversion", "augmentation",
-    "diminution", "fragment", "reorder", "displace",
+    "identity",
+    "retrograde",
+    "inversion",
+    "augmentation",
+    "diminution",
+    "fragment",
+    "reorder",
+    "displace",
 )
 
 
@@ -80,7 +93,9 @@ def pattern_for_section(
         chosen = [base[0]]
         rest = base[1:]
         if keep > 1:
-            chosen.extend(sorted(rng.choice(rest, size=keep - 1, replace=False).tolist()))
+            chosen.extend(
+                sorted(rng.choice(rest, size=keep - 1, replace=False).tolist())
+            )
         base = chosen
     if section_index > 0 and variation > 0:
         shift = int(rng.integers(0, 4)) if rng.random() < variation else 0
@@ -109,7 +124,9 @@ def relate_patterns(
     if relationship == "interlock":
         return a, tuple(step for step in b if step not in set(a))
     if relationship == "shadow":
-        return a, tuple(sorted({(step + max(1, cycle_steps // 8)) % cycle_steps for step in a}))
+        return a, tuple(
+            sorted({(step + max(1, cycle_steps // 8)) % cycle_steps for step in a})
+        )
     if relationship == "call_response":
         midpoint = cycle_steps / 2.0
         return (
@@ -141,31 +158,54 @@ def evolve_phrase(
         return tuple(
             PatternEvent(
                 step=max(0, cycle_steps - event.step - 1),
-                velocity=event.velocity, accent=event.accent,
-                pitch_offset=event.pitch_offset, duration_steps=event.duration_steps,
+                velocity=event.velocity,
+                accent=event.accent,
+                pitch_offset=event.pitch_offset,
+                duration_steps=event.duration_steps,
                 pan=-event.pan,
             )
             for event in reversed(source)
         )
     if transform == "inversion":
         centre = float(np.mean([event.pitch_offset for event in source]))
-        return tuple(PatternEvent(
-            event.step, event.velocity, event.accent,
-            int(round(2 * centre - event.pitch_offset)),
-            event.duration_steps, -event.pan,
-        ) for event in source)
+        return tuple(
+            PatternEvent(
+                event.step,
+                event.velocity,
+                event.accent,
+                int(round(2 * centre - event.pitch_offset)),
+                event.duration_steps,
+                -event.pan,
+            )
+            for event in source
+        )
     if transform == "augmentation":
         factor = 1.0 + amount
-        return tuple(PatternEvent(
-            int(round(event.step * factor)), event.velocity, event.accent,
-            event.pitch_offset, event.duration_steps * factor, event.pan,
-        ) for event in source if event.step * factor < cycle_steps)
+        return tuple(
+            PatternEvent(
+                int(round(event.step * factor)),
+                event.velocity,
+                event.accent,
+                event.pitch_offset,
+                event.duration_steps * factor,
+                event.pan,
+            )
+            for event in source
+            if event.step * factor < cycle_steps
+        )
     if transform == "diminution":
         factor = max(0.25, 1.0 - 0.65 * amount)
-        return tuple(PatternEvent(
-            int(round(event.step * factor)), event.velocity, event.accent,
-            event.pitch_offset, max(0.25, event.duration_steps * factor), event.pan,
-        ) for event in source)
+        return tuple(
+            PatternEvent(
+                int(round(event.step * factor)),
+                event.velocity,
+                event.accent,
+                event.pitch_offset,
+                max(0.25, event.duration_steps * factor),
+                event.pan,
+            )
+            for event in source
+        )
     if transform == "fragment":
         keep = max(1, int(round(len(source) * (1.0 - 0.75 * amount))))
         indices = np.sort(rng.choice(len(source), size=keep, replace=False))
@@ -175,16 +215,27 @@ def evolve_phrase(
         steps = sorted(event.step for event in source)
         return tuple(
             PatternEvent(
-                steps[i], source[int(order[i])].velocity, source[int(order[i])].accent,
-                source[int(order[i])].pitch_offset, source[int(order[i])].duration_steps,
+                steps[i],
+                source[int(order[i])].velocity,
+                source[int(order[i])].accent,
+                source[int(order[i])].pitch_offset,
+                source[int(order[i])].duration_steps,
                 source[int(order[i])].pan,
-            ) for i in range(len(source))
+            )
+            for i in range(len(source))
         )
     if transform == "displace":
         max_shift = max(1, int(round(3 * amount)))
         shift = int(rng.integers(-max_shift, max_shift + 1))
-        return tuple(PatternEvent(
-            (event.step + shift) % cycle_steps, event.velocity, event.accent,
-            event.pitch_offset, event.duration_steps, event.pan,
-        ) for event in source)
+        return tuple(
+            PatternEvent(
+                (event.step + shift) % cycle_steps,
+                event.velocity,
+                event.accent,
+                event.pitch_offset,
+                event.duration_steps,
+                event.pan,
+            )
+            for event in source
+        )
     return source

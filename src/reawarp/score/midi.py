@@ -17,7 +17,11 @@ from reawarp.score.model import Score
 from reawarp.score.pitch import EqualTemperamentTuning, tuning_from_score
 from reawarp.score.render import build_score_control_bus
 from reawarp.score.time import (
-    MeterMap, MeterPoint, TempoMap, TempoPoint, as_fraction,
+    MeterMap,
+    MeterPoint,
+    TempoMap,
+    TempoPoint,
+    as_fraction,
 )
 
 
@@ -35,7 +39,9 @@ def _to_tick(beat: Fraction, ppq: int) -> int:
     return max(0, int(math.floor(float(beat) * ppq + 0.5)))
 
 
-def _automation_beat(score: Score, lane: AutomationLane, point: AutomationPoint) -> Fraction:
+def _automation_beat(
+    score: Score, lane: AutomationLane, point: AutomationPoint
+) -> Fraction:
     if lane.time_basis == "beats":
         return point.at
     if lane.time_basis == "seconds":
@@ -107,8 +113,7 @@ def _event_frequency(event: MusicalEvent, score: Score) -> float | None:
 
 
 _MIDI_NOTE_THRESHOLDS = tuple(
-    440.0 * (2.0 ** ((note + 0.5 - 69.0) / 12.0))
-    for note in range(127)
+    440.0 * (2.0 ** ((note + 0.5 - 69.0) / 12.0)) for note in range(127)
 )
 
 
@@ -140,11 +145,11 @@ def _default_channel(event: MusicalEvent, voice_order: dict[str, int]) -> int:
 
 
 def score_to_midi(
-        score: Score,
-        path: str | Path,
-        *,
-        ticks_per_beat: int | None = None,
-        tempo_ramp_resolution: str | Fraction = "1/4",
+    score: Score,
+    path: str | Path,
+    *,
+    ticks_per_beat: int | None = None,
+    tempo_ramp_resolution: str | Fraction = "1/4",
 ) -> Path:
     """Export notes, MIDI CC automation, tempo, and meter to a type-1 MIDI file.
 
@@ -166,10 +171,16 @@ def score_to_midi(
     midi_file = mido.MidiFile(type=1, ticks_per_beat=ppq)
 
     conductor_items: list[tuple[int, int, int, Any]] = []
-    conductor_items.append((
-        0, -20, 0,
-        mido.MetaMessage("track_name", name=_midi_compatible_text(score.title), time=0),
-    ))
+    conductor_items.append(
+        (
+            0,
+            -20,
+            0,
+            mido.MetaMessage(
+                "track_name", name=_midi_compatible_text(score.title), time=0
+            ),
+        )
+    )
     gestures = score.metadata.get("m29_attention_gestures", ())
     gesture_export_enabled = bool(gestures)
     voices = sorted({event.voice_id for event in score.events})
@@ -178,13 +189,16 @@ def score_to_midi(
     if gesture_export_enabled:
         sample_rate = int(score.metadata.get("sample_rate", 48_000) or 48_000)
         gesture_controls = build_score_control_bus(score, sample_rate)
-    export_rows: list[tuple[MusicalEvent, MusicalEvent, int, Fraction, int | None, float | None]] = []
+    export_rows: list[
+        tuple[MusicalEvent, MusicalEvent, int, Fraction, int | None, float | None]
+    ] = []
     omitted_gesture_events: list[dict[str, Any]] = []
     pan_cc_events: list[dict[str, Any]] = []
     for source_event in score.events:
         rendered_event = (
             apply_attention_gesture_to_event(source_event, gestures)
-            if gesture_export_enabled else source_event
+            if gesture_export_enabled
+            else source_event
         )
         if rendered_event is None:
             if _event_note(source_event, score) is not None:
@@ -199,35 +213,45 @@ def score_to_midi(
             and rendered_event.parameters.get("m29_attention_gesture_id")
             and rendered_event.kind == "note"
         ):
-            midi_duration = as_fraction(str(
-                rendered_event.parameters.get(
-                    "gate_duration_beats", rendered_event.duration_beats
+            midi_duration = as_fraction(
+                str(
+                    rendered_event.parameters.get(
+                        "gate_duration_beats", rendered_event.duration_beats
+                    )
                 )
-            ))
-            midi_duration = max(Fraction(1, 64), min(
-                rendered_event.duration_beats, midi_duration
-            ))
+            )
+            midi_duration = max(
+                Fraction(1, 64), min(rendered_event.duration_beats, midi_duration)
+            )
         pan_cc_value = None
         midi_width = None
         if rendered_event.parameters.get("m29_attention_gesture_id"):
-            frame = gesture_controls.timeline.beat_to_frame(
-                source_event.onset_beats
-            ) if gesture_controls is not None else 0
+            frame = (
+                gesture_controls.timeline.beat_to_frame(source_event.onset_beats)
+                if gesture_controls is not None
+                else 0
+            )
             source_width = 1.0
             if (
                 gesture_controls is not None
                 and "spatial.width" in gesture_controls.target_ids
             ):
                 source_width = gesture_controls.value_for_context(
-                    "spatial.width", frame,
+                    "spatial.width",
+                    frame,
                     event_id=source_event.event_id,
                     default_value=1.0,
                 )
-            midi_width = max(0.0, min(2.0,
-                source_width * float(rendered_event.parameters.get(
-                    "m29_spatial_width_factor", 1.0
-                ))
-            ))
+            midi_width = max(
+                0.0,
+                min(
+                    2.0,
+                    source_width
+                    * float(
+                        rendered_event.parameters.get("m29_spatial_width_factor", 1.0)
+                    ),
+                ),
+            )
             if (
                 "m29_pan_factor" in rendered_event.parameters
                 or "m29_pan_offset" in rendered_event.parameters
@@ -241,31 +265,45 @@ def score_to_midi(
                     and "spatial.pan" in gesture_controls.target_ids
                 ):
                     source_pan = gesture_controls.value_for_context(
-                        "spatial.pan", frame,
+                        "spatial.pan",
+                        frame,
                         event_id=source_event.event_id,
                         default_value=source_pan,
                     )
-                midi_pan = max(-1.0, min(1.0,
-                    source_pan * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
-                    + float(rendered_event.parameters.get("m29_pan_offset", 0.0))
-                ))
-                pan_cc_value = max(0, min(
-                    127, int(round((midi_pan + 1.0) * 63.5))
-                ))
-                channel = source_event.channel if source_event.channel is not None else _default_channel(
-                    source_event, voice_order
+                midi_pan = max(
+                    -1.0,
+                    min(
+                        1.0,
+                        source_pan
+                        * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
+                        + float(rendered_event.parameters.get("m29_pan_offset", 0.0)),
+                    ),
                 )
-                pan_cc_events.append({
-                    "voice_id": source_event.voice_id,
-                    "channel": channel,
-                    "tick": _to_tick(source_event.onset_beats, ppq),
-                    "control": 10,
-                    "value": pan_cc_value,
-                })
-        export_rows.append((
-            source_event, rendered_event, note, midi_duration,
-            pan_cc_value, midi_width,
-        ))
+                pan_cc_value = max(0, min(127, int(round((midi_pan + 1.0) * 63.5))))
+                channel = (
+                    source_event.channel
+                    if source_event.channel is not None
+                    else _default_channel(source_event, voice_order)
+                )
+                pan_cc_events.append(
+                    {
+                        "voice_id": source_event.voice_id,
+                        "channel": channel,
+                        "tick": _to_tick(source_event.onset_beats, ppq),
+                        "control": 10,
+                        "value": pan_cc_value,
+                    }
+                )
+        export_rows.append(
+            (
+                source_event,
+                rendered_event,
+                note,
+                midi_duration,
+                pan_cc_value,
+                midi_width,
+            )
+        )
 
     score_meta = {
         "title": score.title,
@@ -288,39 +326,57 @@ def score_to_midi(
             "omitted_events": omitted_gesture_events,
             "pan_cc_events": pan_cc_events,
         }
-    conductor_items.append((
-        0, -10, 1,
-        mido.MetaMessage(
-            "text",
-            text="REAWARP_SCORE:" + json.dumps(
-                score_meta, ensure_ascii=True, separators=(",", ":"), allow_nan=False
-            ),
-            time=0,
-        ),
-    ))
-    for index, (beat, bpm) in enumerate(_tempo_samples(score, resolution)):
-        tempo = int(round(60_000_000.0 / bpm))
-        conductor_items.append((
-            _to_tick(beat, ppq), 0, index + 2,
-            mido.MetaMessage("set_tempo", tempo=tempo, time=0),
-        ))
-    for index, point in enumerate(score.meter_map.points):
-        conductor_items.append((
-            _to_tick(point.at_beats, ppq), 1, index,
+    conductor_items.append(
+        (
+            0,
+            -10,
+            1,
             mido.MetaMessage(
-                "time_signature",
-                numerator=point.numerator,
-                denominator=point.denominator,
+                "text",
+                text="REAWARP_SCORE:"
+                + json.dumps(
+                    score_meta,
+                    ensure_ascii=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ),
                 time=0,
             ),
-        ))
+        )
+    )
+    for index, (beat, bpm) in enumerate(_tempo_samples(score, resolution)):
+        tempo = int(round(60_000_000.0 / bpm))
+        conductor_items.append(
+            (
+                _to_tick(beat, ppq),
+                0,
+                index + 2,
+                mido.MetaMessage("set_tempo", tempo=tempo, time=0),
+            )
+        )
+    for index, point in enumerate(score.meter_map.points):
+        conductor_items.append(
+            (
+                _to_tick(point.at_beats, ppq),
+                1,
+                index,
+                mido.MetaMessage(
+                    "time_signature",
+                    numerator=point.numerator,
+                    denominator=point.denominator,
+                    time=0,
+                ),
+            )
+        )
 
     def make_track(name: str, items: list[tuple[int, int, int, Any]]) -> None:
         track = mido.MidiTrack()
-        track.append(mido.MetaMessage("track_name", name=_midi_compatible_text(name), time=0))
+        track.append(
+            mido.MetaMessage("track_name", name=_midi_compatible_text(name), time=0)
+        )
         previous_tick = 0
         for tick, _priority, _sequence, message in sorted(
-                items, key=lambda item: (item[0], item[1], item[2])
+            items, key=lambda item: (item[0], item[1], item[2])
         ):
             message.time = max(0, tick - previous_tick)
             previous_tick = tick
@@ -333,10 +389,19 @@ def score_to_midi(
         voice: [] for voice in voices
     }
     sequence = 0
-    for source_event, rendered_event, note, midi_duration, pan_cc_value, midi_width in export_rows:
+    for (
+        source_event,
+        rendered_event,
+        note,
+        midi_duration,
+        pan_cc_value,
+        midi_width,
+    ) in export_rows:
         event = source_event
-        channel = event.channel if event.channel is not None else _default_channel(
-            event, voice_order
+        channel = (
+            event.channel
+            if event.channel is not None
+            else _default_channel(event, voice_order)
         )
         start_tick = _to_tick(event.onset_beats, ppq)
         length_tick = max(1, _to_tick(midi_duration, ppq))
@@ -344,14 +409,16 @@ def score_to_midi(
         velocity = max(1, min(127, int(round(event.velocity * 127.0))))
         payload = event.to_dict()
         resolved_frequency = _event_frequency(event, score)
-        payload.update({
-            "midi_channel": channel,
-            "midi_note": note,
-            "reawarp_pitch_coordinate": event.pitch,
-            "reawarp_resolved_frequency_hz": resolved_frequency,
-            "reawarp_tuning_id": score.tuning_id,
-            "reawarp_tuning_period_ratio": score.tuning_period_ratio,
-        })
+        payload.update(
+            {
+                "midi_channel": channel,
+                "midi_note": note,
+                "reawarp_pitch_coordinate": event.pitch,
+                "reawarp_resolved_frequency_hz": resolved_frequency,
+                "reawarp_tuning_id": score.tuning_id,
+                "reawarp_tuning_period_ratio": score.tuning_period_ratio,
+            }
+        )
         if rendered_event.parameters.get("m29_attention_gesture_id"):
             payload["m29_midi_gesture_id"] = str(
                 rendered_event.parameters["m29_attention_gesture_id"]
@@ -360,7 +427,8 @@ def score_to_midi(
                 rendered_event.parameters.get("m29_attention_action", "")
             )
             midi_pan = (
-                None if pan_cc_value is None
+                None
+                if pan_cc_value is None
                 else -1.0 + 2.0 * float(pan_cc_value) / 127.0
             )
             payload["m29_midi_rendered"] = {
@@ -373,50 +441,74 @@ def score_to_midi(
             }
             if pan_cc_value is not None:
                 sequence += 1
-                voice_items[event.voice_id].append((
-                    start_tick, 0, sequence,
-                    mido.Message(
-                        "control_change",
-                        channel=channel,
-                        control=10,
-                        value=int(pan_cc_value),
-                        time=0,
+                voice_items[event.voice_id].append(
+                    (
+                        start_tick,
+                        0,
+                        sequence,
+                        mido.Message(
+                            "control_change",
+                            channel=channel,
+                            control=10,
+                            value=int(pan_cc_value),
+                            time=0,
+                        ),
+                    )
+                )
+        sequence += 1
+        voice_items[event.voice_id].append(
+            (
+                start_tick,
+                1,
+                sequence,
+                mido.MetaMessage(
+                    "text",
+                    text="REAWARP_EVENT:"
+                    + json.dumps(
+                        payload,
+                        ensure_ascii=True,
+                        separators=(",", ":"),
+                        allow_nan=False,
                     ),
-                ))
-        sequence += 1
-        voice_items[event.voice_id].append((
-            start_tick, 1, sequence,
-            mido.MetaMessage(
-                "text",
-                text="REAWARP_EVENT:" + json.dumps(
-                    payload, ensure_ascii=True, separators=(",", ":"), allow_nan=False
+                    time=0,
                 ),
-                time=0,
-            ),
-        ))
+            )
+        )
         sequence += 1
-        voice_items[event.voice_id].append((
-            start_tick, 2, sequence,
-            mido.Message(
-                "note_on", note=note, velocity=velocity, channel=channel, time=0
-            ),
-        ))
+        voice_items[event.voice_id].append(
+            (
+                start_tick,
+                2,
+                sequence,
+                mido.Message(
+                    "note_on", note=note, velocity=velocity, channel=channel, time=0
+                ),
+            )
+        )
         sequence += 1
-        voice_items[event.voice_id].append((
-            end_tick, 0, sequence,
-            mido.Message(
-                "note_off", note=note, velocity=0, channel=channel, time=0
-            ),
-        ))
+        voice_items[event.voice_id].append(
+            (
+                end_tick,
+                0,
+                sequence,
+                mido.Message(
+                    "note_off", note=note, velocity=0, channel=channel, time=0
+                ),
+            )
+        )
 
     for voice in voices:
         make_track(voice, voice_items[voice])
 
     automation_items: list[tuple[int, int, int, Any]] = []
-    automation_items.append((
-        0, -10, 0,
-        mido.MetaMessage("track_name", name="AUTOMATION", time=0),
-    ))
+    automation_items.append(
+        (
+            0,
+            -10,
+            0,
+            mido.MetaMessage("track_name", name="AUTOMATION", time=0),
+        )
+    )
     sequence = 0
     cc_pattern = re.compile(r"^midi\.cc\.(\d+)\.(\d+)$")
     for lane in score.automation:
@@ -424,10 +516,14 @@ def score_to_midi(
             lane.to_dict(), ensure_ascii=True, separators=(",", ":"), allow_nan=False
         )
         sequence += 1
-        automation_items.append((
-            0, -5, sequence,
-            mido.MetaMessage("text", text="REAWARP_AUTOMATION:" + payload, time=0),
-        ))
+        automation_items.append(
+            (
+                0,
+                -5,
+                sequence,
+                mido.MetaMessage("text", text="REAWARP_AUTOMATION:" + payload, time=0),
+            )
+        )
         match = cc_pattern.match(lane.target_id)
         if not match:
             continue
@@ -439,23 +535,25 @@ def score_to_midi(
             tick = _to_tick(beat, ppq)
             if lane.minimum is not None and lane.maximum is not None:
                 span = lane.maximum - lane.minimum
-                normalized = (
-                    (point.value - lane.minimum) / span if span else 0.0
-                )
+                normalized = (point.value - lane.minimum) / span if span else 0.0
             else:
                 normalized = point.value
             value = max(0, min(127, int(round(normalized * 127.0))))
             sequence += 1
-            automation_items.append((
-                tick, 0, sequence,
-                mido.Message(
-                    "control_change",
-                    channel=channel,
-                    control=controller,
-                    value=value,
-                    time=0,
-                ),
-            ))
+            automation_items.append(
+                (
+                    tick,
+                    0,
+                    sequence,
+                    mido.Message(
+                        "control_change",
+                        channel=channel,
+                        control=controller,
+                        value=value,
+                        time=0,
+                    ),
+                )
+            )
     if len(automation_items) > 1:
         make_track("AUTOMATION", automation_items)
 
@@ -472,7 +570,9 @@ def score_from_midi(path: str | Path) -> Score:
     tempo_by_tick: dict[int, float] = {}
     meter_by_tick: dict[int, tuple[int, int]] = {}
     custom_score: dict[str, Any] = {}
-    custom_events: dict[tuple[int, int, int], deque[dict[str, Any]]] = defaultdict(deque)
+    custom_events: dict[tuple[int, int, int], deque[dict[str, Any]]] = defaultdict(
+        deque
+    )
     custom_automation: list[AutomationLane] = []
     note_records: list[tuple[int, str, int, int, int, int, dict[str, Any] | None]] = []
     cc_points: dict[str, dict[Fraction, float]] = defaultdict(dict)
@@ -487,39 +587,48 @@ def score_from_midi(path: str | Path) -> Score:
             track_messages.append((absolute_tick, message))
             if message.type == "track_name":
                 track_name = str(message.name)
-        active_notes: dict[tuple[int, int], deque[tuple[int, int, dict[str, Any] | None]]] = defaultdict(deque)
+        active_notes: dict[
+            tuple[int, int], deque[tuple[int, int, dict[str, Any] | None]]
+        ] = defaultdict(deque)
         for tick, message in track_messages:
             if message.is_meta:
                 if message.type == "set_tempo":
                     tempo_by_tick[tick] = 60_000_000.0 / float(message.tempo)
                 elif message.type == "time_signature":
-                    meter_by_tick[tick] = (int(message.numerator), int(message.denominator))
+                    meter_by_tick[tick] = (
+                        int(message.numerator),
+                        int(message.denominator),
+                    )
                 elif message.type == "text":
                     text = str(message.text)
                     if text.startswith("REAWARP_SCORE:"):
                         try:
-                            custom_score = json.loads(text[len("REAWARP_SCORE:"):])
-                            export_record = custom_score.get("m29_midi_render_export", {})
+                            custom_score = json.loads(text[len("REAWARP_SCORE:") :])
+                            export_record = custom_score.get(
+                                "m29_midi_render_export", {}
+                            )
                             if (
                                 isinstance(export_record, dict)
                                 and export_record.get("schema_version") == 1
                             ):
                                 for item in export_record.get("pan_cc_events", []):
                                     try:
-                                        m29_pan_cc_events.add((
-                                            str(item["voice_id"]),
-                                            int(item["channel"]),
-                                            int(item["control"]),
-                                            int(item["tick"]),
-                                            int(item["value"]),
-                                        ))
+                                        m29_pan_cc_events.add(
+                                            (
+                                                str(item["voice_id"]),
+                                                int(item["channel"]),
+                                                int(item["control"]),
+                                                int(item["tick"]),
+                                                int(item["value"]),
+                                            )
+                                        )
                                     except (KeyError, TypeError, ValueError):
                                         continue
                         except json.JSONDecodeError:
                             pass
                     elif text.startswith("REAWARP_EVENT:"):
                         try:
-                            payload = json.loads(text[len("REAWARP_EVENT:"):])
+                            payload = json.loads(text[len("REAWARP_EVENT:") :])
                             key = (
                                 int(payload["midi_channel"]),
                                 int(payload["midi_note"]),
@@ -530,7 +639,7 @@ def score_from_midi(path: str | Path) -> Score:
                             pass
                     elif text.startswith("REAWARP_AUTOMATION:"):
                         try:
-                            payload = json.loads(text[len("REAWARP_AUTOMATION:"):])
+                            payload = json.loads(text[len("REAWARP_AUTOMATION:") :])
                             custom_automation.append(AutomationLane.from_dict(payload))
                         except (KeyError, TypeError, ValueError, json.JSONDecodeError):
                             pass
@@ -557,43 +666,61 @@ def score_from_midi(path: str | Path) -> Score:
                 continue
 
             if message.type in {"note_off", "note_on"} and (
-                    message.type == "note_off" or message.velocity == 0
+                message.type == "note_off" or message.velocity == 0
             ):
                 key = (int(message.channel), int(message.note))
                 if active_notes[key]:
                     start_tick, velocity, payload = active_notes[key].popleft()
-                    note_records.append((
-                        track_index, track_name, key[0], key[1],
-                        start_tick, max(start_tick + 1, tick), {
-                            "velocity": velocity,
-                            "payload": payload,
-                        },
-                    ))
+                    note_records.append(
+                        (
+                            track_index,
+                            track_name,
+                            key[0],
+                            key[1],
+                            start_tick,
+                            max(start_tick + 1, tick),
+                            {
+                                "velocity": velocity,
+                                "payload": payload,
+                            },
+                        )
+                    )
 
         track_end = sum(int(message.time) for message in track)
         for (channel, note), opened in active_notes.items():
             while opened:
                 start_tick, velocity, payload = opened.popleft()
-                note_records.append((
-                    track_index, track_name, channel, note,
-                    start_tick, max(start_tick + 1, track_end), {
-                        "velocity": velocity,
-                        "payload": payload,
-                    },
-                ))
+                note_records.append(
+                    (
+                        track_index,
+                        track_name,
+                        channel,
+                        note,
+                        start_tick,
+                        max(start_tick + 1, track_end),
+                        {
+                            "velocity": velocity,
+                            "payload": payload,
+                        },
+                    )
+                )
 
     if 0 not in tempo_by_tick:
         tempo_by_tick[0] = 120.0
-    tempo_map = TempoMap(tuple(
-        TempoPoint(Fraction(tick, ppq), bpm, "step")
-        for tick, bpm in sorted(tempo_by_tick.items())
-    ))
+    tempo_map = TempoMap(
+        tuple(
+            TempoPoint(Fraction(tick, ppq), bpm, "step")
+            for tick, bpm in sorted(tempo_by_tick.items())
+        )
+    )
     if 0 not in meter_by_tick:
         meter_by_tick[0] = (4, 4)
-    meter_map = MeterMap(tuple(
-        MeterPoint(Fraction(tick, ppq), numerator, denominator)
-        for tick, (numerator, denominator) in sorted(meter_by_tick.items())
-    ))
+    meter_map = MeterMap(
+        tuple(
+            MeterPoint(Fraction(tick, ppq), numerator, denominator)
+            for tick, (numerator, denominator) in sorted(meter_by_tick.items())
+        )
+    )
 
     tuning_data = custom_score.get("tuning", {}) if custom_score else {}
     tuning_id = str(tuning_data.get("id", "12tet"))
@@ -612,8 +739,16 @@ def score_from_midi(path: str | Path) -> Score:
     events: list[MusicalEvent] = []
     used_ids: set[str] = set()
     for record_index, (
-            track_index, track_name, channel, note, start_tick, end_tick, details
-    ) in enumerate(sorted(note_records, key=lambda item: (item[4], item[0], item[2], item[3]))):
+        track_index,
+        track_name,
+        channel,
+        note,
+        start_tick,
+        end_tick,
+        details,
+    ) in enumerate(
+        sorted(note_records, key=lambda item: (item[4], item[0], item[2], item[3]))
+    ):
         velocity = int(details["velocity"])
         payload = details["payload"]
         if payload is not None:
@@ -625,55 +760,75 @@ def score_from_midi(path: str | Path) -> Score:
             used_ids.add(event_id)
             onset = (
                 as_fraction(str(original.get("onset_beats", Fraction(start_tick, ppq))))
-                if m29_rendered else Fraction(start_tick, ppq)
+                if m29_rendered
+                else Fraction(start_tick, ppq)
             )
             duration = (
-                as_fraction(str(original.get(
-                    "duration_beats", Fraction(end_tick - start_tick, ppq)
-                )))
-                if m29_rendered else Fraction(end_tick - start_tick, ppq)
+                as_fraction(
+                    str(
+                        original.get(
+                            "duration_beats", Fraction(end_tick - start_tick, ppq)
+                        )
+                    )
+                )
+                if m29_rendered
+                else Fraction(end_tick - start_tick, ppq)
             )
-            events.append(MusicalEvent(
-                event_id=event_id,
-                voice_id=str(original.get("voice_id", track_name)),
-                onset_beats=onset,
-                duration_beats=duration,
-                kind=str(original.get("kind", "note")),
-                pitch=(
-                    None if original.get("pitch") is None else float(original["pitch"])
-                ),
-                frequency_hz=(
-                    None if original.get("frequency_hz") is None
-                    else float(original["frequency_hz"])
-                ),
-                velocity=(
-                    float(original.get("velocity", float(velocity) / 127.0))
-                    if m29_rendered else float(velocity) / 127.0
-                ),
-                articulation=str(original.get("articulation", "default")),
-                parameters=dict(original.get("parameters", {})),
-                tags=tuple(original.get("tags", ())),
-                source_id=original.get("source_id"),
-                seed=original.get("seed"),
-                channel=(
-                    None if original.get("channel") is None else int(original["channel"])
-                ) if m29_rendered else channel,
-                tuning_id=str(original.get("tuning_id", tuning_id)),
-            ))
+            events.append(
+                MusicalEvent(
+                    event_id=event_id,
+                    voice_id=str(original.get("voice_id", track_name)),
+                    onset_beats=onset,
+                    duration_beats=duration,
+                    kind=str(original.get("kind", "note")),
+                    pitch=(
+                        None
+                        if original.get("pitch") is None
+                        else float(original["pitch"])
+                    ),
+                    frequency_hz=(
+                        None
+                        if original.get("frequency_hz") is None
+                        else float(original["frequency_hz"])
+                    ),
+                    velocity=(
+                        float(original.get("velocity", float(velocity) / 127.0))
+                        if m29_rendered
+                        else float(velocity) / 127.0
+                    ),
+                    articulation=str(original.get("articulation", "default")),
+                    parameters=dict(original.get("parameters", {})),
+                    tags=tuple(original.get("tags", ())),
+                    source_id=original.get("source_id"),
+                    seed=original.get("seed"),
+                    channel=(
+                        (
+                            None
+                            if original.get("channel") is None
+                            else int(original["channel"])
+                        )
+                        if m29_rendered
+                        else channel
+                    ),
+                    tuning_id=str(original.get("tuning_id", tuning_id)),
+                )
+            )
         else:
             midi_frequency = _midi_semitone_frequency(note)
-            events.append(MusicalEvent(
-                event_id=f"midi-event-{record_index:06d}",
-                voice_id=track_name,
-                onset_beats=Fraction(start_tick, ppq),
-                duration_beats=Fraction(end_tick - start_tick, ppq),
-                kind="note",
-                pitch=tuning.pitch_for_frequency(midi_frequency),
-                frequency_hz=midi_frequency,
-                velocity=float(velocity) / 127.0,
-                channel=channel,
-                tuning_id=tuning_id,
-            ))
+            events.append(
+                MusicalEvent(
+                    event_id=f"midi-event-{record_index:06d}",
+                    voice_id=track_name,
+                    onset_beats=Fraction(start_tick, ppq),
+                    duration_beats=Fraction(end_tick - start_tick, ppq),
+                    kind="note",
+                    pitch=tuning.pitch_for_frequency(midi_frequency),
+                    frequency_hz=midi_frequency,
+                    velocity=float(velocity) / 127.0,
+                    channel=channel,
+                    tuning_id=tuning_id,
+                )
+            )
 
     midi_render_export = (
         custom_score.get("m29_midi_render_export", {}) if custom_score else {}
@@ -702,8 +857,7 @@ def score_from_midi(path: str | Path) -> Score:
         automation_by_target[target] = AutomationLane(
             target_id=target,
             points=tuple(
-                AutomationPoint(at, value)
-                for at, value in sorted(point_values.items())
+                AutomationPoint(at, value) for at, value in sorted(point_values.items())
             ),
             unit="normalized",
             time_basis="beats",

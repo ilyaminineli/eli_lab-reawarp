@@ -82,7 +82,9 @@ class AudioPlayer(QObject):
         audio = self._pending_audio if self._pending_audio is not None else self._audio
         return 0 if audio is None else len(audio)
 
-    def start(self, audio: np.ndarray, sample_rate: int, device: int | None = None) -> None:
+    def start(
+        self, audio: np.ndarray, sample_rate: int, device: int | None = None
+    ) -> None:
         try:
             import sounddevice as sd
         except ImportError as exc:
@@ -135,7 +137,9 @@ class AudioPlayer(QObject):
         self._pending_audio = self._prepare_audio(audio)
         return True
 
-    def _callback(self, outdata: np.ndarray, frames: int, _time: Any, _status: Any) -> None:
+    def _callback(
+        self, outdata: np.ndarray, frames: int, _time: Any, _status: Any
+    ) -> None:
         # Reference assignment is atomic under CPython's GIL. The buffer itself
         # is fully prepared and immutable while the callback reads it.
         pending = self._pending_audio

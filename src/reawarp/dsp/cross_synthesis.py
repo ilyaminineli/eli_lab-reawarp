@@ -1,4 +1,5 @@
 """Distinct cross-synthesis and frequency-transformation reference algorithms."""
+
 from __future__ import annotations
 
 import math
@@ -8,22 +9,32 @@ from typing import Any
 import numpy as np
 
 from reawarp.dsp._stft import (
-    audio_channels, finite_range, istft, restore_shape, signal_diagnostics, stft,
+    audio_channels,
+    finite_range,
+    istft,
+    restore_shape,
+    signal_diagnostics,
+    stft,
 )
 
 
 class CrossSynthesisResult:
     __slots__ = ("audio", "diagnostics")
+
     def __init__(self, audio: np.ndarray, diagnostics: dict[str, Any]):
         self.audio = audio
         self.diagnostics = diagnostics
 
 
-def _paired_audio(carrier: np.ndarray, modulator: np.ndarray) -> tuple[np.ndarray, np.ndarray, bool]:
+def _paired_audio(
+    carrier: np.ndarray, modulator: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, bool]:
     c, c_vector = audio_channels(carrier, "carrier")
     m, _m_vector = audio_channels(modulator, "modulator")
     if len(c) != len(m):
-        raise ValueError("carrier and modulator must have the same frame count; align them explicitly")
+        raise ValueError(
+            "carrier and modulator must have the same frame count; align them explicitly"
+        )
     if c.shape[1] == m.shape[1]:
         return c, m, c_vector
     if c.shape[1] == 2 and m.shape[1] == 1:
@@ -43,29 +54,49 @@ def ring_modulate(
 ) -> CrossSynthesisResult:
     """Multiply a carrier by a modulator: genuine sum/difference sideband generation."""
     c, m, was_vector = _paired_audio(carrier, modulator)
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     amount = finite_range(wet, "wet", 0.0, 1.0)
     started = time.perf_counter()
     if bypass or amount == 0.0:
         output = restore_shape(c.copy(), was_vector)
-        return CrossSynthesisResult(output, {
-            "module": "m24.3.ring_modulation", "algorithm": "bypass", "bypass": True,
-            "sample_rate": int(sample_rate), "input_frames": len(c), "output_frames": len(c),
-            "latency_frames": 0, "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(output),
-        })
+        return CrossSynthesisResult(
+            output,
+            {
+                "module": "m24.3.ring_modulation",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": int(sample_rate),
+                "input_frames": len(c),
+                "output_frames": len(c),
+                "latency_frames": 0,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(output),
+            },
+        )
     product = c.astype(np.float64) * m.astype(np.float64)
     output = c.astype(np.float64) * (1.0 - amount) + product * amount
     output = restore_shape(output, was_vector)
-    return CrossSynthesisResult(output, {
-        "module": "m24.3.ring_modulation", "algorithm": "time_domain_sample_product",
-        "bypass": False, "sample_rate": int(sample_rate), "input_frames": len(c),
-        "output_frames": len(output), "latency_frames": 0,
-        "processing_seconds": time.perf_counter() - started,
-        "formula": "y[n] = (1-wet)*carrier[n] + wet*carrier[n]*modulator[n]",
-        "wet": amount, **signal_diagnostics(output),
-    })
+    return CrossSynthesisResult(
+        output,
+        {
+            "module": "m24.3.ring_modulation",
+            "algorithm": "time_domain_sample_product",
+            "bypass": False,
+            "sample_rate": int(sample_rate),
+            "input_frames": len(c),
+            "output_frames": len(output),
+            "latency_frames": 0,
+            "processing_seconds": time.perf_counter() - started,
+            "formula": "y[n] = (1-wet)*carrier[n] + wet*carrier[n]*modulator[n]",
+            "wet": amount,
+            **signal_diagnostics(output),
+        },
+    )
 
 
 def frequency_shift(
@@ -79,7 +110,11 @@ def frequency_shift(
 ) -> CrossSynthesisResult:
     """Translate every analytic-signal partial by a fixed Hz offset (not pitch shift)."""
     source, was_vector = audio_channels(audio, "input audio")
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
     shift = finite_range(shift_hz, "shift_hz", -0.45 * rate, 0.45 * rate)
@@ -88,13 +123,21 @@ def frequency_shift(
     started = time.perf_counter()
     if bypass or amount == 0.0 or len(source) == 0 or shift == 0.0:
         output = restore_shape(source.copy(), was_vector)
-        return CrossSynthesisResult(output, {
-            "module": "m24.3.frequency_shift", "algorithm": "bypass", "bypass": True,
-            "sample_rate": rate, "shift_hz": shift, "input_frames": len(source),
-            "output_frames": len(source), "latency_frames": 0,
-            "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(output),
-        })
+        return CrossSynthesisResult(
+            output,
+            {
+                "module": "m24.3.frequency_shift",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "shift_hz": shift,
+                "input_frames": len(source),
+                "output_frames": len(source),
+                "latency_frames": 0,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(output),
+            },
+        )
     pad = int(round(rate * pad_ms / 1000.0))
     if len(source) > 1 and pad:
         padded = np.pad(source.astype(np.float64), ((pad, pad), (0, 0)), mode="reflect")
@@ -105,29 +148,43 @@ def frequency_shift(
     analytic_mask = np.zeros(count, dtype=np.float64)
     analytic_mask[0] = 1.0
     if count % 2 == 0:
-        analytic_mask[1:count // 2] = 2.0
+        analytic_mask[1 : count // 2] = 2.0
         analytic_mask[count // 2] = 1.0
     else:
-        analytic_mask[1:(count + 1) // 2] = 2.0
+        analytic_mask[1 : (count + 1) // 2] = 2.0
     analytic = np.fft.ifft(spectrum * analytic_mask[:, None], axis=0)
     time_axis = np.arange(count, dtype=np.float64) / rate
     translated = np.real(analytic * np.exp(1j * math.tau * shift * time_axis)[:, None])
-    translated = translated[pad:pad + len(source)]
+    translated = translated[pad : pad + len(source)]
     output = source.astype(np.float64) * (1.0 - amount) + translated * amount
     output = restore_shape(output, was_vector)
-    return CrossSynthesisResult(output, {
-        "module": "m24.3.frequency_shift", "algorithm": "fft_analytic_signal_translation",
-        "bypass": False, "sample_rate": rate, "shift_hz": shift,
-        "input_frames": len(source), "output_frames": len(output),
-        "latency_frames": 0, "edge_padding_frames": pad,
-        "frequency_shift_is_not_pitch_shift": True, "wet": amount,
-        "processing_seconds": time.perf_counter() - started,
-        **signal_diagnostics(output),
-    })
+    return CrossSynthesisResult(
+        output,
+        {
+            "module": "m24.3.frequency_shift",
+            "algorithm": "fft_analytic_signal_translation",
+            "bypass": False,
+            "sample_rate": rate,
+            "shift_hz": shift,
+            "input_frames": len(source),
+            "output_frames": len(output),
+            "latency_frames": 0,
+            "edge_padding_frames": pad,
+            "frequency_shift_is_not_pitch_shift": True,
+            "wet": amount,
+            "processing_seconds": time.perf_counter() - started,
+            **signal_diagnostics(output),
+        },
+    )
 
 
 def _smooth_frequency(magnitude: np.ndarray, width: int) -> np.ndarray:
-    if isinstance(width, bool) or not isinstance(width, int) or width < 3 or width > 255:
+    if (
+        isinstance(width, bool)
+        or not isinstance(width, int)
+        or width < 3
+        or width > 255
+    ):
         raise ValueError("envelope_bins must be an odd integer between 3 and 255")
     if width % 2 == 0:
         raise ValueError("envelope_bins must be odd")
@@ -156,7 +213,11 @@ def spectral_envelope_transfer(
 ) -> CrossSynthesisResult:
     """Apply modulator's smoothed spectral envelope to carrier detail and phase."""
     c, m, was_vector = _paired_audio(carrier, modulator)
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
     amt = finite_range(amount, "amount", 0.0, 1.0)
@@ -165,13 +226,20 @@ def spectral_envelope_transfer(
     started = time.perf_counter()
     if bypass or wet_amount == 0.0 or amt == 0.0:
         output = restore_shape(c.copy(), was_vector)
-        return CrossSynthesisResult(output, {
-            "module": "m24.3.spectral_envelope_transfer", "algorithm": "bypass",
-            "bypass": True, "sample_rate": rate, "input_frames": len(c),
-            "output_frames": len(c), "latency_frames": 0,
-            "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(output),
-        })
+        return CrossSynthesisResult(
+            output,
+            {
+                "module": "m24.3.spectral_envelope_transfer",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "input_frames": len(c),
+                "output_frames": len(c),
+                "latency_frames": 0,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(output),
+            },
+        )
     carrier_spec, metadata = stft(c, frame_size, hop_size)
     modulator_spec, _ = stft(m, frame_size, hop_size)
     carrier_mag = np.abs(carrier_spec)
@@ -185,17 +253,31 @@ def spectral_envelope_transfer(
     rendered = istft(transformed, metadata, len(c))
     output = c * np.float32(1.0 - wet_amount) + rendered * np.float32(wet_amount)
     output = restore_shape(output, was_vector)
-    return CrossSynthesisResult(output, {
-        "module": "m24.3.spectral_envelope_transfer", "algorithm": "stft_smoothed_magnitude_ratio",
-        "bypass": False, "sample_rate": rate, "frame_size": frame_size,
-        "hop_size": hop_size, "envelope_bins": envelope_bins,
-        "carrier_phase_retained": True, "modulator_contributes": "smoothed_spectral_envelope",
-        "ratio_limit": ratio_limit, "amount": amt, "wet": wet_amount,
-        "input_frames": len(c), "output_frames": len(output), "latency_frames": 0,
-        "processing_seconds": time.perf_counter() - started,
-        "estimated_working_bytes": int(carrier_spec.nbytes * 2 + modulator_spec.nbytes + transformed.nbytes),
-        **signal_diagnostics(output),
-    })
+    return CrossSynthesisResult(
+        output,
+        {
+            "module": "m24.3.spectral_envelope_transfer",
+            "algorithm": "stft_smoothed_magnitude_ratio",
+            "bypass": False,
+            "sample_rate": rate,
+            "frame_size": frame_size,
+            "hop_size": hop_size,
+            "envelope_bins": envelope_bins,
+            "carrier_phase_retained": True,
+            "modulator_contributes": "smoothed_spectral_envelope",
+            "ratio_limit": ratio_limit,
+            "amount": amt,
+            "wet": wet_amount,
+            "input_frames": len(c),
+            "output_frames": len(output),
+            "latency_frames": 0,
+            "processing_seconds": time.perf_counter() - started,
+            "estimated_working_bytes": int(
+                carrier_spec.nbytes * 2 + modulator_spec.nbytes + transformed.nbytes
+            ),
+            **signal_diagnostics(output),
+        },
+    )
 
 
 def _triangular_bands(sample_rate: int, frame_size: int, bands: int) -> np.ndarray:
@@ -208,11 +290,25 @@ def _triangular_bands(sample_rate: int, frame_size: int, bands: int) -> np.ndarr
     log_centres = np.log(centres)
     weights = np.zeros((bands, len(frequencies)), dtype=np.float64)
     for index, centre in enumerate(log_centres):
-        left = log_centres[index] - (log_centres[index] - log_centres[index - 1] if index else (log_centres[1] - log_centres[0]))
-        right = log_centres[index] + (log_centres[index + 1] - log_centres[index] if index < bands - 1 else (log_centres[-1] - log_centres[-2]))
-        weights[index] = np.maximum(0.0, 1.0 - np.where(log_frequency < centre,
-            (centre - log_frequency) / max(centre - left, 1e-12),
-            (log_frequency - centre) / max(right - centre, 1e-12)))
+        left = log_centres[index] - (
+            log_centres[index] - log_centres[index - 1]
+            if index
+            else (log_centres[1] - log_centres[0])
+        )
+        right = log_centres[index] + (
+            log_centres[index + 1] - log_centres[index]
+            if index < bands - 1
+            else (log_centres[-1] - log_centres[-2])
+        )
+        weights[index] = np.maximum(
+            0.0,
+            1.0
+            - np.where(
+                log_frequency < centre,
+                (centre - log_frequency) / max(centre - left, 1e-12),
+                (log_frequency - centre) / max(right - centre, 1e-12),
+            ),
+        )
     weights[0, frequencies <= minimum] = 1.0
     normalizer = np.sum(weights, axis=0)
     weights[:, normalizer <= 1e-12] = 0.0
@@ -221,9 +317,23 @@ def _triangular_bands(sample_rate: int, frame_size: int, bands: int) -> np.ndarr
     return weights / normalizer[None, :]
 
 
-def _envelope_follow(values: np.ndarray, sample_rate: int, hop_size: int, attack_ms: float, release_ms: float) -> np.ndarray:
-    attack = math.exp(-hop_size / max(sample_rate * attack_ms / 1000.0, 1.0)) if attack_ms > 0.0 else 0.0
-    release = math.exp(-hop_size / max(sample_rate * release_ms / 1000.0, 1.0)) if release_ms > 0.0 else 0.0
+def _envelope_follow(
+    values: np.ndarray,
+    sample_rate: int,
+    hop_size: int,
+    attack_ms: float,
+    release_ms: float,
+) -> np.ndarray:
+    attack = (
+        math.exp(-hop_size / max(sample_rate * attack_ms / 1000.0, 1.0))
+        if attack_ms > 0.0
+        else 0.0
+    )
+    release = (
+        math.exp(-hop_size / max(sample_rate * release_ms / 1000.0, 1.0))
+        if release_ms > 0.0
+        else 0.0
+    )
     result = np.zeros_like(values, dtype=np.float64)
     state = np.zeros(values.shape[1:], dtype=np.float64)
     for frame in range(len(values)):
@@ -250,7 +360,11 @@ def vocoder(
 ) -> CrossSynthesisResult:
     """Vocoder: modulator band envelopes articulate carrier spectral detail."""
     c, m, was_vector = _paired_audio(carrier, modulator)
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
     attack = finite_range(attack_ms, "attack_ms", 0.0, 250.0)
@@ -261,12 +375,20 @@ def vocoder(
     started = time.perf_counter()
     if bypass or wet_amount == 0.0 or amt == 0.0:
         output = restore_shape(c.copy(), was_vector)
-        return CrossSynthesisResult(output, {
-            "module": "m24.3.vocoder", "algorithm": "bypass", "bypass": True,
-            "sample_rate": rate, "input_frames": len(c), "output_frames": len(c),
-            "latency_frames": 0, "processing_seconds": time.perf_counter() - started,
-            **signal_diagnostics(output),
-        })
+        return CrossSynthesisResult(
+            output,
+            {
+                "module": "m24.3.vocoder",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "input_frames": len(c),
+                "output_frames": len(c),
+                "latency_frames": 0,
+                "processing_seconds": time.perf_counter() - started,
+                **signal_diagnostics(output),
+            },
+        )
     carrier_spec, metadata = stft(c, frame_size, hop_size)
     modulator_spec, _ = stft(m, frame_size, hop_size)
     weights = _triangular_bands(rate, frame_size, bands)
@@ -274,8 +396,12 @@ def vocoder(
     modulator_mag = np.abs(modulator_spec)
     # Weighted RMS band levels retain the modulator's evolving articulation.
     denom = np.sum(weights, axis=1)[None, :, None]
-    carrier_level = np.sqrt(np.einsum("bk,fkc->fbc", weights, carrier_mag ** 2) / np.maximum(denom, 1e-12))
-    modulator_level = np.sqrt(np.einsum("bk,fkc->fbc", weights, modulator_mag ** 2) / np.maximum(denom, 1e-12))
+    carrier_level = np.sqrt(
+        np.einsum("bk,fkc->fbc", weights, carrier_mag**2) / np.maximum(denom, 1e-12)
+    )
+    modulator_level = np.sqrt(
+        np.einsum("bk,fkc->fbc", weights, modulator_mag**2) / np.maximum(denom, 1e-12)
+    )
     followed = _envelope_follow(modulator_level, rate, hop_size, attack, release)
     ratio = followed / np.maximum(carrier_level, 1e-8)
     ratio = np.clip(ratio, 0.0, gain_limit)
@@ -285,15 +411,30 @@ def vocoder(
     rendered = istft(transformed, metadata, len(c))
     output = c * np.float32(1.0 - wet_amount) + rendered * np.float32(wet_amount)
     output = restore_shape(output, was_vector)
-    return CrossSynthesisResult(output, {
-        "module": "m24.3.vocoder", "algorithm": "log_triangular_band_envelope_vocoder",
-        "bypass": False, "sample_rate": rate, "bands": bands,
-        "frame_size": frame_size, "hop_size": hop_size,
-        "attack_ms": attack, "release_ms": release,
-        "carrier_phase_retained": True, "modulator_contributes": "smoothed_band_amplitude_envelopes",
-        "max_band_gain": gain_limit, "amount": amt, "wet": wet_amount,
-        "input_frames": len(c), "output_frames": len(output), "latency_frames": 0,
-        "processing_seconds": time.perf_counter() - started,
-        "estimated_working_bytes": int(carrier_spec.nbytes * 2 + modulator_spec.nbytes + transformed.nbytes),
-        **signal_diagnostics(output),
-    })
+    return CrossSynthesisResult(
+        output,
+        {
+            "module": "m24.3.vocoder",
+            "algorithm": "log_triangular_band_envelope_vocoder",
+            "bypass": False,
+            "sample_rate": rate,
+            "bands": bands,
+            "frame_size": frame_size,
+            "hop_size": hop_size,
+            "attack_ms": attack,
+            "release_ms": release,
+            "carrier_phase_retained": True,
+            "modulator_contributes": "smoothed_band_amplitude_envelopes",
+            "max_band_gain": gain_limit,
+            "amount": amt,
+            "wet": wet_amount,
+            "input_frames": len(c),
+            "output_frames": len(output),
+            "latency_frames": 0,
+            "processing_seconds": time.perf_counter() - started,
+            "estimated_working_bytes": int(
+                carrier_spec.nbytes * 2 + modulator_spec.nbytes + transformed.nbytes
+            ),
+            **signal_diagnostics(output),
+        },
+    )

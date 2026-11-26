@@ -4,6 +4,7 @@ Automation is evaluated offline from musical beats to sample frames. It contains
 no random sources and can therefore be replayed identically for the same tempo,
 sample rate, routing, and lane data.
 """
+
 from __future__ import annotations
 
 import json
@@ -42,11 +43,13 @@ def automation_targets(stem_names: Sequence[str]) -> tuple[str, ...]:
     """Return the small, explicit set of automatable routing controls."""
     targets = ["bus.space.wet", "bus.echo.wet"]
     for name in stem_names:
-        targets.extend((
-            f"stem.{name}.insert_wet",
-            f"stem.{name}.send.space",
-            f"stem.{name}.send.echo",
-        ))
+        targets.extend(
+            (
+                f"stem.{name}.insert_wet",
+                f"stem.{name}.send.space",
+                f"stem.{name}.send.echo",
+            )
+        )
     return tuple(targets)
 
 
@@ -68,7 +71,9 @@ def normalise_fx_automation(
     allowed = set(automation_targets(stem_names))
     unknown = set(lanes) - allowed
     if unknown:
-        raise ValueError("Unknown automation target(s): " + ", ".join(sorted(map(str, unknown))))
+        raise ValueError(
+            "Unknown automation target(s): " + ", ".join(sorted(map(str, unknown)))
+        )
 
     result: dict[str, list[dict[str, float | str]]] = {}
     for target, raw_points in lanes.items():
@@ -83,7 +88,9 @@ def normalise_fx_automation(
         for index, raw in enumerate(raw_points, start=1):
             if not isinstance(raw, Mapping):
                 raise ValueError(f"{target} point {index} must be an object")
-            beat = _number(raw.get("beat"), f"{target} point {index} beat", 0.0, 1_000_000.0)
+            beat = _number(
+                raw.get("beat"), f"{target} point {index} beat", 0.0, 1_000_000.0
+            )
             value = _number(raw.get("value"), f"{target} point {index} value", 0.0, 1.0)
             curve = str(raw.get("curve", "linear"))
             if curve not in FX_AUTOMATION_CURVES:
@@ -91,7 +98,9 @@ def normalise_fx_automation(
                     f"{target} point {index} curve must be one of {', '.join(FX_AUTOMATION_CURVES)}"
                 )
             if beat <= previous:
-                raise ValueError(f"{target} points must have strictly increasing beat positions")
+                raise ValueError(
+                    f"{target} points must have strictly increasing beat positions"
+                )
             previous = beat
             points.append({"beat": beat, "value": value, "curve": curve})
         result[str(target)] = points
@@ -155,9 +164,7 @@ def automation_envelope(
     return envelope
 
 
-def load_fx_automation(
-    path: str | Path, stem_names: Sequence[str]
-) -> dict[str, Any]:
+def load_fx_automation(path: str | Path, stem_names: Sequence[str]) -> dict[str, Any]:
     payload = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
     return normalise_fx_automation(payload, stem_names)
 
@@ -177,7 +184,6 @@ def save_fx_automation(
     return destination
 
 
-
 def fx_automation_registry(stem_names: Sequence[str]) -> AutomationTargetRegistry:
     """Build a typed registry for the existing M13 FX target identifiers."""
     targets = list(DEFAULT_AUTOMATION_TARGETS.targets)
@@ -185,14 +191,16 @@ def fx_automation_registry(stem_names: Sequence[str]) -> AutomationTargetRegistr
     for target_id in automation_targets(stem_names):
         if target_id in known:
             continue
-        targets.append(AutomationTarget(
-            target_id=target_id,
-            domain="fx",
-            unit="normalized",
-            minimum=0.0,
-            maximum=1.0,
-            interpolation=("step", "linear", "smooth"),
-        ))
+        targets.append(
+            AutomationTarget(
+                target_id=target_id,
+                domain="fx",
+                unit="normalized",
+                minimum=0.0,
+                maximum=1.0,
+                interpolation=("step", "linear", "smooth"),
+            )
+        )
         known.add(target_id)
     return AutomationTargetRegistry(targets)
 
@@ -219,15 +227,17 @@ def fx_automation_to_score_lanes(
             )
             for point in raw_points
         )
-        lanes.append(AutomationLane(
-            target_id=target_id,
-            points=points,
-            unit="normalized",
-            time_basis="beats",
-            interpolation="linear",
-            minimum=0.0,
-            maximum=1.0,
-        ))
+        lanes.append(
+            AutomationLane(
+                target_id=target_id,
+                points=points,
+                unit="normalized",
+                time_basis="beats",
+                interpolation="linear",
+                minimum=0.0,
+                maximum=1.0,
+            )
+        )
     return tuple(lanes)
 
 
@@ -254,11 +264,13 @@ def score_lanes_to_fx_automation(
                 raise ValueError(
                     f"cannot export {interpolation!r} interpolation to M13 FX automation"
                 )
-            points.append({
-                "beat": float(point.at),
-                "value": float(point.value),
-                "curve": curve,
-            })
+            points.append(
+                {
+                    "beat": float(point.at),
+                    "value": float(point.value),
+                    "curve": curve,
+                }
+            )
         payload_lanes[lane.target_id] = points
     return normalise_fx_automation(
         {"schema_version": FX_AUTOMATION_SCHEMA_VERSION, "lanes": payload_lanes},
@@ -274,10 +286,15 @@ def attach_fx_automation_to_score(
     """Merge a legacy M13 automation document into a score without losing lanes."""
     names = tuple(stem_names or score.metadata.get("render_stems", ()))
     if not names:
-        names = tuple(sorted({
-            event.voice_id for event in score.events
-            if event.voice_id not in {"sample_break"}
-        }))
+        names = tuple(
+            sorted(
+                {
+                    event.voice_id
+                    for event in score.events
+                    if event.voice_id not in {"sample_break"}
+                }
+            )
+        )
     converted = fx_automation_to_score_lanes(payload, names)
     merged = {lane.target_id: lane for lane in score.automation}
     for lane in converted:
@@ -303,9 +320,14 @@ def score_to_fx_automation(
         or score.metadata.get("render_stems", ())
     )
     if not names:
-        names = tuple(sorted({
-            lane.target_id.split(".")[1]
-            for lane in score.automation
-            if lane.target_id.startswith("stem.") and len(lane.target_id.split(".")) >= 4
-        }))
+        names = tuple(
+            sorted(
+                {
+                    lane.target_id.split(".")[1]
+                    for lane in score.automation
+                    if lane.target_id.startswith("stem.")
+                    and len(lane.target_id.split(".")) >= 4
+                }
+            )
+        )
     return score_lanes_to_fx_automation(score.automation, names)

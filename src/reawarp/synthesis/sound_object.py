@@ -3,6 +3,7 @@
 Core implementation is NumPy-only. Source identity and processing identity are
 stored separately; rendering never mutates supplied source arrays or assets.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,7 +15,6 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import numpy as np
-
 
 SOUND_OBJECT_FORMAT = "eli_lab_reawarp_sound_object"
 SOUND_OBJECT_SCHEMA_VERSION = 1
@@ -32,14 +32,18 @@ def _identifier(value: str, field_name: str) -> str:
 
 def _json_object(value: Mapping[str, Any], field_name: str) -> dict[str, Any]:
     try:
-        result = json.loads(json.dumps(dict(value), ensure_ascii=False, allow_nan=False))
+        result = json.loads(
+            json.dumps(dict(value), ensure_ascii=False, allow_nan=False)
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{field_name} must be finite JSON-compatible data") from exc
     return result
 
 
 def _number(
-    value: Any, field_name: str, low: float | None = None,
+    value: Any,
+    field_name: str,
+    low: float | None = None,
     high: float | None = None,
 ) -> float:
     try:
@@ -69,9 +73,13 @@ class EnvelopeSpec:
 
     def __post_init__(self) -> None:
         for name in ("attack_seconds", "decay_seconds", "release_seconds"):
-            object.__setattr__(self, name, _number(getattr(self, name), name, 0.0, 30.0))
+            object.__setattr__(
+                self, name, _number(getattr(self, name), name, 0.0, 30.0)
+            )
         object.__setattr__(
-            self, "sustain_level", _number(self.sustain_level, "sustain_level", 0.0, 1.0)
+            self,
+            "sustain_level",
+            _number(self.sustain_level, "sustain_level", 0.0, 1.0),
         )
         for name in ("attack_curve", "decay_curve", "release_curve"):
             if getattr(self, name) not in ENVELOPE_CURVES:
@@ -109,7 +117,9 @@ class SoundObjectSource:
         object.__setattr__(self, "sample_rate", int(self.sample_rate))
         object.__setattr__(self, "channels", int(self.channels))
         if self.source_kind == "asset":
-            if not self.asset_sha256 or not re.fullmatch(r"[0-9a-fA-F]{64}", self.asset_sha256):
+            if not self.asset_sha256 or not re.fullmatch(
+                r"[0-9a-fA-F]{64}", self.asset_sha256
+            ):
                 raise ValueError("asset sources require a valid SHA-256 digest")
             if not (self.asset_id or self.uri):
                 raise ValueError("asset sources require asset_id or uri")
@@ -161,9 +171,13 @@ class SoundObjectLayer:
         if not isinstance(self.envelope, EnvelopeSpec):
             object.__setattr__(self, "envelope", EnvelopeSpec.from_dict(self.envelope))
         if self.phase_group is not None:
-            object.__setattr__(self, "phase_group", _identifier(self.phase_group, "phase_group"))
+            object.__setattr__(
+                self, "phase_group", _identifier(self.phase_group, "phase_group")
+            )
         object.__setattr__(
-            self, "identity_tags", tuple(_identifier(tag, "identity tag") for tag in self.identity_tags)
+            self,
+            "identity_tags",
+            tuple(_identifier(tag, "identity tag") for tag in self.identity_tags),
         )
 
     @property
@@ -172,11 +186,17 @@ class SoundObjectLayer:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "layer_id": self.layer_id, "role": self.role, "source_id": self.source_id,
-            "start_frame": self.start_frame, "end_frame": self.end_frame,
-            "source_start_frame": self.source_start_frame, "gain": self.gain,
-            "pan": self.pan, "envelope": self.envelope.to_dict(),
-            "phase_group": self.phase_group, "identity_tags": list(self.identity_tags),
+            "layer_id": self.layer_id,
+            "role": self.role,
+            "source_id": self.source_id,
+            "start_frame": self.start_frame,
+            "end_frame": self.end_frame,
+            "source_start_frame": self.source_start_frame,
+            "gain": self.gain,
+            "pan": self.pan,
+            "envelope": self.envelope.to_dict(),
+            "phase_group": self.phase_group,
+            "identity_tags": list(self.identity_tags),
         }
 
     @classmethod
@@ -201,10 +221,16 @@ class TransformationRecord:
     non_destructive: bool = True
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "operation", _identifier(self.operation, "transformation operation"))
+        object.__setattr__(
+            self, "operation", _identifier(self.operation, "transformation operation")
+        )
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("transformation seed must be an integer")
-        object.__setattr__(self, "parameters", _json_object(self.parameters, "transformation parameters"))
+        object.__setattr__(
+            self,
+            "parameters",
+            _json_object(self.parameters, "transformation parameters"),
+        )
         for name in ("source_sha256", "output_sha256"):
             value = getattr(self, name)
             if value is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", str(value)):
@@ -215,13 +241,17 @@ class TransformationRecord:
             raise ValueError("sound-object transformations must be non-destructive")
         for name in ("preserved_dimensions", "changed_dimensions"):
             object.__setattr__(
-                self, name, tuple(_identifier(item, name) for item in getattr(self, name))
+                self,
+                name,
+                tuple(_identifier(item, name) for item in getattr(self, name)),
             )
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "operation": self.operation, "seed": self.seed,
-            "parameters": self.parameters, "source_sha256": self.source_sha256,
+            "operation": self.operation,
+            "seed": self.seed,
+            "parameters": self.parameters,
+            "source_sha256": self.source_sha256,
             "output_sha256": self.output_sha256,
             "preserved_dimensions": list(self.preserved_dimensions),
             "changed_dimensions": list(self.changed_dimensions),
@@ -258,31 +288,61 @@ class SoundObjectPatch:
     def __post_init__(self) -> None:
         object.__setattr__(self, "patch_id", _identifier(self.patch_id, "patch_id"))
         object.__setattr__(self, "name", _identifier(self.name, "sound-object name"))
-        object.__setattr__(self, "source_identity_id", _identifier(self.source_identity_id, "source_identity_id"))
-        object.__setattr__(self, "processing_identity_id", _identifier(self.processing_identity_id, "processing_identity_id"))
+        object.__setattr__(
+            self,
+            "source_identity_id",
+            _identifier(self.source_identity_id, "source_identity_id"),
+        )
+        object.__setattr__(
+            self,
+            "processing_identity_id",
+            _identifier(self.processing_identity_id, "processing_identity_id"),
+        )
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", self.patch_id):
-            raise ValueError("patch_id must contain only letters, digits, underscore or hyphen")
-        if isinstance(self.sample_rate, bool) or not isinstance(self.sample_rate, int) or self.sample_rate <= 0:
+            raise ValueError(
+                "patch_id must contain only letters, digits, underscore or hyphen"
+            )
+        if (
+            isinstance(self.sample_rate, bool)
+            or not isinstance(self.sample_rate, int)
+            or self.sample_rate <= 0
+        ):
             raise ValueError("sound-object sample_rate must be a positive integer")
         if isinstance(self.seed, bool) or not isinstance(self.seed, int):
             raise ValueError("sound-object seed must be an integer")
         if self.schema_version != SOUND_OBJECT_SCHEMA_VERSION:
-            raise ValueError(f"unsupported sound-object schema version: {self.schema_version}")
+            raise ValueError(
+                f"unsupported sound-object schema version: {self.schema_version}"
+            )
 
         sources = tuple(
-            item if isinstance(item, SoundObjectSource) else SoundObjectSource.from_dict(item)
+            (
+                item
+                if isinstance(item, SoundObjectSource)
+                else SoundObjectSource.from_dict(item)
+            )
             for item in self.sources
         )
         layers = tuple(
-            item if isinstance(item, SoundObjectLayer) else SoundObjectLayer.from_dict(item)
+            (
+                item
+                if isinstance(item, SoundObjectLayer)
+                else SoundObjectLayer.from_dict(item)
+            )
             for item in self.layers
         )
         transforms = tuple(
-            item if isinstance(item, TransformationRecord) else TransformationRecord.from_dict(item)
+            (
+                item
+                if isinstance(item, TransformationRecord)
+                else TransformationRecord.from_dict(item)
+            )
             for item in self.transformations
         )
         if not sources or not layers:
-            raise ValueError("sound-object patches require at least one source and one layer")
+            raise ValueError(
+                "sound-object patches require at least one source and one layer"
+            )
         source_ids = [item.source_id for item in sources]
         layer_ids = [item.layer_id for item in layers]
         if len(source_ids) != len(set(source_ids)):
@@ -291,9 +351,14 @@ class SoundObjectPatch:
             raise ValueError("sound-object layer IDs must be unique")
         missing = {item.source_id for item in layers} - set(source_ids)
         if missing:
-            raise ValueError("sound-object layer references unknown source(s): " + ", ".join(sorted(missing)))
+            raise ValueError(
+                "sound-object layer references unknown source(s): "
+                + ", ".join(sorted(missing))
+            )
         if any(source.sample_rate != self.sample_rate for source in sources):
-            raise ValueError("source sample_rate must match patch sample_rate; resample explicitly first")
+            raise ValueError(
+                "source sample_rate must match patch sample_rate; resample explicitly first"
+            )
         object.__setattr__(self, "sources", sources)
         object.__setattr__(self, "layers", layers)
         object.__setattr__(self, "transformations", transforms)
@@ -303,7 +368,9 @@ class SoundObjectPatch:
         spatial = _json_object(self.spatial, "spatial")
         pitch_kind = pitch.get("kind", "unpitched")
         if pitch_kind not in {"unpitched", "pitched", "resonant", "noise"}:
-            raise ValueError("pitch_model.kind must be unpitched, pitched, resonant or noise")
+            raise ValueError(
+                "pitch_model.kind must be unpitched, pitched, resonant or noise"
+            )
         if pitch.get("frequency_hz") is not None:
             _number(pitch["frequency_hz"], "pitch_model.frequency_hz", 0.001)
         partials = spectrum.get("partials", [])
@@ -335,9 +402,13 @@ class SoundObjectPatch:
 
     @property
     def source_hashes(self) -> tuple[str, ...]:
-        return tuple(sorted(
-            source.asset_sha256 for source in self.sources if source.asset_sha256 is not None
-        ))
+        return tuple(
+            sorted(
+                source.asset_sha256
+                for source in self.sources
+                if source.asset_sha256 is not None
+            )
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -363,18 +434,25 @@ class SoundObjectPatch:
         if data.get("format") not in {None, SOUND_OBJECT_FORMAT}:
             raise ValueError("file is not a Reawarp sound-object patch")
         return cls(
-            patch_id=str(data["patch_id"]), name=str(data["name"]),
-            sample_rate=int(data["sample_rate"]), seed=int(data.get("seed", 0)),
+            patch_id=str(data["patch_id"]),
+            name=str(data["name"]),
+            sample_rate=int(data["sample_rate"]),
+            seed=int(data.get("seed", 0)),
             source_identity_id=str(data["source_identity_id"]),
             processing_identity_id=str(data["processing_identity_id"]),
-            sources=tuple(SoundObjectSource.from_dict(item) for item in data.get("sources", ())),
-            layers=tuple(SoundObjectLayer.from_dict(item) for item in data.get("layers", ())),
+            sources=tuple(
+                SoundObjectSource.from_dict(item) for item in data.get("sources", ())
+            ),
+            layers=tuple(
+                SoundObjectLayer.from_dict(item) for item in data.get("layers", ())
+            ),
             pitch_model=dict(data.get("pitch_model", {})),
             spectrum=dict(data.get("spectrum", {})),
             modulation=dict(data.get("modulation", {})),
             spatial=dict(data.get("spatial", {})),
             transformations=tuple(
-                TransformationRecord.from_dict(item) for item in data.get("transformations", ())
+                TransformationRecord.from_dict(item)
+                for item in data.get("transformations", ())
             ),
             schema_version=int(data.get("schema_version", 1)),
         )
@@ -387,9 +465,13 @@ class HybridRenderResult:
     diagnostics: dict[str, Any]
 
 
-def derive_sound_object_seed(root_seed: int | str, patch_id: str, layer_id: str = "") -> int:
+def derive_sound_object_seed(
+    root_seed: int | str, patch_id: str, layer_id: str = ""
+) -> int:
     """Domain-separated deterministic seed for a sound-object or one of its layers."""
-    payload = f"reawarp:sound-object:v1:{root_seed}:{patch_id}:{layer_id}".encode("utf-8")
+    payload = f"reawarp:sound-object:v1:{root_seed}:{patch_id}:{layer_id}".encode(
+        "utf-8"
+    )
     return int.from_bytes(hashlib.blake2b(payload, digest_size=8).digest(), "little")
 
 
@@ -406,7 +488,9 @@ def _to_stereo(audio: np.ndarray, pan: float, width: float) -> np.ndarray:
     if source.ndim == 1:
         mono = source
         angle = (float(pan) + 1.0) * math.pi / 4.0
-        return np.column_stack((mono * math.cos(angle), mono * math.sin(angle))).astype(np.float32)
+        return np.column_stack((mono * math.cos(angle), mono * math.sin(angle))).astype(
+            np.float32
+        )
     if source.ndim != 2 or source.shape[1] != 2:
         raise ValueError("source audio must be mono or stereo (frames, 2)")
     result = source.copy()
@@ -433,7 +517,9 @@ def _curve(length: int, curve: str, *, rising: bool) -> np.ndarray:
     return shaped if rising else 1.0 - shaped
 
 
-def build_envelope_curve(frames: int, sample_rate: int, spec: EnvelopeSpec) -> np.ndarray:
+def build_envelope_curve(
+    frames: int, sample_rate: int, spec: EnvelopeSpec
+) -> np.ndarray:
     """Render an exact-length ADSR curve; all segment lengths are frame-addressed."""
     if frames < 0 or sample_rate <= 0:
         raise ValueError("frames must be non-negative and sample_rate positive")
@@ -444,7 +530,9 @@ def build_envelope_curve(frames: int, sample_rate: int, spec: EnvelopeSpec) -> n
     # Release begins only after the attack/decay segment. If its requested
     # duration is longer than the remaining layer, clamp it to the available
     # frames rather than letting it overlap the attack and zero the whole layer.
-    release = min(frames - attack - decay, int(round(spec.release_seconds * sample_rate)))
+    release = min(
+        frames - attack - decay, int(round(spec.release_seconds * sample_rate))
+    )
     result = np.full(frames, spec.sustain_level, dtype=np.float64)
     cursor = 0
     if attack:
@@ -452,7 +540,7 @@ def build_envelope_curve(frames: int, sample_rate: int, spec: EnvelopeSpec) -> n
         cursor = attack
     if decay:
         decay_curve = _curve(decay, spec.decay_curve, rising=False)
-        result[cursor:cursor + decay] = (
+        result[cursor : cursor + decay] = (
             spec.sustain_level + (1.0 - spec.sustain_level) * decay_curve
         )
         cursor += decay
@@ -468,7 +556,7 @@ def _phase_warnings(layer_audio: Mapping[str, np.ndarray]) -> list[dict[str, Any
     warnings: list[dict[str, Any]] = []
     names = sorted(layer_audio)
     for i, left_name in enumerate(names):
-        for right_name in names[i + 1:]:
+        for right_name in names[i + 1 :]:
             left = layer_audio[left_name]
             right = layer_audio[right_name]
             count = min(len(left), len(right))
@@ -483,12 +571,14 @@ def _phase_warnings(layer_audio: Mapping[str, np.ndarray]) -> list[dict[str, Any
                 continue
             correlation = float(np.dot(a, b) / denom)
             if correlation <= -0.70:
-                warnings.append({
-                    "kind": "correlated_phase_cancellation_risk",
-                    "layers": [left_name, right_name],
-                    "correlation": correlation,
-                    "heuristic_only": True,
-                })
+                warnings.append(
+                    {
+                        "kind": "correlated_phase_cancellation_risk",
+                        "layers": [left_name, right_name],
+                        "correlation": correlation,
+                        "heuristic_only": True,
+                    }
+                )
     return warnings
 
 
@@ -516,16 +606,22 @@ class HybridVoiceRenderer:
         controls = dict(control_values or {})
         patch_gain = _number(
             controls.get(f"sound_object.{patch.patch_id}.gain", 1.0),
-            "sound-object gain", 0.0, 4.0,
+            "sound-object gain",
+            0.0,
+            4.0,
         )
         prefix = f"sound_object.{patch.patch_id}"
         global_pan = _number(
             controls.get(f"{prefix}.spatial.pan", patch.spatial.get("pan", 0.0)),
-            "spatial.pan", -1.0, 1.0,
+            "spatial.pan",
+            -1.0,
+            1.0,
         )
         width = _number(
             controls.get(f"{prefix}.spatial.width", patch.spatial.get("width", 1.0)),
-            "spatial.width", 0.0, 2.0,
+            "spatial.width",
+            0.0,
+            2.0,
         )
         pitch_semitones = _number(
             controls.get(f"{prefix}.pitch", 0.0), "sound-object pitch", -48.0, 48.0
@@ -537,15 +633,25 @@ class HybridVoiceRenderer:
         source_map = {item.source_id: item for item in patch.sources}
 
         modulation_depth = _number(
-            controls.get(f"{prefix}.modulation.depth", patch.modulation.get("depth", 0.0)),
-            "modulation.depth", 0.0, 1.0,
+            controls.get(
+                f"{prefix}.modulation.depth", patch.modulation.get("depth", 0.0)
+            ),
+            "modulation.depth",
+            0.0,
+            1.0,
         )
         modulation_rate = _number(
-            controls.get(f"{prefix}.modulation.rate", patch.modulation.get("rate_hz", 0.0)),
-            "modulation.rate_hz", 0.0, 40.0,
+            controls.get(
+                f"{prefix}.modulation.rate", patch.modulation.get("rate_hz", 0.0)
+            ),
+            "modulation.rate_hz",
+            0.0,
+            40.0,
         )
         if modulation_depth > 0.0 and modulation_rate > 0.0:
-            phase_seed = derive_sound_object_seed(patch.seed, patch.patch_id, "coherent-modulation")
+            phase_seed = derive_sound_object_seed(
+                patch.seed, patch.patch_id, "coherent-modulation"
+            )
             phase = 2.0 * math.pi * (phase_seed / float(1 << 64))
             t = np.arange(frames, dtype=np.float64) / patch.sample_rate
             wave = str(patch.modulation.get("waveform", "sine"))
@@ -567,12 +673,16 @@ class HybridVoiceRenderer:
             if layer.source_id not in source_audio:
                 raise KeyError(f"missing source audio for {layer.source_id!r}")
             if source_spec.sample_rate != patch.sample_rate:
-                raise ValueError("source and patch sample rates differ; explicit resampling is required")
+                raise ValueError(
+                    "source and patch sample rates differ; explicit resampling is required"
+                )
             source = np.asarray(source_audio[layer.source_id], dtype=np.float32)
             if source.ndim == 2 and source.shape[1] == 1:
                 source = source[:, 0]
             if source.ndim not in {1, 2} or (source.ndim == 2 and source.shape[1] != 2):
-                raise ValueError("source audio must have shape (frames,) or (frames, 2)")
+                raise ValueError(
+                    "source audio must have shape (frames,) or (frames, 2)"
+                )
             actual_channels = 1 if source.ndim == 1 else 2
             if actual_channels != source_spec.channels:
                 raise ValueError(
@@ -603,33 +713,45 @@ class HybridVoiceRenderer:
                 source_axis = np.arange(len(segment), dtype=np.float64)
                 if segment.ndim == 1:
                     segment = np.interp(
-                        source_positions, source_axis, segment,
-                        left=0.0, right=0.0,
+                        source_positions,
+                        source_axis,
+                        segment,
+                        left=0.0,
+                        right=0.0,
                     ).astype(np.float32)
                 else:
-                    segment = np.column_stack([
-                        np.interp(
-                            source_positions, source_axis, segment[:, channel],
-                            left=0.0, right=0.0,
-                        )
-                        for channel in range(2)
-                    ]).astype(np.float32)
+                    segment = np.column_stack(
+                        [
+                            np.interp(
+                                source_positions,
+                                source_axis,
+                                segment[:, channel],
+                                left=0.0,
+                                right=0.0,
+                            )
+                            for channel in range(2)
+                        ]
+                    ).astype(np.float32)
             envelope_spec = layer.envelope
-            if any(value is not None for value in (
-                attack_override, decay_override, release_override
-            )):
+            if any(
+                value is not None
+                for value in (attack_override, decay_override, release_override)
+            ):
                 envelope_spec = EnvelopeSpec(
                     attack_seconds=(
-                        envelope_spec.attack_seconds if attack_override is None
+                        envelope_spec.attack_seconds
+                        if attack_override is None
                         else _number(attack_override, "attack override", 0.0, 30.0)
                     ),
                     decay_seconds=(
-                        envelope_spec.decay_seconds if decay_override is None
+                        envelope_spec.decay_seconds
+                        if decay_override is None
                         else _number(decay_override, "decay override", 0.0, 30.0)
                     ),
                     sustain_level=envelope_spec.sustain_level,
                     release_seconds=(
-                        envelope_spec.release_seconds if release_override is None
+                        envelope_spec.release_seconds
+                        if release_override is None
                         else _number(release_override, "release override", 0.0, 30.0)
                     ),
                     attack_curve=envelope_spec.attack_curve,
@@ -639,16 +761,24 @@ class HybridVoiceRenderer:
             envelope = build_envelope_curve(length, patch.sample_rate, envelope_spec)
             layer_gain = _number(
                 controls.get(f"{prefix}.layer.{layer.layer_id}.gain", layer.gain),
-                "layer gain", 0.0, 4.0,
+                "layer gain",
+                0.0,
+                4.0,
             )
-            segment = segment * envelope.reshape((-1,) if segment.ndim == 1 else (-1, 1))
-            segment = segment * float(layer_gain) * modulation[
-                layer.start_frame:layer.end_frame
-            ].reshape((-1,) if segment.ndim == 1 else (-1, 1))
+            segment = segment * envelope.reshape(
+                (-1,) if segment.ndim == 1 else (-1, 1)
+            )
+            segment = (
+                segment
+                * float(layer_gain)
+                * modulation[layer.start_frame : layer.end_frame].reshape(
+                    (-1,) if segment.ndim == 1 else (-1, 1)
+                )
+            )
             pan = _number(global_pan + layer.pan, "combined pan", -2.0, 2.0)
             segment = _to_stereo(segment, max(-1.0, min(1.0, pan)), width)
             rendered = np.zeros((frames, 2), dtype=np.float32)
-            rendered[layer.start_frame:layer.end_frame] = segment
+            rendered[layer.start_frame : layer.end_frame] = segment
             spatial_stems[layer.layer_id] = rendered
 
         mix = np.zeros((frames, 2), dtype=np.float64)
@@ -661,25 +791,38 @@ class HybridVoiceRenderer:
         mix *= headroom_gain
         final = mix.astype(np.float32)
         mono = (final[:, 0] + final[:, 1]) * 0.5 if frames else np.empty(0)
-        stereo_rms = float(np.sqrt(np.mean(np.square(final, dtype=np.float64)))) if frames else 0.0
-        mono_rms = float(np.sqrt(np.mean(np.square(mono, dtype=np.float64)))) if frames else 0.0
+        stereo_rms = (
+            float(np.sqrt(np.mean(np.square(final, dtype=np.float64))))
+            if frames
+            else 0.0
+        )
+        mono_rms = (
+            float(np.sqrt(np.mean(np.square(mono, dtype=np.float64))))
+            if frames
+            else 0.0
+        )
         mono_loss_db = (
             20.0 * math.log10(max(mono_rms, 1e-12) / max(stereo_rms, 1e-12))
-            if stereo_rms > 0 else 0.0
+            if stereo_rms > 0
+            else 0.0
         )
         warnings = _phase_warnings(spatial_stems)
         if mono_loss_db < -6.0:
-            warnings.append({
-                "kind": "mono_fold_level_loss",
-                "loss_db": mono_loss_db,
-                "heuristic_only": True,
-            })
+            warnings.append(
+                {
+                    "kind": "mono_fold_level_loss",
+                    "loss_db": mono_loss_db,
+                    "heuristic_only": True,
+                }
+            )
         if clip_count:
-            warnings.append({
-                "kind": "headroom_compensation",
-                "pre_scale_clipped_samples": clip_count,
-                "applied_gain": headroom_gain,
-            })
+            warnings.append(
+                {
+                    "kind": "headroom_compensation",
+                    "pre_scale_clipped_samples": clip_count,
+                    "applied_gain": headroom_gain,
+                }
+            )
         return HybridRenderResult(
             audio=final,
             layers=spatial_stems,
@@ -687,7 +830,9 @@ class HybridVoiceRenderer:
                 "sample_rate": patch.sample_rate,
                 "frame_count": frames,
                 "peak_before_headroom": pre_peak,
-                "peak_after_headroom": float(np.max(np.abs(final))) if final.size else 0.0,
+                "peak_after_headroom": (
+                    float(np.max(np.abs(final))) if final.size else 0.0
+                ),
                 "headroom_gain": headroom_gain,
                 "pre_scale_clipped_samples": clip_count,
                 "mono_fold_loss_db": mono_loss_db,
@@ -696,7 +841,9 @@ class HybridVoiceRenderer:
                 "pitch_semitones": pitch_semitones,
                 "modulation_rate_hz": modulation_rate,
                 "modulation_depth": modulation_depth,
-                "audio_bytes": int(final.nbytes + sum(item.nbytes for item in spatial_stems.values())),
+                "audio_bytes": int(
+                    final.nbytes + sum(item.nbytes for item in spatial_stems.values())
+                ),
             },
         )
 
@@ -707,20 +854,81 @@ def sound_object_automation_targets(patch: SoundObjectPatch):
 
     prefix = f"sound_object.{patch.patch_id}"
     targets = [
-        AutomationTarget(f"{prefix}.gain", "synthesis", "normalized", minimum=0.0, maximum=4.0),
-        AutomationTarget(f"{prefix}.pitch", "synthesis", "semitones", minimum=-48.0, maximum=48.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.attack", "synthesis", "seconds", minimum=0.0, maximum=30.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.decay", "synthesis", "seconds", minimum=0.0, maximum=30.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.release", "synthesis", "seconds", minimum=0.0, maximum=30.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.modulation.rate", "synthesis", "Hz", minimum=0.0, maximum=40.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.modulation.depth", "synthesis", "normalized", minimum=0.0, maximum=1.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.spatial.pan", "spatial", "normalized", minimum=-1.0, maximum=1.0, update_clock="event"),
-        AutomationTarget(f"{prefix}.spatial.width", "spatial", "ratio", minimum=0.0, maximum=2.0, update_clock="event"),
+        AutomationTarget(
+            f"{prefix}.gain", "synthesis", "normalized", minimum=0.0, maximum=4.0
+        ),
+        AutomationTarget(
+            f"{prefix}.pitch",
+            "synthesis",
+            "semitones",
+            minimum=-48.0,
+            maximum=48.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.attack",
+            "synthesis",
+            "seconds",
+            minimum=0.0,
+            maximum=30.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.decay",
+            "synthesis",
+            "seconds",
+            minimum=0.0,
+            maximum=30.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.release",
+            "synthesis",
+            "seconds",
+            minimum=0.0,
+            maximum=30.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.modulation.rate",
+            "synthesis",
+            "Hz",
+            minimum=0.0,
+            maximum=40.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.modulation.depth",
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.spatial.pan",
+            "spatial",
+            "normalized",
+            minimum=-1.0,
+            maximum=1.0,
+            update_clock="event",
+        ),
+        AutomationTarget(
+            f"{prefix}.spatial.width",
+            "spatial",
+            "ratio",
+            minimum=0.0,
+            maximum=2.0,
+            update_clock="event",
+        ),
     ]
     targets.extend(
         AutomationTarget(
             f"{prefix}.layer.{layer.layer_id}.gain",
-            "synthesis", "normalized", minimum=0.0, maximum=4.0,
+            "synthesis",
+            "normalized",
+            minimum=0.0,
+            maximum=4.0,
             update_clock="event",
         )
         for layer in patch.layers
@@ -750,14 +958,33 @@ def render_modal_resonator_bank(
         raise ValueError("frames must be non-negative and sample_rate positive")
     frequencies = np.asarray(frequencies_hz, dtype=np.float64)
     gains = np.asarray(amplitudes, dtype=np.float64)
-    if frequencies.ndim != 1 or gains.shape != frequencies.shape or len(frequencies) == 0:
-        raise ValueError("frequencies_hz and amplitudes must be matching non-empty vectors")
-    if not np.isfinite(frequencies).all() or np.any(frequencies <= 0) or np.any(frequencies >= sample_rate / 2):
+    if (
+        frequencies.ndim != 1
+        or gains.shape != frequencies.shape
+        or len(frequencies) == 0
+    ):
+        raise ValueError(
+            "frequencies_hz and amplitudes must be matching non-empty vectors"
+        )
+    if (
+        not np.isfinite(frequencies).all()
+        or np.any(frequencies <= 0)
+        or np.any(frequencies >= sample_rate / 2)
+    ):
         raise ValueError("modal frequencies must be positive and below Nyquist")
     if not np.isfinite(gains).all() or np.any(gains < 0) or not np.any(gains > 0):
-        raise ValueError("modal amplitudes must be finite, non-negative and not all zero")
-    decays = np.asarray(decay_seconds if np.ndim(decay_seconds) else [decay_seconds] * len(frequencies), dtype=np.float64)
-    if decays.shape != frequencies.shape or not np.isfinite(decays).all() or np.any(decays <= 0):
+        raise ValueError(
+            "modal amplitudes must be finite, non-negative and not all zero"
+        )
+    decays = np.asarray(
+        decay_seconds if np.ndim(decay_seconds) else [decay_seconds] * len(frequencies),
+        dtype=np.float64,
+    )
+    if (
+        decays.shape != frequencies.shape
+        or not np.isfinite(decays).all()
+        or np.any(decays <= 0)
+    ):
         raise ValueError("each modal decay must be finite and positive")
     attack = _number(attack_seconds, "attack_seconds", 0.0, 30.0)
     rng = np.random.default_rng(derive_sound_object_seed(seed, "modal-bank"))
@@ -765,8 +992,12 @@ def render_modal_resonator_bank(
     t = np.arange(frames, dtype=np.float64) / float(sample_rate)
     attack_curve = 1.0 - np.exp(-t / max(attack, 1e-5))
     audio = np.zeros(frames, dtype=np.float64)
-    for frequency, gain, decay, phase in zip(frequencies, gains, decays, phases, strict=True):
-        audio += gain * np.sin(2.0 * math.pi * frequency * t + phase) * np.exp(-t / decay)
+    for frequency, gain, decay, phase in zip(
+        frequencies, gains, decays, phases, strict=True
+    ):
+        audio += (
+            gain * np.sin(2.0 * math.pi * frequency * t + phase) * np.exp(-t / decay)
+        )
     audio *= attack_curve
     peak = float(np.max(np.abs(audio))) if len(audio) else 0.0
     if peak > 0.8:
@@ -805,7 +1036,9 @@ def render_additive_partial_voice(
     envelope = 1.0 - np.exp(-t / max(attack, 1e-5))
     audio = np.zeros(frames, dtype=np.float64)
     for (frequency, gain, decay), phase in zip(validated, phases, strict=True):
-        audio += gain * np.sin(2.0 * math.pi * frequency * t + phase) * np.exp(-t / decay)
+        audio += (
+            gain * np.sin(2.0 * math.pi * frequency * t + phase) * np.exp(-t / decay)
+        )
     audio *= envelope
     peak = float(np.max(np.abs(audio))) if len(audio) else 0.0
     if peak > 0.8:
@@ -814,42 +1047,61 @@ def render_additive_partial_voice(
 
 
 def resample_audio_non_destructive(
-    audio: np.ndarray, source_sample_rate: int, target_sample_rate: int,
-    *, seed: int = 0,
+    audio: np.ndarray,
+    source_sample_rate: int,
+    target_sample_rate: int,
+    *,
+    seed: int = 0,
 ) -> tuple[np.ndarray, TransformationRecord]:
     """Linearly resample a new buffer and record both source/output hashes."""
     if source_sample_rate <= 0 or target_sample_rate <= 0:
         raise ValueError("sample rates must be positive")
     source = np.asarray(audio, dtype=np.float32)
-    if source.ndim not in {1, 2} or (source.ndim == 2 and source.shape[1] not in {1, 2}):
+    if source.ndim not in {1, 2} or (
+        source.ndim == 2 and source.shape[1] not in {1, 2}
+    ):
         raise ValueError("audio must be mono or stereo")
     if not np.isfinite(source).all():
         raise ValueError("audio must contain only finite samples")
     out_frames = int(round(len(source) * target_sample_rate / source_sample_rate))
     if len(source) == 0 or out_frames == 0:
-        output = np.zeros((out_frames,) if source.ndim == 1 else (out_frames, source.shape[1]), dtype=np.float32)
+        output = np.zeros(
+            (out_frames,) if source.ndim == 1 else (out_frames, source.shape[1]),
+            dtype=np.float32,
+        )
     else:
         old_positions = np.arange(len(source), dtype=np.float64)
-        new_positions = np.arange(out_frames, dtype=np.float64) * source_sample_rate / target_sample_rate
+        new_positions = (
+            np.arange(out_frames, dtype=np.float64)
+            * source_sample_rate
+            / target_sample_rate
+        )
         new_positions = np.clip(new_positions, 0.0, max(0, len(source) - 1))
         if source.ndim == 1:
             output = np.interp(new_positions, old_positions, source).astype(np.float32)
         else:
-            output = np.column_stack([
-                np.interp(new_positions, old_positions, source[:, channel])
-                for channel in range(source.shape[1])
-            ]).astype(np.float32)
+            output = np.column_stack(
+                [
+                    np.interp(new_positions, old_positions, source[:, channel])
+                    for channel in range(source.shape[1])
+                ]
+            ).astype(np.float32)
     record = TransformationRecord(
         operation="resample",
         seed=int(seed),
-        parameters={"source_sample_rate": int(source_sample_rate), "target_sample_rate": int(target_sample_rate), "frames_before": len(source), "frames_after": out_frames, "interpolation": "linear"},
+        parameters={
+            "source_sample_rate": int(source_sample_rate),
+            "target_sample_rate": int(target_sample_rate),
+            "frames_before": len(source),
+            "frames_after": out_frames,
+            "interpolation": "linear",
+        },
         source_sha256=_audio_hash(source),
         output_sha256=_audio_hash(output),
         preserved_dimensions=("source_identity", "relative_timing", "channel_count"),
         changed_dimensions=("sample_rate", "frame_count"),
     )
     return output, record
-
 
 
 def build_score_sound_object_renderer(
@@ -882,9 +1134,7 @@ def build_score_sound_object_renderer(
     missing = set(source_specs) - set(frozen_sources)
     if missing:
         raise KeyError("missing sound-object source(s): " + ", ".join(sorted(missing)))
-    target_ids = {
-        target.target_id for target in sound_object_automation_targets(patch)
-    }
+    target_ids = {target.target_id for target in sound_object_automation_targets(patch)}
     renderer = HybridVoiceRenderer()
 
     def render(scheduled, sample_rate: int, controls) -> np.ndarray:
@@ -952,10 +1202,26 @@ def sound_object_editor_model(patch: SoundObjectPatch) -> dict[str, Any]:
                     "gain": {"minimum": 0.0, "maximum": 4.0, "unit": "linear"},
                     "pan": {"minimum": -1.0, "maximum": 1.0, "unit": "normalized"},
                     "envelope": {
-                        "attack_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
-                        "decay_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
-                        "sustain_level": {"minimum": 0.0, "maximum": 1.0, "unit": "normalized"},
-                        "release_seconds": {"minimum": 0.0, "maximum": 30.0, "unit": "seconds"},
+                        "attack_seconds": {
+                            "minimum": 0.0,
+                            "maximum": 30.0,
+                            "unit": "seconds",
+                        },
+                        "decay_seconds": {
+                            "minimum": 0.0,
+                            "maximum": 30.0,
+                            "unit": "seconds",
+                        },
+                        "sustain_level": {
+                            "minimum": 0.0,
+                            "maximum": 1.0,
+                            "unit": "normalized",
+                        },
+                        "release_seconds": {
+                            "minimum": 0.0,
+                            "maximum": 30.0,
+                            "unit": "seconds",
+                        },
                     },
                 },
             }

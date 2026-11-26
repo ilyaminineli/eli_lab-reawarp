@@ -1,4 +1,5 @@
 """Frequency-region spectral delay with bounded, offline spectral feedback."""
+
 from __future__ import annotations
 
 import math
@@ -8,34 +9,68 @@ from typing import Any
 
 import numpy as np
 
-from reawarp.dsp._stft import audio_channels, finite_range, istft, restore_shape, signal_diagnostics, stft
-
+from reawarp.dsp._stft import (
+    audio_channels,
+    finite_range,
+    istft,
+    restore_shape,
+    signal_diagnostics,
+    stft,
+)
 
 
 class SpectralDelayResult:
     __slots__ = ("audio", "diagnostics")
+
     def __init__(self, audio: np.ndarray, diagnostics: dict[str, Any]):
         self.audio = audio
         self.diagnostics = diagnostics
 
 
-def _normalise_bands(bands: Sequence[Mapping[str, Any]] | None, sample_rate: int, feedback: float) -> list[dict[str, float]]:
+def _normalise_bands(
+    bands: Sequence[Mapping[str, Any]] | None, sample_rate: int, feedback: float
+) -> list[dict[str, float]]:
     nyquist = sample_rate / 2.0
-    source = bands if bands is not None else [{"low_hz": 0.0, "high_hz": nyquist, "delay_ms": 180.0}]
+    source = (
+        bands
+        if bands is not None
+        else [{"low_hz": 0.0, "high_hz": nyquist, "delay_ms": 180.0}]
+    )
     if not source:
         raise ValueError("frequency_bands cannot be empty")
     result: list[dict[str, float]] = []
     for index, band in enumerate(source):
         if not isinstance(band, Mapping):
             raise ValueError(f"frequency_bands[{index}] must be an object")
-        low = finite_range(band.get("low_hz"), f"frequency_bands[{index}].low_hz", 0.0, nyquist)
-        high = finite_range(band.get("high_hz"), f"frequency_bands[{index}].high_hz", 0.0, nyquist)
-        delay = finite_range(band.get("delay_ms"), f"frequency_bands[{index}].delay_ms", 0.0, 2000.0)
-        fb = finite_range(band.get("feedback", feedback), f"frequency_bands[{index}].feedback", 0.0, 0.85)
-        gain = finite_range(band.get("gain", 1.0), f"frequency_bands[{index}].gain", 0.0, 1.5)
+        low = finite_range(
+            band.get("low_hz"), f"frequency_bands[{index}].low_hz", 0.0, nyquist
+        )
+        high = finite_range(
+            band.get("high_hz"), f"frequency_bands[{index}].high_hz", 0.0, nyquist
+        )
+        delay = finite_range(
+            band.get("delay_ms"), f"frequency_bands[{index}].delay_ms", 0.0, 2000.0
+        )
+        fb = finite_range(
+            band.get("feedback", feedback),
+            f"frequency_bands[{index}].feedback",
+            0.0,
+            0.85,
+        )
+        gain = finite_range(
+            band.get("gain", 1.0), f"frequency_bands[{index}].gain", 0.0, 1.5
+        )
         if high <= low:
             raise ValueError(f"frequency_bands[{index}] high_hz must exceed low_hz")
-        result.append({"low_hz": low, "high_hz": high, "delay_ms": delay, "feedback": fb, "gain": gain})
+        result.append(
+            {
+                "low_hz": low,
+                "high_hz": high,
+                "delay_ms": delay,
+                "feedback": fb,
+                "gain": gain,
+            }
+        )
     ordered = sorted(result, key=lambda item: item["low_hz"])
     for left, right in zip(ordered, ordered[1:]):
         if right["low_hz"] < left["high_hz"]:
@@ -64,7 +99,11 @@ def spectral_delay(
     giving decaying repeats without an unbounded recursive graph.
     """
     source, was_vector = audio_channels(audio, "input audio")
-    if isinstance(sample_rate, bool) or int(sample_rate) != sample_rate or int(sample_rate) < 1000:
+    if (
+        isinstance(sample_rate, bool)
+        or int(sample_rate) != sample_rate
+        or int(sample_rate) < 1000
+    ):
         raise ValueError("sample_rate must be an integer >= 1000 Hz")
     rate = int(sample_rate)
     amount = finite_range(wet, "wet", 0.0, 1.0)
@@ -74,13 +113,23 @@ def spectral_delay(
     started = time.perf_counter()
     if bypass or amount == 0.0 or len(source) == 0:
         dry = restore_shape(source.copy(), was_vector)
-        return SpectralDelayResult(dry, {
-            "module": "m24.2.spectral_delay", "algorithm": "bypass", "bypass": True,
-            "sample_rate": rate, "input_frames": len(source), "output_frames": len(source),
-            "tail_frames": 0, "tail_seconds": 0.0, "latency_frames": 0,
-            "processing_seconds": time.perf_counter() - started, "wet": amount,
-            **signal_diagnostics(dry),
-        })
+        return SpectralDelayResult(
+            dry,
+            {
+                "module": "m24.2.spectral_delay",
+                "algorithm": "bypass",
+                "bypass": True,
+                "sample_rate": rate,
+                "input_frames": len(source),
+                "output_frames": len(source),
+                "tail_frames": 0,
+                "tail_seconds": 0.0,
+                "latency_frames": 0,
+                "processing_seconds": time.perf_counter() - started,
+                "wet": amount,
+                **signal_diagnostics(dry),
+            },
+        )
     bands = _normalise_bands(frequency_bands, rate, fb_default)
     spectra, meta = stft(source, frame_size, hop_size)
     bins = spectra.shape[1]
@@ -107,12 +156,14 @@ def spectral_delay(
         requested_tail = max_delay * repeats * hop_size
     else:
         repeats, requested_tail = 0, 0
-    tail_frames = min(requested_tail, int(math.floor(tail_limit * rate / hop_size)) * hop_size)
+    tail_frames = min(
+        requested_tail, int(math.floor(tail_limit * rate / hop_size)) * hop_size
+    )
     tail_stft_frames = int(math.ceil(tail_frames / hop_size))
     truncated = tail_frames < requested_tail
     output_count = spectra.shape[0] + tail_stft_frames
     rendered = np.zeros((output_count, bins, source.shape[1]), dtype=np.complex128)
-    rendered[:len(spectra)] = spectra
+    rendered[: len(spectra)] = spectra
 
     # Positive spectral flux estimates abrupt attacks; it only attenuates the
     # repeat contribution on attack frames, never the direct source spectrum.
@@ -139,27 +190,42 @@ def spectral_delay(
         attenuation = 1.0
         if frame < len(spectra) and transient_amount > 0.0:
             attenuation -= transient_amount * transient[frame]
-        rendered[frame] = direct + previous * (bin_feedback * bin_gain * attenuation)[:, None]
+        rendered[frame] = (
+            direct + previous * (bin_feedback * bin_gain * attenuation)[:, None]
+        )
 
     output_length = len(source) + tail_frames
     processed = istft(rendered, meta, output_length)
     dry = np.zeros((output_length, source.shape[1]), dtype=np.float32)
-    dry[:len(source)] = source
+    dry[: len(source)] = source
     if amount < 1.0:
         processed = dry + (processed - dry) * np.float32(amount)
     output = restore_shape(processed, was_vector)
     diagnostics = {
-        "module": "m24.2.spectral_delay", "algorithm": "centered_stft_bin_delay_feedback",
-        "bypass": False, "sample_rate": rate, "frame_size": frame_size, "hop_size": hop_size,
-        "input_frames": len(source), "output_frames": len(output),
-        "tail_frames": tail_frames, "tail_seconds": tail_frames / rate,
-        "latency_frames": 0, "offline_alignment": "centered_stft_reconstructed_to_source_origin",
-        "feedback_ceiling": 0.85, "maximum_feedback": max_fb,
-        "maximum_delay_hops": max_delay, "feedback_repeats_estimate": repeats,
-        "tail_truncated": truncated, "frequency_bands": bands,
-        "transient_preserve": transient_amount, "wet": amount,
+        "module": "m24.2.spectral_delay",
+        "algorithm": "centered_stft_bin_delay_feedback",
+        "bypass": False,
+        "sample_rate": rate,
+        "frame_size": frame_size,
+        "hop_size": hop_size,
+        "input_frames": len(source),
+        "output_frames": len(output),
+        "tail_frames": tail_frames,
+        "tail_seconds": tail_frames / rate,
+        "latency_frames": 0,
+        "offline_alignment": "centered_stft_reconstructed_to_source_origin",
+        "feedback_ceiling": 0.85,
+        "maximum_feedback": max_fb,
+        "maximum_delay_hops": max_delay,
+        "feedback_repeats_estimate": repeats,
+        "tail_truncated": truncated,
+        "frequency_bands": bands,
+        "transient_preserve": transient_amount,
+        "wet": amount,
         "processing_seconds": time.perf_counter() - started,
-        "estimated_working_bytes": int(spectra.nbytes * 2 + rendered.nbytes + processed.nbytes),
+        "estimated_working_bytes": int(
+            spectra.nbytes * 2 + rendered.nbytes + processed.nbytes
+        ),
         **signal_diagnostics(output),
     }
     return SpectralDelayResult(output, diagnostics)

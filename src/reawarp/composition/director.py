@@ -1,4 +1,5 @@
 """Deterministic formal section planning for long-form IDM generation."""
+
 from __future__ import annotations
 
 import hashlib
@@ -72,134 +73,134 @@ class CompositionPlan:
 # Name, relative duration, target energy, motif treatment.
 STRUCTURES: dict[str, tuple[tuple[str, float, float, str], ...]] = {
     "evolving": (
-        ("INTRO", .13, .20, "fragment"),
-        ("FOUNDATION", .24, .43, "present"),
-        ("EXPANSION", .25, .69, "develop"),
-        ("MUTATION", .18, .82, "fragment"),
-        ("REASSEMBLY", .14, .56, "return"),
-        ("OUTRO", .06, .12, "dissolve"),
+        ("INTRO", 0.13, 0.20, "fragment"),
+        ("FOUNDATION", 0.24, 0.43, "present"),
+        ("EXPANSION", 0.25, 0.69, "develop"),
+        ("MUTATION", 0.18, 0.82, "fragment"),
+        ("REASSEMBLY", 0.14, 0.56, "return"),
+        ("OUTRO", 0.06, 0.12, "dissolve"),
     ),
     "additive": (
-        ("INTRO", .16, .18, "fragment"),
-        ("FOUNDATION", .22, .38, "present"),
-        ("EXPANSION", .30, .62, "develop"),
-        ("PEAK", .22, .84, "develop"),
-        ("OUTRO", .10, .14, "dissolve"),
+        ("INTRO", 0.16, 0.18, "fragment"),
+        ("FOUNDATION", 0.22, 0.38, "present"),
+        ("EXPANSION", 0.30, 0.62, "develop"),
+        ("PEAK", 0.22, 0.84, "develop"),
+        ("OUTRO", 0.10, 0.14, "dissolve"),
     ),
     "subtractive": (
-        ("FULL", .22, .78, "present"),
-        ("UNRAVEL", .28, .58, "fragment"),
-        ("EXPOSE", .22, .34, "fragment"),
-        ("RESIDUAL", .18, .18, "dissolve"),
-        ("OUTRO", .10, .08, "dissolve"),
+        ("FULL", 0.22, 0.78, "present"),
+        ("UNRAVEL", 0.28, 0.58, "fragment"),
+        ("EXPOSE", 0.22, 0.34, "fragment"),
+        ("RESIDUAL", 0.18, 0.18, "dissolve"),
+        ("OUTRO", 0.10, 0.08, "dissolve"),
     ),
     "episodic": (
-        ("SCENE_A", .22, .44, "present"),
-        ("SUSPENSION", .14, .16, "fragment"),
-        ("SCENE_B", .26, .72, "develop"),
-        ("CONTRAST", .18, .35, "fragment"),
-        ("REASSEMBLY", .20, .57, "return"),
+        ("SCENE_A", 0.22, 0.44, "present"),
+        ("SUSPENSION", 0.14, 0.16, "fragment"),
+        ("SCENE_B", 0.26, 0.72, "develop"),
+        ("CONTRAST", 0.18, 0.35, "fragment"),
+        ("REASSEMBLY", 0.20, 0.57, "return"),
     ),
     "drift": (
-        ("ORIGIN", .20, .30, "present"),
-        ("DRIFT_A", .20, .50, "develop"),
-        ("DRIFT_B", .20, .66, "develop"),
-        ("DRIFT_C", .20, .42, "fragment"),
-        ("RETURN", .20, .52, "return"),
+        ("ORIGIN", 0.20, 0.30, "present"),
+        ("DRIFT_A", 0.20, 0.50, "develop"),
+        ("DRIFT_B", 0.20, 0.66, "develop"),
+        ("DRIFT_C", 0.20, 0.42, "fragment"),
+        ("RETURN", 0.20, 0.52, "return"),
     ),
     # Classical phrase functions translated into electronic orchestration:
     # exposition, contrasting subject, development, recapitulation and coda.
     "classical_arc": (
-        ("EXPOSITION_I", .18, .30, "present"),
-        ("EXPOSITION_II", .16, .42, "present"),
-        ("DEVELOPMENT", .28, .78, "develop"),
-        ("RECAPITULATION", .24, .58, "return"),
-        ("CODA", .14, .16, "dissolve"),
+        ("EXPOSITION_I", 0.18, 0.30, "present"),
+        ("EXPOSITION_II", 0.16, 0.42, "present"),
+        ("DEVELOPMENT", 0.28, 0.78, "develop"),
+        ("RECAPITULATION", 0.24, 0.58, "return"),
+        ("CODA", 0.14, 0.16, "dissolve"),
     ),
     "sonata_mutation": (
-        ("SUBJECT_A", .17, .34, "present"),
-        ("SUBJECT_B", .16, .55, "present"),
-        ("DEVELOPMENT", .27, .86, "fragment"),
-        ("FALSE_RETURN", .12, .46, "return"),
-        ("REPRISE_TRANSFORMED", .18, .68, "return"),
-        ("CODA", .10, .14, "dissolve"),
+        ("SUBJECT_A", 0.17, 0.34, "present"),
+        ("SUBJECT_B", 0.16, 0.55, "present"),
+        ("DEVELOPMENT", 0.27, 0.86, "fragment"),
+        ("FALSE_RETURN", 0.12, 0.46, "return"),
+        ("REPRISE_TRANSFORMED", 0.18, 0.68, "return"),
+        ("CODA", 0.10, 0.14, "dissolve"),
     ),
     "free_jazz": (
-        ("SPARSE_PROPOSITION", .15, .22, "fragment"),
-        ("COLLECTIVE_IMPROVISATION", .30, .82, "develop"),
-        ("OPEN_SPACE", .13, .20, "fragment"),
-        ("SECOND_WAVE", .24, .72, "develop"),
-        ("AFTERIMAGE", .18, .26, "dissolve"),
+        ("SPARSE_PROPOSITION", 0.15, 0.22, "fragment"),
+        ("COLLECTIVE_IMPROVISATION", 0.30, 0.82, "develop"),
+        ("OPEN_SPACE", 0.13, 0.20, "fragment"),
+        ("SECOND_WAVE", 0.24, 0.72, "develop"),
+        ("AFTERIMAGE", 0.18, 0.26, "dissolve"),
     ),
     "free_jazz_episodic": (
-        ("GESTURE_A", .18, .35, "present"),
-        ("COUNTER_GESTURE", .17, .55, "develop"),
-        ("COLLISION", .20, .90, "fragment"),
-        ("DECOMPRESSION", .15, .18, "dissolve"),
-        ("GESTURE_B", .18, .62, "develop"),
-        ("RESIDUE", .12, .12, "dissolve"),
+        ("GESTURE_A", 0.18, 0.35, "present"),
+        ("COUNTER_GESTURE", 0.17, 0.55, "develop"),
+        ("COLLISION", 0.20, 0.90, "fragment"),
+        ("DECOMPRESSION", 0.15, 0.18, "dissolve"),
+        ("GESTURE_B", 0.18, 0.62, "develop"),
+        ("RESIDUE", 0.12, 0.12, "dissolve"),
     ),
     "autechre_like": (
-        ("SEED_OBJECT", .14, .26, "present"),
-        ("RULE_ESTABLISHMENT", .19, .48, "present"),
-        ("PHASE_DRIFT", .23, .72, "develop"),
-        ("SYSTEM_BREAK", .16, .84, "fragment"),
-        ("RECOMBINATION", .18, .62, "return"),
-        ("RESIDUE", .10, .10, "dissolve"),
+        ("SEED_OBJECT", 0.14, 0.26, "present"),
+        ("RULE_ESTABLISHMENT", 0.19, 0.48, "present"),
+        ("PHASE_DRIFT", 0.23, 0.72, "develop"),
+        ("SYSTEM_BREAK", 0.16, 0.84, "fragment"),
+        ("RECOMBINATION", 0.18, 0.62, "return"),
+        ("RESIDUE", 0.10, 0.10, "dissolve"),
     ),
     "minimal_variation": (
-        ("OBJECT", .28, .34, "present"),
-        ("MICRO_SHIFT", .24, .42, "develop"),
-        ("WITHDRAWAL", .16, .18, "fragment"),
-        ("RETURN_CHANGED", .22, .48, "return"),
-        ("FADE", .10, .10, "dissolve"),
+        ("OBJECT", 0.28, 0.34, "present"),
+        ("MICRO_SHIFT", 0.24, 0.42, "develop"),
+        ("WITHDRAWAL", 0.16, 0.18, "fragment"),
+        ("RETURN_CHANGED", 0.22, 0.48, "return"),
+        ("FADE", 0.10, 0.10, "dissolve"),
     ),
     "hybrid": (
-        ("EXPOSITION", .16, .30, "present"),
-        ("GROOVE", .18, .55, "develop"),
-        ("FREE_SECTION", .20, .82, "fragment"),
-        ("REPRISE", .18, .58, "return"),
-        ("DECONSTRUCTION", .16, .30, "fragment"),
-        ("CODA", .12, .12, "dissolve"),
+        ("EXPOSITION", 0.16, 0.30, "present"),
+        ("GROOVE", 0.18, 0.55, "develop"),
+        ("FREE_SECTION", 0.20, 0.82, "fragment"),
+        ("REPRISE", 0.18, 0.58, "return"),
+        ("DECONSTRUCTION", 0.16, 0.30, "fragment"),
+        ("CODA", 0.12, 0.12, "dissolve"),
     ),
     # IRO Track 01-inspired organism arc: isolated signal, construction,
     # orbital counter-motion, collision, withdrawal, false memory and residue.
     "iro_metamorphosis": (
-        ("SIGNAL_INTRO", .08, .12, "fragment"),
-        ("CONSTRUCTION", .13, .34, "present"),
-        ("ORBIT", .17, .54, "develop"),
-        ("UPLIFT", .09, .72, "rhythmic"),
-        ("COLLISION", .13, .88, "fragment"),
-        ("OVERLOAD", .10, .96, "rhythmic"),
-        ("NULL_DROP", .07, .12, "fragment"),
-        ("AFTERSHOCK", .08, .48, "inversion"),
-        ("UNRAVEL", .06, .28, "fragment"),
-        ("FALSE_RETURN", .05, .42, "return"),
-        ("RESIDUE_CODA", .04, .10, "dissolve"),
+        ("SIGNAL_INTRO", 0.08, 0.12, "fragment"),
+        ("CONSTRUCTION", 0.13, 0.34, "present"),
+        ("ORBIT", 0.17, 0.54, "develop"),
+        ("UPLIFT", 0.09, 0.72, "rhythmic"),
+        ("COLLISION", 0.13, 0.88, "fragment"),
+        ("OVERLOAD", 0.10, 0.96, "rhythmic"),
+        ("NULL_DROP", 0.07, 0.12, "fragment"),
+        ("AFTERSHOCK", 0.08, 0.48, "inversion"),
+        ("UNRAVEL", 0.06, 0.28, "fragment"),
+        ("FALSE_RETURN", 0.05, 0.42, "return"),
+        ("RESIDUE_CODA", 0.04, 0.10, "dissolve"),
     ),
     # A more conventional but clearly articulated rise / arrival / void / return.
     "uplift_drop_return": (
-        ("FRAGMENT_INTRO", .10, .16, "fragment"),
-        ("ANCHOR_ESTABLISHMENT", .18, .38, "present"),
-        ("MOTIF_DEVELOPMENT", .18, .52, "develop"),
-        ("UPLIFT_A", .10, .68, "rhythmic"),
-        ("UPLIFT_B", .10, .82, "develop"),
-        ("ARRIVAL_PEAK", .10, .94, "present"),
-        ("DROP_VOID", .08, .08, "fragment"),
-        ("REBUILD", .08, .48, "inversion"),
-        ("TRANSFORMED_RETURN", .05, .62, "return"),
-        ("RESIDUE_OUTRO", .03, .10, "dissolve"),
+        ("FRAGMENT_INTRO", 0.10, 0.16, "fragment"),
+        ("ANCHOR_ESTABLISHMENT", 0.18, 0.38, "present"),
+        ("MOTIF_DEVELOPMENT", 0.18, 0.52, "develop"),
+        ("UPLIFT_A", 0.10, 0.68, "rhythmic"),
+        ("UPLIFT_B", 0.10, 0.82, "develop"),
+        ("ARRIVAL_PEAK", 0.10, 0.94, "present"),
+        ("DROP_VOID", 0.08, 0.08, "fragment"),
+        ("REBUILD", 0.08, 0.48, "inversion"),
+        ("TRANSFORMED_RETURN", 0.05, 0.62, "return"),
+        ("RESIDUE_OUTRO", 0.03, 0.10, "dissolve"),
     ),
     "two_movement": (
-        ("MOVEMENT_I_SIGNAL", .10, .18, "fragment"),
-        ("MOVEMENT_I_FORM", .16, .42, "present"),
-        ("MOVEMENT_I_EXPANSION", .18, .72, "develop"),
-        ("MOVEMENT_I_CADENCE", .06, .26, "dissolve"),
-        ("INTERMOVEMENT_VOID", .04, .04, "fragment"),
-        ("MOVEMENT_II_REENTRY", .12, .38, "return"),
-        ("MOVEMENT_II_MUTATION", .18, .82, "fragment"),
-        ("MOVEMENT_II_REASSEMBLY", .10, .60, "return"),
-        ("FINAL_RESIDUE", .06, .12, "dissolve"),
+        ("MOVEMENT_I_SIGNAL", 0.10, 0.18, "fragment"),
+        ("MOVEMENT_I_FORM", 0.16, 0.42, "present"),
+        ("MOVEMENT_I_EXPANSION", 0.18, 0.72, "develop"),
+        ("MOVEMENT_I_CADENCE", 0.06, 0.26, "dissolve"),
+        ("INTERMOVEMENT_VOID", 0.04, 0.04, "fragment"),
+        ("MOVEMENT_II_REENTRY", 0.12, 0.38, "return"),
+        ("MOVEMENT_II_MUTATION", 0.18, 0.82, "fragment"),
+        ("MOVEMENT_II_REASSEMBLY", 0.10, 0.60, "return"),
+        ("FINAL_RESIDUE", 0.06, 0.12, "dissolve"),
     ),
 }
 
@@ -210,16 +211,16 @@ def _seed_value(seed: int | str) -> int:
 
 
 def build_composition_plan(
-        *,
-        duration_seconds: float,
-        bpm: float,
-        seed: int | str,
-        structure: str = "evolving",
-        energy: float = .62,
-        variation: float = .45,
-        flow: str = "preset",
-        pattern_family: str = "broken_funk",
-        pattern_relationship: str = "interlock",
+    *,
+    duration_seconds: float,
+    bpm: float,
+    seed: int | str,
+    structure: str = "evolving",
+    energy: float = 0.62,
+    variation: float = 0.45,
+    flow: str = "preset",
+    pattern_family: str = "broken_funk",
+    pattern_relationship: str = "interlock",
 ) -> CompositionPlan:
     """Allocate deterministic, bar-aligned sections over an exact render duration."""
     if duration_seconds <= 0 or bpm <= 0:
@@ -262,10 +263,10 @@ def build_composition_plan(
             template = (template[0], *(middle[int(i)] for i in order), template[-1])
     weights = np.asarray([item[1] for item in template], dtype=np.float64)
     if variation:
-        noise = rng.normal(0.0, .18 * variation, len(weights))
+        noise = rng.normal(0.0, 0.18 * variation, len(weights))
         noise -= noise.mean()
-        weights *= np.exp(np.clip(noise, -.30, .30))
-    weights = np.maximum(weights, .07)
+        weights *= np.exp(np.clip(noise, -0.30, 0.30))
+    weights = np.maximum(weights, 0.07)
     weights /= weights.sum()
 
     bar_seconds = 240.0 / float(bpm)
@@ -293,30 +294,47 @@ def build_composition_plan(
     edges = np.concatenate(([0], np.cumsum(bars)))
     sections: list[SectionPlan] = []
     for index, ((name, _weight, target, motif), first_bar, last_bar) in enumerate(
-            zip(template, edges[:-1], edges[1:], strict=True)
+        zip(template, edges[:-1], edges[1:], strict=True)
     ):
-        section_energy = float(np.clip(
-            .68 * target + .32 * energy + rng.normal(0.0, .025 * variation), 0, 1
-        ))
-        density = float(np.clip(.08 + .68 * section_energy, .04, .78))
-        brightness = float(np.clip(.16 + .69 * section_energy, .08, .92))
-        instability = float(np.clip(
-            .08 + .56 * section_energy + rng.uniform(-.08, .08) * variation, 0, .78
-        ))
-        space = float(np.clip(
-            1.0 - .76 * density + rng.uniform(-.06, .06) * variation, .12, 1
-        ))
+        section_energy = float(
+            np.clip(
+                0.68 * target + 0.32 * energy + rng.normal(0.0, 0.025 * variation), 0, 1
+            )
+        )
+        density = float(np.clip(0.08 + 0.68 * section_energy, 0.04, 0.78))
+        brightness = float(np.clip(0.16 + 0.69 * section_energy, 0.08, 0.92))
+        instability = float(
+            np.clip(
+                0.08 + 0.56 * section_energy + rng.uniform(-0.08, 0.08) * variation,
+                0,
+                0.78,
+            )
+        )
+        space = float(
+            np.clip(
+                1.0 - 0.76 * density + rng.uniform(-0.06, 0.06) * variation, 0.12, 1
+            )
+        )
 
         upper = name.upper()
-        is_outro = any(token in upper for token in ("OUTRO", "RESIDUAL", "CODA", "RELEASE"))
+        is_outro = any(
+            token in upper for token in ("OUTRO", "RESIDUAL", "CODA", "RELEASE")
+        )
         is_silence = any(token in upper for token in ("NULL", "VOID", "SILENCE"))
         is_drop = "DROP" in upper
-        is_sparse = is_silence or is_drop or any(
-            token in upper for token in ("SUSPENSION", "EXPOSE", "AFTERSHOCK", "UNRAVEL")
+        is_sparse = (
+            is_silence
+            or is_drop
+            or any(
+                token in upper
+                for token in ("SUSPENSION", "EXPOSE", "AFTERSHOCK", "UNRAVEL")
+            )
         )
         is_intro = any(token in upper for token in ("INTRO", "SIGNAL"))
         is_uplift = "UPLIFT" in upper
-        is_arrival = any(token in upper for token in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL"))
+        is_arrival = any(
+            token in upper for token in ("PEAK", "COLLISION", "OVERLOAD", "ARRIVAL")
+        )
         kick = not (is_outro or is_sparse or is_intro or is_silence)
         melody = not is_outro and motif != "dissolve" and not is_silence
         texture = not is_outro and not is_silence
@@ -333,14 +351,18 @@ def build_composition_plan(
             texture = False
         if is_silence:
             kick = melody = texture = False
-        register = int(rng.choice((-12, -7, 0, 5, 12))) if variation and motif in {"develop", "fragment"} else 0
+        register = (
+            int(rng.choice((-12, -7, 0, 5, 12)))
+            if variation and motif in {"develop", "fragment"}
+            else 0
+        )
         if "UPLIFT" in upper:
             register += int(rng.choice((5, 7, 12)))
         elif "DROP" in upper or is_silence:
             register -= int(rng.choice((5, 7, 12)))
         elif "RETURN" in upper:
             register = int(round(register * 0.5))
-        support = float(np.clip(.98 - .43 * density, .52, .96))
+        support = float(np.clip(0.98 - 0.43 * density, 0.52, 0.96))
         if is_silence:
             support = 0.0
         elif is_drop:
@@ -349,7 +371,7 @@ def build_composition_plan(
             support = min(1.0, support * 1.18)
         elif is_arrival:
             support = min(1.0, support * 1.08)
-        if section_energy > .78 and density > .62 and rng.random() < .65:
+        if section_energy > 0.78 and density > 0.62 and rng.random() < 0.65:
             texture = False
         # A real void is an orchestration state, not merely a low energy value.
         # Keep the time axis running while leaving only optional ambience/residue.
@@ -369,26 +391,28 @@ def build_composition_plan(
         end_seconds = min(duration_seconds, last_bar * bar_seconds)
         if index == len(template) - 1:
             end_seconds = duration_seconds
-        sections.append(SectionPlan(
-            index=index,
-            name=name,
-            start_bar=int(first_bar),
-            end_bar=int(last_bar),
-            start_seconds=float(start_seconds),
-            end_seconds=float(end_seconds),
-            energy=section_energy,
-            density=density,
-            brightness=brightness,
-            instability=instability,
-            space=space,
-            kick=kick,
-            melody=melody,
-            texture=texture,
-            ambience=ambience,
-            motif_mode=motif,
-            motif_register_semitones=register,
-            percussion_density_scale=support,
-        ))
+        sections.append(
+            SectionPlan(
+                index=index,
+                name=name,
+                start_bar=int(first_bar),
+                end_bar=int(last_bar),
+                start_seconds=float(start_seconds),
+                end_seconds=float(end_seconds),
+                energy=section_energy,
+                density=density,
+                brightness=brightness,
+                instability=instability,
+                space=space,
+                kick=kick,
+                melody=melody,
+                texture=texture,
+                ambience=ambience,
+                motif_mode=motif,
+                motif_register_semitones=register,
+                percussion_density_scale=support,
+            )
+        )
 
     return CompositionPlan(
         duration_seconds=float(duration_seconds),
