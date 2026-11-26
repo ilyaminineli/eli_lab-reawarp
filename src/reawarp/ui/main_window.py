@@ -66,6 +66,7 @@ from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.pages.variations import VariationBrowserPage
 from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
 from reawarp.ui.pages.attention_map import AttentionMapPage
+from reawarp.ui.pages.sound_object_editor import SoundObjectEditorPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -118,6 +119,7 @@ class MainWindow(QMainWindow):
         self._phrase_compare_epoch = 0
         self._phrase_compare_signature: tuple[str, str, str] | None = None
         self._phrase_compare_project: ReawarpProject | None = None
+        self._sound_object_worker: CancellableRenderWorker | None = None
         self._mix_rows: dict[str, StemRow] = {}
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
@@ -212,6 +214,15 @@ class MainWindow(QMainWindow):
         )
 
         self.attention_map_page = AttentionMapPage(self)
+
+        self.sound_object_page = SoundObjectEditorPage(self)
+        self.sound_object_page.createRequested.connect(self._sound_object_create_requested)
+        self.sound_object_page.refreshRequested.connect(self._refresh_sound_object_targets)
+        self.sound_object_page.saveRequested.connect(self._sound_object_save_requested)
+        self.sound_object_page.auditionRequested.connect(self._sound_object_audition_requested)
+        self.sound_object_page.printRequested.connect(self._sound_object_print_requested)
+        self.sound_object_page.playRequested.connect(self._sound_object_play_requested)
+        self.sound_object_page.cancelRequested.connect(self._sound_object_cancel_requested)
         self.attention_map_page.planChanged.connect(self._attention_plan_changed)
         self.attention_map_page.reviewRequested.connect(self._attention_review_requested)
         self.attention_map_page.translationCheckRequested.connect(
@@ -231,6 +242,7 @@ class MainWindow(QMainWindow):
         for workspace in (
             generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
             self.variation_page, self.phrase_workbench, self.attention_map_page,
+            self.sound_object_page,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -243,6 +255,7 @@ class MainWindow(QMainWindow):
             ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
             ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
             ("ATTENTION MAP", "Shape figure/ground roles, inspect overlaps and test mono/low-volume translation."),
+            ("SOUND OBJECT WORKSHOP", "Edit hybrid sound objects, audition aligned layers and print lineage-backed assets."),
         ]
         self.navigator = WorkspaceNavigator(
             [
@@ -259,6 +272,7 @@ class MainWindow(QMainWindow):
                 ]),
                 ("ASSETS", [
                     ("Library", "Browse and organise reusable samples, stems and variations.", 4),
+                    ("Sound Objects", "Edit transient/body/tail layers and print reusable assets with full source lineage.", 8),
                 ]),
             ]
         )
@@ -309,7 +323,7 @@ class MainWindow(QMainWindow):
         title, description = self._workspace_info[index]
         self.workspace_title.setText(title)
         self.workspace_description.setText(description)
-        self.transport_bar.setVisible(index in (0, 2, 5, 7))
+        self.transport_bar.setVisible(index in (0, 2, 5, 7, 8))
 
     def _update_project_context(self) -> None:
         if self.project is None:
@@ -2471,8 +2485,127 @@ class MainWindow(QMainWindow):
             self.variation_page.set_sound_objects([
                 (patch.patch_id, patch.name) for patch in patches
             ])
+            if hasattr(self, "sound_object_page"):
+                self.sound_object_page.set_patches(patches)
         except Exception as exc:
             self.statusBar().showMessage(f"Sound-object catalogue unavailable: {exc}", 6000)
+
+    def _sound_object_worker_start(self, operation, on_success) -> None:
+        if self._sound_object_worker is not None:
+            self._sound_object_worker.cancel()
+        worker = CancellableRenderWorker(operation)
+        self._sound_object_worker = worker
+        self.sound_object_page.set_busy(True)
+
+        def finished(result):
+            if self._sound_object_worker is not worker:
+                return
+            self._sound_object_worker = None
+            self.sound_object_page.set_busy(False)
+            on_success(result)
+
+        def failed(message):
+            if self._sound_object_worker is not worker:
+                return
+            self._sound_object_worker = None
+            self.sound_object_page.set_busy(False)
+            self.sound_object_page.set_status(message)
+            self.statusBar().showMessage(message.splitlines()[0], 7000)
+
+        worker.signals.finished.connect(finished)
+        worker.signals.error.connect(failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _sound_object_create_requested(self, path: str, name: str) -> None:
+        from reawarp.synthesis.workshop import create_sound_object_from_file
+
+        self._sound_object_worker_start(
+            lambda cancel: create_sound_object_from_file(path, name=name),
+            lambda patch: (
+                self._refresh_sound_object_targets(),
+                self.sound_object_page.select_patch(patch.patch_id),
+                self.sound_object_page.set_status(
+                    f"Created {patch.name!r} from an indexed, hash-verified source."
+                ),
+            ),
+        )
+
+    def _sound_object_save_requested(self, patch) -> None:
+        try:
+            from reawarp.library.store import SampleLibrary
+
+            with SampleLibrary() as library:
+                digest = library.save_sound_object(patch)
+                versions = library.list_sound_object_versions(patch.patch_id)
+            self._refresh_sound_object_targets()
+            latest = versions[-1]
+            self.sound_object_page.select_patch(patch.patch_id)
+            self.sound_object_page.set_status(
+                f"Saved revision {latest['revision']} · {latest['version_id']} · "
+                f"patch SHA-256 {digest[:16]}…"
+            )
+        except Exception as exc:
+            self.sound_object_page.set_status(f"Cannot save sound object: {exc}")
+
+    def _sound_object_audition_requested(self, patch, layer_id: str) -> None:
+        self._sound_object_worker_start(
+            lambda cancel: self._render_sound_object_audition_job(
+                patch, layer_id or None, cancel
+            ),
+            lambda result: self.sound_object_page.set_preview(
+                result.audio, patch.sample_rate,
+                label=(f"Layer {layer_id}" if layer_id else "Full object"),
+            ),
+        )
+
+    @staticmethod
+    def _render_sound_object_audition_job(patch, layer_id, cancel_event):
+        from reawarp.library.store import SampleLibrary
+        from reawarp.synthesis.workshop import render_sound_object_audition
+
+        with SampleLibrary() as library:
+            return render_sound_object_audition(
+                patch, library, layer_id=layer_id, cancel_event=cancel_event
+            )
+
+    def _sound_object_print_requested(
+        self, patch, output_path: str, sample_rate: int, target_role: str
+    ) -> None:
+        from reawarp.library.store import SampleLibrary
+        from reawarp.synthesis.workshop import print_sound_object_to_asset
+
+        self.sound_object_page.set_status("Rendering and indexing a new print…")
+
+        def operation(cancel_event):
+            with SampleLibrary() as library:
+                return print_sound_object_to_asset(
+                    patch, library, output_path,
+                    target_sample_rate=sample_rate,
+                    target_role=target_role,
+                    cancel_event=cancel_event,
+                )
+
+        def complete(result):
+            self._refresh_sound_object_targets()
+            self.sound_object_page.set_status(
+                f"Printed {result.asset.file_name} · {result.asset.source_sample_rate:,} Hz · "
+                f"role {result.record.role_assignment['target_role']} · "
+                f"version {result.version.version_id} · "
+                f"file SHA-256 {result.record.output_file_sha256[:16]}…"
+            )
+
+        self._sound_object_worker_start(operation, complete)
+
+    def _sound_object_play_requested(self, audio, sample_rate: int) -> None:
+        try:
+            self.player.start(audio, sample_rate)
+        except Exception as exc:
+            self.sound_object_page.set_status(f"Audio output unavailable: {exc}")
+
+    def _sound_object_cancel_requested(self) -> None:
+        if self._sound_object_worker is not None:
+            self._sound_object_worker.cancel()
+            self.sound_object_page.set_status("Cancellation requested; current safe step will finish.")
 
     def _render_sound_object_candidate(
         self, base: ReawarpProject, index: int, variation_seed: int,
