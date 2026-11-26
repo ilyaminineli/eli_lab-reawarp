@@ -229,6 +229,20 @@ class ReawarpProject:
             )
         _check_cancelled(cancel_event, "project export")
         score = self.to_score()
+        arrangement_record = score.metadata.get("m33_arrangement")
+        if isinstance(arrangement_record, dict):
+            from reawarp.composition.arrangement import (
+                arrangement_snapshot, copy_print_assets,
+            )
+
+            snapshot = arrangement_snapshot(score)
+            snapshot["print_exports"] = copy_print_assets(
+                arrangement_record, output / "arrangement_prints"
+            )
+            (output / "arrangement_snapshot.json").write_text(
+                json.dumps(snapshot, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
         score.save(output / "score.json")
         if include_midi:
             _check_cancelled(cancel_event, "project MIDI export")

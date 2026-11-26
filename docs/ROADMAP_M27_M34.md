@@ -1,8 +1,8 @@
 # Reawarp — M27–M34 development roadmap
 
 **Agent-facing technical roadmap · 26 November 2026**  
-**Status:** M27 is implemented; M28 and M29 remain in progress with human listening acceptance open; M30 implementation is complete with formal listening sign-off still open.  
-**Current baseline:** M30 transition/ending grammar, M31 sound-object editing/print lineage and the M32 critical-listening core are implemented; M33 is the next planned priority. M32 human listening acceptance remains open. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
+**Status:** M27–M33 core implementations are delivered; M28, M29, M30, M31, M32 and M33 retain explicit human listening/production acceptance work.  
+**Current baseline:** M30 transition/ending grammar, M31 sound-object editing/print lineage, M32 critical-listening core and M33 Score-native arrangement/print-to-track workflow are implemented. M34 remains a conditional research gate. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -297,7 +297,7 @@ Make the guide's subtraction, invariance and context tests executable as repeata
 ## M33 — Arrangement Editor, Manual Composition and Print-to-Track
 
 **Priority:** P3  
-**Status:** Planned  
+**Status:** Core implementation delivered; human listening acceptance open  
 **Depends on:** M28–M32; builds on M4, M5, M23, M25, M26  
 **Primary guide basis:** Field Guide §9, especially print/edit/recompose and subtraction; Advanced Appendix §§17–18; Composition Atlas §§1, 12–18.
 
@@ -324,6 +324,18 @@ Close the distance between an interesting generator result and a finished, delib
 - Arrangement reopens with the same ordering, timing, sources, transitions and ending.
 - A finished export includes the final arrangement state and full provenance.
 - The workflow can finish a piece without requiring arbitrary DAW-style clip editing.
+
+### Delivered implementation — 26 November 2026
+
+- `src/reawarp/composition/arrangement.py` provides a fingerprinted M33 arrangement record over M28 PhrasePlan spans and Score event IDs, including rational-beat edits, source/candidate lineage, freeze state, checklist, edit audit and bounded undo/redo.
+- `src/reawarp/ui/pages/arrangement_editor.py` and MainWindow workspace index 9 provide the Compose → Arrangement editor, candidate replacement and M30 cue selection/relinking.
+- Move, duplicate, trim, reorder, mute, layer exchange, candidate replacement, freeze, branch and revert update the canonical Score and PhrasePlan. Audio-affecting edits use the Score render path, preserving specialist ambience/texture layers and extending the project render when needed (within the 180-second limit).
+- M30 transition and ending cues are visible and movable; transition relinking keeps the three phase durations and validates the new source/target spans.
+- Print-to-new-WAV writes an offline, dry Score render as a separate 24-bit PCM file. Its WAV header, SHA-256 and event/source lineage are recorded. A print that races with a project/arrangement change is not attached.
+- Project export writes `arrangement_snapshot.json` and verified `arrangement_prints/` copies. The standard Score/MIDI/stem/master/M32 report package remains the existing delivery path.
+- Automated coverage: `tests/test_m33_arrangement.py` and `tests/test_m33_arrangement_ui.py`.
+
+**Acceptance still open:** human listening on real compositions, target-Windows performance/listening and confirmation that dry phrase prints are sufficient for the intended downstream production. The editor is phrase/section-focused; it does not claim arbitrary audio clip fades, crossfades, live arrangement or full DAW behaviour. Undo history stores the latest 50 reversible edits and a bounded audit tail.
 
 ### Non-goals
 
@@ -631,34 +643,39 @@ The following paths are recommended service boundaries. Confirm current package 
 - Mono/downmix tests check phase cancellation and do not rewrite stereo production.
 - Reports export and reopen even if Reawarp UI is unavailable.
 
-### M33 implementation map — arrangement and print-to-track
+### M33 implementation map — delivered arrangement and print-to-track
 
-**Likely modules**
-- src/reawarp/arrangement/model.py — ordered arrangement of phrase/section references, frozen blocks, transitions and endings.
-- src/reawarp/arrangement/operations.py — non-destructive move/duplicate/trim/reorder/mute/replace and edit history.
-- src/reawarp/ui/pages/arrangement_editor.py — Score-aware arrangement workspace.
-- src/reawarp/export/delivery.py only if the existing folder delivery service needs an extension; do not conflate delivery output with a restorable project archive.
-- Tests: test_arrangement_operations.py, test_arrangement_roundtrip.py, test_manual_edit_provenance.py.
+**Delivered modules**
+- `src/reawarp/composition/arrangement.py` — M33 arrangement schema, Score/PhrasePlan integrity checks, manual operations, transition/ending cue movement/relinking, edit journal, print lineage and export snapshot.
+- `src/reawarp/ui/pages/arrangement_editor.py` — Compose → Arrangement workspace.
+- `src/reawarp/ui/main_window.py` — canonical Score render handoff, project-duration reconciliation and background print worker.
+- `src/reawarp/core/project.py` and `src/reawarp/export/project_archive.py` — arrangement snapshot, verified WAV copies and package documentation.
+- Tests: `tests/test_m33_arrangement.py` and `tests/test_m33_arrangement_ui.py`.
 
-**Suggested public concepts**
-- ArrangementDocument: schema version, project/Score revision, ordered section references and explicit final duration policy.
-- ArrangementBlock: stable block ID, phrase/candidate/source reference, rational start/end, role participation and freeze state.
-- ArrangementEdit: operation, before/after references, authoring mode (generated/manual), source revision and undo identity.
-- PrintRecord: selected arrangement region, printed source, output hash and lineage.
+**Public concepts implemented**
+- `ArrangementClip`: stable phrase placement with rational source/destination spans, event IDs, candidate/source lineage, role exchange map, mute/freeze state and revision.
+- `ArrangementPlan`: versioned Score-bound arrangement, ordered clips, project revision fingerprint and finishing checklist.
+- Edit records: composer actor, operation, revision, details and before/after Score plus arrangement snapshots. The undo stack is bounded to the latest 50 operations; the audit tail is bounded to 200 records.
+- Print records: selected clip/phrase, source/current event IDs, candidate ID, verified WAV sample rate/frame count, output hash, renderer and arrangement revision.
 
-**Design decisions to settle**
-- Establish whether arrangement blocks reference Score subranges, frozen Score snapshots or separately stored phrase documents. A block must not ambiguously own two sources of truth.
-- Determine whether trim changes event duration, crops render audio, or both; store explicit semantics.
-- Define how overlaps, crossfades and tails are represented without introducing an arbitrary timeline engine.
-- Keep edits reversible and separate manual operations from generation changes.
-- Define the handoff between the editing arrangement and the existing export pipeline.
+**Design decisions implemented**
+- One source of truth: clips reference the Score's M28 phrase IDs and event IDs. No independently editable event copy is stored in the arrangement.
+- Trim updates rational phrase bounds, crops intersecting events and retains in-range zero-duration events.
+- Move/duplicate/reorder preserve event identity for the moved source and generate new IDs for duplicates. Manual origin is separated from generator/candidate provenance.
+- M30 cues remain silent Score markers. Transition relinking is explicit when reordered phrases reverse source/target direction.
+- Printed phrases are dry Score renders to a separate 24-bit PCM WAV; no claim is made that stem inserts or SPACE/ECHO returns are printed.
+- Existing project folder delivery remains the export handoff; M33 adds a restorable arrangement snapshot and verified print copies without creating a second archive type.
 
-**Minimum tests**
-- Reorder/duplicate/trim maintain rational timing and source lineage.
-- Frozen blocks remain unchanged after upstream config/seed edits.
-- Undo/redo reproduces previous arrangement identity.
-- Export/reopen retains final section order, transitions, ending and MIDI projection.
-- A full piece can be finished using phrase/section operations without a general-purpose clip editor.
+**Automated tests delivered**
+- Exact rational move/trim, unique duplicate event IDs, source lineage and non-destructive mute/unmute.
+- Candidate replacement, freeze, branch, generation revert, undo/redo, reorder and cue relinking.
+- Finishing checklist and print WAV header/hash verification.
+- Project export/reopen with arrangement snapshot, manifest and copied print asset.
+- UI signal behaviour, candidate filtering and human checklist interaction.
+
+**Acceptance still open**
+- Full human listening sign-off on real compositions and target-Windows performance/listening acceptance.
+- Confirm that a dry Score print is a sufficient print-to-track object for downstream use; FX-inclusive phrase printing remains outside M33 core scope.
 
 ### M34 implementation map — research gates
 

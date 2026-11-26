@@ -136,6 +136,7 @@ project loader or use `ReawarpProject.load(folder)`.
 - `manifest.json`: schema, environment, source-asset audit and SHA-256 file inventory.
 - `candidates/` and `listening_report.json`: variation session data when present.
 - `critical_listening_report.json` and `critical_listening_report.md`: M32 audition provenance, technical evidence and human-authored listening notes when present.
+- `arrangement_snapshot.json` and `arrangement_prints/`: M33 phrase/cue order, finishing checklist, reversible edit history and verified printed WAV objects when present.
 
 MIDI 1.0 uses integer semitone notes and finite tick resolution. When MIDI is included,
 Reawarp-specific escaped text metadata preserves exact pitch/event provenance for

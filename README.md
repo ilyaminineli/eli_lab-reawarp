@@ -13,6 +13,7 @@ Reawarp turns musical constraints and generative systems into structured composi
 - **Work with a musical Score:** rational-beat events, tempo/meter maps, tuning-aware pitch, typed automation, Score-first event rendering and optional MIDI 1.0 interchange.
 - **Produce non-destructively:** role-aware per-stem inserts, shared SPACE/ECHO returns, beat automation, routing meters, tail handling, matched-level audition and project-aware FX variations.
 - **Review variations:** deterministic candidate batches, blind A/B, difference inspection, listening sets, review notes and candidate ancestry.
+- **Arrange and finish:** build a deliberate arrangement from frozen phrases, move/duplicate/trim/reorder/mute/exchange or replace material, edit transitions/endings, branch/revert, print phrase WAVs with source hashes, and track human finishing checks.
 - **Export deliveries:** one-click folder export containing a package README, routed master WAV, aligned dry stems and combined/per-voice MIDI. No source-sample copying or ZIP archive.
 
 ## Architecture
@@ -219,6 +220,7 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 - [Milestone history and current status](docs/MILESTONES.md) — delivered milestone ledger.
 - [M30 Ending Director design note](docs/M30_ENDING_DIRECTOR.md) — ending strategies, transition actuation and mutation boundaries.
 - [M32 Critical Listening design note](docs/M32_CRITICAL_LISTENING.md) — contextual audition, reversible subtraction, diagnostics and exportable human report.
+- [M33 Arrangement Editor design note](docs/M33_ARRANGEMENT_EDITOR.md) — manual Score-native arrangement, reversible edits, transition/ending cues, dry print-to-WAV and export lineage.
 - [M31 Sound-Object Workshop design note](docs/M31_SOUND_OBJECT_WORKSHOP.md) — versioned objects, aligned layer audition and print lineage.
 - [M27–M34 development roadmap](docs/ROADMAP_M27_M34.md) — detailed future milestone specifications and agent handoff.
 - [Implementation notes](docs/IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.

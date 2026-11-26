@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import secrets
@@ -26,12 +27,22 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.composition.arrangement import (
+    ARRANGEMENT_METADATA_KEY, ArrangementPlan, branch_arrangement,
+    clip_score_for_render, create_arrangement, duplicate_clip, exchange_clip_layer,
+    freeze_clip, move_clip, move_ending, move_transition, record_print,
+    relink_transition,
+    redo_arrangement_edit, reorder_clip, replace_clip_with_candidate,
+    revert_to_generation, set_checklist_item, set_clip_muted, trim_clip,
+    undo_arrangement_edit,
+)
 from reawarp.composition.phrases import (
     PhrasePlan, PhraseSpan, MotifIdentity, MotifFamily,
     build_phrase_candidate_batch, branch_phrase_candidate,
     freeze_phrase_candidate, restore_phrase_base, phrase_context_events,
 )
 from reawarp.export.project_archive import export_project_package
+from reawarp.export.wav import write_wav
 from reawarp.fx_routing import (
     build_fx_variation_routings, match_audition_level, measure_signal,
     render_fx_routing, render_master_with_returns,
@@ -67,6 +78,7 @@ from reawarp.ui.pages.variations import VariationBrowserPage
 from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
 from reawarp.ui.pages.attention_map import AttentionMapPage
 from reawarp.ui.pages.sound_object_editor import SoundObjectEditorPage
+from reawarp.ui.pages.arrangement_editor import ArrangementEditorPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -116,6 +128,9 @@ class MainWindow(QMainWindow):
         self._m32_history_fingerprint: str | None = None
         self._m32_current_result = None
         self._m32_analysis_enabled = True
+        self._m33_print_worker: CancellableRenderWorker | None = None
+        self._m33_print_pending: dict[str, Any] | None = None
+        self._m33_preserve_candidates = False
 
         self._phrase_batch_worker: CancellableRenderWorker | None = None
         self._phrase_audition_worker: CancellableRenderWorker | None = None
@@ -228,6 +243,27 @@ class MainWindow(QMainWindow):
         self.attention_map_page = AttentionMapPage(self)
 
         self.sound_object_page = SoundObjectEditorPage(self)
+        self.arrangement_page = ArrangementEditorPage(self)
+        self.arrangement_page.createRequested.connect(self._m33_create_requested)
+        self.arrangement_page.moveRequested.connect(self._m33_move_requested)
+        self.arrangement_page.duplicateRequested.connect(self._m33_duplicate_requested)
+        self.arrangement_page.trimRequested.connect(self._m33_trim_requested)
+        self.arrangement_page.reorderRequested.connect(self._m33_reorder_requested)
+        self.arrangement_page.muteRequested.connect(self._m33_mute_requested)
+        self.arrangement_page.exchangeRequested.connect(self._m33_exchange_requested)
+        self.arrangement_page.replaceRequested.connect(self._m33_replace_requested)
+        self.arrangement_page.freezeRequested.connect(self._m33_freeze_requested)
+        self.arrangement_page.branchRequested.connect(self._m33_branch_requested)
+        self.arrangement_page.revertRequested.connect(self._m33_revert_requested)
+        self.arrangement_page.undoRequested.connect(self._m33_undo_requested)
+        self.arrangement_page.redoRequested.connect(self._m33_redo_requested)
+        self.arrangement_page.printRequested.connect(self._m33_print_requested)
+        self.arrangement_page.moveTransitionRequested.connect(self._m33_move_transition_requested)
+        self.arrangement_page.moveEndingRequested.connect(self._m33_move_ending_requested)
+        self.arrangement_page.relinkTransitionRequested.connect(
+            self._m33_relink_transition_requested
+        )
+        self.arrangement_page.checklistChanged.connect(self._m33_checklist_changed)
         self.sound_object_page.createRequested.connect(self._sound_object_create_requested)
         self.sound_object_page.refreshRequested.connect(self._refresh_sound_object_targets)
         self.sound_object_page.saveRequested.connect(self._sound_object_save_requested)
@@ -254,7 +290,7 @@ class MainWindow(QMainWindow):
         for workspace in (
             generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
             self.variation_page, self.phrase_workbench, self.attention_map_page,
-            self.sound_object_page,
+            self.sound_object_page, self.arrangement_page,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -268,6 +304,7 @@ class MainWindow(QMainWindow):
             ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
             ("ATTENTION MAP", "Shape figure/ground roles, inspect overlaps and test mono/low-volume translation."),
             ("SOUND OBJECT WORKSHOP", "Edit hybrid sound objects, audition aligned layers and print lineage-backed assets."),
+            ("ARRANGEMENT EDITOR", "Assemble frozen phrases, edit the form, print selected objects and finish the track."),
         ]
         self.navigator = WorkspaceNavigator(
             [
@@ -276,6 +313,7 @@ class MainWindow(QMainWindow):
                     ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
                     ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
                     ("Phrase Workbench", "Develop phrase grammar, motif lineage and contextual candidates.", 6),
+                    ("Arrangement", "Arrange frozen phrases, edit M30 cues and prepare the final package.", 9),
                     ("Attention Map", "Assign foreground, midground, background and semantic orchestral roles.", 7),
                 ]),
                 ("PRODUCE", [
@@ -1562,19 +1600,43 @@ class MainWindow(QMainWindow):
         cancel_event: object | None = None,
     ) -> ReawarpProject:
         """Render a controlled Score and retain the specialist whole-field layers."""
+        render_event_voices = tuple(score.metadata.get("m33_render_event_voices", ()))
+        if "m33_render_event_voices" in score.metadata:
+            render_metadata = dict(score.metadata)
+            render_metadata.pop("m33_render_event_voices", None)
+            score = replace(score, metadata=render_metadata)
+        render_config = project.config
+        if ARRANGEMENT_METADATA_KEY in score.metadata:
+            arrangement = ArrangementPlan.from_score(score)
+            from reawarp.composition.endings import ending_plans_from_score
+            end_beats = max(
+                [item.end_beats for item in arrangement.clips]
+                + [item.end_beats for item in ending_plans_from_score(score)]
+                + [Fraction(0)]
+            )
+            required_seconds = float(score.beat_to_seconds(end_beats))
+            if required_seconds > 180.0:
+                raise ValueError("M33 arrangement exceeds the supported 180-second offline render limit")
+            render_config = replace(
+                project.config, duration=max(project.config.duration, required_seconds, 5.0)
+            )
         rendered = ReawarpEngine().render_score(
-            score, config=project.config, cancel_event=cancel_event
+            score, config=render_config, cancel_event=cancel_event
         )
         canonical_score = rendered.score or score
-        stems = {
-            name: np.asarray(audio, dtype=np.float32).copy()
-            for name, audio in project.stems.items()
-        }
+        stems = {}
+        for name, audio in project.stems.items():
+            source = np.asarray(audio, dtype=np.float32)
+            padded = np.zeros((rendered.frame_count, source.shape[1]), dtype=np.float32)
+            count = min(len(source), rendered.frame_count)
+            padded[:count] = source[:count]
+            stems[name] = padded
         aliases = {"hat": "hats", "break": "synthetic_break"}
         event_voices = {
             event.voice_id for event in canonical_score.events
             if event.kind not in {"control", "marker"}
         }
+        event_voices.update(str(item) for item in render_event_voices if str(item).strip())
         empty = np.zeros((rendered.frame_count, 2), dtype=np.float32)
         peak_ceiling = 10.0 ** (-1.0 / 20.0)
         for voice_id in sorted(event_voices):
@@ -1603,13 +1665,20 @@ class MainWindow(QMainWindow):
             ],
         }
         score_metadata = dict(canonical_score.metadata)
+        score_metadata.pop("m33_render_event_voices", None)
         score_metadata["m18_score_automation"] = automation_summary
         score_metadata["render_stems"] = list(stems)
+        score_metadata["sample_rate"] = project.sample_rate
+        score_metadata["frame_count"] = rendered.frame_count
+        score_metadata["duration_seconds"] = rendered.frame_count / float(project.sample_rate)
         controlled_score = replace(canonical_score, metadata=score_metadata)
+        if ARRANGEMENT_METADATA_KEY in controlled_score.metadata:
+            from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+            controlled_score = refresh_arrangement_fingerprint(controlled_score)
         project_metadata = dict(project.metadata)
         project_metadata["m18_score_automation"] = automation_summary
         return ReawarpProject(
-            config=project.config,
+            config=render_config,
             sample_rate=project.sample_rate,
             stems=stems,
             events=list(project.events),
@@ -1617,6 +1686,313 @@ class MainWindow(QMainWindow):
             score=controlled_score,
         )
 
+
+    def _m33_refresh_score_workspaces(self, score) -> None:
+        self.score_automation_editor.set_score(score)
+        self.phrase_workbench.set_score(score)
+        self.attention_map_page.set_score(score)
+        self.arrangement_page.set_score(score)
+        self._update_project_context()
+
+    def _m33_commit_score(self, updated, message: str, *, render: bool = True) -> None:
+        if self.project is None:
+            return
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+            or self._pending_export_destination is not None
+        ):
+            self.arrangement_page.set_status(
+                "Wait for the current render, export or print operation to finish."
+            )
+            return
+        current = self.project.to_score()
+        if updated.to_dict() == current.to_dict():
+            return
+        if render:
+            base_project = self.project
+            render_metadata = dict(updated.metadata)
+            render_metadata["m33_render_event_voices"] = sorted({
+                event.voice_id for event in current.events
+                if event.kind not in {"control", "marker"}
+            } | {
+                event.voice_id for event in updated.events
+                if event.kind not in {"control", "marker"}
+            })
+            updated = replace(updated, metadata=render_metadata)
+            self._m33_preserve_candidates = True
+            self._run_render(
+                lambda cancel_event: self._render_score_automation_project(
+                    base_project, updated, cancel_event=cancel_event
+                ),
+                message,
+            )
+        else:
+            self.project.score = updated
+            self._m33_refresh_score_workspaces(updated)
+            self.arrangement_page.set_status(message)
+            self.statusBar().showMessage(message, 8000)
+
+    def _m33_apply_edit(self, action, message: str, *, render: bool = True) -> None:
+        if self.project is None:
+            self.arrangement_page.set_status("Generate or load a project first.")
+            return
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+            or self._pending_export_destination is not None
+        ):
+            self.arrangement_page.set_status("Wait for the current background operation to finish.")
+            return
+        try:
+            updated = action(self.project.to_score())
+        except Exception as exc:
+            self.arrangement_page.set_status(f"Arrangement edit rejected: {exc}")
+            return
+        self._m33_commit_score(updated, message, render=render)
+
+    def _m33_create_requested(self) -> None:
+        self._m33_apply_edit(
+            create_arrangement, "Creating the M33 arrangement from the current phrase plan…",
+            render=False,
+        )
+
+    def _m33_move_requested(self, clip_id: str, beat: str) -> None:
+        self._m33_apply_edit(
+            lambda score: move_clip(score, clip_id, beat),
+            f"Moving {clip_id} and rebuilding event-backed voices…",
+        )
+
+    def _m33_duplicate_requested(self, clip_id: str, beat: str) -> None:
+        self._m33_apply_edit(
+            lambda score: duplicate_clip(score, clip_id, beat or None),
+            f"Duplicating {clip_id} with new event identities…",
+        )
+
+    def _m33_trim_requested(self, clip_id: str, start: str, end: str) -> None:
+        self._m33_apply_edit(
+            lambda score: trim_clip(score, clip_id, start, end),
+            f"Trimming {clip_id} on exact Score beats…",
+        )
+
+    def _m33_reorder_requested(self, clip_id: str, index: int) -> None:
+        self._m33_apply_edit(
+            lambda score: reorder_clip(score, clip_id, index),
+            f"Reordering {clip_id} and updating linked cue positions…",
+        )
+
+    def _m33_mute_requested(self, clip_id: str, muted: bool) -> None:
+        self._m33_apply_edit(
+            lambda score: set_clip_muted(score, clip_id, muted),
+            f"{'Muting' if muted else 'Unmuting'} {clip_id} and rendering the arrangement…",
+        )
+
+    def _m33_exchange_requested(self, clip_id: str, source: str, target: str) -> None:
+        self._m33_apply_edit(
+            lambda score: exchange_clip_layer(score, clip_id, source, target),
+            f"Exchanging the {source} layer for {target} in {clip_id}…",
+        )
+
+    def _m33_replace_requested(self, clip_id: str, candidate_id: str) -> None:
+        candidate = self._phrase_candidates.get(candidate_id)
+        if candidate is None:
+            self.arrangement_page.set_status(
+                "The selected M28 candidate is no longer available; generate it again."
+            )
+            return
+        self._m33_apply_edit(
+            lambda score: replace_clip_with_candidate(score, clip_id, candidate),
+            f"Replacing {clip_id} with candidate {candidate_id}…",
+        )
+
+    def _m33_freeze_requested(self, clip_id: str) -> None:
+        self._m33_apply_edit(
+            lambda score: freeze_clip(score, clip_id),
+            f"Freezing {clip_id} as an explicit arrangement selection.",
+            render=False,
+        )
+
+    def _m33_branch_requested(self) -> None:
+        self._m33_apply_edit(
+            branch_arrangement, "Branching the current arrangement without changing source events.",
+            render=False,
+        )
+
+    def _m33_revert_requested(self) -> None:
+        self._m33_apply_edit(
+            revert_to_generation, "Restoring the preserved generation Score and rebuilding its audio…",
+        )
+
+    def _m33_undo_requested(self) -> None:
+        self._m33_apply_edit(
+            undo_arrangement_edit, "Undoing the last arrangement edit and rerendering the Score…",
+        )
+
+    def _m33_redo_requested(self) -> None:
+        self._m33_apply_edit(
+            redo_arrangement_edit, "Redoing the arrangement edit and rerendering the Score…",
+        )
+
+    def _m33_move_transition_requested(self, transition_id: str, beat: str) -> None:
+        self._m33_apply_edit(
+            lambda score: move_transition(score, transition_id, beat),
+            f"Moving M30 transition cue {transition_id}.", render=False,
+        )
+
+    def _m33_move_ending_requested(self, ending_id: str, beat: str) -> None:
+        self._m33_apply_edit(
+            lambda score: move_ending(score, ending_id, beat),
+            f"Moving M30 ending cue {ending_id}.", render=False,
+        )
+
+    def _m33_relink_transition_requested(
+        self, transition_id: str, source_phrase_id: str, target_phrase_id: str,
+    ) -> None:
+        self._m33_apply_edit(
+            lambda score: relink_transition(
+                score, transition_id, source_phrase_id, target_phrase_id
+            ),
+            f"Relinking M30 transition {transition_id} to the selected phrase order.",
+            render=False,
+        )
+
+    def _m33_checklist_changed(self, item: str, checked: bool) -> None:
+        self._m33_apply_edit(
+            lambda score: set_checklist_item(score, item, checked),
+            f"Finishing checklist updated: {item.replace('_', ' ')}.",
+            render=False,
+        )
+
+    def _m33_print_requested(self, clip_id: str) -> None:
+        if self.project is None:
+            self.arrangement_page.set_status("Generate or load a project first.")
+            return
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+            or self._pending_export_destination is not None
+        ):
+            self.arrangement_page.set_status("Wait for the current background operation to finish.")
+            return
+        try:
+            score = self.project.to_score()
+            plan = ArrangementPlan.from_score(score)
+            clip = next(item for item in plan.clips if item.clip_id == clip_id)
+            clip_score = clip_score_for_render(score, clip_id)
+            start_seconds = float(score.beat_to_seconds(clip.start_beats))
+            end_seconds = float(score.beat_to_seconds(clip.end_beats))
+            frame_start = max(0, int(np.floor(start_seconds * self.project.sample_rate)))
+            frame_end = max(frame_start + 1, int(np.ceil(end_seconds * self.project.sample_rate)))
+        except Exception as exc:
+            self.arrangement_page.set_status(f"Could not prepare print: {exc}")
+            return
+        suggested = str(Path.home() / f"reawarp_{clip_id}_print.wav")
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Print phrase to a new WAV object", suggested, "WAV audio (*.wav)"
+        )
+        if not destination:
+            return
+        if not destination.lower().endswith(".wav"):
+            destination += ".wav"
+        project = self.project
+        revision = plan.revision
+        sample_rate = int(project.sample_rate)
+        self.arrangement_page.set_status(
+            "Rendering the selected phrase offline to a separate WAV object. Existing stems are untouched."
+        )
+
+        def operation(cancel_event):
+            if cancel_event.is_set():
+                raise RuntimeError("arrangement print cancelled")
+            config = replace(
+                project.config,
+                duration=max(project.config.duration, end_seconds + 0.01),
+            )
+            rendered = ReawarpEngine().render_score(
+                clip_score, config=config, frame_count=frame_end,
+                cancel_event=cancel_event,
+            )
+            if cancel_event.is_set():
+                raise RuntimeError("arrangement print cancelled")
+            rendered_mix = np.asarray(rendered.render_master(), dtype=np.float32)
+            if rendered_mix.ndim == 1:
+                rendered_mix = np.repeat(rendered_mix[:, None], 2, axis=1)
+            if rendered_mix.shape[1] == 1:
+                rendered_mix = np.repeat(rendered_mix, 2, axis=1)
+            mixed = np.zeros((frame_end - frame_start, 2), dtype=np.float32)
+            left = min(frame_start, len(rendered_mix))
+            right = min(frame_end, len(rendered_mix))
+            if right > left:
+                mixed[:right - left] = rendered_mix[left:right, :2]
+            output_path = Path(destination).expanduser()
+            write_wav(output_path, mixed, sample_rate, bit_depth=24)
+            digest = hashlib.sha256(output_path.read_bytes()).hexdigest()
+            return {
+                "clip_id": clip_id, "revision": revision, "path": str(output_path),
+                "sha256": digest, "sample_rate": sample_rate,
+                "frame_count": len(mixed),
+            }
+
+        self._m33_print_pending = {"project": project, "revision": revision}
+        self.cancel_background_button.setVisible(True)
+        self.cancel_background_button.setEnabled(True)
+        worker = CancellableRenderWorker(operation)
+        self._m33_print_worker = worker
+        worker.signals.finished.connect(self._m33_print_finished)
+        worker.signals.error.connect(self._m33_print_failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _m33_print_finished(self, result: object) -> None:
+        self._m33_print_worker = None
+        pending = self._m33_print_pending
+        self._m33_print_pending = None
+        if not isinstance(result, dict) or pending is None:
+            self.arrangement_page.set_status("Print worker returned an invalid result.")
+            if self._worker is None and self._export_worker is None:
+                self.cancel_background_button.setEnabled(False)
+                self.cancel_background_button.setVisible(False)
+            return
+        if self.project is not pending["project"]:
+            self.arrangement_page.set_status(
+                f"Printed file created at {result['path']}, but the active project changed; lineage was not attached."
+            )
+            if self._worker is None and self._export_worker is None:
+                self.cancel_background_button.setEnabled(False)
+                self.cancel_background_button.setVisible(False)
+            return
+        try:
+            plan = ArrangementPlan.from_score(self.project.to_score())
+            if plan.revision != result["revision"]:
+                raise ValueError("arrangement changed while print was running")
+            updated = record_print(
+                self.project.to_score(), result["clip_id"], path=result["path"],
+                sha256=result["sha256"], sample_rate=result["sample_rate"],
+                frame_count=result["frame_count"],
+            )
+            self.project.score = updated
+            self._m33_refresh_score_workspaces(updated)
+            self.arrangement_page.set_status(
+                f"Printed {result['path']} · {result['frame_count']:,} frames · SHA-256 {result['sha256'][:16]}…"
+            )
+        except Exception as exc:
+            self.arrangement_page.set_status(
+                f"Printed WAV exists at {result['path']}, but could not attach its lineage: {exc}"
+            )
+        if self._worker is None and self._export_worker is None:
+            self.cancel_background_button.setEnabled(False)
+            self.cancel_background_button.setVisible(False)
+
+    def _m33_print_failed(self, message: str) -> None:
+        self._m33_print_worker = None
+        self._m33_print_pending = None
+        detail = str(message)
+        self.arrangement_page.set_status(
+            "Arrangement print cancelled." if detail.startswith("CANCELLED:")
+            else f"Arrangement print failed: {detail.splitlines()[0]}"
+        )
+        if self._worker is None and self._export_worker is None:
+            self.cancel_background_button.setEnabled(False)
+            self.cancel_background_button.setVisible(False)
 
     @staticmethod
     def _phrase_plan_for_score(score) -> PhrasePlan:
@@ -1634,6 +2010,11 @@ class MainWindow(QMainWindow):
             self.phrase_workbench.set_error("Phrase ID cannot be empty.")
             return
         score = self.project.to_score()
+        if ARRANGEMENT_METADATA_KEY in score.metadata:
+            self.phrase_workbench.set_error(
+                "Phrase definitions are locked by the active arrangement. Revert to generation before changing phrase grammar."
+            )
+            return
         if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
             self.phrase_workbench.set_error(
                 "This phrase is frozen. Restore its source before editing its definition."
@@ -1698,6 +2079,11 @@ class MainWindow(QMainWindow):
         if self.project is None:
             return
         score = self.project.to_score()
+        if ARRANGEMENT_METADATA_KEY in score.metadata:
+            self.phrase_workbench.set_error(
+                "Phrase definitions are locked by the active arrangement. Revert to generation before deleting a phrase."
+            )
+            return
         if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
             self.phrase_workbench.set_error("Restore this frozen phrase before deleting it.")
             return
@@ -1816,6 +2202,7 @@ class MainWindow(QMainWindow):
             item.candidate_id: item for item in batch.candidates
         }
         self.phrase_workbench.set_candidates(list(batch.candidates))
+        self.arrangement_page.set_candidates(list(batch.candidates))
         self.phrase_workbench.set_error(
             f"{len(batch.candidates)} candidates ready · batch {batch.batch_id} · "
             "candidate order is deterministic for this request."
@@ -1839,6 +2226,11 @@ class MainWindow(QMainWindow):
             return
         candidate = self._phrase_candidates.get(candidate_id)
         if candidate is None:
+            return
+        if ARRANGEMENT_METADATA_KEY in self.project.to_score().metadata:
+            self.phrase_workbench.set_error(
+                "Use FREEZE SELECTION in Arrangement Editor; the M33 timeline owns the selected material now."
+            )
             return
         try:
             frozen, _record = freeze_phrase_candidate(
@@ -1868,6 +2260,11 @@ class MainWindow(QMainWindow):
 
     def _phrase_restore_requested(self, phrase_id: str) -> None:
         if self.project is None:
+            return
+        if ARRANGEMENT_METADATA_KEY in self.project.to_score().metadata:
+            self.phrase_workbench.set_error(
+                "Restore the generation base from Arrangement Editor to leave the M33 composition."
+            )
             return
         try:
             restored = restore_phrase_base(self.project.to_score(), phrase_id)
@@ -2241,9 +2638,12 @@ class MainWindow(QMainWindow):
 
 
     def _attention_plan_changed(self, payload: dict[str, Any]) -> None:
-        if self._worker is not None or self._export_worker is not None:
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+        ):
             self.attention_map_page.set_error(
-                "Attention map edits are paused during an active render or export."
+                "Attention map edits are paused during an active render, export or phrase print."
             )
             return
         if self.project is None:
@@ -2266,6 +2666,9 @@ class MainWindow(QMainWindow):
             updated, orphaned_gestures = reconcile_attention_gestures(
                 updated, plan.attention
             )
+            if ARRANGEMENT_METADATA_KEY in updated.metadata:
+                from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+                updated = refresh_arrangement_fingerprint(updated)
             self.project.score = updated
             self.project.metadata = {
                 **self.project.metadata,
@@ -2276,6 +2679,8 @@ class MainWindow(QMainWindow):
             self.attention_map_page.set_error(f"Could not save attention map: {exc}")
             return
         self.attention_map_page.set_score(updated)
+        if hasattr(self, "arrangement_page"):
+            self.arrangement_page.set_score(updated)
         if orphaned_gestures:
             base_project = self.project
             self._run_render(
@@ -2300,9 +2705,12 @@ class MainWindow(QMainWindow):
                 "Generate or load a composition before applying render gestures."
             )
             return
-        if self._worker is not None or self._export_worker is not None:
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+        ):
             self.attention_map_page.set_error(
-                "Wait for the active render or export before applying an attention gesture."
+                "Wait for the active render, export or phrase print before applying an attention gesture."
             )
             return
         try:
@@ -2339,9 +2747,12 @@ class MainWindow(QMainWindow):
                 "Generate or load a composition before resetting render gestures."
             )
             return
-        if self._worker is not None or self._export_worker is not None:
+        if (
+            self._worker is not None or self._export_worker is not None
+            or self._m33_print_worker is not None
+        ):
             self.attention_map_page.set_error(
-                "Wait for the active render or export before resetting an attention gesture."
+                "Wait for the active render, export or phrase print before resetting an attention gesture."
             )
             return
         try:
@@ -2384,6 +2795,9 @@ class MainWindow(QMainWindow):
                 disposition=str(payload["disposition"]),
                 notes=str(payload.get("notes", "")),
             )
+            if ARRANGEMENT_METADATA_KEY in updated.metadata:
+                from reawarp.composition.arrangement import refresh_arrangement_fingerprint
+                updated = refresh_arrangement_fingerprint(updated)
             self.project.score = updated
             self.project.metadata = {
                 **self.project.metadata,
@@ -2395,6 +2809,8 @@ class MainWindow(QMainWindow):
             self.attention_map_page.set_error(f"Could not record attention review: {exc}")
             return
         self.attention_map_page.set_score(updated)
+        if hasattr(self, "arrangement_page"):
+            self.arrangement_page.set_score(updated)
         self.statusBar().showMessage(
             f"Attention review recorded · {payload['disposition']}.",
             6000,
@@ -3568,7 +3984,7 @@ class MainWindow(QMainWindow):
 
     def _cancel_background_job(self) -> None:
         cancelled = False
-        for worker in (self._worker, self._export_worker):
+        for worker in (self._worker, self._export_worker, self._m33_print_worker):
             if worker is not None:
                 worker.cancel()
                 cancelled = True
@@ -3580,6 +3996,12 @@ class MainWindow(QMainWindow):
             )
 
     def _run_render(self, operation: Any, message: str) -> None:
+        if self._m33_print_worker is not None:
+            self.statusBar().showMessage(
+                "A phrase print is in progress; finish or cancel it before starting another render.",
+                8000,
+            )
+            return
         if self._worker is not None:
             return
         if self._pending_export_destination is not None:
@@ -3640,7 +4062,11 @@ class MainWindow(QMainWindow):
         self.score_automation_editor.set_score(result.to_score())
         self.phrase_workbench.set_score(result.to_score())
         self.attention_map_page.set_score(result.to_score())
-        self._phrase_candidates.clear()
+        self.arrangement_page.set_score(result.to_score())
+        if not self._m33_preserve_candidates:
+            self._phrase_candidates.clear()
+            self.arrangement_page.set_candidates([])
+        self._m33_preserve_candidates = False
         if self._phrase_batch_worker is not None:
             self._phrase_batch_worker.cancel()
             self._phrase_batch_worker = None
@@ -3799,6 +4225,7 @@ class MainWindow(QMainWindow):
 
     def _render_failed(self, message: str) -> None:
         self._worker = None
+        self._m33_preserve_candidates = False
         self._set_busy(False)
         if str(message).startswith("CANCELLED:"):
             self.statusBar().showMessage("Background render cancelled.", 8000)
@@ -4587,6 +5014,7 @@ class MainWindow(QMainWindow):
         if (
             self.project is None
             or self._export_worker is not None
+            or self._m33_print_worker is not None
             or self._pending_export_destination is not None
         ):
             return
@@ -4627,6 +5055,13 @@ class MainWindow(QMainWindow):
 
     def _start_delivery_export(self, destination: Path) -> None:
         """Snapshot the final routed master and launch the folder writer."""
+        if self._m33_print_worker is not None:
+            self._pending_export_destination = destination
+            self.statusBar().showMessage(
+                "Delivery export queued until the active phrase print is attached.",
+                8000,
+            )
+            return
         if self.project is None or self._export_worker is not None:
             self._pending_export_destination = destination
             return
