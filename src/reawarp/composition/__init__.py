@@ -1,5 +1,14 @@
 """Composition-level formal, motif and orchestration planning."""
 
+from reawarp.composition.brief import (
+    BRIEF_SCHEMA_VERSION, CompositionBrief, MutationContract,
+    MaterialIdentity, SourceAssetReference, SourceFamily, AnchorSpec,
+    PitchWorld, ContrastTarget, EndingIntent, TempoFormPolicy,
+    ResolvedCompositionIntent, BoundedExplorationResult,
+    source_families_from_config, resolve_composition_brief,
+    quick_mutation_contracts, bounded_explore_generation_config,
+    resolve_and_explore,
+)
 from reawarp.composition.director import (
     STRUCTURES,
     CompositionPlan,
@@ -54,6 +63,13 @@ from reawarp.composition.orchestration import (
 )
 
 __all__ = [
+    "BRIEF_SCHEMA_VERSION", "CompositionBrief", "MutationContract",
+    "MaterialIdentity", "SourceAssetReference", "SourceFamily", "AnchorSpec",
+    "PitchWorld", "ContrastTarget", "EndingIntent", "TempoFormPolicy",
+    "ResolvedCompositionIntent", "BoundedExplorationResult",
+    "source_families_from_config", "resolve_composition_brief",
+    "quick_mutation_contracts", "bounded_explore_generation_config",
+    "resolve_and_explore",
     "PhraseBoundary",
     "PhraseSpan",
     "PhrasePlan",

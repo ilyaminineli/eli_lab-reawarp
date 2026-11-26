@@ -105,6 +105,14 @@ def test_generator_intent_editor_round_trips_materials_permissions_and_pitch_wor
     assert brief.pitch_world.root == 3
     assert brief.mutation_contracts[0].mutable_fields == ("arrangement_density",)
 
+    # Dormant tempo/duration bounds are ignored unless those fields are granted permission.
+    editor.bpm_min.setValue(120.0)
+    editor.bpm_max.setValue(80.0)
+    editor.duration_min.setValue(30.0)
+    editor.duration_max.setValue(20.0)
+    assert editor.build_brief(config).tempo_form_policy.bpm_bounds == (60.0, 220.0)
+    assert editor.build_brief(config).tempo_form_policy.duration_bounds == (5.0, 180.0)
+
     restored = CompositionIntentEditor()
     restored.set_brief(brief, exploration_enabled=True)
     assert restored.has_user_content()

@@ -387,9 +387,10 @@ class CompositionIntentEditor(QGroupBox):
             materials=tuple(materials),
             anchor=anchor,
             pitch_world=PitchWorld(
-                scale=scale if self._pitch_world_explicit else config.melody_scale,
-                root=root if self._pitch_world_explicit else config.melody_root,
-                tuning_id=(self.tuning_id.text().strip() or "12tet"),
+                scale=scale if self._pitch_world_explicit else "chromatic",
+                root=root if self._pitch_world_explicit else 0,
+                tuning_id=(self.tuning_id.text().strip() or "12tet")
+                if self._pitch_world_explicit else "12tet",
             ),
             pitch_world_explicit=self._pitch_world_explicit,
             source_families=source_families,

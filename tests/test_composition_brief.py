@@ -113,3 +113,37 @@ def test_legacy_brief_is_a_read_only_compatibility_view():
     assert brief.authorship == "legacy"
     assert brief.structured is False
     assert brief.has_user_content is False
+
+
+
+def test_default_pitch_world_does_not_overwrite_generation_config_but_explicit_default_can():
+    from reawarp.composition.brief import PitchWorld, resolve_and_explore
+
+    config = replace(
+        _config(), melody_scale="whole_tone", melody_root=4
+    )
+    implicit = CompositionBrief(
+        brief_id="pitch-inherited",
+        artistic_question="The existing generator pitch world remains authoritative.",
+    )
+    inherited, _, _ = resolve_and_explore(implicit, config)
+    assert inherited.melody_scale == "whole_tone"
+    assert inherited.melody_root == 4
+
+    explicit = CompositionBrief(
+        brief_id="pitch-explicit-reset",
+        artistic_question="Return to chromatic zero-root.",
+        pitch_world=PitchWorld(scale="chromatic", root=0),
+        pitch_world_explicit=True,
+    )
+    reset, _, _ = resolve_and_explore(explicit, config)
+    assert reset.melody_scale == "chromatic"
+    assert reset.melody_root == 0
+
+
+def test_pitch_world_exports_through_public_composition_api():
+    from reawarp.composition import CompositionBrief as PublicCompositionBrief
+    from reawarp.composition import resolve_and_explore as public_resolve
+
+    assert PublicCompositionBrief is CompositionBrief
+    assert callable(public_resolve)
