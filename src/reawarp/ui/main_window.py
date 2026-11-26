@@ -2297,13 +2297,14 @@ class MainWindow(QMainWindow):
             return
         try:
             base_project = self.project
+            original_score = base_project.to_score()
             updated_score = remove_attention_gesture(
-                base_project.to_score(),
+                original_score,
                 role=str(payload["role"]),
                 start_beats=payload["start_beats"],
                 end_beats=payload["end_beats"],
             )
-            if updated_score is base_project.to_score():
+            if updated_score is original_score:
                 self.attention_map_page.set_error(
                     "No render gesture exists for the selected role and beat span."
                 )
