@@ -1,0 +1,21 @@
+{
+  "fixture_id": "m34-audio-conditioning-order-pair-v1",
+  "purpose": "Demonstrate the temporal-order information lost by global audio summaries.",
+  "sample_rate": 22050,
+  "segment_frames": 45056,
+  "segment_alignment": "44 analysis hops of 1024 frames; each segment is surrounded by 2048 silent guard frames",
+  "segments": {
+    "sparse_dark": {"frequency_hz": 110, "pulse_count": 4, "pulse_duration_seconds": 0.16, "amplitude": 0.7},
+    "dense_bright": {"frequency_hz": 3800, "pulse_count": 16, "pulse_duration_seconds": 0.045, "amplitude": 0.7}
+  },
+  "sequences": {
+    "A": ["sparse_dark", "dense_bright"],
+    "B": ["dense_bright", "sparse_dark"]
+  },
+  "current_global_metrics_expected_to_match": [
+    "peak", "rms", "rms_dbfs", "crest_factor_db",
+    "spectral_centroid_hz", "spectral_rolloff85_hz", "spectral_flatness"
+  ],
+  "temporal_order_expected_to_differ": true,
+  "interpretation": "The two examples contain the same audio material in opposite order. A whole-file feature summary cannot describe whether the track moves from sparse/dark to dense/bright or the reverse. This is a limitation demonstration, not proof that audio conditioning improves a composition."
+}

@@ -381,6 +381,22 @@ Evaluate whether audio analysis and the remaining advanced DSP ideas solve a dem
 - The simplest implementation that answers the musical problem is preferred.
 - M24.5–M24.7 status remains accurately marked until each separate design and listening gate passes.
 
+### Research gate review — 26 November 2026
+
+**Decision:** M34 research reviewed; no production implementation approved.
+
+The repository audit found:
+- transient detection and slicing for imported breaks, plus whole-file library metrics (peak/RMS, centroid, rolloff, flatness, onset density and rhythm histogram);
+- no time-indexed library feature curve, confidence model or audio-analysis-to-Score control adapter;
+- M27 bounded mutation contracts, M28 identity-bearing phrase candidates and M32 contextual listening already cover generation/selection, so a separate evolutionary search system has no demonstrated gap;
+- M22 remains intentionally bounded to serial per-stem inserts and fixed SPACE/ECHO returns. M24.5 sidechain semantics and M24.6 feedback networks remain planned; M24.7 parallel branches remain conditional.
+
+The most plausible candidate is audio-conditioned phrase macros, limited initially to density, brightness and activity. A synthetic order-reversal baseline shows that two sequences made from the same sparse/dark and dense/bright materials can have matching whole-file summaries while presenting opposite temporal trajectories. The fixture and regression test are in tests/fixtures/m34/audio_conditioning_order_pair.json and tests/test_m34_research_gate.py.
+
+This proves only that the current aggregate feature API loses temporal order. It does not prove a musical benefit. A real source, an explicit composition problem, a matched static-macro comparison and human listening evidence are still required. The proposed objective acceptance contract and candidate ranking are recorded in docs/M34_RESEARCH_GATE.md.
+
+**Gate outcome:** retain M34 as research/deferred. Do not add production feature code, a UI, new routing schemas, M24.5–M24.7 processors or dependencies until the real-composition and listening evidence passes the gate.
+
 ---
 
 ## Cross-milestone architecture contracts

@@ -221,6 +221,7 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 - [M30 Ending Director design note](docs/M30_ENDING_DIRECTOR.md) — ending strategies, transition actuation and mutation boundaries.
 - [M32 Critical Listening design note](docs/M32_CRITICAL_LISTENING.md) — contextual audition, reversible subtraction, diagnostics and exportable human report.
 - [M33 Arrangement Editor design note](docs/M33_ARRANGEMENT_EDITOR.md) — manual Score-native arrangement, reversible edits, transition/ending cues, dry print-to-WAV and export lineage.
+- [M34 Research Gate review](docs/M34_RESEARCH_GATE.md) — repository audit, synthetic order-reversal baseline, candidate ranking and acceptance conditions; no M34 feature implementation is approved yet.
 - [M31 Sound-Object Workshop design note](docs/M31_SOUND_OBJECT_WORKSHOP.md) — versioned objects, aligned layer audition and print lineage.
 - [M27–M34 development roadmap](docs/ROADMAP_M27_M34.md) — detailed future milestone specifications and agent handoff.
 - [Implementation notes](docs/IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
