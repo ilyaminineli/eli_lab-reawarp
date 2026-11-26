@@ -15,6 +15,7 @@ from reawarp.score.attention import apply_attention_gesture_to_event
 from reawarp.score.events import AutomationLane, AutomationPoint, MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.pitch import EqualTemperamentTuning, tuning_from_score
+from reawarp.score.render import build_score_control_bus
 from reawarp.score.time import (
     MeterMap, MeterPoint, TempoMap, TempoPoint, as_fraction,
 )
@@ -173,7 +174,11 @@ def score_to_midi(
     gesture_export_enabled = bool(gestures)
     voices = sorted({event.voice_id for event in score.events})
     voice_order = {voice: index for index, voice in enumerate(voices)}
-    export_rows: list[tuple[MusicalEvent, MusicalEvent, int, Fraction, int | None]] = []
+    gesture_controls = None
+    if gesture_export_enabled:
+        sample_rate = int(score.metadata.get("sample_rate", 48_000) or 48_000)
+        gesture_controls = build_score_control_bus(score, sample_rate)
+    export_rows: list[tuple[MusicalEvent, MusicalEvent, int, Fraction, int | None, float | None]] = []
     omitted_gesture_events: list[dict[str, Any]] = []
     pan_cc_events: list[dict[str, Any]] = []
     for source_event in score.events:
@@ -203,13 +208,41 @@ def score_to_midi(
                 rendered_event.duration_beats, midi_duration
             ))
         pan_cc_value = None
+        midi_width = None
         if rendered_event.parameters.get("m29_attention_gesture_id"):
             source_pan = float(rendered_event.parameters.get(
                 "pan", rendered_event.parameters.get("spatial_position", 0.0)
             ))
+            frame = gesture_controls.timeline.beat_to_frame(
+                source_event.onset_beats
+            ) if gesture_controls is not None else 0
+            if (
+                gesture_controls is not None
+                and "spatial.pan" in gesture_controls.target_ids
+            ):
+                source_pan = gesture_controls.value_for_context(
+                    "spatial.pan", frame,
+                    event_id=source_event.event_id,
+                    default_value=source_pan,
+                )
             midi_pan = max(-1.0, min(1.0,
                 source_pan * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
                 + float(rendered_event.parameters.get("m29_pan_offset", 0.0))
+            ))
+            source_width = 1.0
+            if (
+                gesture_controls is not None
+                and "spatial.width" in gesture_controls.target_ids
+            ):
+                source_width = gesture_controls.value_for_context(
+                    "spatial.width", frame,
+                    event_id=source_event.event_id,
+                    default_value=1.0,
+                )
+            midi_width = max(0.0, min(2.0,
+                source_width * float(rendered_event.parameters.get(
+                    "m29_spatial_width_factor", 1.0
+                ))
             ))
             pan_cc_value = max(0, min(
                 127, int(round((midi_pan + 1.0) * 63.5))
@@ -225,7 +258,8 @@ def score_to_midi(
                 "value": pan_cc_value,
             })
         export_rows.append((
-            source_event, rendered_event, note, midi_duration, pan_cc_value
+            source_event, rendered_event, note, midi_duration,
+            pan_cc_value, midi_width,
         ))
 
     score_meta = {
@@ -294,7 +328,7 @@ def score_to_midi(
         voice: [] for voice in voices
     }
     sequence = 0
-    for source_event, rendered_event, note, midi_duration, pan_cc_value in export_rows:
+    for source_event, rendered_event, note, midi_duration, pan_cc_value, midi_width in export_rows:
         event = source_event
         channel = event.channel if event.channel is not None else _default_channel(
             event, voice_order
@@ -327,9 +361,7 @@ def score_to_midi(
                 "duration_beats": str(midi_duration),
                 "articulation": rendered_event.articulation,
                 "pan": midi_pan,
-                "spatial_width_factor": rendered_event.parameters.get(
-                    "m29_spatial_width_factor", 1.0
-                ),
+                "spatial_width_factor": midi_width,
             }
             sequence += 1
             voice_items[event.voice_id].append((
