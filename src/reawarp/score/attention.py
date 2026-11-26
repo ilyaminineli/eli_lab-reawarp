@@ -464,7 +464,7 @@ def apply_attention_gesture_to_event(
 
     if not protected:
         try:
-            pan = float(parameters.get("pan", parameters.get("spatial_position", 0.0)))
+            pan = float(parameters.get("pan", 0.0))
         except (TypeError, ValueError):
             pan = 0.0
         pan = float(np.clip(pan, -1.0, 1.0))
