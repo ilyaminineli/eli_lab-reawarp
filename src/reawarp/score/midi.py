@@ -11,8 +11,6 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-
 from reawarp.score.attention import apply_attention_gesture_to_event
 from reawarp.score.events import AutomationLane, AutomationPoint, MusicalEvent
 from reawarp.score.model import Score
@@ -299,10 +297,9 @@ def score_to_midi(
             source_pan = float(rendered_event.parameters.get(
                 "pan", rendered_event.parameters.get("spatial_position", 0.0)
             ))
-            midi_pan = float(np.clip(
+            midi_pan = max(-1.0, min(1.0,
                 source_pan * float(rendered_event.parameters.get("m29_pan_factor", 1.0))
-                + float(rendered_event.parameters.get("m29_pan_offset", 0.0)),
-                -1.0, 1.0,
+                + float(rendered_event.parameters.get("m29_pan_offset", 0.0))
             ))
             payload["m29_midi_rendered"] = {
                 "pitch": rendered_event.pitch,
@@ -313,7 +310,6 @@ def score_to_midi(
                     "m29_spatial_width_factor", 1.0
                 ),
             }
-            payload["m29_midi_source_event"] = event.to_dict()
             sequence += 1
             voice_items[event.voice_id].append((
                 start_tick, 0, sequence,
