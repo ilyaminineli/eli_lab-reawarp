@@ -9,6 +9,7 @@ import secrets
 import shutil
 import tempfile
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,11 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.composition.phrases import (
+    PhrasePlan, PhraseSpan, MotifIdentity, MotifFamily,
+    build_phrase_candidate_batch, branch_phrase_candidate,
+    freeze_phrase_candidate, restore_phrase_base, phrase_context_events,
+)
 from reawarp.export.project_archive import export_project_package
 from reawarp.fx_routing import (
     build_fx_variation_routings, match_audition_level, measure_signal,
@@ -52,6 +58,7 @@ from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.pages.variations import VariationBrowserPage
+from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -95,6 +102,11 @@ class MainWindow(QMainWindow):
         self._variation_ab_buffers: dict[str, np.ndarray] = {}
         self._variation_listening_buffers: dict[str, np.ndarray] = {}
         self._variation_session_epoch = 0
+        self._phrase_batch_worker: CancellableRenderWorker | None = None
+        self._phrase_audition_worker: CancellableRenderWorker | None = None
+        self._phrase_candidates: dict[str, Any] = {}
+        self._phrase_batch_epoch = 0
+        self._phrase_audition_epoch = 0
         self._mix_rows: dict[str, StemRow] = {}
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
@@ -175,13 +187,22 @@ class MainWindow(QMainWindow):
         self.variation_page.loadProjectRequested.connect(self._load_variation_project)
         self.variation_page.listeningItemRequested.connect(self._variation_listening_item)
 
+        self.phrase_workbench = PhraseWorkbenchPage(self)
+        self.phrase_workbench.phraseSaveRequested.connect(self._phrase_save_requested)
+        self.phrase_workbench.phraseDeleteRequested.connect(self._phrase_delete_requested)
+        self.phrase_workbench.batchRequested.connect(self._phrase_batch_requested)
+        self.phrase_workbench.freezeRequested.connect(self._phrase_freeze_requested)
+        self.phrase_workbench.branchRequested.connect(self._phrase_branch_requested)
+        self.phrase_workbench.restoreRequested.connect(self._phrase_restore_requested)
+        self.phrase_workbench.auditionRequested.connect(self._phrase_audition_requested)
+
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
         # code/tests that query the number of workspace pages.
         self.tabs = self.workspace_stack
         for workspace in (
             generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
-            self.variation_page,
+            self.variation_page, self.phrase_workbench,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -192,6 +213,7 @@ class MainWindow(QMainWindow):
             ("FX LAB", "Build reusable non-destructive processing chains and compare results."),
             ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
             ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
+            ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
         ]
         self.navigator = WorkspaceNavigator(
             [
@@ -199,6 +221,7 @@ class MainWindow(QMainWindow):
                     ("Generator", "Create the composition plan and its coordinated sound sources.", 0),
                     ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
                     ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
+                    ("Phrase Workbench", "Develop phrase grammar, motif lineage and contextual candidates.", 6),
                 ]),
                 ("PRODUCE", [
                     ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
@@ -2331,6 +2354,14 @@ class MainWindow(QMainWindow):
             )
         self._fx_project_revision += 1
         self.score_automation_editor.set_score(result.to_score())
+        self.phrase_workbench.set_score(result.to_score())
+        self._phrase_candidates.clear()
+        if self._phrase_batch_worker is not None:
+            self._phrase_batch_worker.cancel()
+            self._phrase_batch_worker = None
+        if self._phrase_audition_worker is not None:
+            self._phrase_audition_worker.cancel()
+            self._phrase_audition_worker = None
         if self._fx_worker is not None:
             self._fx_worker.cancel()
         self._fx_worker = None
