@@ -104,9 +104,13 @@ class MainWindow(QMainWindow):
         self._variation_session_epoch = 0
         self._phrase_batch_worker: CancellableRenderWorker | None = None
         self._phrase_audition_worker: CancellableRenderWorker | None = None
+        self._phrase_compare_worker: CancellableRenderWorker | None = None
         self._phrase_candidates: dict[str, Any] = {}
         self._phrase_batch_epoch = 0
         self._phrase_audition_epoch = 0
+        self._phrase_compare_epoch = 0
+        self._phrase_compare_signature: tuple[str, str, str] | None = None
+        self._phrase_compare_project: ReawarpProject | None = None
         self._mix_rows: dict[str, StemRow] = {}
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
@@ -195,6 +199,10 @@ class MainWindow(QMainWindow):
         self.phrase_workbench.branchRequested.connect(self._phrase_branch_requested)
         self.phrase_workbench.restoreRequested.connect(self._phrase_restore_requested)
         self.phrase_workbench.auditionRequested.connect(self._phrase_audition_requested)
+        self.phrase_workbench.compareRequested.connect(self._phrase_compare_requested)
+        self.phrase_workbench.compareAuditionRequested.connect(
+            self._phrase_comparison_audition_requested
+        )
 
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
@@ -1834,9 +1842,15 @@ class MainWindow(QMainWindow):
         )
 
     def _phrase_audition_requested(self, target: str, context: str) -> None:
-        if self.project is None or self._phrase_audition_worker is not None:
+        if (
+            self.project is None
+            or self._phrase_audition_worker is not None
+            or self._phrase_compare_worker is not None
+        ):
             if self._phrase_audition_worker is not None:
                 self._phrase_audition_worker.cancel()
+            if self._phrase_compare_worker is not None:
+                self._phrase_compare_worker.cancel()
             return
         phrase_id = self.phrase_workbench.selected_phrase_id
         if not phrase_id:
@@ -1970,6 +1984,210 @@ class MainWindow(QMainWindow):
             self.phrase_workbench.set_audition_busy(False, "Phrase audition cancelled.")
         else:
             self.phrase_workbench.set_audition_busy(False, f"Phrase audition failed: {detail}")
+
+
+    def _phrase_compare_requested(self, candidate_id: str, context: str) -> None:
+        if self.project is None:
+            self.phrase_workbench.set_error("Load or generate a project before comparing phrases.")
+            return
+        if self._phrase_audition_worker is not None or self._phrase_compare_worker is not None:
+            self.phrase_workbench.set_error("Another phrase render is already in progress.")
+            return
+        phrase_id = self.phrase_workbench.selected_phrase_id
+        candidate = self._phrase_candidates.get(candidate_id)
+        if not phrase_id or candidate is None:
+            self.phrase_workbench.set_error("Select a phrase and one of its candidates before comparing.")
+            return
+        if candidate.phrase_id != phrase_id:
+            self.phrase_workbench.set_error("The selected candidate belongs to a different phrase.")
+            return
+
+        project = self.project
+        base_score = project.to_score()
+        candidate_score = candidate.candidate_score
+        try:
+            base_plan = PhrasePlan.from_score(base_score)
+            candidate_plan = PhrasePlan.from_score(candidate_score)
+            base_ordered = list(base_plan.phrases)
+            base_index = next(
+                index for index, phrase in enumerate(base_ordered)
+                if phrase.phrase_id == phrase_id
+            )
+            base_phrase = base_ordered[base_index]
+            candidate_phrase = next(
+                phrase for phrase in candidate_plan.phrases
+                if phrase.phrase_id == phrase_id
+            )
+            if (
+                base_phrase.start_beats != candidate_phrase.start_beats
+                or base_phrase.end_beats != candidate_phrase.end_beats
+            ):
+                raise ValueError("candidate phrase boundaries differ from the current source")
+            if set(base_phrase.event_ids) != set(candidate.source_event_ids):
+                raise ValueError("candidate source events no longer match the current phrase")
+            if context not in {"solo", "after_predecessor", "before_successor"}:
+                raise ValueError(f"unsupported phrase comparison context: {context}")
+        except (ValueError, StopIteration) as exc:
+            self.phrase_workbench.set_error(f"Cannot compare this candidate: {exc}")
+            return
+
+        if context == "solo":
+            start_beat, end_beat = base_phrase.start_beats, base_phrase.end_beats
+        elif context == "after_predecessor":
+            start_beat = (
+                base_ordered[base_index - 1].start_beats
+                if base_index > 0 else base_phrase.start_beats
+            )
+            end_beat = base_phrase.end_beats
+        else:
+            start_beat = base_phrase.start_beats
+            end_beat = (
+                base_ordered[base_index + 1].end_beats
+                if base_index + 1 < len(base_ordered) else base_phrase.end_beats
+            )
+
+        sample_rate = int(project.sample_rate)
+        self._phrase_compare_epoch += 1
+        epoch = self._phrase_compare_epoch
+        signature = (phrase_id, candidate_id, context)
+        self._phrase_compare_signature = signature
+        self._phrase_compare_project = project
+        self.phrase_workbench.set_comparison_busy(
+            True,
+            f"Rendering source and candidate in the same {context.replace('_', ' ')} window…",
+        )
+
+        def operation(cancel_event):
+            from reawarp.score.render import build_score_control_bus
+
+            timing = build_score_control_bus(base_score, sample_rate).timeline
+            start_frame = max(0, timing.beat_to_frame(start_beat))
+            end_frame = max(start_frame + 1, timing.beat_to_frame(end_beat))
+            frame_count = min(int(project.frame_count), end_frame)
+            if frame_count <= start_frame:
+                raise ValueError("selected phrase context lies outside the rendered project")
+
+            def render_context(score, events):
+                if cancel_event.is_set():
+                    raise RuntimeError("phrase comparison cancelled")
+                if not events:
+                    return np.zeros((frame_count - start_frame, 2), dtype=np.float32)
+                voices = sorted({event.voice_id for event in events})
+                metadata = copy.deepcopy(score.metadata)
+                metadata["render_stems"] = voices
+                audition_score = replace(
+                    score,
+                    events=tuple(events),
+                    bass_plan=None,
+                    sonority_plan=None,
+                    orchestration_plan=None,
+                    metadata=metadata,
+                )
+                rendered = ReawarpEngine().render_score(
+                    audition_score,
+                    config=project.config,
+                    frame_count=frame_count,
+                    cancel_event=cancel_event,
+                )
+                if cancel_event.is_set():
+                    raise RuntimeError("phrase comparison cancelled")
+                return np.asarray(
+                    rendered.render_master()[start_frame:frame_count],
+                    dtype=np.float32,
+                ).copy()
+
+            base_context = phrase_context_events(base_score, phrase_id)[context]
+            candidate_context = phrase_context_events(candidate_score, phrase_id)[context]
+            reference_audio = render_context(base_score, base_context)
+            candidate_audio = render_context(candidate_score, candidate_context)
+            if cancel_event.is_set():
+                raise RuntimeError("phrase comparison cancelled")
+            comparison = matched_ab(
+                reference_audio, candidate_audio, sample_rate=sample_rate
+            )
+            message = (
+                f"MATCHED A/B · {context.replace('_', ' ').upper()} · "
+                f"{len(base_context)} source event(s) / "
+                f"{len(candidate_context)} candidate event(s) · "
+                "A and B are RMS-matched where peak headroom permits"
+            )
+            return epoch, signature, comparison, message
+
+        worker = CancellableRenderWorker(operation)
+        self._phrase_compare_worker = worker
+        worker.signals.finished.connect(self._phrase_compare_finished)
+        worker.signals.error.connect(
+            lambda message, requested=epoch, requested_signature=signature:
+                self._phrase_compare_failed((requested, requested_signature, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _phrase_compare_finished(self, result: object) -> None:
+        self._phrase_compare_worker = None
+        if not isinstance(result, tuple) or len(result) != 4:
+            self.phrase_workbench.set_comparison_busy(
+                False, "Phrase comparison returned an invalid result."
+            )
+            return
+        epoch, signature, comparison, message = result
+        if epoch != self._phrase_compare_epoch:
+            return
+        if (
+            signature != self._phrase_compare_signature
+            or self.project is not self._phrase_compare_project
+            or signature[0] != self.phrase_workbench.selected_phrase_id
+            or signature[1] != self.phrase_workbench.selected_candidate_id
+        ):
+            self.phrase_workbench.set_comparison_busy(
+                False, "Comparison superseded by a phrase, candidate or project change."
+            )
+            return
+        self.phrase_workbench.set_comparison_busy(False)
+        self.phrase_workbench.set_comparison(
+            comparison["reference"],
+            comparison["candidate"],
+            comparison["difference"],
+            int(comparison["sample_rate"]),
+            message=message,
+        )
+        report = comparison["difference_meter"]
+        self.statusBar().showMessage(
+            f"Phrase matched A/B · difference peak {report['peak_dbfs']:.1f} dBFS",
+            8000,
+        )
+
+    def _phrase_compare_failed(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 3:
+            return
+        epoch, signature, message = payload
+        if epoch != self._phrase_compare_epoch or signature != self._phrase_compare_signature:
+            return
+        self._phrase_compare_worker = None
+        detail = str(message)
+        if detail.startswith("CANCELLED:"):
+            self.phrase_workbench.set_comparison_busy(False, "Phrase comparison cancelled.")
+        else:
+            self.phrase_workbench.set_comparison_busy(
+                False, f"Phrase comparison failed: {detail}"
+            )
+
+    def _phrase_comparison_audition_requested(self, key: str) -> None:
+        audio = self.phrase_workbench.comparison_audio(key)
+        if audio is None:
+            self.phrase_workbench.set_error("Render a phrase comparison before playing A/B/Δ.")
+            return
+        try:
+            self.player.stop()
+            self.player.start(
+                audio,
+                self.phrase_workbench.comparison_sample_rate,
+                device=self.output_device.currentData(),
+            )
+            self.statusBar().showMessage(
+                f"Phrase comparison playback · {key.upper()}", 6000
+            )
+        except Exception as exc:
+            self.phrase_workbench.set_error(f"Audio output unavailable: {exc}")
 
     def _clear_variation_session(self) -> None:
         self._variation_session_epoch += 1

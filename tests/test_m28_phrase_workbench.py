@@ -289,3 +289,49 @@ def test_main_window_registers_phrase_workbench_without_shifting_existing_worksp
     assert window.navigator._workspace_items[6] is not None
     window.close()
     app.processEvents()
+
+
+
+def test_phrase_workbench_compares_source_and_candidate_in_selected_context():
+    _application()
+    score = _attached_score()
+    batch = build_phrase_candidate_batch(
+        score, "phrase-main", count=2, root_seed=74,
+        operations=("transposition", "fragmentation"),
+        batch_id="workbench-ab",
+    )
+    page = PhraseWorkbenchPage()
+    page.set_score(score, selected_phrase_id="phrase-main")
+    page.set_candidates(list(batch.candidates), selected_id=batch.candidates[0].candidate_id)
+
+    requests = []
+    playback = []
+    page.compareRequested.connect(
+        lambda candidate_id, context: requests.append((candidate_id, context))
+    )
+    page.compareAuditionRequested.connect(playback.append)
+    page.audition_context.setCurrentIndex(
+        page.audition_context.findData("before_successor")
+    )
+    assert page.compare_button.isEnabled()
+    page.compare_button.click()
+    assert requests == [(batch.candidates[0].candidate_id, "before_successor")]
+    assert page.audition_tabs.currentWidget() is page.comparison_tab
+
+    page.set_comparison(
+        [0.0, 0.1, 0.0, -0.1],
+        [0.0, 0.2, 0.0, -0.2],
+        [0.0, 0.1, 0.0, -0.1],
+        22_050,
+        message="Matched comparison ready.",
+    )
+    assert page.comparison_audio("reference") == [0.0, 0.1, 0.0, -0.1]
+    assert page.comparison_audio("candidate") == [0.0, 0.2, 0.0, -0.2]
+    assert page.compare_status.text() == "Matched comparison ready."
+    assert page.play_reference_button.isEnabled()
+    assert page.play_candidate_button.isEnabled()
+    assert page.play_difference_button.isEnabled()
+
+    page.play_candidate_button.click()
+    assert playback == ["candidate"]
+    page.close()

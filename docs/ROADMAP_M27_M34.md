@@ -86,7 +86,7 @@ Give each composition an explicit, inspectable identity before generation. Repla
 ## M28 — Phrase Grammar, Motif Families and Candidate Freeze
 
 **Priority:** P0  
-**Status:** In progress — core model, Phrase Workbench and contextual audition implemented in PR #25; CI and full acceptance remain open; broad sound-object transformations remain gated on M31  
+**Status:** In progress — core model, Phrase Workbench, contextual audition and matched-level A/B comparison are implemented; full musical acceptance and broader edge-case coverage remain open; sound-object transformations remain gated on M31  
 **Depends on:** M27; builds on M15, M19, M20, M23  
 **Primary guide basis:** Composition Atlas §§7, 10, 12–14; Advanced Appendix §§2, 10.1, 10.5, 12, 17, 20.
 
@@ -102,6 +102,7 @@ Move the centre of generation from isolated patterns and fixed bar-based section
 - Make transformation operations explicit and provenance-aware: transposition, inversion, retrograde, augmentation, diminution, fragmentation, extension, truncation, displacement, re-orchestration, resampling and timbral translation.
 - Implement a variation ladder from subtle to disruptive; enforce “one principal change” as a selectable development policy, not an absolute rule.
 - Generate multiple phrase candidates offline from a frozen base; audition them in isolation and in preceding/following context.
+- Compare source and candidate in the same context using matched-level A/B copies and a difference signal; keep comparison playback separate from production stems.
 - Freeze a candidate into the Score with its parent identity, source events, seed streams, config delta, selection notes and generator version.
 - Add explicit “continue evolving”, “freeze”, “branch from frozen phrase” and “restore base” actions. Frozen phrases must not silently change when another layer is regenerated.
 
@@ -111,7 +112,7 @@ Move the centre of generation from isolated patterns and fixed bar-based section
 - Each generated variation records which motif dimensions changed and which remained invariant.
 - Frozen phrase content and unrelated score regions are bit-identical under unrelated regeneration.
 - The same candidate request and frozen base reproduce the same candidate list.
-- A user can compare a candidate alone, after its predecessor and before its successor.
+- A user can compare source and candidate in the same phrase context—alone, after its predecessor and before its successor—with matched-level A/B and difference audition.
 - Phrase/Score export and reopen preserve lineage, edits and freeze state.
 - Tests include open phrases, omission, unusual phrase lengths, delayed returns and deliberate no-change repetition.
 
