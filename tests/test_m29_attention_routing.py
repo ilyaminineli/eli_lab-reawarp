@@ -167,7 +167,7 @@ def test_fx_router_clamps_receded_send_and_requires_score_timeline():
     routing["stems"]["melody"]["insert"] = {
         "kind": "bypass", "wet": 0.0, "tail_seconds": 0.0,
     }
-    routing["stems"]["melody"]["sends"] = {"space": 0.9, "echo": 0.9}
+    routing["stems"]["melody"]["sends"] = {"space": 0.9, "echo": 0.7}
     routing["buses"]["space"]["wet"] = 0.0
     routing["buses"]["echo"]["wet"] = 0.0
 
@@ -181,7 +181,7 @@ def test_fx_router_clamps_receded_send_and_requires_score_timeline():
     )
     sends = metadata["audition_audio"]["sends"]["melody"]
     assert sends["space"][200, 0] == pytest.approx(0.1)
-    assert sends["echo"][200, 0] == pytest.approx(0.09)
+    assert sends["echo"][200, 0] == pytest.approx(0.084)
 
     with pytest.raises(ValueError, match="Score control bus timeline"):
         render_fx_routing(
