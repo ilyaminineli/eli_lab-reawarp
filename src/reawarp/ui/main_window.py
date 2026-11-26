@@ -43,7 +43,8 @@ from reawarp.score.render import build_score_control_bus
 from reawarp.score.orchestration_intent import OrchestrationPlan
 from reawarp.score.attention import (
     apply_attention_gesture, build_attention_translation_check,
-    record_attention_review, remove_attention_gesture,
+    record_attention_review, reconcile_attention_gestures,
+    remove_attention_gesture,
 )
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
@@ -2234,6 +2235,9 @@ class MainWindow(QMainWindow):
                 orchestration_plan=plan.to_dict(),
                 metadata=metadata,
             )
+            updated, orphaned_gestures = reconcile_attention_gestures(
+                updated, plan.attention
+            )
             self.project.score = updated
             self.project.metadata = {
                 **self.project.metadata,
@@ -2244,6 +2248,18 @@ class MainWindow(QMainWindow):
             self.attention_map_page.set_error(f"Could not save attention map: {exc}")
             return
         self.attention_map_page.set_score(updated)
+        if orphaned_gestures:
+            base_project = self.project
+            self._run_render(
+                lambda cancel_event: self._render_score_automation_project(
+                    base_project, updated, cancel_event=cancel_event
+                ),
+                (
+                    f"Attention spans changed · removing {orphaned_gestures} orphaned "
+                    "render gesture(s) and rebuilding event-backed voices…"
+                ),
+            )
+            return
         self.statusBar().showMessage(
             "Attention intent saved to Score · project stems and mix are unchanged.",
             6000,
