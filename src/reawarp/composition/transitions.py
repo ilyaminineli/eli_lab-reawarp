@@ -511,6 +511,76 @@ def transition_plans_from_score(score: Score) -> tuple[TransitionPlan, ...]:
     return plans
 
 
+
+@dataclass(frozen=True, slots=True)
+class TransitionActuation:
+    """Resolved M30 transition state at one exact Score beat.
+
+    This is an immutable planning snapshot for a downstream consumer. It does
+    not run inside the audio callback and does not itself render or mutate audio.
+    """
+
+    transition_id: str
+    at_beats: Fraction
+    phase: str
+    atomic_scene_commit: bool
+    scene_state: Mapping[str, Any]
+    participating_roles: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "at_beats", _beat(self.at_beats, "actuation beat"))
+        if self.phase not in {*TRANSITION_PHASES, "complete"}:
+            raise ValueError("unsupported transition actuation phase")
+        object.__setattr__(
+            self, "scene_state", _json_object(self.scene_state, "actuation scene_state")
+        )
+        roles = tuple(_text(item, "actuation role") for item in self.participating_roles)
+        if len(roles) != len(set(roles)):
+            raise ValueError("actuation roles must be unique")
+        object.__setattr__(self, "participating_roles", roles)
+
+
+def transition_actuation_at(
+    score: Score,
+    at_beats: Any,
+) -> tuple[TransitionActuation, ...]:
+    """Resolve transition phases at an exact Score beat.
+
+    Before the change boundary the source scene remains authoritative. At the
+    exact change beat the full target scene is committed atomically; throughout
+    change/arrival and at completion the target snapshot is exposed. Multiple
+    disjoint transition plans may be returned together for one boundary.
+    """
+    if not isinstance(score, Score):
+        raise TypeError("score must be a reawarp Score")
+    beat = _beat(at_beats, "actuation beat")
+    resolved: list[TransitionActuation] = []
+    for plan in transition_plans_from_score(score):
+        if beat < plan.start_beats or beat > plan.end_beats:
+            continue
+        if beat == plan.end_beats:
+            phase = "complete"
+        else:
+            phase = next(
+                (
+                    item.phase for item in plan.phases
+                    if item.start_beats <= beat < item.end_beats
+                ),
+                None,
+            )
+            if phase is None:
+                continue
+        committed = beat >= plan.change_beat
+        resolved.append(TransitionActuation(
+            transition_id=plan.transition_id,
+            at_beats=beat,
+            phase=phase,
+            atomic_scene_commit=beat == plan.change_beat,
+            scene_state=plan.target_state if committed else plan.source_state,
+            participating_roles=plan.participating_roles,
+        ))
+    return tuple(resolved)
+
 __all__ = [
     "TRANSITION_DIMENSIONS",
     "TRANSITION_FORMAT",
@@ -522,4 +592,6 @@ __all__ = [
     "compile_transition_plans",
     "transition_marker_events",
     "transition_plans_from_score",
+    "TransitionActuation",
+    "transition_actuation_at",
 ]

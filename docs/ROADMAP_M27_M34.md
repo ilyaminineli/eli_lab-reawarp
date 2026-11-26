@@ -1,8 +1,8 @@
 # Reawarp — M27–M34 development roadmap
 
 **Agent-facing technical roadmap · 26 November 2026**  
-**Status:** M27 is implemented; M28 and M29 remain in progress with human listening acceptance open; M30 has typed transition contracts and bounded SectionMemory implemented, with EndingDirector and transition actuation still open.  
-**Current baseline:** M30 transition grammar and bounded Score-attached section-memory foundation. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
+**Status:** M27 is implemented; M28 and M29 remain in progress with human listening acceptance open; M30 implementation is complete with formal listening sign-off still open.  
+**Current baseline:** M30 transition grammar, bounded Score-attached section memory, exact-beat transition actuation and typed EndingDirector. M31 — Sound-Object Workshop and Resampling Lineage — is the next planned priority. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -171,7 +171,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 ## M30 — Transition Grammar, Section Memory and Ending Director
 
 **Priority:** P1  
-**Status:** In progress — typed three-phase TransitionPlan / Score-marker compiler and bounded, serializable SectionMemory implemented; EndingDirector, transition actuation and broader formal acceptance remain open  
+**Status:** Implemented; human listening sign-off open — typed three-phase TransitionPlan, exact-beat actuation resolver, bounded serializable SectionMemory, and fingerprinted EndingPlan/EndingDirector with silent Score markers  
 **Depends on:** M28, M29; builds on M7, M15, M20  
 **Primary guide basis:** Field Guide §§8–9; Composition Atlas §§13–14; Advanced Appendix §§5–6, 12, 17, 20.
 
@@ -187,7 +187,7 @@ Make transitions and endings first-class compositional events. Long-form work ne
 - Keep memory capacity explicit (default 12, hard maximum 64). Append is deterministic and idempotent; only the newest section may be revised, with unchanged beat bounds and a higher revision; overflow evicts the oldest state. No global mutable cache or parallel scheduler is introduced.
 - Expose queries for previous section, last motif/role use, motif recurrence, transformation history, unresolved expectations and unconsumed return opportunities. A later motif use closes an earlier return opportunity; an explicit expectation ID resolves its matching open expectation.
 - Attach the versioned memory snapshot and fingerprint to canonical Score metadata without changing audio events. Validate phrase references against an attached M28 PhrasePlan or M20 OrchestrationPlan; store compact trajectory summaries rather than raw time-series.
-- Add delayed return, transformed reprise, interrupted cadence, residue, dissolve and hard-stop ending strategies.
+- Add delayed return, transformed reprise, interrupted cadence, residue, dissolve and hard-stop ending strategies through the typed EndingPlan/EndingDirector contract. Motif returns must reference an open SectionMemory opportunity; interrupted cadences must name an unresolved expectation.
 - Allow an ending to preserve a residual A/B/C identity without introducing new section-level randomness.
 - Make tempo-map changes an explicit composition choice with rational beat location, clear conversion semantics and user review; keep fixed BPM as the default.
 - Scene changes affecting several roles must be atomic at a Score boundary.
@@ -198,10 +198,14 @@ Make transitions and endings first-class compositional events. Long-form work ne
 - Every transition has deterministic timing and can be inspected/reproduced. Compiled Score markers preserve the phase boundaries; one marker carries the whole target scene at the atomic change beat.
 - Existing M20 phrase spans and M28 phrase plans are valid references; compilation is idempotent and leaves unrelated Score events unchanged.
 - Section memory round-trips through a versioned Score metadata record with a verified fingerprint, preserves unrelated events, and validates M20/M28 phrase references. Capacity/eviction, deterministic revision, last-use/recurrence, transformation lineage, expectation resolution and motif-return closure are tested.
-- Ending plans are present in the Score and do not depend on an arbitrary audio fade alone.
+- Ending plans are present in fingerprinted Score metadata with deterministic silent start/completion markers; they do not depend on an arbitrary audio fade alone. Return strategies validate motif/source lineage against open SectionMemory opportunities, and interrupted cadences validate unresolved expectation IDs.
 - A frozen or selected section cannot be modified by an unrelated later section mutation.
-- Tests cover asymmetrical phrases, no-transition repetition, abrupt rupture, silence, false return and multiple ending types.
+- Tests cover asymmetrical phrases, no-transition repetition, abrupt rupture, silence, false return, all six ending strategies, return permissions, unresolved expectations, exact-beat transition actuation and multiple ending types.
 - Tempo-map behaviour is tested for beat-to-second and beat-to-frame conversion; no implied continuously varying tempo is assumed.
+
+### Implementation boundary
+
+Transition actuation is a pure exact-beat resolver that exposes the source scene until the declared change beat and the complete target scene at/after that beat. Ending markers carry explicit directives only. Neither service mutates rendered audio or runs as a parallel playback scheduler; a later arrangement/render action must consume a directive explicitly and retain reversible provenance.
 
 ### Non-goals
 

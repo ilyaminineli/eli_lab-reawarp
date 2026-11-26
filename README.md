@@ -217,6 +217,7 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 ## Documentation
 
 - [Milestone history and current status](docs/MILESTONES.md) — delivered milestone ledger.
+- [M30 Ending Director design note](docs/M30_ENDING_DIRECTOR.md) — ending strategies, transition actuation and mutation boundaries.
 - [M27–M34 development roadmap](docs/ROADMAP_M27_M34.md) — detailed future milestone specifications and agent handoff.
 - [Implementation notes](docs/IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
 - [Dependency ecosystem](docs/DEPENDENCY_ECOSYSTEM.md) — optional dependencies, platform constraints and licensing.

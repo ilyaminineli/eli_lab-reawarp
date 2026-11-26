@@ -28,6 +28,11 @@ from reawarp.composition.perceptual import build_perceptual_orchestration_plan
 from reawarp.composition.transitions import (
     TransitionPhase, TransitionPlan, compile_transition_plans,
     transition_marker_events, transition_plans_from_score,
+    TransitionActuation, transition_actuation_at,
+)
+from reawarp.composition.endings import (
+    ENDING_STRATEGIES, EndingDirector, EndingPlan, compile_ending_plans,
+    ending_marker_events, ending_plans_from_score,
 )
 from reawarp.composition.section_memory import (
     DEFAULT_SECTION_MEMORY_CAPACITY, EXPECTATION_KINDS,
@@ -102,4 +107,7 @@ __all__ = [
     "shape_role_events",
     "section_for_time",
     "transform_motif",
+    "ENDING_STRATEGIES", "EndingDirector", "EndingPlan", "compile_ending_plans",
+    "ending_marker_events", "ending_plans_from_score",
+    "TransitionActuation", "transition_actuation_at",
 ]

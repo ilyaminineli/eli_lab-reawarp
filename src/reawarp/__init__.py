@@ -4,6 +4,11 @@ from reawarp.config import GenerationConfig
 from reawarp.composition.transitions import (
     TransitionPhase, TransitionPlan, compile_transition_plans,
     transition_marker_events, transition_plans_from_score,
+    TransitionActuation, transition_actuation_at,
+)
+from reawarp.composition.endings import (
+    ENDING_STRATEGIES, EndingDirector, EndingPlan, compile_ending_plans,
+    ending_marker_events, ending_plans_from_score,
 )
 from reawarp.composition.section_memory import (
     DEFAULT_SECTION_MEMORY_CAPACITY, MemoryExpectation, ReturnOpportunity,
@@ -108,5 +113,8 @@ __all__ = [
     "fx_automation_to_score_lanes",
     "score_lanes_to_fx_automation",
     "score_to_fx_automation",
+    "ENDING_STRATEGIES", "EndingDirector", "EndingPlan", "compile_ending_plans",
+    "ending_marker_events", "ending_plans_from_score",
+    "TransitionActuation", "transition_actuation_at",
 ]
 __version__ = "0.12.0"
