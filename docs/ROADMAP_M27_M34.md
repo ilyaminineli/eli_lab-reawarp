@@ -147,6 +147,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 - Introduce composition-level “focus” and “recede” operations through presence, register, articulation, density and space before resorting to volume. The first render-facing slice stores reversible role/span gestures in Score provenance and resolves them on render-time event copies: Recede uses deterministic thinning for non-anchor events and shortens note gates; Focus retains the event population and can extend eligible notes by at most 5%, only where the original note-off is already inside the gesture span. Optional semitone translation is supported, and stereo/pan placement moves narrower or wider. No master/fader gain is introduced.
 - Add low-volume and mono checks as separate production views, not destructive master processing.
 - Preserve kick/sub protection and existing M22 bounded routing contracts.
+- Make MIDI export gesture-aware: emitted note population, register and gate duration follow the same deterministic M29 event gestures; pan is approximated with channel-wide MIDI CC 10. Roles sharing one MIDI channel (notably default GM percussion) therefore share pan state rather than receiving independent simultaneous positions. Store omitted source events and rendered/source mapping in Reawarp metadata so a Reawarp import restores canonical events and gesture provenance rather than freezing the performance mutation into the Score.
 
 ### Acceptance criteria
 
@@ -155,7 +156,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 - Warnings identify affected roles, time range and descriptor basis, and can be reviewed as useful, masked or unresolved with project/plan provenance. Matching intentional-merge IDs suppress expected overlap warnings.
 - “Foreground” can change without requiring master gain automation.
 - Mono/low-volume checks operate on analysis/audition copies and never rewrite production audio.
-- Focus/recede changes are explicit and reversible. The implemented first slice rerenders event-backed voices from unchanged canonical Score events, applies to events whose onsets fall in the exact rational-beat half-open span, protects kick/sub and tagged anchors from Recede thinning, and restores the base event render when the gesture is removed. Whole-field texture/ambience and existing M22 routing remain intact. Further phrase-aware space/send articulation, gesture-aware MIDI export parity and complete listening acceptance remain open.
+- Focus/recede changes are explicit and reversible. The render path and MIDI note export apply the same event-level gesture to the exact rational-beat half-open span; kick/sub and tagged anchors are protected from Recede thinning, and the canonical Score is restored on Reawarp MIDI import. Whole-field texture/ambience and existing M22 routing remain intact. Standard MIDI 1.0 receives a channel-wide pan approximation via CC 10; tracks sharing a MIDI channel also share pan state. Stereo-width shaping remains Reawarp metadata because standard MIDI 1.0 has no equivalent per-note width control. Further phrase-aware space/send articulation and complete listening acceptance remain open.
 - Human review can mark a conflict as useful, masked, or unresolved.
 
 ### Non-goals
