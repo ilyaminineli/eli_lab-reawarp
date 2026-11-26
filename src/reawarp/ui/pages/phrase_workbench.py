@@ -242,6 +242,7 @@ class PhraseWorkbenchPage(QWidget):
         self.audition_tabs.addTab(audition_tab, "PHRASE AUDITION")
 
         comparison_tab = QWidget()
+        self.comparison_tab = comparison_tab
         comparison_layout = QVBoxLayout(comparison_tab)
         self.compare_status = QLabel(
             "Select a candidate and render a matched-level comparison in the same phrase context."
@@ -573,6 +574,7 @@ class PhraseWorkbenchPage(QWidget):
         if message:
             self.compare_status.setText(message)
         self.audition_tabs.setCurrentIndex(1)
+        self._refresh_controls()
 
     def clear_comparison(self) -> None:
         self._comparison_buffers = {}
