@@ -190,7 +190,7 @@ def test_memory_rejects_overlap_backwards_time_and_over_capacity_payloads():
         SectionMemory(states=(second, first), capacity=4)
     with pytest.raises(ValueError, match="follow"):
         SectionMemory(capacity=4).append(second).append(
-            replace(first, section_id="earlier")
+            replace(first, section_id="earlier", return_opportunities=())
         )
     with pytest.raises(ValueError, match="more states"):
         SectionMemory(states=(first, second), capacity=1)
