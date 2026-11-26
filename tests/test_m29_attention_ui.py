@@ -55,7 +55,19 @@ def test_attention_map_edits_rational_spans_and_focus_recede_without_audio_gain(
     assert span.register_low == 48
     assert span.onset_density == pytest.approx(0.5)
 
+    gestures = []
+    resets = []
+    page.gestureRequested.connect(gestures.append)
+    page.gestureRemoveRequested.connect(resets.append)
+    page.register_shift.setText("5")
     page.focus_button.click()
+    assert gestures[-1] == {
+        "role": "melody",
+        "start_beats": "1/4",
+        "end_beats": "13/4",
+        "action": "focus",
+        "register_shift_semitones": 5.0,
+    }
     focused = OrchestrationPlan.from_dict(plans[-1]).attention[0]
     assert focused.depth == "foreground"
     assert focused.prominence == pytest.approx(0.85)
@@ -64,6 +76,13 @@ def test_attention_map_edits_rational_spans_and_focus_recede_without_audio_gain(
     assert receded.depth == "background"
     assert receded.prominence == pytest.approx(0.70)
     assert receded.register_low == 48
+    assert gestures[-1]["action"] == "recede"
+    page.reset_gesture_button.click()
+    assert resets == [{
+        "role": "melody",
+        "start_beats": "1/4",
+        "end_beats": "13/4",
+    }]
     page.close()
 
 
