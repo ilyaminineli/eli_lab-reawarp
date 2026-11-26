@@ -86,7 +86,7 @@ Give each composition an explicit, inspectable identity before generation. Repla
 ## M28 — Phrase Grammar, Motif Families and Candidate Freeze
 
 **Priority:** P0  
-**Status:** In progress — core model and symbolic candidate service implemented; workbench integration, broad transformations and full acceptance remain open  
+**Status:** In progress — core model, Phrase Workbench and contextual audition implemented in PR #25; CI and full acceptance remain open; broad sound-object transformations remain gated on M31  
 **Depends on:** M27; builds on M15, M19, M20, M23  
 **Primary guide basis:** Composition Atlas §§7, 10, 12–14; Advanced Appendix §§2, 10.1, 10.5, 12, 17, 20.
 

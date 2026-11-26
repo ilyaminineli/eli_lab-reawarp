@@ -288,3 +288,45 @@ def test_project_archive_round_trip_retains_phrase_plan_and_freeze(tmp_path):
     assert reopened.to_score().metadata["m28_phrase_freezes"] == frozen.metadata[
         "m28_phrase_freezes"
     ]
+
+
+def test_candidate_score_phrase_references_follow_transformed_event_ids():
+    from reawarp.composition.phrases import phrase_context_events
+
+    score = _score()
+    candidate = build_phrase_candidate_batch(
+        score, "phrase-A", count=1, root_seed=41,
+        operations=("fragmentation",), batch_id="candidate-plan-binding",
+    ).candidates[0]
+    plan = PhrasePlan.from_score(candidate.candidate_score)
+    phrase = next(item for item in plan.phrases if item.phrase_id == "phrase-A")
+    assert phrase.event_ids == candidate.target_event_ids
+    assert tuple(
+        event.event_id for event in phrase_context_events(
+            candidate.candidate_score, "phrase-A"
+        )["solo"]
+    ) == candidate.target_event_ids
+
+
+def test_branch_candidate_can_be_frozen_without_losing_original_restore_point():
+    score = _score()
+    first = build_phrase_candidate_batch(
+        score, "phrase-A", count=1, root_seed=51,
+        operations=("transposition",), batch_id="first-freeze",
+    ).candidates[0]
+    frozen, first_record = freeze_phrase_candidate(score, first)
+    branch = branch_phrase_candidate(
+        frozen, "phrase-A", branch_seed="second-generation", count=1,
+    )
+    second = branch.candidates[0]
+    advanced, second_record = freeze_phrase_candidate(
+        frozen, second, selection_note="Second branch selected.",
+    )
+    assert second_record["parent_candidate_id"] == first.candidate_id
+    assert second_record["source_events"] == first_record["source_events"]
+    assert second_record["root_base_score_fingerprint"] == first.base_score_fingerprint
+    restored = restore_phrase_base(advanced, "phrase-A")
+    for event_id in first.source_event_ids:
+        original = next(item for item in score.events if item.event_id == event_id)
+        actual = next(item for item in restored.events if item.event_id == event_id)
+        assert actual.to_dict() == original.to_dict()

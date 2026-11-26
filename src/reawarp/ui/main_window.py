@@ -9,6 +9,7 @@ import secrets
 import shutil
 import tempfile
 from dataclasses import replace
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,11 @@ from PySide6.QtWidgets import (
 from reawarp import GenerationConfig, ReawarpEngine, ReawarpProject
 from reawarp.composition.director import STRUCTURES
 from reawarp.composition.patterns import PATTERN_FAMILIES, PATTERN_RELATIONSHIPS
+from reawarp.composition.phrases import (
+    PhrasePlan, PhraseSpan, MotifIdentity, MotifFamily,
+    build_phrase_candidate_batch, branch_phrase_candidate,
+    freeze_phrase_candidate, restore_phrase_base, phrase_context_events,
+)
 from reawarp.export.project_archive import export_project_package
 from reawarp.fx_routing import (
     build_fx_variation_routings, match_audition_level, measure_signal,
@@ -52,6 +58,7 @@ from reawarp.ui.pages.fx_routing import FXRoutingEditor
 from reawarp.ui.pages.score_automation import ScoreAutomationEditor
 from reawarp.ui.pages.library import LibraryPage
 from reawarp.ui.pages.variations import VariationBrowserPage
+from reawarp.ui.pages.phrase_workbench import PhraseWorkbenchPage
 from reawarp.ui.navigation import WorkspaceNavigator
 from reawarp.ui.theme import APP_STYLE
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -95,6 +102,11 @@ class MainWindow(QMainWindow):
         self._variation_ab_buffers: dict[str, np.ndarray] = {}
         self._variation_listening_buffers: dict[str, np.ndarray] = {}
         self._variation_session_epoch = 0
+        self._phrase_batch_worker: CancellableRenderWorker | None = None
+        self._phrase_audition_worker: CancellableRenderWorker | None = None
+        self._phrase_candidates: dict[str, Any] = {}
+        self._phrase_batch_epoch = 0
+        self._phrase_audition_epoch = 0
         self._mix_rows: dict[str, StemRow] = {}
         self._fx_processed_stems: dict[str, np.ndarray] = {}
         self._fx_bus_returns: dict[str, np.ndarray] = {}
@@ -175,13 +187,22 @@ class MainWindow(QMainWindow):
         self.variation_page.loadProjectRequested.connect(self._load_variation_project)
         self.variation_page.listeningItemRequested.connect(self._variation_listening_item)
 
+        self.phrase_workbench = PhraseWorkbenchPage(self)
+        self.phrase_workbench.phraseSaveRequested.connect(self._phrase_save_requested)
+        self.phrase_workbench.phraseDeleteRequested.connect(self._phrase_delete_requested)
+        self.phrase_workbench.batchRequested.connect(self._phrase_batch_requested)
+        self.phrase_workbench.freezeRequested.connect(self._phrase_freeze_requested)
+        self.phrase_workbench.branchRequested.connect(self._phrase_branch_requested)
+        self.phrase_workbench.restoreRequested.connect(self._phrase_restore_requested)
+        self.phrase_workbench.auditionRequested.connect(self._phrase_audition_requested)
+
         self.workspace_stack = QStackedWidget()
         # Keep the historical attribute as a small compatibility bridge for
         # code/tests that query the number of workspace pages.
         self.tabs = self.workspace_stack
         for workspace in (
             generator_page, break_page, mixer_page, self.fx_lab_page, self.library_page,
-            self.variation_page,
+            self.variation_page, self.phrase_workbench,
         ):
             self.workspace_stack.addWidget(workspace)
 
@@ -192,6 +213,7 @@ class MainWindow(QMainWindow):
             ("FX LAB", "Build reusable non-destructive processing chains and compare results."),
             ("LIBRARY", "Find, organise and reuse the sounds and variations in your Reawarp ecosystem."),
             ("VARIATION BROWSER", "Generate comparable candidates, audition matched A/B and preserve selection lineage."),
+            ("PHRASE WORKBENCH", "Develop Score-native phrases, compare deterministic candidates and audition in context."),
         ]
         self.navigator = WorkspaceNavigator(
             [
@@ -199,6 +221,7 @@ class MainWindow(QMainWindow):
                     ("Generator", "Create the composition plan and its coordinated sound sources.", 0),
                     ("Break Lab", "Transform source breaks for use by the composition engine.", 1),
                     ("Variations", "Batch-generate candidates and compare them before choosing.", 5),
+                    ("Phrase Workbench", "Develop phrase grammar, motif lineage and contextual candidates.", 6),
                 ]),
                 ("PRODUCE", [
                     ("Stem Mixer", "Balance generated roles and shared processing returns.", 2),
@@ -1536,6 +1559,418 @@ class MainWindow(QMainWindow):
             score=controlled_score,
         )
 
+
+    @staticmethod
+    def _phrase_plan_for_score(score) -> PhrasePlan:
+        try:
+            return PhrasePlan.from_score(score)
+        except ValueError:
+            return PhrasePlan(())
+
+    def _phrase_save_requested(self, payload: dict[str, Any]) -> None:
+        if self.project is None:
+            self.phrase_workbench.set_error("Generate or load a composition first.")
+            return
+        phrase_id = str(payload.get("phrase_id", "")).strip()
+        if not phrase_id:
+            self.phrase_workbench.set_error("Phrase ID cannot be empty.")
+            return
+        score = self.project.to_score()
+        if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
+            self.phrase_workbench.set_error(
+                "This phrase is frozen. Restore its source before editing its definition."
+            )
+            return
+        try:
+            start = Fraction(str(payload.get("start_beats", "0")))
+            end = Fraction(str(payload.get("end_beats", "0")))
+            motif_ids = tuple(str(item).strip() for item in payload.get("motif_ids", ()) if str(item).strip())
+            roles = tuple(str(item).strip() for item in payload.get("roles", ()) if str(item).strip())
+            event_ids = tuple(
+                event.event_id for event in score.events
+                if event.kind not in {"control", "marker"}
+                and event.onset_beats >= start and event.end_beats <= end
+            )
+            function = str(payload.get("function", "continuation")).strip()
+            custom_function = payload.get("custom_function")
+            if custom_function:
+                custom_function = str(custom_function).strip()
+            phrase = PhraseSpan(
+                phrase_id=phrase_id,
+                start_beats=start,
+                end_beats=end,
+                function=function,
+                state=str(payload.get("state", "closed")),
+                motif_ids=motif_ids,
+                roles=roles,
+                event_ids=event_ids,
+                custom_function=custom_function,
+            )
+            plan = self._phrase_plan_for_score(score)
+            families = list(plan.motif_families)
+            family_ids = {item.family_id for item in families}
+            for motif_id in motif_ids:
+                if motif_id not in family_ids:
+                    families.append(MotifFamily(
+                        family_id=motif_id,
+                        versions=(MotifIdentity(motif_id),),
+                    ))
+                    family_ids.add(motif_id)
+            phrases = [
+                item for item in plan.phrases if item.phrase_id != phrase_id
+            ]
+            phrases.append(phrase)
+            updated = PhrasePlan(
+                phrases=tuple(phrases),
+                motif_families=tuple(families),
+            ).attach_to_score(score)
+        except Exception as exc:
+            self.phrase_workbench.set_error(f"Could not save phrase: {exc}")
+            return
+        self.project.score = updated
+        self._phrase_candidates.clear()
+        self.phrase_workbench.set_score(updated, selected_phrase_id=phrase_id)
+        self.phrase_workbench.set_candidates([])
+        self.statusBar().showMessage(
+            f"Phrase {phrase_id} saved · {start}–{end} beats · {len(event_ids)} event(s).",
+            8000,
+        )
+
+    def _phrase_delete_requested(self, phrase_id: str) -> None:
+        if self.project is None:
+            return
+        score = self.project.to_score()
+        if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
+            self.phrase_workbench.set_error("Restore this frozen phrase before deleting it.")
+            return
+        plan = self._phrase_plan_for_score(score)
+        phrases = tuple(item for item in plan.phrases if item.phrase_id != phrase_id)
+        if len(phrases) == len(plan.phrases):
+            return
+        used_families = {motif for item in phrases for motif in item.motif_ids}
+        families = tuple(
+            item for item in plan.motif_families if item.family_id in used_families
+        )
+        updated = PhrasePlan(phrases=phrases, motif_families=families).attach_to_score(score)
+        self.project.score = updated
+        self._phrase_candidates.clear()
+        self.phrase_workbench.set_score(updated)
+        self.phrase_workbench.set_candidates([])
+        self.statusBar().showMessage(f"Deleted phrase {phrase_id}.", 5000)
+
+    def _phrase_batch_requested(self, payload: dict[str, Any]) -> None:
+        if self.project is None:
+            return
+        if self._phrase_batch_worker is not None:
+            return
+        score = self.project.to_score()
+        phrase_id = str(payload.get("phrase_id", ""))
+        if phrase_id in score.metadata.get("m28_phrase_freezes", {}):
+            self.phrase_workbench.set_error(
+                "This phrase is frozen. Use BRANCH FROZEN to develop from the selected material."
+            )
+            return
+        try:
+            count = int(payload.get("count", 4))
+            seed = payload.get("root_seed", "0")
+            ladder = str(payload.get("variation_ladder", "moderate"))
+            policy = str(payload.get("development_policy", "one_principal_change"))
+            # Validate phrase existence before scheduling work.
+            plan = PhrasePlan.from_score(score)
+            if phrase_id not in {item.phrase_id for item in plan.phrases}:
+                raise ValueError(f"unknown phrase ID: {phrase_id}")
+        except Exception as exc:
+            self.phrase_workbench.set_error(f"Invalid candidate request: {exc}")
+            return
+        self._phrase_batch_epoch += 1
+        epoch = self._phrase_batch_epoch
+        self.phrase_workbench.set_batch_busy(True)
+
+        def operation(cancel_event):
+            if cancel_event.is_set():
+                raise RuntimeError("phrase candidate generation cancelled")
+            batch = build_phrase_candidate_batch(
+                score,
+                phrase_id,
+                count=count,
+                root_seed=seed,
+                variation_ladder=ladder,
+                development_policy=policy,
+            )
+            if cancel_event.is_set():
+                raise RuntimeError("phrase candidate generation cancelled")
+            return epoch, batch
+
+        worker = CancellableRenderWorker(operation)
+        self._phrase_batch_worker = worker
+        worker.signals.finished.connect(self._phrase_batch_finished)
+        worker.signals.error.connect(
+            lambda message, requested=epoch: self._phrase_batch_failed((requested, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+        self.phrase_workbench.set_error(
+            f"Generating {count} deterministic {ladder} candidates for {phrase_id}…"
+        )
+
+    def _phrase_branch_requested(self, phrase_id: str, branch_seed: str) -> None:
+        if self.project is None or self._phrase_batch_worker is not None:
+            return
+        score = self.project.to_score()
+        count = self.phrase_workbench.candidate_count.value()
+        self._phrase_batch_epoch += 1
+        epoch = self._phrase_batch_epoch
+        self.phrase_workbench.set_batch_busy(True)
+
+        def operation(cancel_event):
+            if cancel_event.is_set():
+                raise RuntimeError("phrase branch generation cancelled")
+            batch = branch_phrase_candidate(
+                score,
+                phrase_id,
+                branch_seed=branch_seed or "0",
+                count=count,
+            )
+            if cancel_event.is_set():
+                raise RuntimeError("phrase branch generation cancelled")
+            return epoch, batch
+
+        worker = CancellableRenderWorker(operation)
+        self._phrase_batch_worker = worker
+        worker.signals.finished.connect(self._phrase_batch_finished)
+        worker.signals.error.connect(
+            lambda message, requested=epoch: self._phrase_batch_failed((requested, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+        self.phrase_workbench.set_error(
+            f"Branching from the frozen phrase {phrase_id}…"
+        )
+
+    def _phrase_batch_finished(self, result: object) -> None:
+        self._phrase_batch_worker = None
+        self.phrase_workbench.set_batch_busy(False)
+        if not isinstance(result, tuple) or len(result) != 2:
+            self.phrase_workbench.set_error("Phrase candidate worker returned an invalid result.")
+            return
+        epoch, batch = result
+        if epoch != self._phrase_batch_epoch:
+            return
+        self._phrase_candidates = {
+            item.candidate_id: item for item in batch.candidates
+        }
+        self.phrase_workbench.set_candidates(list(batch.candidates))
+        self.phrase_workbench.set_error(
+            f"{len(batch.candidates)} candidates ready · batch {batch.batch_id} · "
+            "candidate order is deterministic for this request."
+        )
+
+    def _phrase_batch_failed(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        epoch, message = payload
+        if epoch != self._phrase_batch_epoch:
+            return
+        self._phrase_batch_worker = None
+        self.phrase_workbench.set_batch_busy(False)
+        if str(message).startswith("CANCELLED:"):
+            self.phrase_workbench.set_error("Phrase candidate generation cancelled.")
+        else:
+            self.phrase_workbench.set_error(f"Phrase candidate generation failed: {message}")
+
+    def _phrase_freeze_requested(self, candidate_id: str, selection_note: str) -> None:
+        if self.project is None:
+            return
+        candidate = self._phrase_candidates.get(candidate_id)
+        if candidate is None:
+            return
+        try:
+            frozen, _record = freeze_phrase_candidate(
+                self.project.to_score(),
+                candidate,
+                selection_note=selection_note,
+            )
+        except Exception as exc:
+            self.phrase_workbench.set_error(f"Could not freeze candidate: {exc}")
+            return
+        if self._worker is not None or self._export_worker is not None:
+            self.phrase_workbench.set_error(
+                "Wait for the active render or export to finish before freezing phrase material."
+            )
+            return
+        base_project = self.project
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, frozen, cancel_event=cancel_event
+            ),
+            f"Freezing {candidate_id} into the project and rendering its Score events…",
+        )
+        self.statusBar().showMessage(
+            f"Committing frozen phrase {candidate.phrase_id} · original source and restore lineage are preserved.",
+            10000,
+        )
+
+    def _phrase_restore_requested(self, phrase_id: str) -> None:
+        if self.project is None:
+            return
+        try:
+            restored = restore_phrase_base(self.project.to_score(), phrase_id)
+        except Exception as exc:
+            self.phrase_workbench.set_error(f"Could not restore phrase source: {exc}")
+            return
+        if self._worker is not None or self._export_worker is not None:
+            self.phrase_workbench.set_error(
+                "Wait for the active render or export to finish before restoring phrase material."
+            )
+            return
+        base_project = self.project
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, restored, cancel_event=cancel_event
+            ),
+            f"Restoring {phrase_id} and rendering the original Score events…",
+        )
+        self.statusBar().showMessage(
+            f"Restoring the original event material for {phrase_id} · unrelated Score regions are retained.",
+            9000,
+        )
+
+    def _phrase_audition_requested(self, target: str, context: str) -> None:
+        if self.project is None or self._phrase_audition_worker is not None:
+            if self._phrase_audition_worker is not None:
+                self._phrase_audition_worker.cancel()
+            return
+        phrase_id = self.phrase_workbench.selected_phrase_id
+        if not phrase_id:
+            return
+        candidate_id = self.phrase_workbench.selected_candidate_id
+        candidate = self._phrase_candidates.get(candidate_id or "")
+        if target == "candidate" and candidate is None:
+            self.phrase_workbench.set_error("Select a candidate before auditioning it.")
+            return
+        project = self.project
+        score = candidate.candidate_score if target == "candidate" else project.to_score()
+        sample_rate = int(project.sample_rate)
+        self._phrase_audition_epoch += 1
+        epoch = self._phrase_audition_epoch
+        self.phrase_workbench.set_audition_busy(
+            True, f"Rendering {target} · {context.replace('_', ' ')}…"
+        )
+
+        def operation(cancel_event):
+            plan = PhrasePlan.from_score(score)
+            ordered = list(plan.phrases)
+            phrase_index = next(
+                index for index, item in enumerate(ordered)
+                if item.phrase_id == phrase_id
+            )
+            phrase = ordered[phrase_index]
+            contexts = phrase_context_events(score, phrase_id)
+            if context == "solo":
+                start_beat, end_beat = phrase.start_beats, phrase.end_beats
+                selected_events = contexts["solo"]
+            elif context == "after_predecessor":
+                start_beat = (
+                    ordered[phrase_index - 1].start_beats
+                    if phrase_index > 0 else phrase.start_beats
+                )
+                end_beat = phrase.end_beats
+                selected_events = contexts["after_predecessor"]
+            elif context == "before_successor":
+                start_beat = phrase.start_beats
+                end_beat = (
+                    ordered[phrase_index + 1].end_beats
+                    if phrase_index + 1 < len(ordered) else phrase.end_beats
+                )
+                selected_events = contexts["before_successor"]
+            else:
+                raise ValueError(f"unsupported phrase audition context: {context}")
+            if cancel_event.is_set():
+                raise RuntimeError("phrase audition cancelled")
+
+            from reawarp.score.render import build_score_control_bus
+
+            timing = build_score_control_bus(score, sample_rate).timeline
+            start_frame = max(0, timing.beat_to_frame(start_beat))
+            end_frame = max(start_frame + 1, timing.beat_to_frame(end_beat))
+            frame_count = min(int(project.frame_count), end_frame)
+            start_frame = min(start_frame, frame_count)
+            if frame_count <= start_frame:
+                return (
+                    epoch, np.zeros((0, 2), dtype=np.float32), sample_rate,
+                    f"{target.upper()} · {context.replace('_', ' ').upper()} · outside rendered project",
+                )
+            if not selected_events:
+                audio = np.zeros((frame_count - start_frame, 2), dtype=np.float32)
+            else:
+                # Render just the requested phrase/context event set. Remove
+                # event-linked planning snapshots whose references intentionally
+                # describe the full composition, not this temporary audition view.
+                voices = sorted({event.voice_id for event in selected_events})
+                metadata = copy.deepcopy(score.metadata)
+                metadata["render_stems"] = voices
+                audition_score = replace(
+                    score,
+                    events=tuple(selected_events),
+                    bass_plan=None,
+                    sonority_plan=None,
+                    orchestration_plan=None,
+                    metadata=metadata,
+                )
+                rendered = ReawarpEngine().render_score(
+                    audition_score,
+                    config=project.config,
+                    frame_count=frame_count,
+                    cancel_event=cancel_event,
+                )
+                audio = rendered.render_master()[start_frame:frame_count].copy()
+            if cancel_event.is_set():
+                raise RuntimeError("phrase audition cancelled")
+            message = (
+                f"{target.upper()} · {context.replace('_', ' ').upper()} · "
+                f"{len(selected_events)} event(s) · {len(audio) / sample_rate:.2f} s"
+            )
+            return epoch, audio, sample_rate, message
+
+        worker = CancellableRenderWorker(operation)
+        self._phrase_audition_worker = worker
+        worker.signals.finished.connect(self._phrase_audition_finished)
+        worker.signals.error.connect(
+            lambda message, requested=epoch: self._phrase_audition_failed((requested, message))
+        )
+        QThreadPool.globalInstance().start(worker)
+
+    def _phrase_audition_finished(self, result: object) -> None:
+        self._phrase_audition_worker = None
+        if not isinstance(result, tuple) or len(result) != 4:
+            self.phrase_workbench.set_audition_busy(False, "Phrase audition returned an invalid result.")
+            return
+        epoch, audio, sample_rate, message = result
+        if epoch != self._phrase_audition_epoch:
+            return
+        self.phrase_workbench.set_audition_busy(False)
+        self.phrase_workbench.set_audition_audio(audio, sample_rate, message=message)
+        if isinstance(audio, np.ndarray) and audio.size:
+            try:
+                self.player.stop()
+                self.player.start(
+                    audio, sample_rate, device=self.output_device.currentData()
+                )
+                self.statusBar().showMessage(f"Phrase audition · {message}", 8000)
+            except Exception as exc:
+                self.phrase_workbench.set_error(f"Audio output unavailable: {exc}")
+
+    def _phrase_audition_failed(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        epoch, message = payload
+        if epoch != self._phrase_audition_epoch:
+            return
+        self._phrase_audition_worker = None
+        detail = str(message)
+        if detail.startswith("CANCELLED:"):
+            self.phrase_workbench.set_audition_busy(False, "Phrase audition cancelled.")
+        else:
+            self.phrase_workbench.set_audition_busy(False, f"Phrase audition failed: {detail}")
+
     def _clear_variation_session(self) -> None:
         self._variation_session_epoch += 1
         if hasattr(self, "variation_page"):
@@ -2331,6 +2766,14 @@ class MainWindow(QMainWindow):
             )
         self._fx_project_revision += 1
         self.score_automation_editor.set_score(result.to_score())
+        self.phrase_workbench.set_score(result.to_score())
+        self._phrase_candidates.clear()
+        if self._phrase_batch_worker is not None:
+            self._phrase_batch_worker.cancel()
+            self._phrase_batch_worker = None
+        if self._phrase_audition_worker is not None:
+            self._phrase_audition_worker.cancel()
+            self._phrase_audition_worker = None
         if self._fx_worker is not None:
             self._fx_worker.cancel()
         self._fx_worker = None

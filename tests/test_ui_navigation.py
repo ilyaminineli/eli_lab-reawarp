@@ -66,7 +66,10 @@ def test_navigator_supports_nested_groups_and_emits_only_workspace_selections():
 def test_main_window_navigation_keeps_workspace_stack_and_transport_in_sync():
     app = _application()
     window = MainWindow()
-    expected_titles = ["GENERATOR", "BREAK LAB", "STEM MIXER", "FX LAB", "LIBRARY", "VARIATION BROWSER"]
+    expected_titles = [
+        "GENERATOR", "BREAK LAB", "STEM MIXER", "FX LAB", "LIBRARY",
+        "VARIATION BROWSER", "PHRASE WORKBENCH",
+    ]
 
     for index, expected_title in enumerate(expected_titles):
         window._set_workspace(index)
