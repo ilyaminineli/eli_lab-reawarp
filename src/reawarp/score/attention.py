@@ -339,6 +339,46 @@ def remove_attention_gesture(
     return replace(score, metadata=metadata)
 
 
+def reconcile_attention_gestures(
+    score: Any,
+    attention_spans: Iterable[AttentionSpan],
+) -> tuple[Any, int]:
+    """Drop render gestures whose exact role/span no longer exists in the attention plan."""
+    from reawarp.score.model import Score
+
+    if not isinstance(score, Score):
+        raise TypeError("score must be a reawarp Score")
+    aliases = {"hats": "hat", "synthetic_break": "break"}
+    valid = {
+        (
+            aliases.get(span.role, span.role),
+            str(span.start_beats),
+            str(span.end_beats),
+        )
+        for span in attention_spans
+    }
+    metadata = copy.deepcopy(score.metadata)
+    records = _validated_attention_gestures(
+        metadata.get("m29_attention_gestures", [])
+    )
+    remaining = [
+        item for item in records
+        if (
+            aliases.get(item["role"], item["role"]),
+            item["start_beats"],
+            item["end_beats"],
+        ) in valid
+    ]
+    removed = len(records) - len(remaining)
+    if not removed:
+        return score, 0
+    if remaining:
+        metadata["m29_attention_gestures"] = list(remaining)
+    else:
+        metadata.pop("m29_attention_gestures", None)
+    return replace(score, metadata=metadata), removed
+
+
 def apply_attention_gesture_to_event(
     event: Any,
     gestures: Any,
@@ -445,5 +485,6 @@ __all__ = [
     "build_attention_translation_check",
     "estimate_attention_descriptors",
     "record_attention_review",
+    "reconcile_attention_gestures",
     "remove_attention_gesture",
 ]
