@@ -130,3 +130,55 @@ def test_attention_map_estimates_symbolic_descriptors_and_exposes_translation_ch
     page.low_volume_button.click()
     assert checks == ["mono", "low_volume"]
     page.close()
+
+
+def test_main_window_persists_attention_plan_and_review_without_rerendering():
+    _application()
+    from reawarp.ui.main_window import MainWindow
+
+    plan = OrchestrationPlan(attention=(
+        AttentionSpan("melody", 0, 4, "foreground", attention_role="motif"),
+    ))
+    score = Score(orchestration_plan=plan.to_dict(), metadata={"keep": True})
+
+    class Project:
+        def __init__(self, current):
+            self.score = current
+            self.metadata = {"project_key": "preserved"}
+
+        def to_score(self):
+            return self.score
+
+    window = MainWindow()
+    window.project = Project(score)
+    updated_plan = OrchestrationPlan(attention=(
+        AttentionSpan(
+            "melody", 0, 4, "background", attention_role="motif",
+            prominence=0.3,
+        ),
+        AttentionSpan(
+            "texture", 4, 8, "foreground", attention_role="harmonic_field",
+            handoff_id="handoff-01",
+        ),
+    ))
+    # A single side is intentionally visible as an incomplete hand-off until
+    # the matching source/target span is authored; this is metadata only.
+    window._attention_plan_changed(updated_plan.to_dict())
+    persisted = window.project.to_score()
+    assert persisted.orchestration_plan == updated_plan.to_dict()
+    assert persisted.metadata["keep"] is True
+    assert window.project.metadata["project_key"] == "preserved"
+
+    conflict = {
+        "kind": "attention_competition", "roles": ["melody", "texture"],
+        "start_beats": "0", "end_beats": "4",
+        "evidence": ["shared spectral zone: mid"], "heuristic_only": True,
+    }
+    window._attention_review_requested({
+        "warning": conflict, "disposition": "useful",
+        "notes": "Intentional fusion.",
+    })
+    review_records = window.project.to_score().metadata["m29_attention_reviews"]
+    assert len(review_records) == 1
+    assert next(iter(review_records.values()))["notes"] == "Intentional fusion."
+    window.close()
