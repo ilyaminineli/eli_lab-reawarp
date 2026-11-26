@@ -48,7 +48,8 @@ class AttentionMapPage(QWidget):
         intro = QLabel(
             "Describe what the listener should follow, what supports it, and where attention "
             "moves. Descriptors are inspectable prompts—not mix rules or artistic scores. "
-            "Intent edits are Score metadata and do not rewrite rendered audio."
+            "FOCUS and RECEDE add reversible Score gestures and rerender event-backed voices; "
+            "they do not automate the master fader."
         )
         intro.setObjectName("muted")
         intro.setWordWrap(True)
