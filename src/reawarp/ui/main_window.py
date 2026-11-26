@@ -110,6 +110,13 @@ class MainWindow(QMainWindow):
         self._variation_ab_buffers: dict[str, np.ndarray] = {}
         self._variation_listening_buffers: dict[str, np.ndarray] = {}
         self._variation_session_epoch = 0
+        self._m32_worker: CancellableRenderWorker | None = None
+        self._m32_session: dict[str, Any] | None = None
+        self._m32_history = None
+        self._m32_history_fingerprint: str | None = None
+        self._m32_current_result = None
+        self._m32_analysis_enabled = True
+
         self._phrase_batch_worker: CancellableRenderWorker | None = None
         self._phrase_audition_worker: CancellableRenderWorker | None = None
         self._phrase_compare_worker: CancellableRenderWorker | None = None
@@ -199,6 +206,11 @@ class MainWindow(QMainWindow):
         self.variation_page.auditionRequested.connect(self._variation_audition)
         self.variation_page.loadProjectRequested.connect(self._load_variation_project)
         self.variation_page.listeningItemRequested.connect(self._variation_listening_item)
+        self.variation_page.m32ContextRequested.connect(self._m32_context_requested)
+        self.variation_page.m32DecisionRequested.connect(self._m32_decision_requested)
+        self.variation_page.m32ReportRequested.connect(self._m32_report_requested)
+        self.variation_page.m32AnalysisToggled.connect(self._m32_analysis_toggled)
+
 
         self.phrase_workbench = PhraseWorkbenchPage(self)
         self.phrase_workbench.phraseSaveRequested.connect(self._phrase_save_requested)
@@ -844,6 +856,7 @@ class MainWindow(QMainWindow):
         workers = (
             self._worker, self._export_worker, self._variation_batch_worker,
             self._variation_compare_worker, self._fx_worker, self._fx_variation_worker,
+            self._m32_worker,
         )
         for worker in workers:
             if worker is not None:
@@ -857,6 +870,7 @@ class MainWindow(QMainWindow):
         self._variation_compare_worker = None
         self._fx_worker = None
         self._fx_variation_worker = None
+        self._m32_worker = None
         self._clear_fx_variation_cache()
 
     def _quit_from_tray(self) -> None:
@@ -2472,6 +2486,15 @@ class MainWindow(QMainWindow):
             active = self._variation_candidates[self._variation_active_candidate_id]
             self._variation_parent_candidate_id = active.record.candidate_id
         self.variation_page.set_stems(list(project.stems))
+        stored_listening = project.metadata.get("m32_listening_session")
+        if isinstance(stored_listening, dict):
+            from reawarp.listening import validate_listening_session
+            try:
+                self._m32_session = validate_listening_session(stored_listening)
+                self.variation_page.set_m32_report_notes(self._m32_session["human_notes"])
+                self.variation_page.set_m32_status("Restored the saved M32 listening session.")
+            except ValueError:
+                self._m32_session = None
         self.variation_page.set_candidates(
             [item.record for item in self._variation_candidates.values()],
             selected_id=self._variation_active_candidate_id,
@@ -3207,11 +3230,276 @@ class MainWindow(QMainWindow):
         if project is None:
             return
         if source == "listening":
-            audio, _report = match_audition_level(audio)
+            # M32 stores a playback-level copy already; do not apply another hidden level match.
+            audio = np.asarray(audio, dtype=np.float32).copy()
         try:
             self.player.start(audio, project.sample_rate, device=self.output_device.currentData())
         except Exception as exc:
             self.statusBar().showMessage(f"Could not audition comparison: {exc}", 8000)
+
+    def _m32_active_project(self):
+        candidate_id = self.variation_page.selected_candidate_id
+        candidate = self._variation_candidates.get(candidate_id or "")
+        if candidate is not None:
+            return candidate.project, candidate_id
+        project = self._variation_branch_base or self._variation_base_project or self.project
+        return project, None
+
+    def _m32_persist_session(self, session: dict[str, Any]) -> None:
+        self._m32_session = session
+        if self.project is not None:
+            metadata = copy.deepcopy(self.project.metadata)
+            metadata["m32_listening_session"] = copy.deepcopy(session)
+            self.project.metadata = metadata
+
+    def _m32_ensure_session(self, project, candidate_id: str | None):
+        from reawarp.listening import new_listening_session, validate_listening_session
+
+        base = self._variation_origin_project or self._variation_base_project or project
+        fingerprint = project_fingerprint(base)
+        existing = self._m32_session
+        if existing is None and self.project is not None:
+            stored = self.project.metadata.get("m32_listening_session")
+            if isinstance(stored, dict):
+                try:
+                    existing = validate_listening_session(stored)
+                except ValueError:
+                    existing = None
+        if existing is None or existing.get("project_fingerprint") != fingerprint:
+            candidate_ids = tuple(self._variation_candidates)
+            if candidate_id:
+                candidate_ids = tuple(dict.fromkeys((*candidate_ids, candidate_id)))
+            existing = new_listening_session(
+                base, candidate_ids=candidate_ids,
+                analysis_enabled=self._m32_analysis_enabled,
+            )
+        elif candidate_id and candidate_id not in existing.get("candidate_ids", []):
+            existing = copy.deepcopy(existing)
+            existing["candidate_ids"].append(candidate_id)
+        self._m32_persist_session(existing)
+        return existing
+
+    def _m32_analysis_toggled(self, enabled: bool) -> None:
+        self._m32_analysis_enabled = bool(enabled)
+        self.variation_page.set_m32_status(
+            "Technical analysis enabled." if enabled
+            else "Technical analysis disabled. No measurements or warnings will be generated."
+        )
+        if self._m32_session is not None:
+            session = copy.deepcopy(self._m32_session)
+            session["analysis_enabled"] = self._m32_analysis_enabled
+            self._m32_persist_session(session)
+
+    def _m32_context_requested(self, payload: dict[str, Any]) -> None:
+        from reawarp.composition.phrases import PhrasePlan
+        from reawarp.listening import (
+            analyse_audio, analyse_project, apply_playback_level,
+            build_contextual_audition_set, record_session_event,
+        )
+
+        project, candidate_id = self._m32_active_project()
+        if project is None:
+            self.variation_page.set_m32_status("Generate or load a project before evaluating it.")
+            return
+        context = str(payload.get("context", "full_track"))
+        analysis_enabled = bool(payload.get("analysis_enabled", self._m32_analysis_enabled))
+        phrase_choices = []
+        try:
+            plan = PhrasePlan.from_score(project.to_score())
+            phrase_choices = [
+                (item.phrase_id, f"{item.phrase_id} · {item.function.upper()}")
+                for item in sorted(plan.phrases, key=lambda item: (item.start_beats, item.end_beats))
+            ]
+        except (ValueError, TypeError):
+            pass
+        self.variation_page.set_phrase_choices(phrase_choices)
+        phrase_id = payload.get("phrase_id")
+        if phrase_id is None and phrase_choices:
+            phrase_id = phrase_choices[0][0]
+        session = self._m32_ensure_session(project, candidate_id)
+        if self._m32_worker is not None:
+            self._m32_worker.cancel()
+        self.variation_page.set_m32_status(f"Preparing {context.replace('_', ' ').upper()} audition…")
+        self.variation_page.m32_build_button.setEnabled(False)
+        project_snapshot = clone_project(project, readonly=True)
+        roles = tuple(str(item) for item in payload.get("roles", ()))
+        percent = int(payload.get("subtraction_percent", 35))
+        semitones = int(payload.get("register_semitones", 12))
+        target_level = float(payload.get("playback_level_dbfs", -18))
+        identity_label = str(payload.get("identity_label", "")).strip()
+
+        def operation(cancel_event):
+            audition_set = build_contextual_audition_set(
+                project_snapshot,
+                context,
+                phrase_id=None if phrase_id is None else str(phrase_id),
+                roles=roles,
+                subtraction_percent=percent,
+                register_semitones=semitones,
+                candidate_id=candidate_id,
+                analysis_enabled=analysis_enabled,
+                cancel_event=cancel_event,
+            )
+            if cancel_event.is_set():
+                raise RuntimeError("critical listening audition cancelled")
+            label, result = next(iter(audition_set.items()))
+            playback, level_record = apply_playback_level(
+                result.audio, level_dbfs=target_level
+            )
+            project_analysis = analyse_project(project_snapshot, enabled=analysis_enabled)
+            audition_analysis = analyse_audio(
+                result.audio, project_snapshot.sample_rate, enabled=analysis_enabled
+            )
+            if cancel_event.is_set():
+                raise RuntimeError("critical listening audition cancelled")
+            return {
+                "candidate_id": candidate_id,
+                "label": label,
+                "result": result,
+                "playback": playback,
+                "level_record": level_record,
+                "project_analysis": project_analysis,
+                "audition_analysis": audition_analysis,
+                "analysis_enabled": analysis_enabled,
+            }
+
+        worker = CancellableRenderWorker(operation)
+        self._m32_worker = worker
+
+        def finished(result):
+            if self._m32_worker is not worker:
+                return
+            self._m32_worker = None
+            self.variation_page.m32_build_button.setEnabled(True)
+            audition = result["result"]
+            self._m32_current_result = audition
+            self._variation_listening_buffers[audition.label] = result["playback"]
+            self.variation_page.set_listening_items(self._variation_listening_buffers)
+            self.variation_page.set_listening_audio(result["playback"], project_snapshot.sample_rate)
+            self._variation_ab_buffers["listening"] = result["playback"]
+            self._m32_analysis_enabled = result["analysis_enabled"]
+            session_value = self._m32_ensure_session(project_snapshot, result["candidate_id"])
+            session_value = record_session_event(
+                session_value, "audition_transforms", audition.transform.to_dict()
+            )
+            session_value = record_session_event(
+                session_value, "level_checks", result["level_record"]
+            )
+            if audition.transform.operation in {"role_subtraction", "invariance_removal_probe"}:
+                session_value = record_session_event(
+                    session_value, "subtraction_history",
+                    {"transform": audition.transform.to_dict(), "decision": "unreviewed"},
+                )
+            if audition.transform.operation == "invariance_removal_probe":
+                session_value = record_session_event(
+                    session_value, "invariance_trials",
+                    {
+                        **audition.transform.to_dict(),
+                        "human_identity_survives": None,
+                    },
+                )
+            session_value["technical_analysis"] = result["project_analysis"]
+            session_value["analysis_enabled"] = result["analysis_enabled"]
+            self._m32_persist_session(session_value)
+            self.variation_page.set_m32_diagnostics(
+                result["project_analysis"], result["audition_analysis"]
+            )
+            self.variation_page.set_m32_status(
+                f"{audition.label} · {len(audition.audio):,} frames · "
+                f"{project_snapshot.sample_rate:,} Hz · "
+                f"audition copy at requested {target_level:.0f} dBFS RMS where peak headroom permits."
+            )
+
+            if audition.audio.shape == project_snapshot.render_master().shape:
+                from reawarp.listening import ListeningEditHistory
+                fingerprint = project_fingerprint(project_snapshot)
+                if self._m32_history is None or self._m32_history_fingerprint != fingerprint:
+                    self._m32_history = ListeningEditHistory(
+                        project_snapshot.render_master(), sample_rate=project_snapshot.sample_rate
+                    )
+                    self._m32_history_fingerprint = fingerprint
+                if audition.transform.operation in {"role_subtraction", "invariance_removal_probe"}:
+                    self._m32_history.push(audition.audio, audition.transform)
+
+        def failed(message):
+            if self._m32_worker is not worker:
+                return
+            self._m32_worker = None
+            self.variation_page.m32_build_button.setEnabled(True)
+            if not str(message).startswith("CANCELLED:"):
+                self.variation_page.set_m32_status(f"Critical listening audition failed: {message}")
+                self.statusBar().showMessage(f"M32 audition failed: {message}", 9000)
+
+        worker.signals.finished.connect(finished)
+        worker.signals.error.connect(failed)
+        QThreadPool.globalInstance().start(worker)
+
+    def _m32_decision_requested(self, decision: str) -> None:
+        from dataclasses import replace as dataclass_replace
+        from reawarp.listening import record_session_event
+
+        if self._m32_current_result is None or self._m32_session is None:
+            self.variation_page.set_m32_status("Build an audition pass before keeping or restoring it.")
+            return
+        if decision == "keep":
+            transform = dataclass_replace(
+                self._m32_current_result.transform, decision="kept_for_review"
+            ).to_dict()
+            record = {"transform": transform, "decision": "kept_for_review"}
+            if self._m32_history is not None and self._m32_history.can_undo:
+                try:
+                    record = self._m32_history.keep_current()
+                except (IndexError, ValueError):
+                    pass
+            session = record_session_event(
+                self._m32_session, "subtraction_history", record
+            )
+            self._m32_persist_session(session)
+            self.variation_page.set_m32_status(
+                "Pass kept in the reversible listening history. The production project is unchanged."
+            )
+            return
+        if decision == "restore":
+            project, _candidate_id = self._m32_active_project()
+            if project is None:
+                return
+            if self._m32_history is not None and self._m32_history.can_undo:
+                restored = self._m32_history.undo()
+            else:
+                restored = project.render_master()
+            playback, level_record = apply_playback_level(
+                restored,
+                level_dbfs=float(self.variation_page.m32_playback_level.currentData()),
+            )
+            self.variation_page.set_listening_audio(playback, project.sample_rate)
+            self._variation_ab_buffers["listening"] = playback
+            session = record_session_event(
+                self._m32_session, "subtraction_history",
+                {
+                    "decision": "restored",
+                    "restored_audio_sha256": audio_fingerprint(restored),
+                    "source_transform_id": self._m32_current_result.transform.transform_id,
+                    "production_edit": False,
+                },
+            )
+            self._m32_persist_session(session)
+            self.variation_page.set_m32_status(
+                "Restored the previous audition snapshot. No production stem or export was modified."
+            )
+
+    def _m32_report_requested(self, notes: dict[str, Any]) -> None:
+        from reawarp.listening import update_human_notes
+        project, candidate_id = self._m32_active_project()
+        if project is None:
+            self.variation_page.set_m32_status("Generate or load a project before saving report notes.")
+            return
+        session = self._m32_ensure_session(project, candidate_id)
+        session = update_human_notes(session, notes)
+        self._m32_persist_session(session)
+        self.variation_page.set_m32_report_notes(session["human_notes"])
+        self.variation_page.set_m32_status(
+            "Human-authored listening notes saved to project metadata. They will travel with the project archive."
+        )
 
     def _project_with_variation_session(self) -> ReawarpProject:
         if self.project is None:
@@ -3359,6 +3647,19 @@ class MainWindow(QMainWindow):
         self.fx_routing_editor.set_meter_report({})
         self._rebuild_mixer()
         self.variation_page.set_stems(list(result.stems))
+        stored_listening = result.metadata.get("m32_listening_session")
+        if isinstance(stored_listening, dict):
+            from reawarp.listening import validate_listening_session
+            try:
+                self._m32_session = validate_listening_session(stored_listening)
+                self.variation_page.set_m32_report_notes(self._m32_session["human_notes"])
+                self.variation_page.set_m32_status("Loaded saved M32 critical-listening notes.")
+            except ValueError:
+                self._m32_session = None
+        else:
+            self._m32_session = None
+        self._m32_history = None
+        self._m32_current_result = None
         self._refresh_sound_object_targets()
         self._restore_variation_session(result)
         self.fx_lab_page.set_project_sources(result.stems, result.sample_rate)

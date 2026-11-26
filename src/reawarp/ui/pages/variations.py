@@ -6,9 +6,9 @@ from typing import Any
 import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QGroupBox, QHBoxLayout, QLabel, QListWidget,
-    QListWidgetItem, QPlainTextEdit, QPushButton, QSpinBox, QSplitter,
-    QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QGridLayout, QGroupBox, QHBoxLayout, QLabel,
+    QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit, QPushButton,
+    QSpinBox, QSplitter, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from reawarp.ui.widgets.audio_preview import AudioPreview
@@ -25,6 +25,10 @@ class VariationBrowserPage(QWidget):
     auditionRequested = Signal(str)
     loadProjectRequested = Signal()
     listeningItemRequested = Signal(str)
+    m32ContextRequested = Signal(dict)
+    m32DecisionRequested = Signal(str)
+    m32ReportRequested = Signal(dict)
+    m32AnalysisToggled = Signal(bool)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -182,6 +186,140 @@ class VariationBrowserPage(QWidget):
         listening_row.addWidget(self.listening_item, 1)
         right_layout.addLayout(listening_row)
 
+        self.m32_tabs = QTabWidget()
+        evaluation_tab = QWidget()
+        evaluation_layout = QVBoxLayout(evaluation_tab)
+        context_row = QHBoxLayout()
+        self.m32_context = QComboBox()
+        for label, key in (
+            ("FULL TRACK", "full_track"),
+            ("FULL SECTION", "full_section"),
+            ("SOLO PHRASE", "solo_phrase"),
+            ("PREDECESSOR → CANDIDATE", "predecessor_to_candidate"),
+            ("CANDIDATE → SUCCESSOR", "candidate_to_successor"),
+            ("REDUCED DENSITY", "reduced_density"),
+            ("ALTERED REGISTER", "altered_register"),
+            ("INVARIANCE REMOVAL", "invariance"),
+            ("OPENING", "opening"), ("MIDDLE", "middle"), ("ENDING", "ending"),
+        ):
+            self.m32_context.addItem(label, key)
+        self.m32_phrase = QComboBox()
+        self.m32_phrase.setMinimumWidth(130)
+        context_row.addWidget(QLabel("CONTEXT"))
+        context_row.addWidget(self.m32_context, 2)
+        context_row.addWidget(QLabel("PHRASE"))
+        context_row.addWidget(self.m32_phrase, 1)
+        evaluation_layout.addLayout(context_row)
+
+        roles_row = QHBoxLayout()
+        roles_panel = QVBoxLayout()
+        roles_panel.addWidget(QLabel("SUBTRACTION / ANCHOR ROLES"))
+        self.m32_roles = QListWidget()
+        self.m32_roles.setMaximumHeight(72)
+        self.m32_roles.setToolTip(
+            "Select roles to attenuate in the disposable audition, or to remove in an invariance probe."
+        )
+        roles_panel.addWidget(self.m32_roles)
+        roles_row.addLayout(roles_panel, 2)
+        parameter_panel = QVBoxLayout()
+        parameter_row = QHBoxLayout()
+        self.m32_subtraction_percent = QSpinBox()
+        self.m32_subtraction_percent.setRange(0, 100)
+        self.m32_subtraction_percent.setValue(35)
+        self.m32_subtraction_percent.setSuffix("%")
+        self.m32_register_shift = QSpinBox()
+        self.m32_register_shift.setRange(-24, 24)
+        self.m32_register_shift.setValue(12)
+        self.m32_register_shift.setSuffix(" st")
+        parameter_row.addWidget(QLabel("SUBTRACT"))
+        parameter_row.addWidget(self.m32_subtraction_percent)
+        parameter_row.addWidget(QLabel("REGISTER"))
+        parameter_row.addWidget(self.m32_register_shift)
+        parameter_panel.addLayout(parameter_row)
+        level_row = QHBoxLayout()
+        self.m32_playback_level = QComboBox()
+        for value in (-12, -18, -24, -30, -36):
+            self.m32_playback_level.addItem(f"{value} dBFS RMS", value)
+        self.m32_playback_level.setCurrentIndex(1)
+        self.m32_analysis_enabled = QCheckBox("TECHNICAL ANALYSIS")
+        self.m32_analysis_enabled.setChecked(True)
+        self.m32_analysis_enabled.setToolTip(
+            "Disable all M32 measurement and warning generation without changing rendered audio."
+        )
+        self.m32_analysis_enabled.toggled.connect(self.m32AnalysisToggled.emit)
+        level_row.addWidget(QLabel("AUDITION LEVEL"))
+        level_row.addWidget(self.m32_playback_level)
+        level_row.addWidget(self.m32_analysis_enabled)
+        parameter_panel.addLayout(level_row)
+        self.m32_identity_label = QLineEdit()
+        self.m32_identity_label.setPlaceholderText("Invariance anchor / material identity")
+        parameter_panel.addWidget(self.m32_identity_label)
+        roles_row.addLayout(parameter_panel, 2)
+        evaluation_layout.addLayout(roles_row)
+
+        m32_actions = QHBoxLayout()
+        self.m32_build_button = QPushButton("BUILD / AUDITION CONTEXT")
+        self.m32_keep_button = QPushButton("KEEP PASS")
+        self.m32_restore_button = QPushButton("RESTORE")
+        self.m32_build_button.clicked.connect(self._m32_request_context)
+        self.m32_keep_button.clicked.connect(lambda: self.m32DecisionRequested.emit("keep"))
+        self.m32_restore_button.clicked.connect(lambda: self.m32DecisionRequested.emit("restore"))
+        m32_actions.addWidget(self.m32_build_button)
+        m32_actions.addWidget(self.m32_keep_button)
+        m32_actions.addWidget(self.m32_restore_button)
+        evaluation_layout.addLayout(m32_actions)
+        self.m32_diagnostics = QLabel(
+            "Technical measurements are evidence, not an artistic score. Build a context to inspect the signal."
+        )
+        self.m32_diagnostics.setObjectName("muted")
+        self.m32_diagnostics.setWordWrap(True)
+        evaluation_layout.addWidget(self.m32_diagnostics)
+        self.m32_tabs.addTab(evaluation_tab, "AUDITION / ANALYSIS")
+
+        report_tab = QWidget()
+        report_layout = QVBoxLayout(report_tab)
+        report_intro = QLabel(
+            "Human-authored listening report. Measurements do not fill in artistic judgements."
+        )
+        report_intro.setObjectName("muted")
+        report_intro.setWordWrap(True)
+        report_layout.addWidget(report_intro)
+        prompts_grid = QGridLayout()
+        self._m32_report_fields = {}
+        report_prompts = {
+            "identity": "Identity",
+            "continuity": "Continuity",
+            "contrast": "Contrast",
+            "legibility": "Legibility",
+            "motif_development": "Motif development",
+            "orchestration": "Orchestration",
+            "pacing": "Pacing",
+            "surprise": "Surprise",
+            "emotional_coherence": "Emotional coherence",
+            "technical_integrity": "Technical integrity",
+        }
+        from reawarp.listening import REPORT_PROMPTS
+        for index, (key, label) in enumerate(report_prompts.items()):
+            row, column = divmod(index, 2)
+            field = QLineEdit()
+            field.setPlaceholderText(REPORT_PROMPTS[key])
+            field.setToolTip(REPORT_PROMPTS[key])
+            prompts_grid.addWidget(QLabel(label.upper()), row, column * 2)
+            prompts_grid.addWidget(field, row, column * 2 + 1)
+            self._m32_report_fields[key] = field
+        report_layout.addLayout(prompts_grid)
+        self.m32_report_save_button = QPushButton("SAVE LISTENING REPORT")
+        self.m32_report_save_button.clicked.connect(
+            lambda: self.m32ReportRequested.emit(self.m32_report_notes())
+        )
+        report_layout.addWidget(self.m32_report_save_button)
+        self.m32_report_status = QLabel("Report notes are saved into project metadata and exported as JSON + Markdown.")
+        self.m32_report_status.setObjectName("muted")
+        self.m32_report_status.setWordWrap(True)
+        report_layout.addWidget(self.m32_report_status)
+        self.m32_tabs.addTab(report_tab, "HUMAN REPORT")
+        right_layout.addWidget(self.m32_tabs)
+
         previews = QSplitter(Qt.Orientation.Horizontal)
         self.reference_preview = AudioPreview()
         self.candidate_preview = AudioPreview()
@@ -203,6 +341,93 @@ class VariationBrowserPage(QWidget):
         self.blind.toggled.connect(self._refresh_candidate_labels)
         self.reveal.toggled.connect(self._refresh_details)
 
+    def _m32_request_context(self) -> None:
+        roles = [
+            str(self.m32_roles.item(index).data(Qt.ItemDataRole.UserRole))
+            for index in range(self.m32_roles.count())
+            if self.m32_roles.item(index).checkState() == Qt.CheckState.Checked
+        ]
+        payload = {
+            "context": str(self.m32_context.currentData() or "full_track"),
+            "phrase_id": self.m32_phrase.currentData(),
+            "roles": roles,
+            "subtraction_percent": self.m32_subtraction_percent.value(),
+            "register_semitones": self.m32_register_shift.value(),
+            "playback_level_dbfs": int(self.m32_playback_level.currentData()),
+            "analysis_enabled": self.m32_analysis_enabled.isChecked(),
+            "identity_label": self.m32_identity_label.text().strip(),
+        }
+        self.m32ContextRequested.emit(payload)
+
+    def set_m32_roles(self, names: list[str] | tuple[str, ...]) -> None:
+        selected = {
+            str(self.m32_roles.item(index).data(Qt.ItemDataRole.UserRole))
+            for index in range(self.m32_roles.count())
+            if self.m32_roles.item(index).checkState() == Qt.CheckState.Checked
+        }
+        self.m32_roles.clear()
+        for name in names:
+            item = QListWidgetItem(str(name).replace("_", " ").upper())
+            item.setData(Qt.ItemDataRole.UserRole, str(name))
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked if str(name) in selected else Qt.CheckState.Unchecked
+            )
+            self.m32_roles.addItem(item)
+        if self.m32_roles.count() and not selected:
+            self.m32_roles.item(0).setCheckState(Qt.CheckState.Checked)
+
+    def set_phrase_choices(self, choices: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> None:
+        selected = self.m32_phrase.currentData()
+        self.m32_phrase.blockSignals(True)
+        self.m32_phrase.clear()
+        for phrase_id, label in choices:
+            self.m32_phrase.addItem(str(label), str(phrase_id))
+        index = self.m32_phrase.findData(selected) if selected else -1
+        if index < 0 and self.m32_phrase.count():
+            index = 0
+        self.m32_phrase.setCurrentIndex(index)
+        self.m32_phrase.blockSignals(False)
+
+    def set_m32_diagnostics(self, analysis: dict[str, Any], audition_analysis: dict[str, Any] | None = None) -> None:
+        if not analysis.get("enabled", False):
+            self.m32_diagnostics.setText(
+                "TECHNICAL ANALYSIS DISABLED · audition transforms remain available; no metrics or warnings were generated."
+            )
+            return
+        master = analysis.get("master", {})
+        warnings = analysis.get("warnings", [])
+        warning_text = ", ".join(
+            f"{str(item.get('severity', 'info')).upper()} {item.get('code', '')}"
+            for item in warnings
+        ) or "No threshold warnings"
+        text = (
+            f"MASTER · peak {master.get('peak_dbfs', float('nan')):.1f} dBFS · "
+            f"RMS {master.get('rms_dbfs', float('nan')):.1f} dBFS · "
+            f"silence {master.get('silence_ratio', 0.0) * 100:.1f}% · "
+            f"mono loss {master.get('mono_fold_level_loss_db', 0.0):.1f} dB\n"
+            f"CLIPPING · {master.get('clipped_sample_count', 0)} samples · "
+            f"tail silence {master.get('trailing_silence_seconds', 0.0):.2f} s\n"
+            f"EVIDENCE · {warning_text}"
+        )
+        if audition_analysis and audition_analysis.get("enabled"):
+            metrics = audition_analysis.get("metrics", {})
+            text += (
+                f"\nAUDITION · peak {metrics.get('peak_dbfs', float('nan')):.1f} dBFS · "
+                f"RMS {metrics.get('rms_dbfs', float('nan')):.1f} dBFS"
+            )
+        self.m32_diagnostics.setText(text)
+
+    def set_m32_status(self, message: str) -> None:
+        self.m32_report_status.setText(str(message))
+
+    def set_m32_report_notes(self, notes: dict[str, Any]) -> None:
+        for key, field in self._m32_report_fields.items():
+            field.setText(str(notes.get(key, "")))
+
+    def m32_report_notes(self) -> dict[str, str]:
+        return {key: field.text().strip() for key, field in self._m32_report_fields.items()}
+
     @staticmethod
     def _preview_panel(title: str, preview: AudioPreview) -> QWidget:
         panel = QWidget()
@@ -217,6 +442,7 @@ class VariationBrowserPage(QWidget):
     def set_stems(self, names: list[str] | tuple[str, ...]) -> None:
         self._stems = tuple(names)
         self._populate_targets()
+        self.set_m32_roles(self._stems)
 
     def set_sound_objects(self, patches: list[tuple[str, str]] | tuple[tuple[str, str], ...]) -> None:
         self._sound_objects = tuple((str(patch_id), str(name)) for patch_id, name in patches)

@@ -294,6 +294,7 @@ def build_subtraction_pass(
     *,
     candidate_id: str | None = None,
     label: str | None = None,
+    analysis_enabled: bool = True,
 ) -> AuditionResult:
     """Attenuate selected role contributions in an audition-only master copy."""
     from reawarp.variations import project_fingerprint
@@ -338,7 +339,7 @@ def build_subtraction_pass(
         audio=result,
         sample_rate=project.sample_rate,
         transform=transform,
-        diagnostics={"analysis": analyse_audio(result, project.sample_rate, enabled=True)},
+        diagnostics={"analysis": analyse_audio(result, project.sample_rate, enabled=analysis_enabled)},
     )
 
 
@@ -349,6 +350,7 @@ def build_invariance_probe(
     removed_roles: Sequence[str],
     identity_label: str,
     candidate_id: str | None = None,
+    analysis_enabled: bool = True,
 ) -> AuditionResult:
     """Create an explicit removal probe; the identity judgement remains human-authored."""
     anchors = tuple(dict.fromkeys(str(item) for item in anchor_roles))
@@ -363,6 +365,7 @@ def build_invariance_probe(
     result = build_subtraction_pass(
         project, removed, 100, candidate_id=candidate_id,
         label=f"INVARIANCE · {identity_label}",
+        analysis_enabled=analysis_enabled,
     )
     params = dict(result.transform.parameters)
     params.update({
@@ -424,7 +427,9 @@ def _phrase_audio(
 
 
 def _altered_register(
-    project: ReawarpProject, phrase_id: str, semitones: int, *, candidate_id: str | None
+    project: ReawarpProject, phrase_id: str, semitones: int, *,
+    candidate_id: str | None, cancel_event: Any | None = None,
+    analysis_enabled: bool = True,
 ) -> AuditionResult:
     from reawarp.composition.phrases import PhrasePlan
     from reawarp.core.engine import ReawarpEngine
@@ -457,8 +462,11 @@ def _altered_register(
     if not changed:
         raise ValueError("selected phrase contains no pitched note events")
     audition_score = replace(score, events=tuple(shifted))
+    if cancel_event is not None and cancel_event.is_set():
+        raise RuntimeError("altered-register audition cancelled")
     rendered = ReawarpEngine().render_score(
-        audition_score, config=project.config, frame_count=project.frame_count
+        audition_score, config=project.config, frame_count=project.frame_count,
+        cancel_event=cancel_event,
     )
     timeline = RenderTimeline(project.sample_rate, score.tempo_map, score.meter_map)
     start_frame = min(project.frame_count, timeline.beat_to_frame(phrase.start_beats))
@@ -488,7 +496,7 @@ def _altered_register(
         audio=audio,
         sample_rate=project.sample_rate,
         transform=transform,
-        diagnostics={"analysis": analyse_audio(audio, project.sample_rate, enabled=True)},
+        diagnostics={"analysis": analyse_audio(audio, project.sample_rate, enabled=analysis_enabled)},
     )
 
 
@@ -501,11 +509,15 @@ def build_contextual_audition_set(
     subtraction_percent: int = 35,
     register_semitones: int = 12,
     candidate_id: str | None = None,
+    analysis_enabled: bool = True,
+    cancel_event: Any | None = None,
 ) -> dict[str, AuditionResult]:
     """Return disposable listening contexts derived from an unchanged project."""
     from reawarp.variations import project_fingerprint
     if not isinstance(project, ReawarpProject):
         raise TypeError("project must be a ReawarpProject")
+    if cancel_event is not None and cancel_event.is_set():
+        raise RuntimeError("contextual audition cancelled")
     selected = project.render_master()
     before_hash = audio_fingerprint(selected)
     if context == "full_track":
@@ -567,13 +579,15 @@ def build_contextual_audition_set(
         result = build_subtraction_pass(
             project, roles, subtraction_percent, candidate_id=candidate_id,
             label=f"REDUCED DENSITY · {subtraction_percent}%",
+            analysis_enabled=analysis_enabled,
         )
         return {result.label: result}
     elif context == "altered_register":
         if not phrase_id:
             raise ValueError("altered_register requires a selected phrase ID")
         result = _altered_register(
-            project, phrase_id, register_semitones, candidate_id=candidate_id
+            project, phrase_id, register_semitones, candidate_id=candidate_id,
+            cancel_event=cancel_event, analysis_enabled=analysis_enabled,
         )
         return {result.label: result}
     elif context == "invariance":
@@ -583,11 +597,13 @@ def build_contextual_audition_set(
         result = build_invariance_probe(
             project, anchor_roles=anchors, removed_roles=roles,
             identity_label=" / ".join(anchors) or "declared project identity",
-            candidate_id=candidate_id,
+            candidate_id=candidate_id, analysis_enabled=analysis_enabled,
         )
         return {result.label: result}
     else:
         raise ValueError(f"unsupported listening context: {context}")
+    if cancel_event is not None and cancel_event.is_set():
+        raise RuntimeError("contextual audition cancelled")
     transform = AuditionTransform(
         transform_id=f"context-{uuid.uuid4().hex[:12]}",
         operation="context_crop",
