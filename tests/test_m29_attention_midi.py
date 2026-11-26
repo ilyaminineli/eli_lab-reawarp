@@ -130,7 +130,9 @@ def test_m29_recede_midi_omits_same_events_and_restores_canonical_score(tmp_path
         event.event_id for event in expected if event is not None
     }
     omitted_ids = {
-        event.event_id for event in expected if event is None
+        source_event.event_id
+        for source_event, rendered_event in zip(source.events, expected)
+        if rendered_event is None
     }
     assert 0 < len(omitted_ids) < len(source.events)
 
