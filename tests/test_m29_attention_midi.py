@@ -91,6 +91,7 @@ def test_m29_focus_midi_plays_transposed_bounded_note_and_roundtrips_source(tmp_
 
     restored = Score.from_midi(path)
     assert restored.events == source.events
+    assert restored.automation == source.automation
     assert restored.metadata["m29_attention_gestures"] == (
         focused.metadata["m29_attention_gestures"]
     )
@@ -151,11 +152,12 @@ def test_m29_recede_midi_omits_same_events_and_restores_canonical_score(tmp_path
 
     restored = Score.from_midi(path)
     assert restored.events == source.events
+    assert restored.automation == source.automation
     assert restored.metadata["m29_attention_gestures"] == gestures
 
 
 def test_midi_without_m29_gestures_keeps_existing_event_timing_and_metadata(tmp_path):
-    pytest.importorskip("mido")
+    mido = pytest.importorskip("mido")
     source = Score(events=(
         MusicalEvent(
             event_id="plain-note",
@@ -172,5 +174,5 @@ def test_midi_without_m29_gestures_keeps_existing_event_timing_and_metadata(tmp_
     assert restored.events[0].onset_beats == Fraction(1, 2)
     assert restored.events[0].duration_beats == Fraction(3, 4)
     assert "m29_midi_render_export" not in _reawarp_score_meta(
-        __import__("mido").MidiFile(str(path))
+        mido.MidiFile(str(path))
     )
