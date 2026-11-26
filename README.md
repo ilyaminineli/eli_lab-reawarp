@@ -213,7 +213,7 @@ python -m compileall -q src/reawarp
 python -m pytest -q
 ```
 
-Benchmark and matched-listening tools live in `scripts/`: generation (M14), sound objects (M21), DSP research modules (M24.1–M24.4), offline sidechain routing (M24.5) and project archive/reopen (M25).
+Benchmark and matched-listening tools live in `scripts/`: generation (M14), sound objects (M21), DSP research modules (M24.1–M24.4), offline sidechain routing (M24.5), fixed-topology feedback networks (M24.6) and project archive/reopen (M25).
 
 ## Documentation
 
@@ -222,6 +222,7 @@ Benchmark and matched-listening tools live in `scripts/`: generation (M14), soun
 - [M32 Critical Listening design note](docs/M32_CRITICAL_LISTENING.md) — contextual audition, reversible subtraction, diagnostics and exportable human report.
 - [M33 Arrangement Editor design note](docs/M33_ARRANGEMENT_EDITOR.md) — manual Score-native arrangement, reversible edits, transition/ending cues, dry print-to-WAV and export lineage.
 - [M24.5 Sidechain and Envelope Routing](docs/M24_5_SIDECHAIN.md) — offline detector-to-target gain routing, dynamics contract, UI workflow and acceptance limits.
+- [M24.6 Bounded Feedback Delay Network](docs/M24_6_FEEDBACK_NETWORK.md) — fixed four-line orthogonal network, stability/decay contract, reset/panic API, benchmark and listening workflow.
 - [M34 Research Gate review](docs/M34_RESEARCH_GATE.md) — repository audit, synthetic order-reversal baseline, candidate ranking and acceptance conditions; M34 audio-conditioned composition remains deferred.
 - [M31 Sound-Object Workshop design note](docs/M31_SOUND_OBJECT_WORKSHOP.md) — versioned objects, aligned layer audition and print lineage.
 - [M27–M34 development roadmap](docs/ROADMAP_M27_M34.md) — detailed future milestone specifications and agent handoff.

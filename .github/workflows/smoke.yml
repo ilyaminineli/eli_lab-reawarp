@@ -65,6 +65,10 @@ jobs:
         run: python scripts/benchmark_m24_4_nonlinear.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-4-benchmark.json
       - name: Render M24.4 nonlinear listening example
         run: python scripts/render_m24_4_listening_example.py --output /tmp/reawarp-m24-4-listening --sample-rate 22050
+      - name: Benchmark portable M24.6 feedback network
+        run: python scripts/benchmark_m24_6_feedback_network.py --duration 0.15 --sample-rate 22050 --output /tmp/reawarp-m24-6-benchmark.json
+      - name: Render M24.6 feedback-network listening example
+        run: python scripts/render_m24_6_listening_example.py --output /tmp/reawarp-m24-6-listening --sample-rate 22050
       - name: Smoke-test M25 manifest, asset portability and archive reopen
         run: python scripts/benchmark_m25.py --durations 5 --sample-rate 48000 --output /tmp/reawarp-m25-smoke.json
       - name: Smoke-test CLI

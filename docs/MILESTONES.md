@@ -24,6 +24,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | Role-aware mixer and fixed returns | Implemented | Target-Windows Pyo listening remains open |
 | Variation browser and candidate genealogy | Implemented | Candidate selection remains human-authored |
 | M24.1–M24.4 DSP research | NumPy reference APIs and CI coverage | Not default production inserts; listening and target profiling remain open |
+| M24.6 feedback network | Standalone NumPy implementation delivered | Listening and target-Windows 30/180-second profiling remain open |
 | M24.5 sidechain routing | Core offline implementation delivered | Human listening and target-Windows performance sign-off remain open |
 | M25 portability and project durability | Implementation complete; prior short CI acceptance passed | Target-Windows long benchmark and declared resource budgets remain open |
 | M26 production FX variations and delivery export | Implemented; this change simplifies the delivery handoff | Linux Python 3.10–3.12 smoke and Windows regression jobs passed on the implementation commit; local Pyo/audio listening and human musical acceptance remain separate gates |
@@ -36,7 +37,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | M33 arrangement editor, manual composition and print-to-track | Core implementation delivered; human listening acceptance open | Score-native phrase arrangement with rational-beat move/duplicate/trim/reorder/mute/layer exchange/candidate replacement, freeze/branch/revert, M30 cue editing/relinking, bounded undo/redo and full edit audit; offline dry Score prints carry SHA-256/source-event lineage and are verified/copied into project export. Ten human finishing checks are persisted. Full human listening, target-Windows acceptance and production assessment of dry prints remain open. |
 | M34 audio-conditioned composition and advanced DSP research gate | Research reviewed; implementation deferred | Audit found a plausible gap in time-varying audio-feature curves for phrase-level macro conditioning, but no concrete real-composition need or listening benefit is yet demonstrated. Synthetic order-reversal baseline and objective future acceptance contract are recorded in M34_RESEARCH_GATE.md. No production feature work approved. |
 | M24.5 sidechain and envelope routing | Core implementation delivered; listening sign-off open | Schema-v4 one-way source-detector to target-gain routes, peak/RMS detection, threshold/ratio, capped reduction, attack/release smoothing and hysteresis; FX Routing editor add/update/remove; mute/solo gating; pre-insert target ducking and source/route provenance. Human listening remains open. |
-| M24.6 feedback networks | Planned | Bounded fixed-topology feedback delay/resonator design and stability gates remain outstanding. |
+| M24.6 feedback networks | Core implementation delivered; listening/profile open | Standalone fixed four-line orthogonal FDN, contractive feedback gain, deterministic decay estimate, hard tail cap, reset/panic/cancel, static peak guard and block-memory bound. No M22 routing integration. |
 | M24.7 parallel processing branches | Research gate only | Requires a demonstrated use case that serial inserts and fixed returns cannot express. |
 
 **Previous M25 validation baseline:** [CI run 45701978735](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45701978735) passed Linux Python 3.10–3.12 and Windows. The 5-second 48 kHz export/reopen smoke passed in all four jobs and Windows reported 307 passing tests. This is a short portability/integrity check, not a 30/180-second target-machine performance sign-off. M26 adds further regression coverage; see the latest [Actions runs](https://github.com/ilyaminineli/eli_lab-reawarp/actions).
@@ -70,7 +71,7 @@ Status terms:
 | **M12 — Role-aware FX routing** | Implemented; refined by M22 | Per-stem inserts and fixed shared SPACE/ECHO returns. Dry stems remain intact; returns are wet-only; routed exports can extend with effect tails. |
 | **M13 — Musical FX automation** | Implemented | Beat-based insert wet, per-stem send and return wet automation; hold/linear/smooth curves; tempo-synchronised delay divisions. Schema v1 remains supported. |
 
-The production routing model is intentionally bounded: each role has a serial insert path and can feed two shared auxiliary returns; M24.5 adds only explicit one-way detector-to-target gain envelopes before the target insert. It is not an arbitrary routing graph, a feedback network or a live plug-in host.
+The production routing model is intentionally bounded: each role has a serial insert path and can feed two shared auxiliary returns; M24.5 adds only explicit one-way detector-to-target gain envelopes before the target insert. M24.6 is a separate offline DSP processor and is not wired into the routing graph. The production router is not an arbitrary routing graph or a live plug-in host.
 
 ### Reliability and Score-first rendering (M14–M17)
 
@@ -100,7 +101,7 @@ M18's render-time density, syncopation and articulation do not silently rewrite 
 | **M21 — Sound-object and hybrid instrument architecture** | Implemented; sign-off open | Versioned sound-object patches with separate source/processing identity, frame-exact transient/body/tail layers, hybrid renderer, modal/additive voices, typed Score controls, non-destructive resampling and SQLite patch/variant lineage. An editor-facing model exists; a full graphical patch editor is not claimed. |
 | **M22 — Mixer and routing quality** | Implemented; Pyo listening open | Role-aware defaults, routing schema v4 with v1–v3 migration and optional one-way sidechain envelope routes, four send taps, fader/pan/mute/solo semantics, wet-only returns, meters, tail/headroom reporting, stage audition, matched-level copies and cancellable background routing/cache. |
 | **M23 — Variation browser and critical listening** | Implemented; listening remains human-led | Deterministic candidate batches, frozen bases, blind matched A/B, difference waveform/spectrogram, listening sets, notes, keep/discard/promote/branch/restore, nested project persistence and SQLite ancestry. |
-| **M24 — Advanced DSP and dynamics** | M24.1–M24.4 reference modules; M24.5 offline sidechain routing implemented; M24.6 planned; M24.7 research gate | Reference processors remain opt-in. M24.5 is a bounded routing feature, not a general processor graph or default role-map insert. |
+| **M24 — Advanced DSP and dynamics** | M24.1–M24.4 reference modules; M24.5 offline sidechain routing and M24.6 standalone FDN implemented; M24.7 research gate | M24.5 is a bounded routing feature and M24.6 is an opt-in offline DSP processor. Neither introduces a general processor graph or default effect insert. |
 | **M25 — Performance, portability and project durability** | Implemented; long target benchmark open | Manifest v1, source-asset copy/reference policy, file inventory and SHA-256 audit, compatibility fixtures, background archive service, detailed Score/voice timings and cooperative cancellation. |
 | **M26 — Connected project FX and delivery export** | Implemented; Windows/Pyo and human listening sign-off remain separate | FX Lab loads active project channels and can assign custom serial chains as per-stem inserts. Stem Mixer pre-renders channel inserts/SPACE/ECHO returns, generates deterministic role-aware FX alternatives and reuses the completed routing snapshot for audition and master render. Desktop Delivery Export automatically completes FX rendering, then writes a normal folder containing README.md, routed master.wav, original aligned dry stems/ and combined/per-voice MIDI. It does not copy source samples, create a ZIP, or claim to be a restorable Reawarp project archive. |
 
@@ -114,7 +115,7 @@ M18's render-time density, syncopation and articulation do not silently rewrite 
 | **M24.4 — Oversampled nonlinear processing** | NumPy reference + regression/CI coverage implemented; audition/profile open | Five transfer curves and 1x/2x/4x/8x Kaiser-sinc oversampling. Aliasing is reduced, not eliminated. |
 | **M24.5 — Sidechain and envelope routing** | Core implementation delivered; listening/profile open | Offline linked-channel peak/RMS detection, threshold/ratio, capped reduction, attack/release envelope smoothing, hysteresis and one-way cross-stem gain control. Schema v4, v1–v3 migration, UI authoring, mute/solo semantics and deterministic regression coverage. |
 
-| **M24.6 — Feedback networks** | Planned | Bounded fixed-topology feedback delay/resonator structures with stability, decay and headroom tests. |
+| **M24.6 — Feedback networks** | Core implementation delivered; listening/profile open | Fixed four-line Hadamard FDN, orthogonal matrix, feedback operator norm ≤0.98, distinct delay lines, threshold-based decay estimate, hard tail cap, bounded ring memory, reset/panic/cancel API and complete-render peak guard. Standalone/offline only; not integrated into M22 routing. |
 | **M24.7 — Optional parallel processing branches** | Research gate only | Only if a demonstrated use case cannot be expressed by serial inserts and shared returns. |
 
 M26's project-aware FX variations change routing/effect settings, not source events or the composition seed. Generated alternatives remain deterministic for the same project context and variation seed. Current role protection keeps kick/sub paths dry. Actual Pyo sound and musical acceptance still require listening; a render/cache smoke cannot judge the artistic result.
@@ -141,8 +142,8 @@ M26's project-aware FX variations change routing/effect settings, not source eve
 
 - Pyo is optional and lazy-loaded. The FX Lab can audition a standalone file or an active project's dry stem; a custom chain can be assigned to that stem in Stem Mixer.
 - Stem Mixer pre-render uses a cancellable background worker and reuses the rendered result for channel/master preview and export. If Pyo is unavailable, it reports the failure and retains dry source material rather than claiming a processed result.
-- M22 routing v4 keeps per-stem serial inserts and wet-only SPACE/ECHO returns, with M24.5's bounded one-way detector-to-target gain routes. It is still not an arbitrary routing graph, a feedback network or a live plug-in host.
-- M24.1–M24.4 remain separate reference modules; M24.5 is an explicit offline routing feature. M24.6 feedback and M24.7 parallel processing remain separate decisions.
+- M22 routing v4 keeps per-stem serial inserts and wet-only SPACE/ECHO returns, with M24.5's bounded one-way detector-to-target gain routes. It is not an arbitrary routing graph or a live plug-in host.
+- M24.1–M24.4 remain separate reference modules; M24.5 is an explicit offline routing feature; M24.6 is a standalone offline FDN processor; M24.7 parallel processing remains a separate research gate.
 
 ### Project portability and schemas
 
@@ -168,7 +169,7 @@ The M25 compatibility fixture is `tests/fixtures/m25/legacy_contracts_v1.json`.
 
 ## Validation and remaining acceptance work
 
-CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs the pytest suite, package compilation, CLI/library smoke checks, IRO catalog checks, role-aware routing and M24.5 sidechain contracts, M24.1–M24.4 short DSP reference smokes and M25 5-second 48 kHz archive/reopen smoke.
+CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs the pytest suite, package compilation, CLI/library smoke checks, IRO catalog checks, role-aware routing, M24.5 sidechain contracts, M24.1–M24.4 DSP reference smokes, M24.6 feedback stability/decay smoke and M25 5-second 48 kHz archive/reopen smoke.
 
 **Still required:**
 
@@ -180,7 +181,7 @@ CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs 
    Add agreed `--max-rss-gb` and `--max-wall-seconds` limits for explicit pass/fail budget checks.
 3. Install `.[pyo]` and audition role inserts, sends, returns and the complete mix on the target Windows setup. Check matched-level, low-volume and mono playback.
 4. Perform human listening across M18–M24 composition/sound-object/DSP features. CI does not certify musical identity, masking, negative space or taste.
-5. Complete M24.5 human listening and target-Windows performance acceptance. Keep M24.6 feedback networks and M24.7 parallel paths as separate design decisions, not automatic follow-ons.
+5. Complete M24.5 and M24.6 human listening and target-Windows performance acceptance. Keep M24.7 parallel branches as a separate research gate.
 
 ## Engineering principles for future work
 
