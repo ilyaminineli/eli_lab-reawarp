@@ -2,7 +2,7 @@
 
 **Agent-facing technical roadmap · 26 November 2026**  
 **Status:** M27 is implemented; M28 and M29 remain in progress with human listening acceptance open; M30 implementation is complete with formal listening sign-off still open.  
-**Current baseline:** M30 transition grammar, bounded Score-attached section memory, exact-beat transition actuation and typed EndingDirector. M31 — Sound-Object Workshop and Resampling Lineage — is the next planned priority. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
+**Current baseline:** M30 transition/ending grammar and M31 sound-object editing/print lineage are implemented; M32 — Critical Listening Workbench and Contextual Evaluation — is the next planned priority. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -218,7 +218,7 @@ Transition actuation is a pure exact-beat resolver that exposes the source scene
 ## M31 — Sound-Object Workshop and Resampling Lineage
 
 **Priority:** P2  
-**Status:** Planned  
+**Status:** Core implementation delivered; human listening acceptance open. Optional coherent-family generation, direct phrase/stem/FX-stage printing and contextual matched-level A/B remain follow-on integrations.  
 **Depends on:** M27–M29; builds on M21, M22, M25, M26  
 **Primary guide basis:** Sound Design Guide §§1–6 and closing note; Field Guide §7; Advanced Appendix §§7–9, 17.
 
@@ -232,10 +232,10 @@ Make the existing sound-object and hybrid-instrument architecture directly usabl
 - Expose source, excitation, resonance, spectrum, envelope, motion, space and context/role as organised parameter groups.
 - Support transients, bodies and tails as independently auditioned layers that can also be heard as one object.
 - Add source-to-object and object-to-role workflow: one sound object can appear in several roles, but each assignment retains a separate processing identity.
-- Add a non-destructive resampling/print operation for a selected sound, phrase, stem or FX stage; generated audio becomes a new versioned source object.
+- Add a non-destructive sound-object print/resample operation; generated audio becomes a new versioned SampleLibrary asset. Direct print of arbitrary selected phrases, stems and FX stages remains a follow-on integration.
 - Preserve original samples and dry stems; store parent source IDs/hashes, transform chain, render settings, seed, and output hash.
-- Add A/B auditions for source, intermediate stages and final object with matched-level copies.
-- Introduce optional coherent-family generation: related kick/snare/hat/metallic/percussive objects share a material language without becoming identical.
+- Support separate source/layer/full-object auditions on the shared aligned frame clock; matched-level contextual A/B in a full arrangement remains a follow-on listening-workbench integration.
+- Optional coherent-family generation remains a follow-on; current role assignments preserve separate processing identity without auto-generating related instruments.
 - Keep complex M24 processors opt-in and use bounded M22 routing; no arbitrary processing graph is implied.
 
 ### Acceptance criteria

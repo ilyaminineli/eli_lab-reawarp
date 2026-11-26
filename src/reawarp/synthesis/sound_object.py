@@ -441,7 +441,10 @@ def build_envelope_curve(frames: int, sample_rate: int, spec: EnvelopeSpec) -> n
         return np.empty(0, dtype=np.float32)
     attack = min(frames, int(round(spec.attack_seconds * sample_rate)))
     decay = min(frames - attack, int(round(spec.decay_seconds * sample_rate)))
-    release = min(frames, int(round(spec.release_seconds * sample_rate)))
+    # Release begins only after the attack/decay segment. If its requested
+    # duration is longer than the remaining layer, clamp it to the available
+    # frames rather than letting it overlap the attack and zero the whole layer.
+    release = min(frames - attack - decay, int(round(spec.release_seconds * sample_rate)))
     result = np.full(frames, spec.sustain_level, dtype=np.float64)
     cursor = 0
     if attack:

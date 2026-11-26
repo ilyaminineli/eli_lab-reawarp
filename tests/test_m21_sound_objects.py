@@ -144,6 +144,17 @@ def test_adsr_envelope_and_hybrid_renderer_keep_exact_frame_spans():
     assert envelope[0] == pytest.approx(0.0)
     assert np.isfinite(envelope).all()
 
+    # A long release must not overlap the attack/decay and silence a short tail.
+    short_tail = build_envelope_curve(
+        900, 8_000,
+        EnvelopeSpec(
+            attack_seconds=0.01, decay_seconds=0.08,
+            sustain_level=0.4, release_seconds=0.12,
+        ),
+    )
+    assert np.max(short_tail) > 0.3
+    assert np.max(short_tail[-180:]) > 0
+
 
 def test_hybrid_renderer_warns_about_correlated_phase_cancellation():
     source = np.sin(
