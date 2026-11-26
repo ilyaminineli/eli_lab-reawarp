@@ -793,6 +793,7 @@ def render_fx_routing(
     bpm: float = 120.0,
     automation: Mapping[str, Any] | None = None,
     controls: AutomationControlBus | None = None,
+    attention_gestures: Sequence[Mapping[str, Any]] | None = None,
     mix_controls: Mapping[str, Mapping[str, Any]] | None = None,
     include_audition_audio: bool = False,
     cancel_event: Any | None = None,
@@ -819,6 +820,11 @@ def render_fx_routing(
         raise ValueError("score automation control bus sample rate must match FX render rate")
     if isinstance(sample_rate, bool) or int(sample_rate) <= 0:
         raise ValueError("sample_rate must be positive")
+    attention_records = tuple(attention_gestures) if attention_gestures is not None else ()
+    if attention_records and controls is None:
+        raise ValueError(
+            "M29 attention send gestures require the Score control bus timeline"
+        )
     names = tuple(dry_stems)
     first = np.asarray(dry_stems[names[0]], dtype=np.float32)
     if first.ndim == 1:
@@ -965,6 +971,20 @@ def render_fx_routing(
                 )
             else:
                 send_level = np.full(send_frames, float(static_amount), dtype=np.float32)
+
+            if attention_records:
+                from reawarp.score.attention import build_attention_send_envelope
+
+                gesture_level = build_attention_send_envelope(
+                    attention_records,
+                    role=name,
+                    bus=bus,
+                    timeline=controls.timeline,
+                    frames=send_frames,
+                )
+                send_level = np.clip(
+                    send_level * gesture_level, 0.0, 1.0
+                ).astype(np.float32, copy=False)
 
             tap = route["send_taps"][bus]
             pre_insert = tap.startswith("pre_insert")
