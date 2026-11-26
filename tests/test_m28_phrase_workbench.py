@@ -278,8 +278,8 @@ def test_main_window_phrase_workbench_freeze_and_restore_preserve_project_score(
 def test_main_window_registers_phrase_workbench_without_shifting_existing_workspace_ids():
     app = _application()
     window = MainWindow()
-    # The new M31 workspace is appended; all established workspace IDs stay fixed.
-    assert window.workspace_stack.count() == 9
+    # M33 appends Arrangement after all established workspace IDs.
+    assert window.workspace_stack.count() == 10
     expected = ["GENERATOR", "BREAK LAB", "STEM MIXER", "FX LAB", "LIBRARY", "VARIATION BROWSER"]
     for index, title in enumerate(expected):
         window._set_workspace(index)
@@ -296,6 +296,10 @@ def test_main_window_registers_phrase_workbench_without_shifting_existing_worksp
     assert window.workspace_title.text() == "SOUND OBJECT WORKSHOP"
     assert window.workspace_stack.currentWidget() is window.sound_object_page
     assert window.navigator._workspace_items[8] is not None
+    window._set_workspace(9)
+    assert window.workspace_title.text() == "ARRANGEMENT EDITOR"
+    assert window.workspace_stack.currentWidget() is window.arrangement_page
+    assert window.navigator._workspace_items[9] is not None
     window.close()
     app.processEvents()
 

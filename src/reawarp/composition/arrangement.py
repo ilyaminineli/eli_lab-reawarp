@@ -495,10 +495,10 @@ def move_clip(score: Score, clip_id: str, start_beats: Any) -> Score:
     if delta == 0:
         return score
     new_start, new_end = target, target + clip.duration_beats
-    by_id = {event.event_id: event for event in score.events}
+    selected_event_ids = set(clip.event_ids)
     events = tuple(
-        replace(by_id[event_id], onset_beats=by_id[event_id].onset_beats + delta)
-        if event_id in set(clip.event_ids) else event
+        replace(event, onset_beats=event.onset_beats + delta)
+        if event.event_id in selected_event_ids else event
         for event in score.events
     )
     phrase = _phrase_map(score)[1][clip.phrase_id]
@@ -623,17 +623,20 @@ def trim_clip(score: Score, clip_id: str, start_beats: Any, end_beats: Any) -> S
         kept.append(replace(
             event, onset_beats=clipped_start, duration_beats=clipped_end - clipped_start
         ))
-    events = tuple(
-        event for event in score.events
-        if event.event_id not in removed and event.event_id not in set(clip.event_ids)
-    ) + tuple(kept)
     phrase = _phrase_map(score)[1][clip.phrase_id]
     updated_phrase = replace(
         phrase, start_beats=start, end_beats=end,
         event_ids=tuple(event.event_id for event in kept),
         boundaries=tuple(item for item in phrase.boundaries if start <= item.at_beats <= end),
     )
-    updated = _replace_phrases(replace(score, events=events), {clip.phrase_id: updated_phrase})
+    # Update phrase references while every original Score event is still present;
+    # only then remove the cropped-out events from the canonical Score.
+    updated = _replace_phrases(score, {clip.phrase_id: updated_phrase})
+    events = tuple(
+        event for event in updated.events
+        if event.event_id not in removed and event.event_id not in set(clip.event_ids)
+    ) + tuple(kept)
+    updated = replace(updated, events=events)
     source_start = clip.source_start_beats + (start - clip.start_beats)
     source_end = clip.source_end_beats - (clip.end_beats - end)
     updated_clip = replace(
@@ -821,7 +824,7 @@ def replace_clip_with_candidate(score: Score, clip_id: str, candidate: Any) -> S
         raise ValueError("frozen arrangement material cannot be replaced; branch or duplicate it")
     if str(getattr(candidate, "phrase_id", "")) != clip.source_phrase_id:
         raise ValueError("candidate belongs to a different source phrase")
-    if tuple(getattr(candidate, "source_event_ids", ())) != clip.source_event_ids:
+    if set(getattr(candidate, "source_event_ids", ())) != set(clip.source_event_ids):
         raise ValueError(
             "candidate source events no longer match this arrangement clip; regenerate the candidate"
         )
