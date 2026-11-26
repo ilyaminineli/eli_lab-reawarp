@@ -35,6 +35,7 @@ class PhraseWorkbenchPage(QWidget):
         self._selected_phrase_id: str | None = None
         self._selected_candidate_id: str | None = None
         self._busy = False
+        self._batch_busy = False
         self._loading_phrase = False
 
         root = QVBoxLayout(self)
@@ -269,6 +270,8 @@ class PhraseWorkbenchPage(QWidget):
         self.phrases.blockSignals(False)
         if self.phrases.currentItem() is None and self.phrases.count():
             self.phrases.setCurrentRow(0)
+        if self.phrases.currentItem() is not None:
+            self._phrase_selected(self.phrases.currentItem(), None)
         if not self.phrases.count():
             self._selected_phrase_id = None
             self.phrase_summary.setText(
@@ -315,6 +318,7 @@ class PhraseWorkbenchPage(QWidget):
             )
         )
         self._candidates.clear()
+        self.candidate_list.clear()
         self._candidate_selected(None, None)
         self._refresh_controls()
 
@@ -464,7 +468,7 @@ class PhraseWorkbenchPage(QWidget):
             self.audition_status.setText(message)
 
     def set_batch_busy(self, busy: bool) -> None:
-        self.generate_button.setEnabled(not busy)
+        self._batch_busy = bool(busy)
         if busy:
             self.generate_button.setText("GENERATING…")
         else:
@@ -487,10 +491,11 @@ class PhraseWorkbenchPage(QWidget):
         )
         self.save_phrase_button.setEnabled(has_score and not frozen)
         self.delete_phrase_button.setEnabled(has_phrase and not frozen)
-        self.generate_button.setEnabled(has_phrase and not frozen and not self._busy)
-        self.freeze_button.setEnabled(candidate is not None and not frozen and not self._busy)
-        self.branch_button.setEnabled(frozen and not self._busy)
-        self.restore_button.setEnabled(frozen and not self._busy)
+        idle = not self._busy and not self._batch_busy
+        self.generate_button.setEnabled(has_phrase and not frozen and idle)
+        self.freeze_button.setEnabled(candidate is not None and not frozen and idle)
+        self.branch_button.setEnabled(frozen and idle)
+        self.restore_button.setEnabled(frozen and idle)
         self.render_audition_button.setEnabled(
             has_phrase and not self._busy
         )
