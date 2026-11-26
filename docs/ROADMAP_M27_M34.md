@@ -155,7 +155,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 - Warnings identify affected roles, time range and descriptor basis, and can be reviewed as useful, masked or unresolved with project/plan provenance. Matching intentional-merge IDs suppress expected overlap warnings.
 - “Foreground” can change without requiring master gain automation.
 - Mono/low-volume checks operate on analysis/audition copies and never rewrite production audio.
-- Focus/recede changes are explicit and reversible. The implemented first slice rerenders event-backed voices from unchanged canonical Score events, applies to events whose onsets fall in the exact rational-beat half-open span, protects kick/sub and tagged anchors from Recede thinning, and restores the base event render when the gesture is removed. Whole-field texture/ambience and existing M22 routing remain intact. Further phrase-aware space/send articulation and complete listening acceptance remain open.
+- Focus/recede changes are explicit and reversible. The implemented first slice rerenders event-backed voices from unchanged canonical Score events, applies to events whose onsets fall in the exact rational-beat half-open span, protects kick/sub and tagged anchors from Recede thinning, and restores the base event render when the gesture is removed. Whole-field texture/ambience and existing M22 routing remain intact. Further phrase-aware space/send articulation, gesture-aware MIDI export parity and complete listening acceptance remain open.
 - Human review can mark a conflict as useful, masked, or unresolved.
 
 ### Non-goals
