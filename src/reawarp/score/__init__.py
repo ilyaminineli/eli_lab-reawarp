@@ -56,8 +56,16 @@ from reawarp.score.time import (
     TempoPoint,
     as_fraction,
 )
+from reawarp.score.attention import (
+    apply_attention_gesture, apply_attention_gesture_to_event,
+    reconcile_attention_gestures, remove_attention_gesture,
+)
 
 __all__ = [
+    "apply_attention_gesture",
+    "apply_attention_gesture_to_event",
+    "reconcile_attention_gestures",
+    "remove_attention_gesture",
     "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
     "inspect_attention_conflicts", "inspect_attention_handoffs", "inspect_event_onset_conflicts",
