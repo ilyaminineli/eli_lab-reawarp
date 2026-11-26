@@ -88,7 +88,7 @@ For a producer, the useful approach is to treat IDM as a **historical shorthand*
 There is no official taxonomy. The following are useful listening and production poles, not rigid subgenres.
 
 | Pole | Typical emphasis | Useful reference points |
-|---|---|---|
+| --- | --- | --- |
 | Ambient / melodic electronic listening | Spacious harmony, slow development, atmosphere, subtle rhythm | The Orb, early Aphex Twin, The Future Sound of London, B12, Biosphere |
 | Rhythmic / machine-funk | Precise loops, interlocking patterns, syncopation, groove | Autechre's earlier work, Plaid, The Black Dog, B12 |
 | Breakbeat / drill'n'bass-adjacent | Dense chopped breaks, rapid subdivisions, edits, bass movement | Squarepusher, µ-Ziq, Aphex Twin's faster material |
@@ -328,7 +328,7 @@ IDM arrangements often avoid the predictable sequence of intro → build → dro
 Think of a track as a sequence of **states**, each with a different relationship between musical layers:
 
 | State | Function | Possible material |
-|---|---|---|
+| --- | --- | --- |
 | Introduction | Establish the sound world and a clue to the pulse | Noise, field recording, filtered fragment, one motif |
 | Foundation | Give the listener a temporal anchor | Kick, bass, loop, repeated chord, low drone |
 | Expansion | Reveal a second system | Counter-rhythm, melodic response, new texture |
@@ -821,7 +821,7 @@ The general principle is powerful: **generate more material than you use, then c
 ## 18. Useful programming environments
 
 | Tool | Best suited to | Why it is relevant |
-|---|---|---|
+| --- | --- | --- |
 | **Max/MSP** | Visual patching, MIDI/OSC systems, interactive instruments, real-time DSP | Excellent for building systems as networks of connected objects. The Gen environment can compile patch descriptions into efficient processing code. [Gen overview](https://docs.cycling74.com/userguide/gen/_gen_overview/) |
 | **Pure Data (Pd)** | Open visual programming and modular audio systems | Useful for understanding signal flow, event messaging, and patch-based composition. |
 | **SuperCollider** | Code-based synthesis, pattern systems, algorithmic composition | Strong separation between language-side composition and server-side sound generation. Its pattern system is particularly useful for event streams. |
@@ -1183,7 +1183,7 @@ Finish a two-minute composition. Mute one third of the tracks. If the piece beco
 A practical first project can be built in 16 bars, then expanded:
 
 | Bars | Task | Keep constant | Change |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1–4 | Establish an anchor | Pulse and one bass motif | Introduce one texture |
 | 5–8 | Add a counter-pattern | Anchor remains | Add a 3-step or 5-step layer |
 | 9–12 | Mutate the surface | Main pulse or motif remains | Break edits, density, filter, or harmony |
@@ -1199,7 +1199,7 @@ Use this as a laboratory, not a formula. If the track needs 24 bars to unfold, l
 ## 28. Glossary
 
 | Term | Practical meaning |
-|---|---|
+| --- | --- |
 | **Algorithmic composition** | Using explicit rules or computational processes to generate or transform musical material. |
 | **Backbeat** | A recurring accent commonly placed on beats two and four in 4/4, though the idea varies across styles. |
 | **Breakbeat** | A rhythm built from a break or broken percussion pattern rather than a continuous straight kick pattern. |
@@ -1235,28 +1235,28 @@ Use this as a laboratory, not a formula. If the track needs 24 bars to unfold, l
 
 ## 30. Mathematics and algorithmic composition
 
-5. Godfried Toussaint, [“The Euclidean Algorithm Generates Traditional Musical Rhythms”](https://archive.bridgesmathart.org/2005/bridges2005-47.html), *Proceedings of BRIDGES*, 2005. A foundational mathematical discussion of Euclidean rhythms.
-6. Benoît Gibson, [“Stochastic Music”](https://www.iannis-xenakis.org/en/stochastic-music/), Iannis Xenakis website, 18 October 2023. An accessible account of probability-based composition in Xenakis, including distributions and Markov processes.
-7. Iannis Xenakis, *Formalized Music: Thought and Mathematics in Composition*. A major primary reference for formal, stochastic, and mathematical approaches to composition.
-8. Curtis Roads, *Microsound*. A detailed study of sound at the micro-time scale, granular techniques, and digital sound organisation.
-9. Curtis Roads, *The Computer Music Tutorial*. A broad technical reference for synthesis, signal processing, analysis, and computer music.
+1. Godfried Toussaint, [“The Euclidean Algorithm Generates Traditional Musical Rhythms”](https://archive.bridgesmathart.org/2005/bridges2005-47.html), *Proceedings of BRIDGES*, 2005. A foundational mathematical discussion of Euclidean rhythms.
+2. Benoît Gibson, [“Stochastic Music”](https://www.iannis-xenakis.org/en/stochastic-music/), Iannis Xenakis website, 18 October 2023. An accessible account of probability-based composition in Xenakis, including distributions and Markov processes.
+3. Iannis Xenakis, *Formalized Music: Thought and Mathematics in Composition*. A major primary reference for formal, stochastic, and mathematical approaches to composition.
+4. Curtis Roads, *Microsound*. A detailed study of sound at the micro-time scale, granular techniques, and digital sound organisation.
+5. Curtis Roads, *The Computer Music Tutorial*. A broad technical reference for synthesis, signal processing, analysis, and computer music.
 
 ## 31. Programming and technical documentation
 
-10. [TidalCycles — Documentation Reference](https://tidalcycles.org/docs/). A practical coding environment for rhythmic patterns, transformation, and live-coded music.
-11. [TidalCycles — Mini Notation](https://tidalcycles.org/docs/reference/mini_notation/). Particularly useful for rests, grouping, superposition, probability, Euclidean patterns, and polymeter.
-12. [Cycling '74 — Gen Overview](https://docs.cycling74.com/userguide/gen/_gen_overview/). Explains Gen as a visual graph-based environment for compiled audio and visual processing.
-13. [Cycling '74 — gen~ reference](https://docs.cycling74.com/reference/gen~/). Technical reference for native audio signal processing routines in Max.
-14. [librosa — Spectral Centroid](https://librosa.org/doc-playground/latest/generated/librosa.feature.spectral_centroid.html). A concise reference for a common spectral descriptor and its mathematical definition.
-15. Robin Bigwood, [“Granular Synthesis: A Practical Introduction”](https://www.soundonsound.com/techniques/granular-synthesis-practical-introduction), *Sound On Sound*, November 2022. Practical explanation of granular sound processing.
-16. [Ableton Live Manual — Follow Actions](https://www.ableton.com/en/live-manual/12/launching-clips/). A useful example of probability-based and ordered clip/scene behaviour in a DAW.
+ 1. [TidalCycles — Documentation Reference](https://tidalcycles.org/docs/). A practical coding environment for rhythmic patterns, transformation, and live-coded music.
+ 2. [TidalCycles — Mini Notation](https://tidalcycles.org/docs/reference/mini_notation/). Particularly useful for rests, grouping, superposition, probability, Euclidean patterns, and polymeter.
+ 3. [Cycling '74 — Gen Overview](https://docs.cycling74.com/userguide/gen/_gen_overview/). Explains Gen as a visual graph-based environment for compiled audio and visual processing.
+ 4. [Cycling '74 — gen~ reference](https://docs.cycling74.com/reference/gen~/). Technical reference for native audio signal processing routines in Max.
+ 5. [librosa — Spectral Centroid](https://librosa.org/doc-playground/latest/generated/librosa.feature.spectral_centroid.html). A concise reference for a common spectral descriptor and its mathematical definition.
+ 6. Robin Bigwood, [“Granular Synthesis: A Practical Introduction”](https://www.soundonsound.com/techniques/granular-synthesis-practical-introduction), *Sound On Sound*, November 2022. Practical explanation of granular sound processing.
+ 7. [Ableton Live Manual — Follow Actions](https://www.ableton.com/en/live-manual/12/launching-clips/). A useful example of probability-based and ordered clip/scene behaviour in a DAW.
 
 ## 32. Listening references
 
-17. [Warp Records](https://warp.net/) — a central label catalogue for much of the historical field discussed here.
-18. [Planet Mu](https://planet.mu/) — important for breakbeat, drill'n'bass, experimental electronic music, and related work.
-19. [Squarepusher — *Hard Normal Daddy*](https://squarepusher.bandcamp.com/album/hard-normal-daddy) — album page and track list.
-20. [µ-Ziq — *Lunatic Harness* 25th Anniversary Edition](https://planet.mu/releases/lunatic-harness-25th-anniversary-edition/) — label information and historical context.
+ 1. [Warp Records](https://warp.net/) — a central label catalogue for much of the historical field discussed here.
+ 2. [Planet Mu](https://planet.mu/) — important for breakbeat, drill'n'bass, experimental electronic music, and related work.
+ 3. [Squarepusher — *Hard Normal Daddy*](https://squarepusher.bandcamp.com/album/hard-normal-daddy) — album page and track list.
+ 4. [µ-Ziq — *Lunatic Harness* 25th Anniversary Edition](https://planet.mu/releases/lunatic-harness-25th-anniversary-edition/) — label information and historical context.
 
 ---
 

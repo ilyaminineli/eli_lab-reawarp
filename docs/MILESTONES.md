@@ -16,7 +16,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 ## Current status
 
 | Area | Status | Remaining qualification |
-|---|---|---|
+| --- | --- | --- |
 | Deterministic composition and source roles | Implemented | Musical judgement remains a listening task |
 | Score-first event rendering | Implemented | Whole-field texture and ambience remain specialist passes |
 | Score automation, harmony and orchestration | Implemented | Subjective listening remains separate |
@@ -45,6 +45,7 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 ## Milestone ledger
 
 Status terms:
+
 - **Implemented** — behaviour is present and has automated coverage.
 - **Implemented; sign-off open** — software is present, but optional-backend, target-hardware or human listening evidence is outstanding.
 - **Partial** — a model or vertical slice exists, but the milestone's end-to-end integration/acceptance contract is not met.
@@ -54,7 +55,7 @@ Status terms:
 ### Foundation: material, Score and composition (M3–M9)
 
 | Milestone | Status | Delivered scope |
-|---|---|---|
+| --- | --- | --- |
 | **M3 — Break transformation and percussion** | Implemented | Transient detection, slice-based break transforms, stutter, dropout, reverse, gate, pitch/time operations, granular resynthesis and spectral freeze. Processing uses copies; original sample assets are not overwritten. |
 | **M4 — Desktop instrument** | Implemented | Optional PySide6 Generator, Break Lab and Stem Mixer workspaces; waveform/spectrogram views; SoundDevice transport; background rendering. |
 | **M5 — Universal Score and MIDI** | Implemented | Synthesizer-independent events, rational beat positions, tempo/meter maps, automation lanes, tuning references, Score JSON and optional Mido MIDI 1.0 import/export. |
@@ -67,7 +68,7 @@ Status terms:
 ### Processing and production (M10–M13)
 
 | Milestone | Status | Delivered scope |
-|---|---|---|
+| --- | --- | --- |
 | **M10 — Offline FX Lab** | Implemented | Optional lazy-loaded Pyo offline DSP: filters, saturation, delay, reverb and frequency shift; starter chains; dry/processed audition; `reawarp-fx` CLI. |
 | **M11 — Editable FX chains** | Implemented | User-authored ordered serial chains, bounded stage controls/mixes, portable JSON save/load and CLI validation. |
 | **M12 — Role-aware FX routing** | Implemented; refined by M22 | Per-stem inserts and fixed shared SPACE/ECHO returns. Dry stems remain intact; returns are wet-only; routed exports can extend with effect tails. |
@@ -78,7 +79,7 @@ The production routing model is intentionally bounded: each role has a serial in
 ### Reliability and Score-first rendering (M14–M17)
 
 | Milestone | Status | Delivered scope |
-|---|---|---|
+| --- | --- | --- |
 | **M14 — Reliability and performance baseline** | Implemented baseline; sign-off open | Signal diagnostics, deterministic regression suite, project export/reopen checks, benchmark harness and phase timings, Windows CI and grouped project-centred UI navigation. Target-Windows 30/180-second profiling and Pyo listening remain open. |
 | **M15 — Composition Director 2.0** | Implemented; listening sign-off open | Persistent motif identity and transformations, seven-role orchestration, phrase-boundary transitions, independent density/syncopation/instability/register/brightness/spatial controls. |
 | **M16 — Score-driven render core** | Implemented; completed by M17.5 | Shared beat/frame timeline, ScoreRenderer, typed AutomationControlBus, production voice callback contract and render provenance. |
@@ -89,7 +90,7 @@ The production routing model is intentionally bounded: each role has a serial in
 ### Control, harmony and orchestration (M18–M20)
 
 | Milestone | Status | Delivered scope |
-|---|---|---|
+| --- | --- | --- |
 | **M18 — Musical automation and control performance** | Implemented; listening sign-off open | Typed targets with units/ranges; global/section/role/event scopes; deterministic LFO, envelope, stepped, random-walk and phrase-curve sources; modulation; render-time role/event shaping; supported ADSR/vibrato/spectral/spatial controls; fixed-router integration; Score Control editor. |
 | **M19 — Harmonic context and voice-leading** | Implemented; listening sign-off open | Optional pitch fields, tuning-aware sonorities and transforms, deterministic sequence-level voice-leading with inspectable cost terms, six independent bass grammars and loss-aware MIDI 1.0 interchange. No mandatory functional-harmony model is imposed. |
 | **M20 — Perceptual orchestration and phrase grammar** | Implemented; listening sign-off open | Score-persisted asymmetric phrase spans, independently phased cycles, role-pair grammars, foreground/midground/background/absence, hand-offs, mutation permissions and heuristic conflict warnings. Compiles from M15 director decisions. |
@@ -99,7 +100,7 @@ M18's render-time density, syncopation and articulation do not silently rewrite 
 ### Sound objects, mixing, variation and durability (M21–M26)
 
 | Milestone | Status | Delivered scope |
-|---|---|---|
+| --- | --- | --- |
 | **M21 — Sound-object and hybrid instrument architecture** | Implemented; sign-off open | Versioned sound-object patches with separate source/processing identity, frame-exact transient/body/tail layers, hybrid renderer, modal/additive voices, typed Score controls, non-destructive resampling and SQLite patch/variant lineage. An editor-facing model exists; a full graphical patch editor is not claimed. |
 | **M22 — Mixer and routing quality** | Implemented; Pyo listening open | Role-aware defaults, routing schema v4 with v1–v3 migration and optional one-way sidechain envelope routes, four send taps, fader/pan/mute/solo semantics, wet-only returns, meters, tail/headroom reporting, stage audition, matched-level copies and cancellable background routing/cache. |
 | **M23 — Variation browser and critical listening** | Implemented; listening remains human-led | Deterministic candidate batches, frozen bases, blind matched A/B, difference waveform/spectrogram, listening sets, notes, keep/discard/promote/branch/restore, nested project persistence and SQLite ancestry. |
@@ -110,7 +111,7 @@ M18's render-time density, syncopation and articulation do not silently rewrite 
 #### M24 module ledger
 
 | Module | Status | Scope |
-|---|---|---|
+| --- | --- | --- |
 | **M24.1 — Convolution and designed IR instruments** | NumPy reference + regression/CI coverage implemented; audition/profile open | Partitioned overlap-add FIR, designed modal IR, hashed portable archive, tail/headroom reports and audition generator. |
 | **M24.2 — Spectral delay** | NumPy reference + regression/CI coverage implemented; audition/profile open | Frequency-region delay, bounded repeat feedback, attack-aware repeats and capped tails. |
 | **M24.3 — Cross-synthesis and frequency transformation** | NumPy reference + regression/CI coverage implemented; audition/profile open | Ring modulation, fixed-Hz frequency shift, spectral-envelope transfer and band vocoder. |
@@ -157,7 +158,7 @@ Project archives include application/render provenance, generation configuration
 - Hash identity of an archived artifact is distinct from a regenerated render; cross-platform bit-identical output is not promised.
 
 | Data | Schema | Compatibility |
-|---|---:|---|
+| --- | ---: | --- |
 | Project export | 1 | Existing v1 projects remain readable |
 | Project manifest | 1 | Validated; unsupported versions fail explicitly |
 | Events | 1 | Existing v1 event data supported |
@@ -176,9 +177,11 @@ CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs 
 **Still required:**
 
 1. Run 30-second and 180-second 48 kHz generation/export/reopen on the target Windows machine; record hardware, Python/NumPy/SciPy versions, render time, real-time factor and peak memory. Choose explicit budgets before declaring a budget-gated sign-off:
+
    ```powershell
    python scripts/benchmark_m25.py --durations 30 180 --sample-rate 48000 --output output/m25-target-windows.json
    ```
+
    Add agreed `--max-rss-gb` and `--max-wall-seconds` limits for explicit pass/fail budget checks. This closes the shared M14/M25 long-run acceptance gap.
 2. Install `.[pyo]` on the target Windows setup and audition M22/M26 role inserts, sends, returns, complete mixes and export renders at matched level, in mono and at low monitoring level.
 3. Complete human listening acceptance for M15, M18–M24 and M28–M33. Prioritise M24.1–M24.6 matched-level processor comparisons, M24.5/6 real-material use, M28 phrase identity, M29 figure/ground, M30 transitions/endings, M31 object layers, M32 contextual checks and M33 dry-print suitability. CI does not certify musical identity, masking, negative space or taste.
@@ -214,4 +217,3 @@ The following documents are maintained separately from this delivered-milestone 
 The completed milestone history remains consolidated in this document. Future M27–M34 specifications are maintained in the dedicated roadmap so agents can work from a focused implementation brief.
 
 ---
-

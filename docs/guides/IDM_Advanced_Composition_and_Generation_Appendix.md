@@ -97,7 +97,7 @@ The strongest surprise is often not the most statistically unlikely event. It is
 A useful design space is:
 
 | Familiarity | Deviation | Likely effect |
-|---|---|---|
+| --- | --- | --- |
 | Low | Low | Unclear or neutral; the listener has not learned enough to form a strong expectation |
 | High | Low | Stable, hypnotic, predictable, potentially meditative |
 | High | Moderate | Tension, groove variation, recognition, satisfying mutation |
@@ -122,7 +122,7 @@ The important question is not “How much information is present?” but “What
 Before arranging a dense passage, write a short attention map:
 
 | Time span | Foreground | Midground | Background | Intended listener action |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Opening | One isolated motif | Sparse ticks | Low drone | Recognise a sound identity |
 | First groove | Kick/bass relationship | Broken percussion | Long room tail | Find the pulse |
 | Mutation | New counter-rhythm | Original motif | Reduced ambience | Notice a changed rule |
@@ -178,7 +178,7 @@ Asymmetry becomes meaningful when the listener can recognise some invariant: a m
 A motif is more useful when it can survive change. Treat it as a bundle of properties rather than a fixed MIDI clip.
 
 | Transformation | Preserved | Changed | Typical use |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Transposition | Interval contour and rhythm | Pitch level | Register or harmonic relocation |
 | Inversion | Interval sizes | Up/down direction | A related but altered melodic identity |
 | Retrograde | Note values and intervals | Temporal order | Reflection, reversal, or uncanny recognition |
@@ -337,7 +337,7 @@ This is enough to build a tuning table for a synthesizer or custom sequencer.
 A composition operates on several timescales simultaneously. A robust arrangement makes these scales interact rather than allowing every event to mutate at once.
 
 | Scale | Typical unit | Compositional role |
-|---|---|---|
+| --- | --- | --- |
 | Sample | One waveform cycle to a few milliseconds | Timbre, phase, transient, distortion |
 | Gesture | Milliseconds to a few seconds | Click, sweep, hit, granular burst |
 | Beat | A fraction of a second to over a second | Pulse and groove |
@@ -461,7 +461,7 @@ Release can come from the opposite operations, but it can also come from a new s
 A transition is not merely a crossfade. It is a designed change in the listener's interpretation of the material.
 
 | Transition type | Operation | Useful result |
-|---|---|---|
+| --- | --- | --- |
 | Additive | Introduce a new layer before removing the old one | Continuity and expansion |
 | Subtractive | Remove a defining layer | Exposure, suspension, reorientation |
 | Rhythmic | Change cycle, accent, subdivision, or pulse | New movement without requiring new timbre |
@@ -531,7 +531,7 @@ A single sound can perform multiple roles, and one role can be distributed acros
 A rough orchestral map can divide the frequency spectrum into functional territories:
 
 | Region | Common role | Common risk |
-|---|---|---|
+| --- | --- | --- |
 | Sub-bass | Physical weight, fundamental, slow movement | Excess duration, poor translation, phase interaction |
 | Bass | Pitch identity, rhythmic propulsion | Masking with kick or low synth harmonics |
 | Low-mid | Body, warmth, resonant movement | Accumulation and boxiness |
@@ -809,7 +809,7 @@ Every generative layer should have:
 Example:
 
 | Layer | May change | Must preserve | Mutation interval |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Kick anchor | Sample choice, velocity, occasional omission | Main pulse identity | Every 4–8 bars |
 | High percussion | Density, timing, sample fragments | Broad phrase cycle | Every bar |
 | Bass motif | Register, octave, note duration | Main pitch identity | Every 8 bars |
@@ -1431,7 +1431,7 @@ Save the score, seeds, source assets, generator versions, settings, automation, 
 A generated phrase or finished track can be evaluated through several dimensions. Use these as prompts, not an objective ranking system.
 
 | Dimension | Question | Warning sign |
-|---|---|---|
+| --- | --- | --- |
 | Identity | Can I recognise what makes this piece itself? | Every section sounds unrelated |
 | Continuity | Does each change connect to something established? | Mutations feel arbitrary |
 | Contrast | Are different states meaningfully different? | The whole track has one intensity |
@@ -1486,7 +1486,7 @@ These are not style recipes. They are project blueprints that combine musical an
 
 **Materials:** one kick, one bass note or short motif, two percussion families, one high-frequency texture.
 
-**Composition: **
+**Composition:**
 
 - Establish a two- or four-bar anchor.
 - Add a counter-pattern whose cycle is not an integer number of bars.
@@ -1560,7 +1560,7 @@ These are not style recipes. They are project blueprints that combine musical an
 This study is designed to exercise the connective skills missing from a purely loop-based approach.
 
 | Bars | Formal task | Musical task | Generator behaviour |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1–4 | Presentation | Establish pulse, motif, and sound identity | Deterministic material only |
 | 5–8 | Continuation | Add a contrasting rhythmic voice | Ornament variation, anchor fixed |
 | 9–12 | Departure | Introduce counterpoint and a different cycle length | Phrase-level transformation |
@@ -1762,27 +1762,27 @@ The original guide already lists historical IDM sources, TidalCycles, Max/Gen, l
 
 ## 25. Composition, form, and pitch organisation
 
-5. Fred Lerdahl and Ray Jackendoff, *A Generative Theory of Tonal Music*. A formal account of grouping, meter, and inferred musical structure. [MIT Press](https://mitpress.mit.edu/9780262620499/a-generative-theory-of-tonal-music/)
-6. Dmitri Tymoczko, *A Geometry of Music*. A useful bridge between voice leading, harmony, pitch-class space, and mathematical thinking.
-7. Dmitri Tymoczko, *Tonality: An Owner's Manual* (2023). A more recent systematic discussion of voice leading, harmony, modulation, melody, and musical grammar. [Oxford Academic](https://academic.oup.com/book/57582)
-8. Arnold Schoenberg, *Fundamentals of Musical Composition*. A practical study of motive, phrase, contrast, and formal development. Use it as a compositional resource, not a stylistic prescription for electronic music.
+1. Fred Lerdahl and Ray Jackendoff, *A Generative Theory of Tonal Music*. A formal account of grouping, meter, and inferred musical structure. [MIT Press](https://mitpress.mit.edu/9780262620499/a-generative-theory-of-tonal-music/)
+2. Dmitri Tymoczko, *A Geometry of Music*. A useful bridge between voice leading, harmony, pitch-class space, and mathematical thinking.
+3. Dmitri Tymoczko, *Tonality: An Owner's Manual* (2023). A more recent systematic discussion of voice leading, harmony, modulation, melody, and musical grammar. [Oxford Academic](https://academic.oup.com/book/57582)
+4. Arnold Schoenberg, *Fundamentals of Musical Composition*. A practical study of motive, phrase, contrast, and formal development. Use it as a compositional resource, not a stylistic prescription for electronic music.
 
 ## 26. DSP and synthesis
 
-9. Julius O. Smith III, *Spectral Audio Signal Processing*. Detailed online resource for spectra, windows, STFT, time-frequency analysis, resynthesis, and filter banks. [Online book](https://www.dsprelated.com/freebooks/sasp)
-10. Udo Zölzer (ed.), *DAFX: Digital Audio Effects*. Broad treatment of filters, delays, modulation, nonlinear processing, spatial effects, time-frequency effects, and source-filter processing. [Book contents](https://www.dafx.de/DAFX_Book_Page/index.html)
-11. Curtis Roads, *The Computer Music Tutorial*. Broad reference for computer music, synthesis, and signal processing.
-12. Curtis Roads, *Microsound*. Detailed exploration of granular composition and microsound.
-13. Miller Puckette, *The Theory and Technique of Electronic Music*. A practical and conceptual reference for synthesis and DSP. [Online text](https://msp.ucsd.edu/techniques/latest/book-html/)
+1. Julius O. Smith III, *Spectral Audio Signal Processing*. Detailed online resource for spectra, windows, STFT, time-frequency analysis, resynthesis, and filter banks. [Online book](https://www.dsprelated.com/freebooks/sasp)
+2. Udo Zölzer (ed.), *DAFX: Digital Audio Effects*. Broad treatment of filters, delays, modulation, nonlinear processing, spatial effects, time-frequency effects, and source-filter processing. [Book contents](https://www.dafx.de/DAFX_Book_Page/index.html)
+3. Curtis Roads, *The Computer Music Tutorial*. Broad reference for computer music, synthesis, and signal processing.
+4. Curtis Roads, *Microsound*. Detailed exploration of granular composition and microsound.
+5. Miller Puckette, *The Theory and Technique of Electronic Music*. A practical and conceptual reference for synthesis and DSP. [Online text](https://msp.ucsd.edu/techniques/latest/book-html/)
 
 ## 27. Software, timing, and interoperability
 
-14. [MIDI Association — MIDI 1.0 and MIDI 2.0 specifications](https://midi.org/specs). Official specification resources. MIDI 2.0 extends the MIDI 1.0 system with higher-resolution data and richer per-note expression while maintaining an interoperability path. [MIDI 2.0 overview](https://midi.org/midi-2-0)
-15. [SuperCollider — Server timing and scheduling](https://doc.sccode.org/Guides/ServerTiming.html). Explains logical and physical time, server bundles, timestamps, and latency.
-16. [JUCE — AudioProcessor reference](https://docs.juce.com/develop/classjuce_1_1AudioProcessor.html). Useful for plugin lifecycle and audio-callback considerations.
-17. [Faust documentation](https://faustdoc.grame.fr/manual/introduction/). Describes a functional DSP language and its use in synthesizers, effects, and cross-platform audio applications. [Architecture and sample-accurate control](https://faustdoc.grame.fr/manual/architectures/)
-18. [Ableton Live Manual — Automation](https://www.ableton.com/en/manual/automation/). A practical reference for timeline automation, breakpoint envelopes, and tempo automation. [Clip envelopes](https://www.ableton.com/en/live-manual/12/clip-envelopes/)
-19. [Sonic Visualiser reference](https://www.sonicvisualiser.org/doc/reference/5.2.1/en/). A useful tool for inspecting spectrograms, time rulers, and layers of audio analysis.
+ 1. [MIDI Association — MIDI 1.0 and MIDI 2.0 specifications](https://midi.org/specs). Official specification resources. MIDI 2.0 extends the MIDI 1.0 system with higher-resolution data and richer per-note expression while maintaining an interoperability path. [MIDI 2.0 overview](https://midi.org/midi-2-0)
+ 2. [SuperCollider — Server timing and scheduling](https://doc.sccode.org/Guides/ServerTiming.html). Explains logical and physical time, server bundles, timestamps, and latency.
+ 3. [JUCE — AudioProcessor reference](https://docs.juce.com/develop/classjuce_1_1AudioProcessor.html). Useful for plugin lifecycle and audio-callback considerations.
+ 4. [Faust documentation](https://faustdoc.grame.fr/manual/introduction/). Describes a functional DSP language and its use in synthesizers, effects, and cross-platform audio applications. [Architecture and sample-accurate control](https://faustdoc.grame.fr/manual/architectures/)
+ 5. [Ableton Live Manual — Automation](https://www.ableton.com/en/manual/automation/). A practical reference for timeline automation, breakpoint envelopes, and tempo automation. [Clip envelopes](https://www.ableton.com/en/live-manual/12/clip-envelopes/)
+ 6. [Sonic Visualiser reference](https://www.sonicvisualiser.org/doc/reference/5.2.1/en/). A useful tool for inspecting spectrograms, time rulers, and layers of audio analysis.
 
 ---
 

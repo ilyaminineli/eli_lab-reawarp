@@ -3,6 +3,7 @@
 **Agent-facing technical roadmap · 26 November 2026**  
 **Status:** M27–M33 core implementations are delivered; M28, M29, M30, M31, M32 and M33 retain explicit human listening/production acceptance work.  
 **Current baseline:** M30 transition/ending grammar, M31 sound-object editing/print lineage, M32 critical-listening core and M33 Score-native arrangement/print-to-track workflow are implemented. M34 remains a conditional research gate. Implemented scope and open acceptance are recorded in [MILESTONES.md](MILESTONES.md).
+
 ## Roadmap intent — musical agency, perception and finished work (M27–M34)
 
 **Roadmap assessment:** 26 November 2026  
@@ -36,7 +37,7 @@ These principles are the acceptance lens for every milestone below.
 ## Priority order
 
 | Priority | Milestones | Why this order |
-|---|---|---|
+| --- | --- | --- |
 | P0 — Core composition agency | M27, M28 | Explicit identity/invariants and meaningful phrase development are foundations for all later features. |
 | P1 — Perceptual arrangement | M29, M30 | Role relationships, attention and transitions should act on the new phrase-level representation. |
 | P2 — Sound-object workflow | M31 | Connects the composition engine to the existing M21 sound-object architecture without opening an unbounded DSP graph. |
@@ -386,6 +387,7 @@ Evaluate whether audio analysis and the remaining advanced DSP ideas solve a dem
 **Decision:** M34 research reviewed; no production implementation approved.
 
 The repository audit found:
+
 - transient detection and slicing for imported breaks, plus whole-file library metrics (peak/RMS, centroid, rolloff, flatness, onset density and rhythm histogram);
 - no time-indexed library feature curve, confidence model or audio-analysis-to-Score control adapter;
 - M27 bounded mutation contracts, M28 identity-bearing phrase candidates and M32 contextual listening already cover generation/selection, so a separate evolutionary search system has no demonstrated gap;
@@ -488,6 +490,7 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M27 implementation map — intent and mutation contracts
 
 **Delivered implementation**
+
 - `src/reawarp/composition/brief.py` — versioned brief, source family and mutation contract models; strict validation; source identity resolver; independent deterministic field streams; bounded GenerationConfig adapter; explicit tempo/form policy.
 - `src/reawarp/ui/pages/composition_intent.py` — Generator intent editor; no renderer logic or project mutation in the widget.
 - `src/reawarp/ui/main_window.py` — compiles the authored brief against the current selected source/config snapshot before generation; applies a brief to an existing project without rerendering audio; restores the saved intent and effective GenerationConfig after project load/render.
@@ -497,17 +500,20 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: `tests/test_composition_brief.py`, `tests/test_mutation_contracts.py`, `tests/test_m27_integration.py`.
 
 **Executable boundary**
+
 - Only fields listed in explicit MutationContracts are sampled. Each permitted field gets a stable independent seed derived from root seed, brief ID, contract ID, scale and field.
 - Root seed, sample rate, selected source paths, source metadata and sample banks are always immutable. BPM/duration/form are immutable unless their dedicated TempoFormPolicy explicitly permits exploration.
 - The GenerationConfig adapter currently applies at most one value per permitted field per generation request. Contract scale, cadence, decision boundary and stop condition remain validated intent/provenance; they do not yet schedule repeated event-/pattern-/phrase-/section-level changes during a piece.
 - The UI's **Apply Brief to Current Project** action changes provenance only; it does not rewrite rendered audio or Score events. Bounded exploration is separately opt-in for the next generation.
 
 **Design boundary retained**
+
 - The brief does not replace GenerationConfig, Score, phrase plans or sample identity. It compiles to validated GenerationConfig changes and a resolved-intent record; no second scheduler or hidden mutation loop is introduced.
 - Source references are verified by asset ID/hash where available and by exact role/path identity otherwise. Missing/changed references fail rather than selecting a substitute.
 - Legacy project loading returns a read-only legacy-unstructured brief view. It is not persisted unless the user authors and applies a new brief.
 
 **Minimum tests delivered**
+
 - Schema round-trip and unknown-field/version rejection.
 - Same brief/config/seed reproduces the same field selections and independent seed lineage.
 - Unpermitted fields, source/clock invariants, cross-contract invariant conflicts and unsupported execution cadence are rejected.
@@ -515,10 +521,10 @@ The following paths are recommended service boundaries. Confirm current package 
 - Project export/reopen preserves brief and mutation provenance; tampered fingerprints are rejected.
 - Generator UI round-trips materials, pitch intent, permissions and opt-in exploration.
 
-
 ### M28 implementation map — phrase grammar and frozen candidates
 
 **Likely modules**
+
 - src/reawarp/composition/phrases.py — phrase functions, rational spans, open/closed/fragmentary state and boundary descriptors.
 - src/reawarp/composition/motifs.py — motif identity, dimensional feature references and named transformation operations.
 - src/reawarp/composition/phrase_candidates.py — deterministic offline candidate batch service from a frozen Score region.
@@ -527,6 +533,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: test_phrase_grammar.py, test_motif_lineage.py, test_phrase_candidate_determinism.py, test_phrase_freeze_invariance.py.
 
 **Suggested public concepts**
+
 - PhraseSpan: stable phrase ID, rational start/end, function, boundary type, motif IDs, participating roles and section parent.
 - MotifIdentity: feature domains that make a motif recognisable (rhythmic, pitch/contour, timbral, registral, sample/source, spatial or gesture).
 - MotifTransformation: operation, changed domains, preserved domains, amount, source motif/version and derived seed.
@@ -534,6 +541,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - FreezeRecord: exact source revision, target region, selected candidate ID, frozen content fingerprint, selection note and timestamp.
 
 **Design decisions to settle**
+
 - How semantic phrase objects map onto Score event IDs and automation lanes; no duplicate event scheduler.
 - How overlapping phrases and independently phased cycles are represented.
 - How motif similarity is described for comparison; use transparent descriptors, not a hidden quality score.
@@ -541,6 +549,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Whether branch/freeze persistence belongs in project metadata, candidate records or a new versioned arrangement/phrase document.
 
 **Minimum tests**
+
 - Irregular rational spans, zero/negative length rejection, open and interrupted phrases.
 - Variation candidate reproducibility and candidate lineage.
 - Frozen region byte/semantic identity after unrelated regeneration.
@@ -551,6 +560,7 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M29 implementation map — attention and perceptual orchestration
 
 **Likely modules**
+
 - src/reawarp/composition/attention.py — arrangement attention map and role prominence model.
 - src/reawarp/analysis/masking.py — evidence-based temporal/spectral/registral/transient conflict diagnostics.
 - src/reawarp/composition/hand_offs.py — role hand-off and shared identity transitions, only if not already represented by M20 role relationships.
@@ -558,18 +568,21 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: test_attention_map.py, test_masking_diagnostics.py, test_atomic_role_handoffs.py.
 
 **Suggested public concepts**
+
 - AttentionAssignment: role ID, phrase/section span, foreground/midground/background/anchor/etc. state, intended prominence, register/spectral zone and spatial intent.
 - AttentionMap: assignments plus explicit gaps/absence and hand-off links.
 - ConflictEvidence: roles, time range, measured descriptor overlap, analysis settings, severity and confidence.
 - IntentionalOverlap: reference to evidence marked as desired merge/masking with user reason.
 
 **Design decisions to settle**
+
 - Reuse M20 role relationships and M18 control targets. Do not invent a parallel role enum that drifts from Score.
 - Keep perceived prominence separate from loudness/gain; it can be expressed via density, articulation, register, spectral motion, source behaviour or spatial placement.
 - Analysis windows and thresholds must be visible and configurable; diagnostics must expose uncertainty.
 - Decide which warnings are static pre-render estimates and which require rendered-audio analysis.
 
 **Minimum tests**
+
 - Attention assignments are deterministic and align to valid rational phrase boundaries.
 - Atomic hand-off does not generate a mixed intermediate scene.
 - Mono and low-volume analysis use audition copies only.
@@ -579,6 +592,7 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M30 implementation map — transition and ending grammar
 
 **Likely modules**
+
 - src/reawarp/composition/transitions.py — transition type, preparation/change/arrival plan and boundary constraints.
 - src/reawarp/composition/endings.py — explicit exit state and ending strategies.
 - src/reawarp/composition/section_memory.py — compact history of recent motif/role/energy/density/expectation states for the director.
@@ -586,17 +600,20 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: test_transition_plans.py, test_section_memory.py, test_ending_director.py.
 
 **Suggested public concepts**
+
 - TransitionPlan: source and target state, rational start/end, type, prepare/change/arrival regions, changed and preserved dimensions, participating roles, motif bridge and seed lineage.
 - SectionMemory: bounded recent-state record; motif last-use and transformation history; unresolved return/contrast affordances.
 - EndingPlan: exit type, last permitted mutation boundary, residual identity, tail/silence policy and explicit completion condition.
 
 **Design decisions to settle**
+
 - Transition objects should compile to canonical Score events/markers and existing automation, not run a parallel playback timeline.
 - Section memory must be bounded and serializable; it is planning context, not hidden mutable global state.
 - Define whether an ending extends duration or is constrained to requested duration. The chosen policy must be explicit in project/brief state.
 - Tempo maps must distinguish step changes from continuous ramps and keep beat-to-second conversion mathematically defined.
 
 **Minimum tests**
+
 - Transition plans preserve declared dimensions, validate phrase identity and use permitted transition types.
 - Scene updates are represented by one atomic target-state marker at the declared beat/frame boundary; renderer execution remains a later slice.
 - Ending director cannot schedule a new section-level mutation after the exit state is committed.
@@ -606,18 +623,21 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M31 implementation map — sound-object workshop and resampling lineage
 
 **Likely modules**
+
 - Extend the existing sound_object service/model and its persistence adapter; do not fork a second sound-object renderer.
 - src/reawarp/ui/pages/sound_object_editor.py — graphical editor over the current editor-facing model.
 - src/reawarp/synthesis/resampling.py (or existing samples/resample service) — non-destructive print/resample operations.
 - Tests: test_sound_object_editor_model.py, test_sound_object_lineage.py, test_resampling_non_destructive.py.
 
 **Suggested public concepts**
+
 - SoundObjectVersion: stable object ID/version, source ID/hash, excitation, resonance, spectrum, envelope, motion, space and context role.
 - SoundObjectLayer: transient/body/tail identity, frame region, gain/envelope and renderer source.
 - ResampleRecord: input object/phrase/stage, exact source revision, render graph/settings, seed, sample rate, output hash and parent lineage.
 - RoleAssignment: sound object version plus target role and role-specific processing identity.
 
 **Design decisions to settle**
+
 - Which parameter groups are editable at once and which controls need constrained ranges/units.
 - How patches and rendered audio variants map to the existing SQLite lineage schema.
 - Whether a printed FX stage creates a sound object version or an imported sample-library asset; make the choice explicit and reversible.
@@ -625,6 +645,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Keep M24 research processors opt-in and avoid arbitrary processing-graph scope.
 
 **Minimum tests**
+
 - Patch save/load round trip and schema validation.
 - Transient/body/tail solo and combined audition alignment.
 - New prints never modify input buffers/files.
@@ -635,6 +656,7 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M32 implementation map — critical listening workbench
 
 **Likely modules**
+
 - src/reawarp/analysis/listening_sessions.py — session model, snapshots, tests and human-authored notes.
 - src/reawarp/analysis/delivery_checks.py — technical reports with evidence and thresholds.
 - src/reawarp/ui/pages/listening_workbench.py — contextual audition and review UI.
@@ -642,12 +664,14 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: test_listening_session_roundtrip.py, test_delivery_checks.py, test_audition_transform_non_destructive.py.
 
 **Suggested public concepts**
+
 - ListeningSession: project revision, candidate/phrase IDs, ordered audition contexts, levels, transformations and notes.
 - AuditionContext: solo, predecessor→candidate, candidate→successor, full section, full track, reduced density, alternate register.
 - TechnicalFinding: metric, value, unit, threshold, time/role range, evidence and severity.
 - ListeningReview: identity, continuity, contrast, legibility, motif development, orchestration, pacing, surprise, emotional coherence and technical integrity prompts.
 
 **Design decisions to settle**
+
 - Keep objective checks as separate technical findings; never collapse them into an artistic rank.
 - Decide how matched loudness is computed and store the match report; do not alter source/master buffers.
 - Keep the exact analysis window, weighting, sample rate and channel handling with each finding.
@@ -655,6 +679,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Decide whether listening reports embed waveforms or reference project/candidate IDs; favour compact portable notes.
 
 **Minimum tests**
+
 - Meter/diagnostic functions tested against known signals and documented tolerances.
 - Every audition transform is applied to a copy and source arrays remain unchanged.
 - Session round-trip preserves exact project revision, contexts, order, level match reports and notes.
@@ -664,6 +689,7 @@ The following paths are recommended service boundaries. Confirm current package 
 ### M33 implementation map — delivered arrangement and print-to-track
 
 **Delivered modules**
+
 - `src/reawarp/composition/arrangement.py` — M33 arrangement schema, Score/PhrasePlan integrity checks, manual operations, transition/ending cue movement/relinking, edit journal, print lineage and export snapshot.
 - `src/reawarp/ui/pages/arrangement_editor.py` — Compose → Arrangement workspace.
 - `src/reawarp/ui/main_window.py` — canonical Score render handoff, project-duration reconciliation and background print worker.
@@ -671,12 +697,14 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: `tests/test_m33_arrangement.py` and `tests/test_m33_arrangement_ui.py`.
 
 **Public concepts implemented**
+
 - `ArrangementClip`: stable phrase placement with rational source/destination spans, event IDs, candidate/source lineage, role exchange map, mute/freeze state and revision.
 - `ArrangementPlan`: versioned Score-bound arrangement, ordered clips, project revision fingerprint and finishing checklist.
 - Edit records: composer actor, operation, revision, details and before/after Score plus arrangement snapshots. The undo stack is bounded to the latest 50 operations; the audit tail is bounded to 200 records.
 - Print records: selected clip/phrase, source/current event IDs, candidate ID, verified WAV sample rate/frame count, output hash, renderer and arrangement revision.
 
 **Design decisions implemented**
+
 - One source of truth: clips reference the Score's M28 phrase IDs and event IDs. No independently editable event copy is stored in the arrangement.
 - Trim updates rational phrase bounds, crops intersecting events and retains in-range zero-duration events.
 - Move/duplicate/reorder preserve event identity for the moved source and generate new IDs for duplicates. Manual origin is separated from generator/candidate provenance.
@@ -685,6 +713,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Existing project folder delivery remains the export handoff; M33 adds a restorable arrangement snapshot and verified print copies without creating a second archive type.
 
 **Automated tests delivered**
+
 - Exact rational move/trim, unique duplicate event IDs, source lineage and non-destructive mute/unmute.
 - Candidate replacement, freeze, branch, generation revert, undo/redo, reorder and cue relinking.
 - Finishing checklist and print WAV header/hash verification.
@@ -692,12 +721,14 @@ The following paths are recommended service boundaries. Confirm current package 
 - UI signal behaviour, candidate filtering and human checklist interaction.
 
 **Acceptance still open**
+
 - Full human listening sign-off on real compositions and target-Windows performance/listening acceptance.
 - Confirm that a dry Score print is a sufficient print-to-track object for downstream use; FX-inclusive phrase printing remains outside M33 core scope.
 
 ### M34 implementation map — research gates
 
 **Likely modules**
+
 - Audio analysis adapters remain optional and isolated, e.g. src/reawarp/analysis/audio_features.py.
 - Sidechain/envelope control, if approved, should first be represented as a typed detector/control source in existing M18 automation contracts.
 - Feedback research, if approved, should live in a standalone bounded DSP module with NumPy reference tests before any FX Lab integration.
@@ -705,6 +736,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Tests: feature alignment/confidence, hysteresis, deterministic mapping, control-boundary commit, feedback stability and tail/headroom.
 
 **Audio-conditioned control contract**
+
 - Feature windows, hop size, weighting, smoothing, normalisation and confidence must be explicit.
 - A low-confidence analysis frame must not trigger a large structural decision.
 - Map to a small set of musical controls, not every low-level parameter.
@@ -713,6 +745,7 @@ The following paths are recommended service boundaries. Confirm current package 
 - Provide disable/bypass and deterministic replay.
 
 **Advanced DSP safety contract**
+
 - Each feedback processor needs finite parameter bounds, a documented gain/stability condition, decay/tail cap, reset, panic/stop and headroom tests.
 - A parallel branch must define latency alignment, phase behaviour, wet/dry gain law, tail ownership and channel layout.
 - Optional native libraries remain lazy-loaded and require a licence/platform review.
@@ -738,3 +771,80 @@ Before marking any milestone implemented, an agent should be able to answer “y
 - [ ] Human listening evidence is separately recorded where the milestone requires it.
 - [ ] The README, implementation notes and milestone status agree with actual behaviour.
 
+# Reawarp roadmap re-audit — 26 November 2026
+
+**Audited branch:** `main`  
+**Baseline commit:** `60a50e9adb25617f2669ad29fa61feba9910e273` (`Implement M24.6 bounded feedback delay network`)  
+**Scope:** milestone ledger, M27–M34 roadmap, repository tree, relevant implementation modules/tests, README and latest CI record.
+
+This is a static repository audit plus review of the latest CI result. It is not a target-Windows benchmark, a Pyo listening session or a claim of human musical acceptance. Source and tests on `main` take precedence over older status prose.
+
+## Executive result
+
+- **M24.7 stays gated.** Reawarp already has per-stem serial chains with stage/chain dry-wet blending and two shared wet-only auxiliary returns. Independent per-stem parallel chains are not supported, but no real composition or failed baseline demonstrates that they are needed. See [M24.7 gate](M24_7_PARALLEL_BRANCHES.md).
+- **M27 is less complete than its old status implied.** A versioned `CompositionBrief` / mutation-contract model exists, but current repository search found no non-model consumer, no Generator Intent UI, no project-level persistence/resolution/execution path and no dedicated M27 test module. Its correct status is **Partial**.
+- **M28–M33 contain useful delivered vertical slices**, but M28/M29 remain in progress and M31/M32/M33 retain explicitly scoped follow-ons and human acceptance.
+- **M14/M25 and M24.5/M24.6 still need target-machine profiling.** The 5-second CI smoke is not the requested 30/180-second 48 kHz test.
+- **Pyo/mix listening and musical acceptance remain human gates.** A green CI run cannot evaluate timbre, identity, masking, pacing or emotional coherence.
+
+## M24.7 — decision and evidence
+
+The current FX stack is intentionally bounded:
+
+| Existing capability | Current boundary |
+| --- | --- |
+| Per-stem inserts | One ordered chain per stem; up to 12 stages; per-stage and chain-level dry/wet blend |
+| Auxiliary effects | Two shared wet-only returns, SPACE and ECHO, each with its own shared chain |
+| Sends | Four tap choices around insert/fader; send and return wet automation |
+| Dynamics control | M24.5 one-way source-detector to target-gain sidechain |
+| Timing | Built-in chains report zero latency and are start-aligned; tails are bounded/reported |
+
+The missing capability is a set of independently processed parallel chains for one stem, each with its own chain and recombination control. The shared returns do not supply that: all stems feeding a return share its chain. Still, adding that capability would introduce branch alignment, phase, gain-law, tail-ownership, persistence and UI decisions. There is no submitted real example showing that the current topology blocks a musical result. No code, project schema or UI change is warranted until a source-backed case and matched-level comparison pass the gate.
+
+## Remaining milestone register
+
+### A. Software integration or scoped feature work remains
+
+| Milestone | What is actually present | Remaining work / correct interpretation |
+| --- | --- | --- |
+| **M27 — Artistic Intent** | `src/reawarp/composition/brief.py` contains versioned brief, material/source and mutation-contract models and validators. | The audited tree has no source consumer of those models, no Intent panel, no project integration/resolution/execution adapter and no dedicated M27 test file. Implement the end-to-end path before treating M27 as delivered. |
+| **M28 — Phrase grammar** | Rational phrase plans, motif-family records, deterministic candidate generation, freeze/branch/restore, Phrase Workbench, contextual audition and matched-level A/B/difference playback have code and tests. | Broad edge-case and real-composition acceptance remain open. M31 core is now delivered; sound-object-aware phrase transformations and deeper motif-to-object lineage are follow-on integrations rather than a blocked dependency. |
+| **M29 — Attention / figure-ground** | Score-native attention descriptors, Attention Map editing, conflict evidence/review, translation checks, reversible Focus/Recede event gestures, send shaping and gesture-aware MIDI export are present. | It is a first render-facing slice, not a full audio-measured perception system. Score descriptor estimates remain symbolic; whole-field texture/ambience and direct stem/master gain are intentionally untouched. Broader perceptual controls and listening acceptance remain open. |
+| **M31 — Sound-object workshop** | Dedicated editor, aligned layer auditions, immutable patch revisions, non-destructive WAV print and ResampleRecord lineage are implemented. | Coherent-family generation, direct phrase/stem/FX-stage printing and full-arrangement matched-level A/B remain follow-ons; object-layer balance and mono/role reuse need listening. |
+| **M32 — Critical listening** | Disposable contextual auditions, role subtraction, invariance probes, undo/redo review, technical diagnostics and JSON/Markdown report export are implemented. | Full-FX candidate A/B transport, deeper role-aware spectral occupancy, more precise onset/phase diagnostics and extended invariance mutations remain follow-ons. Human notes must remain human-authored. |
+| **M33 — Arrangement / print-to-track** | Score-native phrase editing, cue relinking, bounded undo/redo, finishing checklist, dry phrase print with SHA-256/source lineage and export copy are implemented. | Current phrase print is intentionally dry; it does not include insert FX, SPACE/ECHO or mastering. Human acceptance must decide whether that print is sufficient for the downstream workflow. This is not a general DAW/clip editor. |
+
+### B. Implemented software with external or human acceptance still open
+
+| Milestone group | Open acceptance |
+| --- | --- |
+| **M14 and M25** | Run the existing 48 kHz generation/export/reopen benchmark at 30 and 180 seconds on the target Windows machine; capture hardware, Python/NumPy/SciPy versions, wall time, real-time factor and peak memory. Agree explicit resource budgets before sign-off. |
+| **M15, M18–M23 and M28–M33** | Human listening on representative compositions. Evaluate identity, contrast, motif/phrase development, figure/ground, transitions/endings, sound-object balance, contextual subtraction and arrangement/print usefulness. |
+| **M22 and M26** | Install the optional Pyo extra on the target Windows environment and audition the actual insert/send/return/master path, export render, matched-level comparisons, mono and low-volume translation. CI currently installs no Pyo runtime. |
+| **M24.1–M24.4** | NumPy reference processors and regression coverage exist; matched-level listening and target-machine profiling remain open. They are not default production inserts. |
+| **M24.5 and M24.6** | Core offline implementations and CI smoke coverage exist. Real-material matched-level listening and target-Windows 30/180-second profiling remain open. |
+| **M30** | Transition/ending model and deterministic Score marker behaviour are implemented; formal listening sign-off remains open. |
+
+### C. Conditional research only
+
+| Item | Decision |
+| --- | --- |
+| **M24.7 — Parallel branches** | Do not implement without a real source-backed use case showing that serial stage/chain blends plus shared SPACE/ECHO cannot express the desired result. |
+| **M34 — Audio-conditioned composition / further DSP** | Remains deferred until a real reference source, a precise composition problem, a static baseline, an objective test and a human listening benefit are demonstrated. The synthetic order-reversal fixture proves only that global descriptors lose temporal order. |
+
+## Verification state
+
+The latest main-branch workflow at audit time was [CI run 45868070414](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45868070414), on baseline commit `60a50e9`. All four jobs passed: Windows regression and Linux Python 3.10, 3.11 and 3.12. It includes the M24.6 smoke and the 5-second M25 archive/reopen smoke. This proves the automated regression baseline only; it does not close the external/human acceptance rows above.
+
+The GitHub open-issues endpoint returned no open issues during this audit. The remaining work is therefore recorded in the milestone documents rather than in an existing issue backlog.
+
+## Recommended implementation order from this audit
+
+1. **M27 end-to-end integration** — the clearest software-completeness gap and a prerequisite for reliable brief-led mutation policy.
+2. **M28 sound-object-aware phrase transformation integration** — M31 core is now available; add only the transformation and lineage bridge needed by a real phrase workflow.
+3. **M29 remaining perceptual controls** — preserve the current event-gesture and Score/MIDI round-trip contracts; add only a concrete missing focus/recede action.
+4. **M32 full-FX candidate comparison / diagnostics** — integrate the existing routed render snapshot rather than creating a second renderer.
+5. **M31/M33 delivery follow-ons** — coherent sound families and FX-aware prints only after a demonstrated listening/production need.
+6. **M24.7 and M34** remain research gates, not queued implementation tasks.
+
+Human listening and target-machine validation should proceed alongside these software priorities; they cannot be closed by code changes alone.

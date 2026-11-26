@@ -1,4 +1,5 @@
 # IDM Sound Design Manual
+
 ## Synthesis, Effects, Timbre, Resampling, and Hybrid Sound Architecture
 
 **A practical and technical reference for sound designers, electronic musicians, producers, and audio-system builders**
@@ -60,7 +61,7 @@ A sound object is more than its waveform. It has an envelope, a spectrum, a spat
 A useful sound-object description contains at least eight dimensions:
 
 | Dimension | Questions |
-|---|---|
+| --- | --- |
 | Source | Oscillator, sample, noise, field recording, physical model, feedback, or hybrid? |
 | Excitation | What starts the sound: note-on, impulse, noise burst, transient, gesture, or self-oscillation? |
 | Resonance | What continues vibrating after excitation? |
@@ -440,7 +441,7 @@ A hard-edged grain can click because it introduces an abrupt amplitude discontin
 
 ### 8.6 Preserve identity where useful
 
-Granular processing can quickly erase the source. Use restrained position scatter, a parallel dry path, or occasional recognisable fragments if the track needs a link to the original material. Full abstraction is also valid, but make it a deliberate choice. Roads's _Microsound_ [2] is a key extended reference for the compositional and technical implications of particle-based sound.
+Granular processing can quickly erase the source. Use restrained position scatter, a parallel dry path, or occasional recognisable fragments if the track needs a link to the original material. Full abstraction is also valid, but make it a deliberate choice. Roads's *Microsound* [2] is a key extended reference for the compositional and technical implications of particle-based sound.
 
 ## 9. Sampling, resampling, and sample-based synthesis
 
@@ -640,10 +641,10 @@ This creates more interesting variation than merely scaling volume. In generativ
 
 ## 13. Effects: a functional map
 
-Effects are easiest to understand by the property they transform. The categories below align broadly with the signal-processing families treated in _DAFX_ [3]:
+Effects are easiest to understand by the property they transform. The categories below align broadly with the signal-processing families treated in *DAFX* [3]:
 
 | Family | Main transformed property | Typical result |
-|---|---|---|
+| --- | --- | --- |
 | Filtering / EQ | Spectral balance and phase | Darkening, emphasis, removal, resonance |
 | Dynamics | Amplitude envelope and level relationship | Punch, sustain, density, gating |
 | Nonlinear | Waveform shape | Saturation, harmonics, clipping, folding |
@@ -1813,7 +1814,7 @@ Common causes:
 Score each quality from 1 to 5, but do not treat the sum as an objective measure of artistic value.
 
 | Criterion | 1 | 3 | 5 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Identity | Generic / unclear | Recognisable in context | Distinctive and repeatable |
 | Envelope | Poorly shaped | Functional | Strongly expressive |
 | Spectral role | Masks or disappears | Mostly clear | Occupies a deliberate role |
@@ -2041,7 +2042,7 @@ Place the sounds in a track, remove unnecessary layers, test mono and low-level 
 ## 68. Choose a synthesis method by desired result
 
 | Desired result | Useful starting methods | Why |
-|---|---|---|
+| --- | --- | --- |
 | Pure, stable sub | Sine / triangle oscillator | Predictable low-frequency content |
 | Bright, moving tone | Wavetable + filter | Direct control over waveform and spectrum |
 | Metallic inharmonic hit | FM / ring modulation / modal synthesis | Flexible inharmonic partials |
@@ -2058,7 +2059,7 @@ Place the sounds in a track, remove unnecessary layers, test mono and low-level 
 ## 69. Choose an effect by the transformation you need
 
 | Need | Try first | Then consider |
-|---|---|---|
+| --- | --- | --- |
 | Remove low rumble | High-pass filter | Dynamic EQ or multiband processing |
 | Add tonal character to noise | Resonant band-pass | Modal or spectral resonator |
 | Increase harmonic density | Saturation | Waveshaping or FM |
@@ -2285,44 +2286,44 @@ A successful sound can be simple or complex, synthetic or recorded, clean or deg
 
 The following references are chosen for technical depth and practical value. This manual paraphrases general concepts; consult the original sources for mathematical derivations, implementation details, and software-specific behaviour.
 
-1. **Curtis Roads, _The Computer Music Tutorial_, 2nd edition, MIT Press (2023).** A broad reference covering digital audio, sampling, additive, subtractive, granular, FM, physical modelling, pulsar, concatenative synthesis, nonlinear processing, convolution, time effects, spatialisation, reverberation, and spectrum analysis.  
-   https://mitpress.ublish.com/book/the-computer-music-tutorial  
-   https://mitpress.mit.edu/9780262044912/the-computer-music-tutorial/
+1. **Curtis Roads, *The Computer Music Tutorial*, 2nd edition, MIT Press (2023).** A broad reference covering digital audio, sampling, additive, subtractive, granular, FM, physical modelling, pulsar, concatenative synthesis, nonlinear processing, convolution, time effects, spatialisation, reverberation, and spectrum analysis.  
+   <https://mitpress.ublish.com/book/the-computer-music-tutorial>  
+   <https://mitpress.mit.edu/9780262044912/the-computer-music-tutorial/>
 
-2. **Curtis Roads, _Microsound_, MIT Press (2001).** A foundational study of sound at granular and microtemporal scales, useful for understanding grains, sonic particles, and the boundary between texture and event.  
-   https://mitpress.mit.edu/9780262681544/microsound/
-   
-3. **Udo Zölzer (ed.), _DAFX: Digital Audio Effects_, 2nd edition, Wiley (2011).** A technical reference on filters, delays, modulators, nonlinear processing, spatial effects, time-segment processing, spectral processing, and related algorithms.  
-   https://onlinelibrary.wiley.com/book/10.1002/9781119991298  
-   https://www.wiley.com/en-us/DAFX%3A+Digital+Audio+Effects%2C+2nd+Edition-p-9780470979679
+2. **Curtis Roads, *Microsound*, MIT Press (2001).** A foundational study of sound at granular and microtemporal scales, useful for understanding grains, sonic particles, and the boundary between texture and event.  
+   <https://mitpress.mit.edu/9780262681544/microsound/>
 
-4. **Julius O. Smith III, _Spectral Audio Signal Processing_, online book.** A detailed resource on Fourier analysis, the short-time Fourier transform, spectral displays, phase-vocoder methods, and time-frequency processing.  
-   https://www.dsprelated.com/freebooks/sasp/
+3. **Udo Zölzer (ed.), *DAFX: Digital Audio Effects*, 2nd edition, Wiley (2011).** A technical reference on filters, delays, modulators, nonlinear processing, spatial effects, time-segment processing, spectral processing, and related algorithms.  
+   <https://onlinelibrary.wiley.com/book/10.1002/9781119991298>  
+   <https://www.wiley.com/en-us/DAFX%3A+Digital+Audio+Effects%2C+2nd+Edition-p-9780470979679>
 
-5. **Julius O. Smith III, _Physical Audio Signal Processing_, online book.** A technical resource on digital waveguides, physical models, resonators, and acoustic instrument synthesis.  
-   https://www.dsprelated.com/freebooks/pasp/
+4. **Julius O. Smith III, *Spectral Audio Signal Processing*, online book.** A detailed resource on Fourier analysis, the short-time Fourier transform, spectral displays, phase-vocoder methods, and time-frequency processing.  
+   <https://www.dsprelated.com/freebooks/sasp/>
+
+5. **Julius O. Smith III, *Physical Audio Signal Processing*, online book.** A technical resource on digital waveguides, physical models, resonators, and acoustic instrument synthesis.  
+   <https://www.dsprelated.com/freebooks/pasp/>
 
 6. **The Csound Reference Manual.** A practical opcode reference with categories for additive, FM, granular, scanned, wave-terrain, physical modelling, convolution, delay, spatialisation, reverberation, filtering, and waveshaping.  
-   https://csound.com/docs/manual/index.html
+   <https://csound.com/docs/manual/index.html>
 
 7. **Ableton Live 12 Manual — Live Audio Effect Reference.** A practical device-oriented reference illustrating resonators, spectral resonators, modulation, delay, reverberation, and other contemporary effect designs. The device examples are implementation-specific, but the underlying concepts are widely applicable.  
-   https://www.ableton.com/en/manual/live-audio-effect-reference/
+   <https://www.ableton.com/en/manual/live-audio-effect-reference/>
 
 8. **Cycling '74 — Gen documentation.** Useful for low-level signal-flow design, sample-accurate processing, feedback networks, delay structures, and custom audio effects.  
-   https://docs.cycling74.com/userguide/gen/_gen_overview/  
-   https://docs.cycling74.com/reference/gen_dsp_delay/
+   <https://docs.cycling74.com/userguide/gen/_gen_overview/>  
+   <https://docs.cycling74.com/reference/gen_dsp_delay/>
 
 9. **Cycling '74 — MSP Delay Tutorial.** A concise explanation of how delayed signals combine with dry signals to create comb filtering, slapback, and distinct echoes.  
-   https://docs.cycling74.com/learn/articles/15_delaychapter01/
+   <https://docs.cycling74.com/learn/articles/15_delaychapter01/>
 
-10. **Andy Farnell, _Designing Sound_, MIT Press (2010).** A practitioner-oriented guide to analysing, modelling, and synthesising sound effects from first principles, with examples using Pure Data. Useful for thinking of sounds as processes rather than fixed recordings.  
-    https://mitpress.mit.edu/9780262288835/designing-sound/
+10. **Andy Farnell, *Designing Sound*, MIT Press (2010).** A practitioner-oriented guide to analysing, modelling, and synthesising sound effects from first principles, with examples using Pure Data. Useful for thinking of sounds as processes rather than fixed recordings.  
+    <https://mitpress.mit.edu/9780262288835/designing-sound/>
 
 11. **SuperCollider — Official Documentation.** A practical reference for unit generators, synthesis graphs, real-time sources and processors, FFT processing, buffers, resonators, and signal-flow structures.  
-    https://doc.sccode.org/
+    <https://doc.sccode.org/>
 
-12. **MIT Press — _The Computer Music Tutorial_, first edition information.** Useful as a historical reference to the breadth of computer-music synthesis and processing.  
-    https://mitpress.mit.edu/9780262680820/the-computer-music-tutorial/
+12. **MIT Press — *The Computer Music Tutorial*, first edition information.** Useful as a historical reference to the breadth of computer-music synthesis and processing.  
+    <https://mitpress.mit.edu/9780262680820/the-computer-music-tutorial/>
 
 ### How to use the references
 

@@ -1,4 +1,5 @@
 # IDM Composition Atlas
+
 ## A Practical Grammar of Patterns, Phrases, Forms, and Complete Tracks
 
 **A composition-only reference for electronic musicians, composers, arrangers, and generative-music authors**  
@@ -110,7 +111,7 @@ These questions move composition away from “add another layer” and toward pu
 A useful composition has at least four interacting time-scales.
 
 | Scale | Approximate span | Typical decisions | Listener's question |
-|---|---:|---|---|
+| --- | ---: | --- | --- |
 | Event | milliseconds to a few seconds | accent, ornament, note length, silence | What just happened? |
 | Pattern | one beat to several bars | groove, motif, ostinato, cycle relationship | What is repeating? |
 | Phrase / section | several bars to a minute or more | development, contrast, return, interruption | Where is this going? |
@@ -204,7 +205,7 @@ This method encourages development from limited material rather than constant in
 There is no single correct starting point. Different starting materials lead to different compositional strengths.
 
 | Starting point | What it naturally foregrounds | Common risk | Useful next step |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Drum or rhythmic loop | movement, syncopation, physical energy | track becomes a loop with decorations | create a melodic or textural identity that changes the meaning of the beat |
 | Melody or pitch cell | memory, contour, emotional direction | rhythm becomes an afterthought | let the rhythm reinterpret the melody |
 | Bass figure | weight, harmonic implication, propulsion | bass dominates all other layers | write an independent upper line or contrasting drum cycle |
@@ -592,7 +593,7 @@ Move up the ladder only when the composition needs a more noticeable change. Sma
 ### 7.2 Four levels of variation
 
 | Level | Span | Examples | Best use |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Micro-variation | each event or bar | velocity, ghost note, articulation | keep repetition alive |
 | Phrase variation | every 2–8 bars | fill, omission, displaced accent | articulate phrases |
 | Section variation | tens of bars | new pattern family, altered cycle, density shift | make a new section |
@@ -681,7 +682,7 @@ Rather than playing continuously, the bass appears at phrase beginnings, endings
 ### 8.8 Bass-pattern design matrix
 
 | Pattern type | Rhythm | Pitch behaviour | Structural function |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Pedal | regular / sparse | one pitch | stability |
 | Ostinato | repeating syncopation | 2–5 pitches | identity and propulsion |
 | Walking fragments | irregular note entries | stepwise or scalar | motion and transition |
@@ -748,7 +749,7 @@ An anti-hook is a small figure that is memorable because it resists complete mel
 Use the following transformations to create related material rather than unrelated new melodies.
 
 | Operation | What changes | What remains recognisable |
-|---|---|---|
+| --- | --- | --- |
 | Transposition | entire pitch level | intervals and rhythm |
 | Inversion | direction of intervals | interval sizes / contour relation |
 | Retrograde | note order | pitch collection and duration sequence |
@@ -894,7 +895,7 @@ A phrase does not need all four functions. A track can deliberately avoid closur
 ### 12.2 Phrase types for IDM
 
 | Phrase type | Character | Example use |
-|---|---|---|
+| --- | --- | --- |
 | Loop phrase | repeats nearly unchanged | establish groove identity |
 | Additive phrase | gains one event or layer at a time | accumulation |
 | Subtractive phrase | loses events or layers | erosion / breakdown |
@@ -1023,7 +1024,7 @@ Transitions are not empty spaces between sections. They are compositional events
 ### 14.1 Transition types
 
 | Transition | Mechanism | Perceptual effect |
-|---|---|---|
+| --- | --- | --- |
 | Additive | new layer enters | expansion / arrival |
 | Subtractive | layer disappears | exposure / release |
 | Filtered or registral | material moves in register or spectral emphasis | narrowing / widening |
@@ -1687,7 +1688,7 @@ O       bars 97–104  final interval and silence
 ## 21. Composition diagnostics: recognise the actual problem
 
 | Symptom | Likely compositional cause | Better intervention than “add more” |
-|---|---|---|
+| --- | --- | --- |
 | Track is interesting for 30 seconds but not 4 minutes | no long-range trajectory | define section functions and a formal consequence |
 | Every section sounds like the same loop | variation is too local | change the relationship between layers or the phrase function |
 | Track sounds like unrelated sketches | no recurring identity | retain a motif, sound-role, interval, or transition gesture |
@@ -1732,50 +1733,50 @@ Use these prompts to generate starting material or to escape a stalled arrangeme
 
 ### Bass prompts
 
-16. Let the bass play only at the end of each four-bar phrase.
-17. Keep one pedal note while the drums change their accent structure.
-18. Give the bass a different cycle length from the kick.
-19. Make the bass answer the snare rather than reinforce the kick.
-20. Start with a two-note bass motif and gradually expose its missing notes.
-21. Use an ascending bass line while the upper melody descends.
-22. Let the bass disappear at the point of maximum rhythmic density.
-23. Make a bass phrase from the pitches of the main melody, but use a different rhythm.
-24. Return the opening bass line in a different register and articulation.
-25. End with one bass note that has been present but understated throughout the track.
+ 1. Let the bass play only at the end of each four-bar phrase.
+ 2. Keep one pedal note while the drums change their accent structure.
+ 3. Give the bass a different cycle length from the kick.
+ 4. Make the bass answer the snare rather than reinforce the kick.
+ 5. Start with a two-note bass motif and gradually expose its missing notes.
+ 6. Use an ascending bass line while the upper melody descends.
+ 7. Let the bass disappear at the point of maximum rhythmic density.
+ 8. Make a bass phrase from the pitches of the main melody, but use a different rhythm.
+ 9. Return the opening bass line in a different register and articulation.
+10. End with one bass note that has been present but understated throughout the track.
 
 ### Melodic and harmonic prompts
 
-26. Write a four-note motif with a distinctive interval and three possible endings.
-27. Keep the pitches fixed while moving the motif's accents.
-28. Keep the rhythm fixed while altering only the final pitch.
-29. Present the melody in fragments before revealing the complete phrase.
-30. Let percussion imitate the melody's rhythm while the melody disappears.
-31. Use one pitch as a recurring point of return and make other pitches orbit around it.
-32. Compose a melody that avoids its expected final note until the last section.
-33. Hold a static harmony while changing the bass line's implied tonal centre.
-34. Let two melodic voices use the same notes but different phrase lengths.
-35. Use a descending motif that gradually loses its first note.
+ 1. Write a four-note motif with a distinctive interval and three possible endings.
+ 2. Keep the pitches fixed while moving the motif's accents.
+ 3. Keep the rhythm fixed while altering only the final pitch.
+ 4. Present the melody in fragments before revealing the complete phrase.
+ 5. Let percussion imitate the melody's rhythm while the melody disappears.
+ 6. Use one pitch as a recurring point of return and make other pitches orbit around it.
+ 7. Compose a melody that avoids its expected final note until the last section.
+ 8. Hold a static harmony while changing the bass line's implied tonal centre.
+ 9. Let two melodic voices use the same notes but different phrase lengths.
+10. Use a descending motif that gradually loses its first note.
 
 ### Formal prompts
 
-36. Make the second section shorter than the first and the third longer than both.
-37. Let the first half of the track build and the second half dismantle the same materials.
-38. Introduce a motif only as a rhythm, then reveal its pitches near the end.
-39. Make a breakdown where the most important layer becomes more prominent.
-40. Return to the opening section but remove the sound that originally defined it.
-41. Use a central section that changes the perceived pulse without changing tempo.
-42. Make the climax a moment of alignment between two previously conflicting cycles.
-43. Make the ending happen before the listener expects the final phrase to complete.
-44. Repeat one section three times, but change its formal function each time.
-45. Build a track from four episodes connected by one recurring interval.
+ 1. Make the second section shorter than the first and the third longer than both.
+ 2. Let the first half of the track build and the second half dismantle the same materials.
+ 3. Introduce a motif only as a rhythm, then reveal its pitches near the end.
+ 4. Make a breakdown where the most important layer becomes more prominent.
+ 5. Return to the opening section but remove the sound that originally defined it.
+ 6. Use a central section that changes the perceived pulse without changing tempo.
+ 7. Make the climax a moment of alignment between two previously conflicting cycles.
+ 8. Make the ending happen before the listener expects the final phrase to complete.
+ 9. Repeat one section three times, but change its formal function each time.
+10. Build a track from four episodes connected by one recurring interval.
 
 ### Generative / procedural prompts
 
-46. Allow one layer to vary freely while all other layers retain fixed phrase boundaries.
-47. Generate several possible fills but choose only one for each section.
-48. Keep the form fixed while selecting different phrase variations for each pass.
-49. Let a process gradually remove events, but manually decide where the process stops.
-50. Make the system generate alternatives for the same phrase, then choose the version that best supports the full arrangement.
+ 1. Allow one layer to vary freely while all other layers retain fixed phrase boundaries.
+ 2. Generate several possible fills but choose only one for each section.
+ 3. Keep the form fixed while selecting different phrase variations for each pass.
+ 4. Let a process gradually remove events, but manually decide where the process stops.
+ 5. Make the system generate alternatives for the same phrase, then choose the version that best supports the full arrangement.
 
 ---
 
@@ -1797,7 +1798,7 @@ What should be absent at the end:
 ### Worksheet B — Material inventory
 
 | Material ID | Type | Identity feature | Main role | Allowed transformations |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | A | | | | |
 | B | | | | |
 | C | | | | |
@@ -1818,7 +1819,7 @@ Main source of rhythmic stability:
 ### Worksheet D — Motif transformation plan
 
 | Version | Retained identity | Changed dimension | Section / purpose |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | M0 | | | |
 | M1 | | | |
 | M2 | | | |
@@ -1828,7 +1829,7 @@ Main source of rhythmic stability:
 ### Worksheet E — Section map
 
 | Section | Formal function | Material used | What changes? | What does it prepare? |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | I | | | | |
 | A | | | | |
 | A' | | | | |
@@ -1851,7 +1852,7 @@ What the next section reveals:
 ### Worksheet G — Energy and density map
 
 | Section | Energy (1–5) | Density (1–5) | Tension (1–5) | Main perceptual focus |
-|---|---:|---:|---:|---|
+| --- | ---: | ---: | ---: | --- |
 | I | | | | |
 | A | | | | |
 | A' | | | | |
@@ -2284,23 +2285,23 @@ The sources below provide theoretical, historical, and practitioner context. The
 
 ## 34. Electronic rhythm and dance-music analysis
 
-5. **Mark J. Butler — *Unlocking the Groove: Rhythm, Meter, and Musical Design in Electronic Dance Music*.** Indiana University Press, 2006. Essential for understanding groove, metrical ambiguity, multimeasure patterns, and large-scale design in electronic dance music. [WorldCat](https://search.worldcat.org/title/Unlocking-the-groove-%3A-rhythm-meter-and-musical-design-in-electronic-dance-music/oclc/61162077)
+1. **Mark J. Butler — *Unlocking the Groove: Rhythm, Meter, and Musical Design in Electronic Dance Music*.** Indiana University Press, 2006. Essential for understanding groove, metrical ambiguity, multimeasure patterns, and large-scale design in electronic dance music. [WorldCat](https://search.worldcat.org/title/Unlocking-the-groove-%3A-rhythm-meter-and-musical-design-in-electronic-dance-music/oclc/61162077)
 
-6. **Simon Reynolds — *Energy Flash: A Journey Through Rave Music and Dance Culture*.** A cultural history rather than a pattern manual; useful for understanding the musical and cultural contexts from which many electronic listening practices developed.
+2. **Simon Reynolds — *Energy Flash: A Journey Through Rave Music and Dance Culture*.** A cultural history rather than a pattern manual; useful for understanding the musical and cultural contexts from which many electronic listening practices developed.
 
-7. **Peter Shapiro (ed.) — *Modulations: A History of Electronic Music: Throbbing Words on Sound*.** A collection of perspectives on electronic music histories, scenes, and production cultures.
+3. **Peter Shapiro (ed.) — *Modulations: A History of Electronic Music: Throbbing Words on Sound*.** A collection of perspectives on electronic music histories, scenes, and production cultures.
 
 ## 35. Practitioner interviews and listening references
 
-8. **Autechre — interview with *Sound On Sound*, “Talking 'Bout Our Generation.”** Discusses generative sequences, rule-based rhythm systems, Max-based tools, and the difference between controlled processes and randomness. [Sound On Sound](https://www.soundonsound.com/people/autechre)
+1. **Autechre — interview with *Sound On Sound*, “Talking 'Bout Our Generation.”** Discusses generative sequences, rule-based rhythm systems, Max-based tools, and the difference between controlled processes and randomness. [Sound On Sound](https://www.soundonsound.com/people/autechre)
 
-9. **Autechre — interviews collected by the Autechre interview archive.** Useful for first-person discussion of process-based composition and the conversion of experimental actions into repeatable musical systems. As with any archive, check original interview provenance when quoting. [Interview archive](https://autechre.neocities.org/en/interviews/interview49)
+2. **Autechre — interviews collected by the Autechre interview archive.** Useful for first-person discussion of process-based composition and the conversion of experimental actions into repeatable musical systems. As with any archive, check original interview provenance when quoting. [Interview archive](https://autechre.neocities.org/en/interviews/interview49)
 
-10. **Boards of Canada — interview archive.** Includes discussion of melody-first writing, selecting memorable melodic sketches, and allowing a track to metamorphose. The archive is a secondary repository of interview transcripts, so use it as a route to the original interview rather than as a substitute for provenance. [Interview collection](https://bocpages.org/wiki/Interviews-all)
+3. **Boards of Canada — interview archive.** Includes discussion of melody-first writing, selecting memorable melodic sketches, and allowing a track to metamorphose. The archive is a secondary repository of interview transcripts, so use it as a route to the original interview rather than as a substitute for provenance. [Interview collection](https://bocpages.org/wiki/Interviews-all)
 
-11. **Aphex Twin — *Selected Ambient Works 85–92*.** A useful listening case for the relationship between repeated rhythmic foundations, melodic material, and atmospheric layers. For a critical overview, see [Pitchfork's retrospective review](https://pitchfork.com/reviews/albums/223-selected-ambient-works-85-92/).
+4. **Aphex Twin — *Selected Ambient Works 85–92*.** A useful listening case for the relationship between repeated rhythmic foundations, melodic material, and atmospheric layers. For a critical overview, see [Pitchfork's retrospective review](https://pitchfork.com/reviews/albums/223-selected-ambient-works-85-92/).
 
-12. **Aphex Twin — “Xtal.”** A useful focused study of a recognisable groove, melodic texture, and gradual changes in arrangement. A track-level discussion of the album's production and arrangement is available at [MusicRadar](https://www.musicradar.com/news/how-aphex-twin-made-saw-85-92).
+5. **Aphex Twin — “Xtal.”** A useful focused study of a recognisable groove, melodic texture, and gradual changes in arrangement. A track-level discussion of the album's production and arrangement is available at [MusicRadar](https://www.musicradar.com/news/how-aphex-twin-made-saw-85-92).
 
 ---
 
