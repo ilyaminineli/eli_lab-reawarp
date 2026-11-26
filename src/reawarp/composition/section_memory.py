@@ -117,7 +117,7 @@ class TrajectorySummary:
     @classmethod
     def from_values(cls, values: Sequence[float]) -> "TrajectorySummary":
         """Summarize a finite sequence without retaining an unbounded raw curve."""
-        if not values:
+        if len(values) == 0:
             raise ValueError("trajectory values cannot be empty")
         samples = tuple(_unit(value, "trajectory sample") for value in values)
         mean = math.fsum(samples) / len(samples)
