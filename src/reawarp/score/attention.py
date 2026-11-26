@@ -413,6 +413,7 @@ def apply_attention_gesture_to_event(
     gesture = min(matching, key=lambda item: (item[0], item[1]))[2]
     action = gesture["action"]
     gesture_id = gesture["gesture_id"]
+    gesture_end = as_fraction(gesture["end_beats"])
     parameters = dict(event.parameters)
     tags = {str(value).casefold() for value in getattr(event, "tags", ())}
     source_kind = str(parameters.get("source_kind", "")).casefold()
@@ -444,8 +445,16 @@ def apply_attention_gesture_to_event(
                 )
         duration = as_fraction(event.duration_beats)
         if duration > 0:
+            if action == "focus" and event.end_beats <= gesture_end:
+                extended = min(
+                    duration * Fraction(105, 100),
+                    gesture_end - event.onset_beats,
+                )
+                if extended > duration:
+                    changes["duration_beats"] = extended
+                    duration = extended
             base_gate = as_fraction(str(
-                parameters.get("gate_duration_beats", duration)
+                parameters.get("gate_duration_beats", event.duration_beats)
             ))
             gate_ratio = 1.08 if action == "focus" else 0.58
             floor = min(Fraction(1, 64), duration)
