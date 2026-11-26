@@ -1,7 +1,9 @@
-"""M29 attention descriptors, listening checks and human review provenance.
+"""M29 attention descriptors, render gestures and human review provenance.
 
-These helpers operate on audition/analysis copies and symbolic Score metadata.
-They do not rewrite production audio or claim to measure artistic quality.
+Descriptors and review records are symbolic Score metadata; translation checks use
+disposable audio copies. Reversible gestures are resolved against render-time event
+copies, leaving canonical Score events and source assets unchanged. Descriptor
+estimates are not psychoacoustic measurements or artistic quality scores.
 """
 from __future__ import annotations
 
