@@ -42,7 +42,9 @@ from reawarp.fx_automation import (
 from reawarp.score.render import build_score_control_bus
 from reawarp.score.orchestration_intent import OrchestrationPlan
 from reawarp.score.attention import (
-    build_attention_translation_check, record_attention_review,
+    apply_attention_gesture, build_attention_translation_check,
+    record_attention_review, reconcile_attention_gestures,
+    remove_attention_gesture,
 )
 from reawarp.samples.io import read_sample
 from reawarp.samples.catalog import (
@@ -214,6 +216,12 @@ class MainWindow(QMainWindow):
         self.attention_map_page.reviewRequested.connect(self._attention_review_requested)
         self.attention_map_page.translationCheckRequested.connect(
             self._attention_translation_check_requested
+        )
+        self.attention_map_page.gestureRequested.connect(
+            self._attention_gesture_requested
+        )
+        self.attention_map_page.gestureRemoveRequested.connect(
+            self._attention_gesture_remove_requested
         )
 
         self.workspace_stack = QStackedWidget()
@@ -2205,6 +2213,11 @@ class MainWindow(QMainWindow):
 
 
     def _attention_plan_changed(self, payload: dict[str, Any]) -> None:
+        if self._worker is not None or self._export_worker is not None:
+            self.attention_map_page.set_error(
+                "Attention map edits are paused during an active render or export."
+            )
+            return
         if self.project is None:
             self.attention_map_page.set_error("Generate or load a composition before editing attention.")
             return
@@ -2222,6 +2235,9 @@ class MainWindow(QMainWindow):
                 orchestration_plan=plan.to_dict(),
                 metadata=metadata,
             )
+            updated, orphaned_gestures = reconcile_attention_gestures(
+                updated, plan.attention
+            )
             self.project.score = updated
             self.project.metadata = {
                 **self.project.metadata,
@@ -2232,9 +2248,101 @@ class MainWindow(QMainWindow):
             self.attention_map_page.set_error(f"Could not save attention map: {exc}")
             return
         self.attention_map_page.set_score(updated)
+        if orphaned_gestures:
+            base_project = self.project
+            self._run_render(
+                lambda cancel_event: self._render_score_automation_project(
+                    base_project, updated, cancel_event=cancel_event
+                ),
+                (
+                    f"Attention spans changed · removing {orphaned_gestures} orphaned "
+                    "render gesture(s) and rebuilding event-backed voices…"
+                ),
+            )
+            return
         self.statusBar().showMessage(
             "Attention intent saved to Score · project stems and mix are unchanged.",
             6000,
+        )
+
+    def _attention_gesture_requested(self, payload: dict[str, Any]) -> None:
+        """Render a reversible M29 role gesture through the canonical Score path."""
+        if self.project is None:
+            self.attention_map_page.set_error(
+                "Generate or load a composition before applying render gestures."
+            )
+            return
+        if self._worker is not None or self._export_worker is not None:
+            self.attention_map_page.set_error(
+                "Wait for the active render or export before applying an attention gesture."
+            )
+            return
+        try:
+            base_project = self.project
+            updated_score = apply_attention_gesture(
+                base_project.to_score(),
+                role=str(payload["role"]),
+                start_beats=payload["start_beats"],
+                end_beats=payload["end_beats"],
+                action=str(payload["action"]),
+                register_shift_semitones=float(
+                    payload.get("register_shift_semitones", 0.0)
+                ),
+            )
+        except Exception as exc:
+            self.attention_map_page.set_error(
+                f"Could not prepare attention gesture: {exc}"
+            )
+            return
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, updated_score, cancel_event=cancel_event
+            ),
+            (
+                f"Applying M29 {payload['action']} gesture to {payload['role']} · "
+                "rendering event-backed voices without changing the master fader…"
+            ),
+        )
+
+    def _attention_gesture_remove_requested(self, payload: dict[str, Any]) -> None:
+        """Restore the base event render for one exact role/span gesture."""
+        if self.project is None:
+            self.attention_map_page.set_error(
+                "Generate or load a composition before resetting render gestures."
+            )
+            return
+        if self._worker is not None or self._export_worker is not None:
+            self.attention_map_page.set_error(
+                "Wait for the active render or export before resetting an attention gesture."
+            )
+            return
+        try:
+            base_project = self.project
+            original_score = base_project.to_score()
+            updated_score = remove_attention_gesture(
+                original_score,
+                role=str(payload["role"]),
+                start_beats=payload["start_beats"],
+                end_beats=payload["end_beats"],
+            )
+            if updated_score is original_score:
+                self.attention_map_page.set_error(
+                    "No render gesture exists for the selected role and beat span."
+                )
+                return
+        except Exception as exc:
+            self.attention_map_page.set_error(
+                f"Could not reset attention gesture: {exc}"
+            )
+            return
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, updated_score, cancel_event=cancel_event
+            ),
+            (
+                f"Resetting M29 render gesture for {payload['role']} · "
+                "restoring the source Score render for that role/span…"
+            ),
         )
 
     def _attention_review_requested(self, payload: dict[str, Any]) -> None:

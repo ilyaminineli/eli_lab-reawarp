@@ -127,7 +127,7 @@ Move the centre of generation from isolated patterns and fixed bar-based section
 ## M29 — Perceptual Orchestration, Figure/Ground and Attention Map
 
 **Priority:** P1  
-**Status:** In progress — Score-native attention descriptors, Attention Map workspace, evidence-led conflict diagnostics, human review provenance and non-destructive translation checks implemented; render-facing focus/recede operations and full listening acceptance remain open  
+**Status:** In progress — Score-native attention descriptors, Attention Map workspace, evidence-led conflict diagnostics, human review provenance, non-destructive translation checks and a first render-facing Focus/Recede gesture path implemented; broader musical acceptance and remaining perceptual controls remain open  
 **Depends on:** M27, M28; builds on M18, M20, M21, M22  
 **Primary guide basis:** Advanced Appendix §§1, 7, 18; Field Guide §§5, 23; Sound Design Guide §1.
 
@@ -144,7 +144,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 - Track spectral zone, register, onset density, transient strength, sustain, spatial position and intended prominence as descriptors—not rigid mix rules.
 - Add a masking/conflict inspector that reports possible competition in time, register, transient or stereo space and explains the evidence.
 - Support intentional masking/merging as an explicit relationship, not every overlap as a warning.
-- Introduce composition-level “focus” and “recede” operations that can be expressed through presence, register, articulation, density and space before resorting to volume.
+- Introduce composition-level “focus” and “recede” operations through presence, register, articulation, density and space before resorting to volume. The first render-facing slice stores reversible role/span gestures in Score provenance and resolves them on render-time event copies: Recede uses deterministic thinning for non-anchor events and shortens note gates; Focus retains the event population and can extend eligible notes by at most 5%, only where the original note-off is already inside the gesture span. Optional semitone translation is supported, and stereo/pan placement moves narrower or wider. No master/fader gain is introduced.
 - Add low-volume and mono checks as separate production views, not destructive master processing.
 - Preserve kick/sub protection and existing M22 bounded routing contracts.
 
@@ -155,7 +155,7 @@ Make orchestration decisions about what the listener notices, follows and rememb
 - Warnings identify affected roles, time range and descriptor basis, and can be reviewed as useful, masked or unresolved with project/plan provenance. Matching intentional-merge IDs suppress expected overlap warnings.
 - “Foreground” can change without requiring master gain automation.
 - Mono/low-volume checks operate on analysis/audition copies and never rewrite production audio.
-- Focus/recede changes are explicit and reversible; when applied to sound they act through presence, register, articulation, density and space before gain. The current Attention Map slice edits declared depth/prominence only; render-facing operations remain follow-on work.
+- Focus/recede changes are explicit and reversible. The implemented first slice rerenders event-backed voices from unchanged canonical Score events, applies to events whose onsets fall in the exact rational-beat half-open span, protects kick/sub and tagged anchors from Recede thinning, and restores the base event render when the gesture is removed. Whole-field texture/ambience and existing M22 routing remain intact. Further phrase-aware space/send articulation, gesture-aware MIDI export parity and complete listening acceptance remain open.
 - Human review can mark a conflict as useful, masked, or unresolved.
 
 ### Non-goals

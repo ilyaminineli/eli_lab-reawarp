@@ -7,6 +7,7 @@ from typing import Any
 
 from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
+from reawarp.score.render import ScoreRenderer
 from reawarp.score.time import MeterMap, TempoMap
 
 
@@ -80,9 +81,9 @@ def project_to_score(project, *, title: str | None = None) -> Score:
         "sample_rate": int(project.sample_rate),
         "frame_count": int(project.frame_count),
         "duration_seconds": float(project.duration),
-        "renderer_version": "reawarp-score-renderer/1.0.0",
+        "renderer_version": f"reawarp-score-renderer/{ScoreRenderer.VERSION}",
         "render_provenance": {
-            "score_renderer_version": "1.0.0",
+            "score_renderer_version": ScoreRenderer.VERSION,
             "engine_algorithm_version": project.metadata.get("algorithm_version"),
             "event_source": "ReawarpProject.events",
             "event_timebase": "seconds converted to rational beats at the project BPM",

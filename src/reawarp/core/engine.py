@@ -300,9 +300,9 @@ class ReawarpEngine:
         if not isinstance(sample_schedule, dict):
             sample_schedule = {}
         sample_sources = dict(sample_schedule.get("sources", {}))
-        renderer_version = "reawarp-score-renderer/1.0.0"
+        renderer_version = f"reawarp-score-renderer/{ScoreRenderer.VERSION}"
         render_provenance = {
-            "score_renderer_version": "1.0.0",
+            "score_renderer_version": ScoreRenderer.VERSION,
             "engine_algorithm_version": self.VERSION,
             "event_source": "Score.events",
             "event_timebase": (

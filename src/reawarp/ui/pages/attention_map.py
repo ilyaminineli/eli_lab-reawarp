@@ -27,6 +27,8 @@ class AttentionMapPage(QWidget):
     planChanged = Signal(dict)
     reviewRequested = Signal(dict)
     translationCheckRequested = Signal(str)
+    gestureRequested = Signal(dict)
+    gestureRemoveRequested = Signal(dict)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -46,7 +48,8 @@ class AttentionMapPage(QWidget):
         intro = QLabel(
             "Describe what the listener should follow, what supports it, and where attention "
             "moves. Descriptors are inspectable prompts—not mix rules or artistic scores. "
-            "Intent edits are Score metadata and do not rewrite rendered audio."
+            "FOCUS and RECEDE add reversible Score gestures and rerender event-backed voices; "
+            "they do not automate the master fader."
         )
         intro.setObjectName("muted")
         intro.setWordWrap(True)
@@ -121,27 +124,32 @@ class AttentionMapPage(QWidget):
         self.spatial_position.setPlaceholderText("-1 left · 0 centre · +1 right")
         self.prominence = QLineEdit()
         self.prominence.setPlaceholderText("0–1 intended prominence")
+        self.register_shift = QLineEdit("0")
+        self.register_shift.setPlaceholderText("-24..+24 semitones")
         for label, field in (
             ("Onset density", self.onset_density),
             ("Transient strength", self.transient_strength),
             ("Sustain", self.sustain),
             ("Spatial position", self.spatial_position),
             ("Intended prominence", self.prominence),
+            ("Render register shift / semitones", self.register_shift),
         ):
             form.addRow(label, field)
 
         actions = QHBoxLayout()
         self.save_span_button = QPushButton("ADD / UPDATE")
         self.delete_span_button = QPushButton("DELETE")
-        self.focus_button = QPushButton("FOCUS ROLE")
-        self.recede_button = QPushButton("RECEDE ROLE")
+        self.focus_button = QPushButton("FOCUS + RENDER")
+        self.recede_button = QPushButton("RECEDE + RENDER")
+        self.reset_gesture_button = QPushButton("RESET RENDER GESTURE")
         self.save_span_button.clicked.connect(self._save_span)
         self.delete_span_button.clicked.connect(self._delete_span)
         self.focus_button.clicked.connect(self._set_focus)
         self.recede_button.clicked.connect(self._set_recede)
+        self.reset_gesture_button.clicked.connect(self._reset_render_gesture)
         for button in (
             self.save_span_button, self.delete_span_button,
-            self.focus_button, self.recede_button,
+            self.focus_button, self.recede_button, self.reset_gesture_button,
         ):
             actions.addWidget(button)
         form.addRow(actions)
@@ -320,7 +328,7 @@ class AttentionMapPage(QWidget):
                 self.register_low, self.register_high, self.onset_density,
                 self.transient_strength, self.sustain, self.spatial_position,
                 self.prominence, self.spectral_band, self.handoff_id,
-                self.intentional_overlap_id,
+                self.intentional_overlap_id, self.register_shift,
             ):
                 field.clear()
             self._refresh_controls()
@@ -441,11 +449,41 @@ class AttentionMapPage(QWidget):
         spans[self._selected_span_index] = replace(
             selected, depth=depth, reserved_silence=False, prominence=prominence,
         )
+        try:
+            register_shift = self._optional_number(
+                self.register_shift, "register shift"
+            )
+        except ValueError as exc:
+            self.span_status.setText(f"Invalid render gesture: {exc}")
+            return
+        register_shift = 0.0 if register_shift is None else register_shift
+        if not -24.0 <= register_shift <= 24.0:
+            self.span_status.setText(
+                "Register shift must be between -24 and +24 semitones."
+            )
+            return
         self._emit_plan(
             tuple(spans),
-            f"{selected.role} assigned to {depth} without changing faders or rendered audio.",
+            f"{selected.role} assigned to {depth}; render gesture queued for its exact beat span.",
             self._selected_span_index,
         )
+        self.gestureRequested.emit({
+            "role": selected.role,
+            "start_beats": str(selected.start_beats),
+            "end_beats": str(selected.end_beats),
+            "action": "focus" if depth == "foreground" else "recede",
+            "register_shift_semitones": register_shift,
+        })
+
+    def _reset_render_gesture(self) -> None:
+        selected = self._selected_span()
+        if selected is None:
+            return
+        self.gestureRemoveRequested.emit({
+            "role": selected.role,
+            "start_beats": str(selected.start_beats),
+            "end_beats": str(selected.end_beats),
+        })
 
     def _estimate_descriptors(self) -> None:
         if self._score is None:
@@ -546,6 +584,7 @@ class AttentionMapPage(QWidget):
         self.delete_span_button.setEnabled(loaded and has_span)
         self.focus_button.setEnabled(loaded and has_span)
         self.recede_button.setEnabled(loaded and has_span)
+        self.reset_gesture_button.setEnabled(loaded and has_span)
         self.estimate_button.setEnabled(loaded and bool(self._plan.attention))
         self.mono_button.setEnabled(loaded)
         self.low_volume_button.setEnabled(loaded)

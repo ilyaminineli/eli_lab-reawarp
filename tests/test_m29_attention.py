@@ -10,9 +10,12 @@ from reawarp.score import (
     inspect_attention_conflicts, inspect_attention_handoffs,
 )
 from reawarp.score.attention import (
-    attention_conflict_id, build_attention_translation_check,
+    attention_conflict_id, apply_attention_gesture,
+    apply_attention_gesture_to_event, build_attention_translation_check,
     estimate_attention_descriptors, record_attention_review,
+    reconcile_attention_gestures, remove_attention_gesture,
 )
+from reawarp.score.render import ScoreRenderer
 
 
 def test_attention_descriptors_are_versioned_and_legacy_plans_remain_readable():
@@ -168,6 +171,186 @@ def test_human_review_is_persisted_with_conflict_and_plan_provenance():
     assert record["plan_fingerprint"]
     with pytest.raises(ValueError, match="disposition"):
         record_attention_review(score, warning, disposition="perfect")
+
+
+
+def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped():
+    source = Score(
+        events=(
+            MusicalEvent(
+                "melody-note", "melody", Fraction(1, 4), 1, kind="note",
+                pitch=60, velocity=0.8,
+                parameters={"gate_duration_beats": "1/2", "pan": 0.6},
+            ),
+            MusicalEvent(
+                "melody-outside", "melody", 3, 1, kind="note",
+                pitch=67, velocity=0.8,
+            ),
+            MusicalEvent(
+                "kick-anchor", "kick", 0, Fraction(1, 8),
+                kind="hit", velocity=0.9, tags=("anchor",),
+            ),
+        ),
+        metadata={"keep": True},
+    )
+    focused = apply_attention_gesture(
+        source, role="melody", start_beats=Fraction(1, 4),
+        end_beats=Fraction(9, 4), action="focus",
+        register_shift_semitones=3,
+    )
+    assert source.metadata == {"keep": True}
+    source_by_id = {event.event_id: event for event in source.events}
+    assert source_by_id["melody-note"].pitch == 60
+    records = focused.metadata["m29_attention_gestures"]
+    assert len(records) == 1
+    assert records[0]["start_beats"] == "1/4"
+    assert records[0]["end_beats"] == "9/4"
+    assert records[0]["register_shift_semitones"] == 3
+
+    from reawarp.score.attention import apply_attention_gesture_to_event
+
+    transformed = apply_attention_gesture_to_event(
+        source_by_id["melody-note"], records
+    )
+    assert transformed.pitch == pytest.approx(63)
+    assert transformed.articulation == "legato"
+    assert transformed.duration_beats == Fraction(21, 20)
+    assert Fraction(transformed.parameters["gate_duration_beats"]) == Fraction(27, 50)
+    assert transformed.parameters["pan"] == pytest.approx(0.6)
+    assert transformed.parameters["m29_pan_factor"] == pytest.approx(0.45)
+    assert transformed.parameters["m29_spatial_width_factor"] == pytest.approx(0.82)
+    assert transformed.parameters["m29_attention_action"] == "focus"
+
+    outside = apply_attention_gesture_to_event(source_by_id["melody-outside"], records)
+    assert outside is source_by_id["melody-outside"]
+    protected = apply_attention_gesture_to_event(
+        source_by_id["kick-anchor"],
+        apply_attention_gesture(
+            source, role="kick", start_beats=0, end_beats=2,
+            action="recede",
+        ).metadata["m29_attention_gestures"],
+    )
+    assert protected is not None
+    assert protected.voice_id == "kick"
+
+    restored = remove_attention_gesture(
+        focused, role="melody", start_beats="1/4", end_beats="9/4"
+    )
+    assert "m29_attention_gestures" not in restored.metadata
+    assert restored.events == source.events
+    assert restored.metadata["keep"] is True
+    with pytest.raises(ValueError, match="focus or recede"):
+        apply_attention_gesture(
+            source, role="melody", start_beats=0, end_beats=2,
+            action="boost",
+        )
+    with pytest.raises(ValueError, match="within -24..24"):
+        apply_attention_gesture(
+            source, role="melody", start_beats=0, end_beats=2,
+            action="focus", register_shift_semitones=25,
+        )
+    with pytest.raises(ValueError, match="no event-backed Score material"):
+        apply_attention_gesture(
+            source, role="melody", start_beats=5, end_beats=6,
+            action="focus",
+        )
+
+
+def test_attention_plan_edits_reconcile_orphaned_render_gestures():
+    source = Score(events=(
+        MusicalEvent("lead-a", "melody", 0, 1, kind="note", pitch=60),
+    ))
+    span = AttentionSpan("melody", 0, 2, "foreground", attention_role="motif")
+    focused = apply_attention_gesture(
+        source, role="melody", start_beats=0, end_beats=2, action="focus"
+    )
+    retained, removed = reconcile_attention_gestures(focused, (span,))
+    assert retained is focused
+    assert removed == 0
+
+    edited_span = AttentionSpan("melody", 0, 3, "foreground", attention_role="motif")
+    cleaned, removed = reconcile_attention_gestures(focused, (edited_span,))
+    assert removed == 1
+    assert "m29_attention_gestures" not in cleaned.metadata
+    assert cleaned.events == source.events
+
+
+def test_attention_recede_event_thinning_is_deterministic_and_never_drops_anchor():
+    source = Score(events=tuple(
+        MusicalEvent(
+            f"hat-{index:02d}", "hat", Fraction(index, 4), Fraction(1, 8),
+            kind="hit", velocity=0.5,
+        )
+        for index in range(40)
+    ) + (
+        MusicalEvent(
+            "kick-anchor", "kick", 0, Fraction(1, 8),
+            kind="hit", velocity=0.9, tags=("anchor",),
+        ),
+    ))
+    score = apply_attention_gesture(
+        source, role="hat", start_beats=0, end_beats=12, action="recede"
+    )
+    gestures = score.metadata["m29_attention_gestures"]
+    outcomes = [
+        apply_attention_gesture_to_event(event, gestures)
+        for event in source.events
+    ]
+    repeated = [
+        apply_attention_gesture_to_event(event, gestures)
+        for event in source.events
+    ]
+    assert [
+        None if event is None else event.event_id for event in outcomes
+    ] == [
+        None if event is None else event.event_id for event in repeated
+    ]
+    hat_results = [
+        outcome for event, outcome in zip(source.events, outcomes)
+        if event.voice_id == "hat"
+    ]
+    assert any(outcome is None for outcome in hat_results)
+    assert any(outcome is not None for outcome in hat_results)
+    kick_gesture = apply_attention_gesture(
+        source, role="kick", start_beats=0, end_beats=2, action="recede"
+    )
+    kick = next(event for event in source.events if event.event_id == "kick-anchor")
+    protected_kick = apply_attention_gesture_to_event(
+        kick, kick_gesture.metadata["m29_attention_gestures"]
+    )
+    assert protected_kick is not None
+    assert protected_kick.voice_id == "kick"
+
+
+def test_score_renderer_executes_attention_gesture_on_render_copy_only():
+    source = Score(events=(
+        MusicalEvent(
+            "lead-note", "melody", 0, 1, kind="note",
+            pitch=60, velocity=0.8,
+        ),
+    ), metadata={"sample_rate": 8_000})
+    focused = apply_attention_gesture(
+        source, role="melody", start_beats=0, end_beats=2,
+        action="focus", register_shift_semitones=2,
+    )
+
+    def stereo_voice(scheduled, sample_rate, controls):
+        del sample_rate, controls
+        return np.tile(
+            np.asarray([[1.0, -1.0]], dtype=np.float32),
+            (scheduled.duration_frames, 1),
+        )
+
+    result = ScoreRenderer().render(
+        focused, 8_000, frame_count=8_000,
+        voice_renderers={"melody": stereo_voice},
+    )
+    assert result.schedule[0].event.pitch == pytest.approx(62)
+    assert result.schedule[0].event.parameters["m29_attention_gesture_id"]
+    assert np.max(np.abs(result.stems["melody"])) == pytest.approx(0.8 * 0.82)
+    source_note = next(event for event in source.events if event.event_id == "lead-note")
+    assert source_note.pitch == 60
+    assert "m29_attention_gestures" not in source.metadata
 
 
 def test_translation_checks_are_non_destructive_audition_copies():
