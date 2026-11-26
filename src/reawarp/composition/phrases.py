@@ -921,6 +921,8 @@ def freeze_phrase_candidate(
     """Freeze candidate events in the Score and retain reversible source lineage."""
     prior_freeze = base_score.metadata.get("m28_phrase_freezes", {}).get(candidate.phrase_id)
     if prior_freeze:
+        if prior_freeze.get("candidate_id") == candidate.candidate_id:
+            raise ValueError("phrase is already frozen with this candidate")
         prior_ids = set(prior_freeze.get("frozen_event_ids", ()))
         if set(candidate.source_event_ids) != prior_ids:
             raise ValueError(
