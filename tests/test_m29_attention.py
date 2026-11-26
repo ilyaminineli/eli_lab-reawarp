@@ -214,6 +214,7 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
     )
     assert transformed.pitch == pytest.approx(63)
     assert transformed.articulation == "legato"
+    assert transformed.duration_beats == Fraction(21, 20)
     assert Fraction(transformed.parameters["gate_duration_beats"]) == Fraction(27, 50)
     assert transformed.parameters["pan"] == pytest.approx(0.6)
     assert transformed.parameters["m29_pan_factor"] == pytest.approx(0.45)
