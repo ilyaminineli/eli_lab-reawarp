@@ -99,7 +99,9 @@ class TrajectorySummary:
         try:
             deviation = float(self.standard_deviation)
         except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("trajectory standard_deviation must be finite and non-negative") from exc
+            raise ValueError(
+                "trajectory standard_deviation must be finite and non-negative"
+            ) from exc
         if not math.isfinite(deviation) or deviation < 0.0 or deviation > 1.0:
             raise ValueError("trajectory standard_deviation must be finite and in [0, 1]")
         if self.minimum > self.maximum:
