@@ -61,8 +61,8 @@ def _score():
         events=events,
         metadata={
             "sample_rate": 22_050,
-            "duration_seconds": 4.0,
-            "frame_count": 88_200,
+            "duration_seconds": 5.0,
+            "frame_count": 110_250,
             "render_stems": ["melody", "kick"],
         },
     )
@@ -72,7 +72,7 @@ def _project():
     from reawarp import GenerationConfig
 
     config = GenerationConfig(
-        duration=4.0, sample_rate=22_050, seed="m28-workbench-ui",
+        duration=5.0, sample_rate=22_050, seed="m28-workbench-ui",
         include_melody=False, include_texture=False, include_ambience=False,
     )
     stems = {
