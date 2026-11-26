@@ -151,6 +151,7 @@ def test_compilation_attaches_four_markers_and_one_atomic_scene_change():
     score = _m28_score()
     base_events = score.events
     plan = _plan()
+    assert len(transition_marker_events(plan)) == 4
 
     compiled = compile_transition_plans(score, (plan,))
     assert score.events == base_events
@@ -267,9 +268,18 @@ def test_transition_markers_are_silent_in_score_renderer():
 
 
 def test_score_roundtrip_keeps_transition_contract_and_markers(tmp_path):
+    from dataclasses import replace
+
     compiled = compile_transition_plans(_m28_score(), (_plan(),))
     path = compiled.save(tmp_path / "m30-transition-score.json")
     restored = Score.load(path)
 
     assert restored.to_dict() == compiled.to_dict()
     assert transition_plans_from_score(restored) == (_plan(),)
+
+    missing_marker_score = replace(
+        restored,
+        events=tuple(event for event in restored.events if event.tags[-1] != "m30_phase:complete"),
+    )
+    with pytest.raises(ValueError, match="marker is missing or does not match"):
+        transition_plans_from_score(missing_marker_score)
