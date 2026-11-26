@@ -174,10 +174,260 @@ def build_attention_translation_check(
     raise ValueError(f"unsupported translation check: {mode}")
 
 
+
+
+ATTENTION_GESTURE_ACTIONS = frozenset({"focus", "recede"})
+ATTENTION_GESTURE_SCHEMA_VERSION = 1
+_RECEDE_EVENT_DROP_PROBABILITY = 0.14
+_PROTECTED_ATTENTION_ROLES = frozenset({
+    "kick", "bass", "sub", "sub_bass", "low_frequency",
+})
+
+
+def _attention_gesture_key(role: str, start: Any, end: Any) -> str:
+    from reawarp.score.time import as_fraction
+
+    payload = (
+        f"reawarp:m29-attention-gesture:v1:{role}:"
+        f"{as_fraction(start)}:{as_fraction(end)}"
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
+
+
+def _validated_attention_gestures(records: Any) -> tuple[dict[str, Any], ...]:
+    from reawarp.score.time import as_fraction
+
+    if records is None:
+        return ()
+    if not isinstance(records, (list, tuple)):
+        raise ValueError("m29_attention_gestures must be a list")
+    result = []
+    for index, raw in enumerate(records):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"attention gesture {index} must be an object")
+        item = dict(raw)
+        if int(item.get("schema_version", 0)) != ATTENTION_GESTURE_SCHEMA_VERSION:
+            raise ValueError(f"attention gesture {index} has an unsupported schema version")
+        role = str(item.get("role", "")).strip()
+        if not role:
+            raise ValueError(f"attention gesture {index} requires a role")
+        start = as_fraction(str(item.get("start_beats", "")))
+        end = as_fraction(str(item.get("end_beats", "")))
+        if start < 0 or end <= start:
+            raise ValueError(f"attention gesture {index} requires 0 <= start < end")
+        action = str(item.get("action", ""))
+        if action not in ATTENTION_GESTURE_ACTIONS:
+            raise ValueError(f"attention gesture {index} has an unsupported action")
+        shift = float(item.get("register_shift_semitones", 0.0))
+        if not np.isfinite(shift) or not -24.0 <= shift <= 24.0:
+            raise ValueError(
+                f"attention gesture {index} register shift must be finite and within -24..24"
+            )
+        gesture_id = str(item.get("gesture_id", "")).strip()
+        if not gesture_id:
+            gesture_id = _attention_gesture_key(role, start, end)
+        result.append({
+            "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
+            "gesture_id": gesture_id,
+            "role": role,
+            "start_beats": str(start),
+            "end_beats": str(end),
+            "action": action,
+            "register_shift_semitones": shift,
+        })
+    return tuple(result)
+
+
+def apply_attention_gesture(
+    score: Any,
+    *,
+    role: str,
+    start_beats: Any,
+    end_beats: Any,
+    action: str,
+    register_shift_semitones: float = 0.0,
+) -> Any:
+    """Return a Score with one reversible, rational-beat figure/ground gesture.
+
+    The gesture is stored as provenance, not baked into Score events or source audio.
+    Renderer-side copies resolve it for events whose onsets fall in the half-open span.
+    """
+    from reawarp.score.model import Score
+    from reawarp.score.time import as_fraction
+
+    if not isinstance(score, Score):
+        raise TypeError("score must be a reawarp Score")
+    role = str(role).strip()
+    if not role:
+        raise ValueError("attention gesture role cannot be empty")
+    start, end = as_fraction(start_beats), as_fraction(end_beats)
+    if start < 0 or end <= start:
+        raise ValueError("attention gesture requires 0 <= start < end")
+    if action not in ATTENTION_GESTURE_ACTIONS:
+        raise ValueError("attention gesture action must be focus or recede")
+    shift = float(register_shift_semitones)
+    if not np.isfinite(shift) or not -24.0 <= shift <= 24.0:
+        raise ValueError("register_shift_semitones must be finite and within -24..24")
+
+    metadata = copy.deepcopy(score.metadata)
+    records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
+    gesture_id = _attention_gesture_key(role, start, end)
+    updated = [
+        item for item in records
+        if item["gesture_id"] != gesture_id
+    ]
+    updated.append({
+        "schema_version": ATTENTION_GESTURE_SCHEMA_VERSION,
+        "gesture_id": gesture_id,
+        "role": role,
+        "start_beats": str(start),
+        "end_beats": str(end),
+        "action": action,
+        "register_shift_semitones": shift,
+    })
+    updated.sort(key=lambda item: (
+        as_fraction(item["start_beats"]),
+        as_fraction(item["end_beats"]),
+        item["role"],
+        item["gesture_id"],
+    ))
+    metadata["m29_attention_gestures"] = list(updated)
+    return replace(score, metadata=metadata)
+
+
+def remove_attention_gesture(
+    score: Any,
+    *,
+    role: str,
+    start_beats: Any,
+    end_beats: Any,
+) -> Any:
+    """Remove the exact role/span gesture and return the unchanged base Score events."""
+    from reawarp.score.model import Score
+    from reawarp.score.time import as_fraction
+
+    if not isinstance(score, Score):
+        raise TypeError("score must be a reawarp Score")
+    role = str(role).strip()
+    start, end = as_fraction(start_beats), as_fraction(end_beats)
+    if not role or start < 0 or end <= start:
+        raise ValueError("attention gesture removal requires a role and 0 <= start < end")
+    gesture_id = _attention_gesture_key(role, start, end)
+    metadata = copy.deepcopy(score.metadata)
+    records = _validated_attention_gestures(metadata.get("m29_attention_gestures", []))
+    remaining = [item for item in records if item["gesture_id"] != gesture_id]
+    if len(remaining) == len(records):
+        return score
+    if remaining:
+        metadata["m29_attention_gestures"] = list(remaining)
+    else:
+        metadata.pop("m29_attention_gestures", None)
+    return replace(score, metadata=metadata)
+
+
+def apply_attention_gesture_to_event(
+    event: Any,
+    gestures: Any,
+) -> Any | None:
+    """Transform one render-time event copy using the matching M29 gesture.
+
+    Recede's event thinning is deterministic and excludes kick/sub and explicitly
+    tagged anchors. Articulation, optional register translation and spatial cues
+    affect only this event's render representation; the canonical Score stays intact.
+    """
+    from reawarp.score.time import as_fraction
+
+    if getattr(event, "kind", None) in {"control", "marker"}:
+        return event
+    records = _validated_attention_gestures(gestures)
+    if not records:
+        return event
+    aliases = {"hats": "hat", "synthetic_break": "break"}
+    role = aliases.get(str(event.voice_id), str(event.voice_id))
+    matching = []
+    for item in records:
+        gesture_role = aliases.get(item["role"], item["role"])
+        start = as_fraction(item["start_beats"])
+        end = as_fraction(item["end_beats"])
+        if gesture_role == role and start <= event.onset_beats < end:
+            matching.append((end - start, -start, item))
+    if not matching:
+        return event
+    # When authored spans overlap, prefer the most local instruction.
+    gesture = min(matching, key=lambda item: (item[0], item[1]))[2]
+    action = gesture["action"]
+    gesture_id = gesture["gesture_id"]
+    parameters = dict(event.parameters)
+    tags = {str(value).casefold() for value in getattr(event, "tags", ())}
+    source_kind = str(parameters.get("source_kind", "")).casefold()
+    protected = (
+        role in _PROTECTED_ATTENTION_ROLES
+        or source_kind in {"kick", "sub", "bass"}
+        or bool(tags & {"anchor", "low_frequency_foundation", "sub_anchor"})
+        or str(parameters.get("attention_role", "")).casefold()
+        in {"anchor", "low_frequency_foundation"}
+    )
+
+    if action == "recede" and not protected:
+        material = f"reawarp:m29-recede:{gesture_id}:{event.event_id}".encode("utf-8")
+        value = int.from_bytes(
+            hashlib.blake2b(material, digest_size=8).digest(), "little"
+        ) / float(1 << 64)
+        if value < _RECEDE_EVENT_DROP_PROBABILITY:
+            return None
+
+    changes: dict[str, Any] = {"parameters": parameters}
+    if getattr(event, "kind", None) == "note":
+        shift = float(gesture["register_shift_semitones"])
+        if shift:
+            if event.pitch is not None:
+                changes["pitch"] = float(event.pitch) + shift
+            if event.frequency_hz is not None:
+                changes["frequency_hz"] = float(event.frequency_hz) * (
+                    2.0 ** (shift / 12.0)
+                )
+        duration = as_fraction(event.duration_beats)
+        if duration > 0:
+            base_gate = as_fraction(str(
+                parameters.get("gate_duration_beats", duration)
+            ))
+            gate_ratio = 1.08 if action == "focus" else 0.58
+            floor = min(Fraction(1, 64), duration)
+            gate = max(floor, min(duration, base_gate * Fraction(str(gate_ratio))))
+            parameters["gate_duration_beats"] = str(gate)
+            changes["articulation"] = "legato" if action == "focus" else "staccato"
+
+    if not protected:
+        try:
+            pan = float(parameters.get("pan", parameters.get("spatial_position", 0.0)))
+        except (TypeError, ValueError):
+            pan = 0.0
+        pan = float(np.clip(pan, -1.0, 1.0))
+        if action == "focus":
+            pan *= 0.45
+            parameters["m29_spatial_width_factor"] = 0.82
+        else:
+            material = f"reawarp:m29-space:{gesture_id}:{event.event_id}".encode("utf-8")
+            side = -1.0 if (
+                int.from_bytes(hashlib.blake2b(material, digest_size=1).digest(), "little") & 1
+            ) == 0 else 1.0
+            pan = side * 0.18 if abs(pan) < 0.08 else float(np.clip(pan * 1.25, -1.0, 1.0))
+            parameters["m29_spatial_width_factor"] = 1.18
+        parameters["pan"] = pan
+    parameters["m29_attention_gesture_id"] = gesture_id
+    parameters["m29_attention_action"] = action
+    return replace(event, **changes)
+
+
 __all__ = [
+    "ATTENTION_GESTURE_ACTIONS",
+    "ATTENTION_GESTURE_SCHEMA_VERSION",
     "ATTENTION_REVIEW_STATES",
+    "apply_attention_gesture",
+    "apply_attention_gesture_to_event",
     "attention_conflict_id",
     "build_attention_translation_check",
     "estimate_attention_descriptors",
     "record_attention_review",
+    "remove_attention_gesture",
 ]
