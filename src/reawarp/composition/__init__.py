@@ -29,6 +29,12 @@ from reawarp.composition.transitions import (
     TransitionPhase, TransitionPlan, compile_transition_plans,
     transition_marker_events, transition_plans_from_score,
 )
+from reawarp.composition.section_memory import (
+    DEFAULT_SECTION_MEMORY_CAPACITY, EXPECTATION_KINDS,
+    MAX_SECTION_MEMORY_CAPACITY, MemoryExpectation, ReturnOpportunity,
+    SectionMemory, SectionState, TrajectorySummary,
+    attach_section_memory, section_memory_from_score,
+)
 from reawarp.composition.orchestration import (
     ROLE_NAMES,
     RoleIntent,
@@ -62,6 +68,16 @@ __all__ = [
     "compile_transition_plans",
     "transition_marker_events",
     "transition_plans_from_score",
+    "DEFAULT_SECTION_MEMORY_CAPACITY",
+    "EXPECTATION_KINDS",
+    "MAX_SECTION_MEMORY_CAPACITY",
+    "MemoryExpectation",
+    "ReturnOpportunity",
+    "SectionMemory",
+    "SectionState",
+    "TrajectorySummary",
+    "attach_section_memory",
+    "section_memory_from_score",
     "STRUCTURES",
     "CompositionPlan",
     "SectionPlan",
