@@ -1,6 +1,10 @@
 """eli_lab-reawarp / 再変形 — mathematical IDM audio generation."""
 
 from reawarp.config import GenerationConfig
+from reawarp.composition.transitions import (
+    TransitionPhase, TransitionPlan, compile_transition_plans,
+    transition_marker_events, transition_plans_from_score,
+)
 from reawarp.core.engine import ReawarpEngine
 from reawarp.core.project import ReawarpProject
 from reawarp.fx_automation import (
@@ -53,6 +57,8 @@ from reawarp.score import (
 __all__ = [
     "AttentionSpan", "CycleSpec", "MutationPolicy", "OrchestrationPlan", "PhraseSpan",
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
+    "TransitionPhase", "TransitionPlan", "compile_transition_plans",
+    "transition_marker_events", "transition_plans_from_score",
     "inspect_attention_conflicts", "inspect_event_onset_conflicts",
     "EnvelopeSpec", "HybridRenderResult", "HybridVoiceRenderer",
     "SoundObjectLayer", "SoundObjectPatch", "SoundObjectSource", "TransformationRecord",
