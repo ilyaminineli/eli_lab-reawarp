@@ -1791,16 +1791,20 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.phrase_workbench.set_error(f"Could not freeze candidate: {exc}")
             return
-        self.project.score = frozen
-        self.phrase_workbench.set_score(
-            frozen, selected_phrase_id=candidate.phrase_id
-        )
-        self.phrase_workbench.set_candidates(
-            list(self._phrase_candidates.values()), selected_id=candidate_id
+        if self._worker is not None or self._export_worker is not None:
+            self.phrase_workbench.set_error(
+                "Wait for the active render or export to finish before freezing phrase material."
+            )
+            return
+        base_project = self.project
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, frozen, cancel_event=cancel_event
+            ),
+            f"Freezing {candidate_id} into the project and rendering its Score events…",
         )
         self.statusBar().showMessage(
-            f"Frozen {candidate_id} into phrase {candidate.phrase_id}. "
-            "The original source events and restore point remain in the Score.",
+            f"Committing frozen phrase {candidate.phrase_id} · original source and restore lineage are preserved.",
             10000,
         )
 
@@ -1812,12 +1816,20 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.phrase_workbench.set_error(f"Could not restore phrase source: {exc}")
             return
-        self.project.score = restored
-        self._phrase_candidates.clear()
-        self.phrase_workbench.set_score(restored, selected_phrase_id=phrase_id)
-        self.phrase_workbench.set_candidates([])
+        if self._worker is not None or self._export_worker is not None:
+            self.phrase_workbench.set_error(
+                "Wait for the active render or export to finish before restoring phrase material."
+            )
+            return
+        base_project = self.project
+        self._run_render(
+            lambda cancel_event: self._render_score_automation_project(
+                base_project, restored, cancel_event=cancel_event
+            ),
+            f"Restoring {phrase_id} and rendering the original Score events…",
+        )
         self.statusBar().showMessage(
-            f"Restored the original event material for {phrase_id}. Unrelated Score regions were retained.",
+            f"Restoring the original event material for {phrase_id} · unrelated Score regions are retained.",
             9000,
         )
 
