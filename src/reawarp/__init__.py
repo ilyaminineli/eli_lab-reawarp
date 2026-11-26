@@ -5,6 +5,11 @@ from reawarp.composition.transitions import (
     TransitionPhase, TransitionPlan, compile_transition_plans,
     transition_marker_events, transition_plans_from_score,
 )
+from reawarp.composition.section_memory import (
+    DEFAULT_SECTION_MEMORY_CAPACITY, MemoryExpectation, ReturnOpportunity,
+    SectionMemory, SectionState, TrajectorySummary,
+    attach_section_memory, section_memory_from_score,
+)
 from reawarp.core.engine import ReawarpEngine
 from reawarp.core.project import ReawarpProject
 from reawarp.fx_automation import (
@@ -59,6 +64,9 @@ __all__ = [
     "RoleRelationship", "TransitionSpan", "build_orchestration_plan",
     "TransitionPhase", "TransitionPlan", "compile_transition_plans",
     "transition_marker_events", "transition_plans_from_score",
+    "DEFAULT_SECTION_MEMORY_CAPACITY", "MemoryExpectation", "ReturnOpportunity",
+    "SectionMemory", "SectionState", "TrajectorySummary",
+    "attach_section_memory", "section_memory_from_score",
     "inspect_attention_conflicts", "inspect_event_onset_conflicts",
     "EnvelopeSpec", "HybridRenderResult", "HybridVoiceRenderer",
     "SoundObjectLayer", "SoundObjectPatch", "SoundObjectSource", "TransformationRecord",
