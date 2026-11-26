@@ -5,7 +5,9 @@ from fractions import Fraction
 
 import pytest
 
-from reawarp.score import MusicalEvent, Score, apply_attention_gesture
+from reawarp.score import (
+    AutomationLane, AutomationPoint, MusicalEvent, Score, apply_attention_gesture,
+)
 from reawarp.score.attention import apply_attention_gesture_to_event
 
 
@@ -154,6 +156,68 @@ def test_m29_recede_midi_omits_same_events_and_restores_canonical_score(tmp_path
     assert restored.events == source.events
     assert restored.automation == source.automation
     assert restored.metadata["m29_attention_gestures"] == gestures
+
+
+
+def test_m29_midi_pan_and_width_gestures_compose_with_score_automation(tmp_path):
+    mido = pytest.importorskip("mido")
+    source = Score(
+        events=(
+            MusicalEvent(
+                event_id="lead-automated",
+                voice_id="lead",
+                onset_beats=0,
+                duration_beats=1,
+                kind="note",
+                pitch=60,
+                parameters={"pan": 0.6},
+            ),
+        ),
+        automation=(
+            AutomationLane(
+                target_id="spatial.pan",
+                points=(AutomationPoint(Fraction(0), -0.5),),
+                unit="normalized",
+                minimum=-1.0,
+                maximum=1.0,
+            ),
+            AutomationLane(
+                target_id="spatial.width",
+                points=(AutomationPoint(Fraction(0), 1.5),),
+                unit="ratio",
+                minimum=0.0,
+                maximum=2.0,
+            ),
+        ),
+    )
+    focused = apply_attention_gesture(
+        source, role="lead", start_beats=0, end_beats=2, action="focus"
+    )
+    path = focused.export_midi(tmp_path / "m29-automated-pan.mid")
+    midi = mido.MidiFile(str(path))
+    track = next(
+        track for track in midi.tracks
+        if track and track[0].type == "track_name" and track[0].name == "lead"
+    )
+    messages = _track_messages(track)
+    pan = next(
+        message for _tick, message in messages
+        if not message.is_meta and message.type == "control_change"
+        and message.control == 10
+    )
+    assert pan.value == 49  # (−0.5 × 0.45) mapped to CC 10
+
+    payload = next(
+        json.loads(message.text[len("REAWARP_EVENT:"):])
+        for _tick, message in messages
+        if message.is_meta and message.type == "text"
+        and message.text.startswith("REAWARP_EVENT:")
+    )
+    assert payload["m29_midi_rendered"]["spatial_width_factor"] == pytest.approx(1.23)
+
+    restored = Score.from_midi(path)
+    assert restored.events == source.events
+    assert restored.automation == source.automation
 
 
 def test_midi_without_m29_gestures_keeps_existing_event_timing_and_metadata(tmp_path):
