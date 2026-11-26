@@ -308,3 +308,36 @@ def test_trajectory_summary_is_compact_normalized_and_validated():
         TrajectorySummary.from_values((0.2, 1.2))
     with pytest.raises(ValueError, match="cannot exceed"):
         TrajectorySummary(2, 0.2, 0.5, 0.8, 0.9, 0.1)
+
+
+def test_section_memory_accepts_m20_orchestration_phrase_references():
+    from reawarp.score.orchestration_intent import (
+        OrchestrationPlan,
+        PhraseSpan as OrchestrationPhraseSpan,
+    )
+
+    plan = OrchestrationPlan(
+        phrases=(
+            OrchestrationPhraseSpan(
+                phrase_id="m20-phrase",
+                start_beats=Fraction(2),
+                end_beats=Fraction(6),
+                section_id="m20-section",
+            ),
+        ),
+    )
+    score = Score(
+        title="M20-backed section memory",
+        tempo_map=TempoMap.constant(120),
+        orchestration_plan=plan.to_dict(),
+    )
+    state = SectionState(
+        section_id="m20-section",
+        start_beats=Fraction(2),
+        end_beats=Fraction(6),
+        phrase_ids=("m20-phrase",),
+        roles=("lead",),
+    )
+    memory = SectionMemory(states=(state,), capacity=2)
+
+    assert section_memory_from_score(attach_section_memory(score, memory)) == memory
