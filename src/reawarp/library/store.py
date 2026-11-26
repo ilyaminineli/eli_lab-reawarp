@@ -230,6 +230,19 @@ class SampleLibrary:
             CREATE INDEX IF NOT EXISTS idx_sound_objects_identity
                 ON sound_objects(source_identity_id, processing_identity_id);
 
+            CREATE TABLE IF NOT EXISTS sound_object_versions (
+                version_id TEXT PRIMARY KEY,
+                patch_id TEXT NOT NULL REFERENCES sound_objects(patch_id) ON DELETE CASCADE,
+                revision INTEGER NOT NULL,
+                content_sha256 TEXT NOT NULL,
+                patch_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(patch_id, revision),
+                UNIQUE(patch_id, content_sha256)
+            );
+            CREATE INDEX IF NOT EXISTS idx_sound_object_versions_patch
+                ON sound_object_versions(patch_id, revision);
+
             CREATE TABLE IF NOT EXISTS sound_object_variants (
                 variant_id TEXT PRIMARY KEY,
                 patch_id TEXT NOT NULL REFERENCES sound_objects(patch_id)
@@ -833,8 +846,64 @@ class SampleLibrary:
                 _canonical_json(sorted(normalized_tags)), canonical, indexed_at,
             ),
         )
+        row = self._connection.execute(
+            "SELECT version_id FROM sound_object_versions WHERE patch_id = ? AND content_sha256 = ?",
+            (value.patch_id, digest),
+        ).fetchone()
+        if row is None:
+            latest = self._connection.execute(
+                "SELECT COALESCE(MAX(revision), 0) AS revision FROM sound_object_versions WHERE patch_id = ?",
+                (value.patch_id,),
+            ).fetchone()
+            revision = int(latest["revision"]) + 1
+            version_id = f"{value.patch_id}@{revision:04d}-{digest[:12]}"
+            self._connection.execute(
+                """
+                INSERT INTO sound_object_versions (
+                    version_id, patch_id, revision, content_sha256, patch_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (version_id, value.patch_id, revision, digest, canonical, indexed_at),
+            )
         self._connection.commit()
         return digest
+
+    def list_sound_object_versions(self, patch_id: str) -> list[dict[str, Any]]:
+        """Return immutable patch snapshots in ascending revision order."""
+        from reawarp.synthesis.sound_object import SoundObjectPatch
+
+        rows = self._connection.execute(
+            "SELECT version_id, revision, content_sha256, patch_json, created_at "
+            "FROM sound_object_versions WHERE patch_id = ? ORDER BY revision",
+            (str(patch_id),),
+        ).fetchall()
+        return [{
+            "version_id": str(row["version_id"]),
+            "revision": int(row["revision"]),
+            "content_sha256": str(row["content_sha256"]),
+            "patch": SoundObjectPatch.from_dict(json.loads(row["patch_json"])),
+            "created_at": str(row["created_at"]),
+        } for row in rows]
+
+    def get_sound_object_version(self, version_id: str) -> dict[str, Any] | None:
+        """Load one immutable patch snapshot by its stable version ID."""
+        from reawarp.synthesis.sound_object import SoundObjectPatch
+
+        row = self._connection.execute(
+            "SELECT version_id, patch_id, revision, content_sha256, patch_json, created_at "
+            "FROM sound_object_versions WHERE version_id = ?",
+            (str(version_id),),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "version_id": str(row["version_id"]),
+            "patch_id": str(row["patch_id"]),
+            "revision": int(row["revision"]),
+            "content_sha256": str(row["content_sha256"]),
+            "patch": SoundObjectPatch.from_dict(json.loads(row["patch_json"])),
+            "created_at": str(row["created_at"]),
+        }
 
     def get_sound_object(self, patch_id: str):
         """Load and validate one patch from the sound-object catalogue."""
