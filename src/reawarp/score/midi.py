@@ -210,9 +210,10 @@ def score_to_midi(
         pan_cc_value = None
         midi_width = None
         if rendered_event.parameters.get("m29_attention_gesture_id"):
-            source_pan = float(rendered_event.parameters.get(
-                "pan", rendered_event.parameters.get("spatial_position", 0.0)
-            ))
+            try:
+                source_pan = float(rendered_event.parameters.get("pan", 0.0))
+            except (TypeError, ValueError):
+                source_pan = 0.0
             frame = gesture_controls.timeline.beat_to_frame(
                 source_event.onset_beats
             ) if gesture_controls is not None else 0
