@@ -248,6 +248,11 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
             source, role="melody", start_beats=0, end_beats=2,
             action="focus", register_shift_semitones=25,
         )
+    with pytest.raises(ValueError, match="no event-backed Score material"):
+        apply_attention_gesture(
+            source, role="melody", start_beats=5, end_beats=6,
+            action="focus",
+        )
 
 
 def test_attention_plan_edits_reconcile_orphaned_render_gestures():
