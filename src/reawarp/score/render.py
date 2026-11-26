@@ -16,6 +16,7 @@ from reawarp.score.automation import (
     AutomationTargetRegistry,
     DEFAULT_AUTOMATION_TARGETS,
 )
+from reawarp.score.attention import apply_attention_gesture_to_event
 from reawarp.score.events import MusicalEvent
 from reawarp.score.model import Score
 from reawarp.score.timeline import RenderTimeline
@@ -393,6 +394,11 @@ class ScoreRenderer:
             )
             if event is None:
                 continue
+            event = apply_attention_gesture_to_event(
+                event, score.metadata.get("m29_attention_gestures", ())
+            )
+            if event is None:
+                continue
             start, end = timeline.beat_span_to_frames(
                 event.onset_beats, event.duration_beats
             )
@@ -497,11 +503,18 @@ class ScoreRenderer:
                 )).astype(np.float32, copy=False)
             else:
                 rendered_stereo = rendered.copy()
-                if "spatial.width" in controls.target_ids:
-                    width = controls.value_for_context(
-                        "spatial.width", scheduled.start_frame,
-                        event_id=event.event_id, default_value=1.0,
+                gesture_width = float(event.parameters.get(
+                    "m29_spatial_width_factor", 1.0
+                ))
+                if "spatial.width" in controls.target_ids or gesture_width != 1.0:
+                    width = (
+                        controls.value_for_context(
+                            "spatial.width", scheduled.start_frame,
+                            event_id=event.event_id, default_value=1.0,
+                        )
+                        if "spatial.width" in controls.target_ids else 1.0
                     )
+                    width = float(np.clip(width * gesture_width, 0.0, 2.0))
                     mid = 0.5 * (rendered_stereo[:, 0] + rendered_stereo[:, 1])
                     side = 0.5 * (rendered_stereo[:, 0] - rendered_stereo[:, 1]) * width
                     rendered_stereo = np.column_stack((mid + side, mid - side)).astype(
