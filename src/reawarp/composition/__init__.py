@@ -1,14 +1,5 @@
 """Composition-level formal, motif and orchestration planning."""
 
-from reawarp.composition.brief import (
-    BRIEF_SCHEMA_VERSION, CompositionBrief, MutationContract,
-    MaterialIdentity, SourceAssetReference, SourceFamily, AnchorSpec,
-    PitchWorld, ContrastTarget, EndingIntent, TempoFormPolicy,
-    ResolvedCompositionIntent, BoundedExplorationResult,
-    source_families_from_config, resolve_composition_brief,
-    quick_mutation_contracts, bounded_explore_generation_config,
-    resolve_and_explore,
-)
 from reawarp.composition.director import (
     STRUCTURES,
     CompositionPlan,
@@ -63,6 +54,13 @@ from reawarp.composition.orchestration import (
 )
 
 __all__ = [
+    "BRIEF_SCHEMA_VERSION", "CompositionBrief", "MutationContract",
+    "MaterialIdentity", "SourceAssetReference", "SourceFamily", "AnchorSpec",
+    "PitchWorld", "ContrastTarget", "EndingIntent", "TempoFormPolicy",
+    "ResolvedCompositionIntent", "BoundedExplorationResult",
+    "source_families_from_config", "resolve_composition_brief",
+    "quick_mutation_contracts", "bounded_explore_generation_config",
+    "resolve_and_explore",
     "BRIEF_SCHEMA_VERSION", "CompositionBrief", "MutationContract",
     "MaterialIdentity", "SourceAssetReference", "SourceFamily", "AnchorSpec",
     "PitchWorld", "ContrastTarget", "EndingIntent", "TempoFormPolicy",
@@ -125,5 +123,43 @@ __all__ = [
     "transform_motif",
     "ENDING_STRATEGIES", "EndingDirector", "EndingPlan", "compile_ending_plans",
     "ending_marker_events", "ending_plans_from_score",
-    "TransitionActuation", "transition_actuation_at",
-]
+    "TransitionActuation", "transition_actuation_at",]
+
+
+# M27 exports are lazy to avoid a cycle: config imports submodules from this
+# package while brief.py itself references GenerationConfig.
+_M27_EXPORTS = {
+    "BRIEF_SCHEMA_VERSION",
+    "CompositionBrief",
+    "MutationContract",
+    "MaterialIdentity",
+    "SourceAssetReference",
+    "SourceFamily",
+    "AnchorSpec",
+    "PitchWorld",
+    "ContrastTarget",
+    "EndingIntent",
+    "TempoFormPolicy",
+    "ResolvedCompositionIntent",
+    "BoundedExplorationResult",
+    "source_families_from_config",
+    "resolve_composition_brief",
+    "quick_mutation_contracts",
+    "bounded_explore_generation_config",
+    "resolve_and_explore",
+}
+
+
+def __getattr__(name: str):
+    if name not in _M27_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    from importlib import import_module
+
+    module = import_module(".brief", __name__)
+    value = getattr(module, name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted(set(globals()) | _M27_EXPORTS)
