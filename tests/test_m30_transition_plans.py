@@ -239,7 +239,7 @@ def test_m20_orchestration_phrase_model_remains_a_supported_compile_source():
     plan = OrchestrationPlan(
         phrases=(
             M20PhraseSpan("phrase-a", 0, 8, "establishment"),
-            M20PhraseSpan("phrase-b", 8, 16, "arrival"),
+            M20PhraseSpan("phrase-b", 8, 16, "development"),
         ),
     )
     score = Score(title="M20 transition fallback", orchestration_plan=plan.to_dict())
@@ -279,7 +279,10 @@ def test_score_roundtrip_keeps_transition_contract_and_markers(tmp_path):
 
     missing_marker_score = replace(
         restored,
-        events=tuple(event for event in restored.events if event.tags[-1] != "m30_phase:complete"),
+        events=tuple(
+            event for event in restored.events
+            if event.parameters.get("m30_transition_marker", {}).get("phase") != "complete"
+        ),
     )
     with pytest.raises(ValueError, match="marker is missing or does not match"):
         transition_plans_from_score(missing_marker_score)
