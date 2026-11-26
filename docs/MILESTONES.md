@@ -28,8 +28,8 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | M24.5 sidechain routing | Core offline implementation delivered | Human listening and target-Windows performance sign-off remain open |
 | M25 portability and project durability | Implementation complete; prior short CI acceptance passed | Target-Windows long benchmark and declared resource budgets remain open |
 | M26 production FX variations and delivery export | Implemented; this change simplifies the delivery handoff | Linux Python 3.10–3.12 smoke and Windows regression jobs passed on the implementation commit; local Pyo/audio listening and human musical acceptance remain separate gates |
-| M27 artistic intent and mutation contracts | Implemented; UI integration and broader Score-native mutation execution are follow-on work | Versioned CompositionBrief, source identity resolution, bounded GenerationConfig exploration, explicit tempo/form policy and deterministic contract seeds; M27 is merged and CI-verified in PR #23. |
-| M28 phrase grammar and frozen candidates | In progress; Workbench, contextual audition and matched A/B implemented | Score-native rational-beat phrases, motif-family identity/provenance, deterministic candidate batches, phrase editing, freeze/branch/restore, solo/predecessor/successor audition and matched-level source/candidate comparison with difference playback. Full musical acceptance and broader edge cases remain open; sound-object transformations depend on M31. |
+| M27 artistic intent and mutation contracts | **Partial — standalone model only** | `src/reawarp/composition/brief.py` contains versioned intent/contract models, but no other source module currently consumes them; no Generator Intent UI, project-level brief integration, resolver/execution path or dedicated M27 regression test was found in the main-branch audit. |
+| M28 phrase grammar and frozen candidates | In progress; core model, Workbench, contextual audition and matched A/B implemented | Score-native rational-beat phrases, motif-family identity/provenance, deterministic candidate batches, phrase editing, freeze/branch/restore and contextual comparison are present. Broader edge-case and musical acceptance remain open. M31 core is now delivered; M28's sound-object-aware phrase transformations are still a follow-on integration, not a blocked prerequisite. |
 | M29 perceptual orchestration and attention map | In progress; render-facing Focus/Recede and gesture-aware MIDI export implemented | Semantic attention roles/descriptors, rational-beat spans and hand-offs, evidence-led competition prompts, human review provenance, intentional-merge suppression, mono/low-volume audition, plus reversible Score-provenanced render gestures for deterministic non-anchor thinning, phrase-bounded note articulation/extension, optional register shift and pan/stereo-width shaping. MIDI export mirrors note population, register and gate changes, writes pan as CC 10, and preserves omitted source events plus gesture provenance for canonical Reawarp reimport. Kick/sub and tagged anchors are protected; CC 10 is channel-wide (roles sharing a MIDI channel share pan state), and stereo width remains metadata-only in standard MIDI 1.0; phrase-aware SPACE/ECHO sends now follow reversible role/span gestures with eased Score-tempo-aware phrase edges, composing with existing send routing/automation; direct stem gain, return chains and whole-field ambience/texture remain unchanged. Broader musical listening acceptance remains open. |
 | M30 transition and ending grammar | Implemented; human listening sign-off open | Versioned three-phase TransitionPlan compilation and exact-beat transition actuation; bounded immutable SectionMemory (default 12, max 64) with M20/M28 phrase validation, motif/role history, transformation lineage, compact energy/density summaries, expectations and return opportunities; versioned EndingPlan/EndingDirector for delayed return, transformed reprise, interrupted cadence, residue, dissolve and hard stop. Transition/ending markers and metadata are fingerprinted, deterministic, Score-round-trippable and silent; source audio events remain unchanged. Formal listening acceptance remains open. |
 | M31 sound-object workshop and resampling lineage | Core implementation delivered; human listening acceptance open | Dedicated editor over M21 SoundObjectPatch/editor model and HybridVoiceRenderer; immutable content-addressed patch revisions; aligned layer audition; role-specific processing identities; non-destructive new WAV prints with ResampleRecord lineage, source/transform/output hashes, renderer version/settings and seed. Optional coherent-family generation, direct phrase/stem/FX-stage printing and contextual matched-level A/B remain follow-on work. |
@@ -38,16 +38,18 @@ Event-backed voices are planned into a rational-beat Score and scheduled by Scor
 | M34 audio-conditioned composition and advanced DSP research gate | Research reviewed; implementation deferred | Audit found a plausible gap in time-varying audio-feature curves for phrase-level macro conditioning, but no concrete real-composition need or listening benefit is yet demonstrated. Synthetic order-reversal baseline and objective future acceptance contract are recorded in M34_RESEARCH_GATE.md. No production feature work approved. |
 | M24.5 sidechain and envelope routing | Core implementation delivered; listening sign-off open | Schema-v4 one-way source-detector to target-gain routes, peak/RMS detection, threshold/ratio, capped reduction, attack/release smoothing and hysteresis; FX Routing editor add/update/remove; mute/solo gating; pre-insert target ducking and source/route provenance. Human listening remains open. |
 | M24.6 feedback networks | Core implementation delivered; listening/profile open | Standalone fixed four-line orthogonal FDN, contractive feedback gain, deterministic decay estimate, hard tail cap, reset/panic/cancel, static peak guard and block-memory bound. No M22 routing integration. |
-| M24.7 parallel processing branches | Research gate only | Requires a demonstrated use case that serial inserts and fixed returns cannot express. |
+| M24.7 parallel processing branches | Research gate retained; no implementation approved | The current model has wet/dry serial-stage mixing, one serial insert path per stem and two shared wet-only SPACE/ECHO returns. Per-stem independent parallel chains are not expressible, but no real composition has demonstrated that this matters. Reopen only with a failing baseline and a matched-level listening case; see [M24.7 gate](M24_7_PARALLEL_BRANCHES.md). |
 
-**Previous M25 validation baseline:** [CI run 45701978735](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45701978735) passed Linux Python 3.10–3.12 and Windows. The 5-second 48 kHz export/reopen smoke passed in all four jobs and Windows reported 307 passing tests. This is a short portability/integrity check, not a 30/180-second target-machine performance sign-off. M26 adds further regression coverage; see the latest [Actions runs](https://github.com/ilyaminineli/eli_lab-reawarp/actions).
+**Latest full CI verification:** [run 45868070414](https://github.com/ilyaminineli/eli_lab-reawarp/actions/runs/45868070414), on commit `60a50e9`, passed all four jobs (Windows regression and Linux Python 3.10, 3.11 and 3.12). It includes the M24.6 smoke and M25 5-second 48 kHz archive/reopen check. This is a regression baseline, not a target-machine 30/180-second performance sign-off or Pyo/listening acceptance. See the latest [Actions runs](https://github.com/ilyaminineli/eli_lab-reawarp/actions).
 
 ## Milestone ledger
 
 Status terms:
 - **Implemented** — behaviour is present and has automated coverage.
 - **Implemented; sign-off open** — software is present, but optional-backend, target-hardware or human listening evidence is outstanding.
+- **Partial** — a model or vertical slice exists, but the milestone's end-to-end integration/acceptance contract is not met.
 - **Planned** — direction/specification only.
+- **Research gate only** — implementation is intentionally withheld until a concrete use case and baseline pass the stated gate.
 
 ### Foundation: material, Score and composition (M3–M9)
 
@@ -173,15 +175,15 @@ CI currently targets Ubuntu/Python 3.10–3.12 and Windows/Python 3.11. It runs 
 
 **Still required:**
 
-1. Confirm the current M26 regression run passes on all four CI jobs.
-2. Run 30-second and 180-second 48 kHz generation/export/reopen on the target Windows machine; record hardware, Python/NumPy/SciPy versions, render time, real-time factor and peak memory. Choose explicit budgets before declaring a budget-gated sign-off:
+1. Run 30-second and 180-second 48 kHz generation/export/reopen on the target Windows machine; record hardware, Python/NumPy/SciPy versions, render time, real-time factor and peak memory. Choose explicit budgets before declaring a budget-gated sign-off:
    ```powershell
    python scripts/benchmark_m25.py --durations 30 180 --sample-rate 48000 --output output/m25-target-windows.json
    ```
-   Add agreed `--max-rss-gb` and `--max-wall-seconds` limits for explicit pass/fail budget checks.
-3. Install `.[pyo]` and audition role inserts, sends, returns and the complete mix on the target Windows setup. Check matched-level, low-volume and mono playback.
-4. Perform human listening across M18–M24 composition/sound-object/DSP features. CI does not certify musical identity, masking, negative space or taste.
-5. Complete M24.5 and M24.6 human listening and target-Windows performance acceptance. Keep M24.7 parallel branches as a separate research gate.
+   Add agreed `--max-rss-gb` and `--max-wall-seconds` limits for explicit pass/fail budget checks. This closes the shared M14/M25 long-run acceptance gap.
+2. Install `.[pyo]` on the target Windows setup and audition M22/M26 role inserts, sends, returns, complete mixes and export renders at matched level, in mono and at low monitoring level.
+3. Complete human listening acceptance for M15, M18–M24 and M28–M33. Prioritise M24.1–M24.6 matched-level processor comparisons, M24.5/6 real-material use, M28 phrase identity, M29 figure/ground, M30 transitions/endings, M31 object layers, M32 contextual checks and M33 dry-print suitability. CI does not certify musical identity, masking, negative space or taste.
+4. Close the M24.5/M24.6 target-Windows 30/180-second DSP profile and listening records; the most recent CI smoke is not a substitute.
+5. Finish the M27 end-to-end intent workflow and the scoped M28/M29/M31/M32 integrations listed in [the 26 November re-audit](ROADMAP_REAUDIT_2026_11_26.md). Keep M24.7 and M34 as research gates until their evidence requirements pass.
 
 ## Engineering principles for future work
 
@@ -198,6 +200,8 @@ The following documents are maintained separately from this delivered-milestone 
 
 - [Implementation notes](IMPLEMENTATION_NOTES.md) — architecture and engineering conventions.
 - [M27–M34 development roadmap](ROADMAP_M27_M34.md) — detailed forward milestone specifications and implementation handoff for agents.
+- [M24.7 parallel branches gate](M24_7_PARALLEL_BRANCHES.md) — current FX expressiveness audit and evidence required before implementation.
+- [Roadmap re-audit · 26 November 2026](ROADMAP_REAUDIT_2026_11_26.md) — remaining software gaps, research gates and human/target-machine acceptance work.
 - [Dependency ecosystem](DEPENDENCY_ECOSYSTEM.md) — dependencies, platform constraints and licences.
 - [Sample banks and hybrid composition](SAMPLE_BANKS_HYBRID_COMPOSITION.md) — source selection and hybrid percussion.
 - [IRO integration](IRO_INTEGRATION.md) — shared manifests, source identity and missing-asset policy.

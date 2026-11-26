@@ -48,7 +48,7 @@ These principles are the acceptance lens for every milestone below.
 ## M27 — Artistic Intent, Material Vocabulary and Mutation Contracts
 
 **Priority:** P0  
-**Status:** Implemented; UI integration and broader Score-native mutation execution remain follow-on work  
+**Status:** Partial — the versioned CompositionBrief/contract models exist in `composition/brief.py`, but current main-branch search found no source consumer, Generator Intent UI, project-level integration, brief resolver/execution path or dedicated M27 regression test. End-to-end integration remains unimplemented.  
 **Depends on:** M15, M18, M20, M21, M23  
 **Primary guide basis:** Field Guide §§9, 12, 14, 17; Composition Atlas §§1–3; Advanced Appendix §§10.2, 13, 16–17.
 
@@ -86,7 +86,7 @@ Give each composition an explicit, inspectable identity before generation. Repla
 ## M28 — Phrase Grammar, Motif Families and Candidate Freeze
 
 **Priority:** P0  
-**Status:** In progress — core model, Phrase Workbench, contextual audition and matched-level A/B comparison are implemented; full musical acceptance and broader edge-case coverage remain open; sound-object transformations remain gated on M31  
+**Status:** In progress — core model, Phrase Workbench, contextual audition and matched-level A/B comparison are implemented; full musical acceptance and broader edge-case coverage remain open. M31 core is now delivered; M28 sound-object-aware phrase transformations remain a follow-on integration.  
 **Depends on:** M27; builds on M15, M19, M20, M23  
 **Primary guide basis:** Composition Atlas §§7, 10, 12–14; Advanced Appendix §§2, 10.1, 10.5, 12, 17, 20.
 
@@ -361,7 +361,7 @@ Evaluate whether audio analysis and the remaining advanced DSP ideas solve a dem
 - **Audio-conditioned composition:** analyse an imported break, stem or reference audio at multiple windows; extract onset, RMS, centroid, flux, chroma/low-frequency descriptors; smooth and normalise; map to a small number of explicit musical macros with confidence, hysteresis, phrase-boundary updates and manual overrides.
 - **Sidechain/envelope routing (existing M24.5 research topic):** explicit detector, envelope, smoothing, hysteresis and cross-stem control semantics.
 - **Bounded feedback systems (existing M24.6 topic):** fixed-topology networks with gain stability, decay, reset, tail and headroom contracts.
-- **Parallel processing branches (existing M24.7 research topic):** only if a documented use case cannot be represented by existing serial inserts and SPACE/ECHO returns.
+- **Parallel processing branches (existing M24.7 research topic):** only if a documented use case cannot be represented by existing serial inserts and SPACE/ECHO returns; see [the M24.7 gate and current expressiveness audit](M24_7_PARALLEL_BRANCHES.md).
 - **Search/constraint/evolutionary approaches:** generate alternatives against declared hard constraints and musical objectives, then expose them for audition; numerical scores remain advisory.
 
 ### Gate questions
@@ -389,7 +389,7 @@ The repository audit found:
 - transient detection and slicing for imported breaks, plus whole-file library metrics (peak/RMS, centroid, rolloff, flatness, onset density and rhythm histogram);
 - no time-indexed library feature curve, confidence model or audio-analysis-to-Score control adapter;
 - M27 bounded mutation contracts, M28 identity-bearing phrase candidates and M32 contextual listening already cover generation/selection, so a separate evolutionary search system has no demonstrated gap;
-- M22 remains intentionally bounded to serial per-stem inserts and fixed SPACE/ECHO returns. M24.5 is implemented as a one-way sidechain control; M24.6 is implemented as a standalone fixed-topology FDN processor, not a routing graph; M24.7 parallel branches remain conditional.
+- M22 remains intentionally bounded to one serial insert chain per stem and two fixed shared wet-only SPACE/ECHO returns. M24.5 is implemented as a one-way sidechain control; M24.6 is implemented as a standalone fixed-topology FDN processor, not a routing graph; M24.7 parallel branches remain conditional under [their own research gate](M24_7_PARALLEL_BRANCHES.md).
 
 The most plausible candidate is audio-conditioned phrase macros, limited initially to density, brightness and activity. A synthetic order-reversal baseline shows that two sequences made from the same sparse/dark and dense/bright materials can have matching whole-file summaries while presenting opposite temporal trajectories. The fixture and regression test are in tests/fixtures/m34/audio_conditioning_order_pair.json and tests/test_m34_research_gate.py.
 
