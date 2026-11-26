@@ -49,7 +49,7 @@ def test_fx_variation_routings_are_seeded_by_project_context_and_role():
 
     for candidate in first:
         route = candidate["routing"]
-        assert route["schema_version"] == 3
+        assert route["schema_version"] == 4
         assert route["stems"]["kick"]["insert"]["kind"] == "bypass"
         assert route["stems"]["kick"]["sends"] == {"space": 0.0, "echo": 0.0}
         assert set(route["buses"]) == {"space", "echo"}

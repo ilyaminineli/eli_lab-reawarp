@@ -1,8 +1,9 @@
 """Versioned role-aware mixer: per-stem inserts, tap-point sends and fixed returns.
 
 The render contract keeps dry stems immutable. Inserts operate per stem before
-the master, and SPACE/ECHO are fixed auxiliary returns. Schema v1 projects are
-migrated in memory to v2. No arbitrary routing graph or feedback bus is implied.
+the master, and SPACE/ECHO are fixed auxiliary returns. Schemas v1–v3 are
+migrated in memory to v4. Sidechains are one-way detector-to-gain controls, not
+an arbitrary routing graph or feedback bus.
 """
 from __future__ import annotations
 
@@ -19,10 +20,12 @@ import numpy as np
 from reawarp.fx import FX_PRESETS, normalise_fx_stages, render_pyo_fx
 from reawarp.fx_automation import automation_envelope, normalise_fx_automation
 from reawarp.score.automation import AutomationControlBus
+from reawarp.sidechain import normalise_sidechain_routes, render_sidechain_gain_envelope
 
-FX_ROUTING_SCHEMA_VERSION = 3
+FX_ROUTING_SCHEMA_VERSION = 4
 LEGACY_FX_ROUTING_SCHEMA_VERSION = 1
-PREVIOUS_FX_ROUTING_SCHEMA_VERSION = 2
+PREVIOUS_FX_ROUTING_SCHEMA_VERSION = 3
+EARLIER_FX_ROUTING_SCHEMA_VERSION = 2
 FX_BUSES = ("space", "echo")
 SEND_TAP_POINTS = (
     "pre_insert_pre_fader",
@@ -130,6 +133,7 @@ def _base_routing(stem_names: Sequence[str], *, routing_mode: str) -> dict[str, 
                 "alignment_policy": "start_aligned",
             },
         },
+        "sidechains": [],
     }
 
 
@@ -497,18 +501,23 @@ def build_fx_variation_routings(
 def normalise_fx_routing(
     payload: Mapping[str, Any], stem_names: Sequence[str], sample_rate: int
 ) -> dict[str, Any]:
-    """Validate v1/v2 JSON and return the canonical v2 representation."""
+    """Validate v1–v4 JSON and return the canonical v4 representation."""
     if not isinstance(payload, Mapping):
         raise ValueError("FX routing must be a JSON object")
     version = payload.get("schema_version")
-    if version not in {LEGACY_FX_ROUTING_SCHEMA_VERSION, PREVIOUS_FX_ROUTING_SCHEMA_VERSION, FX_ROUTING_SCHEMA_VERSION}:
-        raise ValueError("FX routing schema_version must be 1, 2 or 3")
+    if version not in {
+        LEGACY_FX_ROUTING_SCHEMA_VERSION,
+        EARLIER_FX_ROUTING_SCHEMA_VERSION,
+        PREVIOUS_FX_ROUTING_SCHEMA_VERSION,
+        FX_ROUTING_SCHEMA_VERSION,
+    }:
+        raise ValueError("FX routing schema_version must be 1, 2, 3 or 4")
     mode = str(payload.get("routing_mode", "manual"))
     if mode not in {"manual", "role_auto", "percussion_focus", "melody_foreground",
                     "ambience_background", "combined_roles"}:
         raise ValueError(f"unsupported routing_mode: {mode}")
     # v1/v2 are historical authored sessions: keep their manual values.
-    if version in {LEGACY_FX_ROUTING_SCHEMA_VERSION, PREVIOUS_FX_ROUTING_SCHEMA_VERSION} and mode == "manual":
+    if version in {LEGACY_FX_ROUTING_SCHEMA_VERSION, EARLIER_FX_ROUTING_SCHEMA_VERSION} and mode == "manual":
         defaults = default_fx_routing(stem_names)
     elif mode in {"percussion_focus", "melody_foreground", "ambience_background", "combined_roles"}:
         defaults = build_role_audition_matrix(stem_names)[mode]
@@ -568,6 +577,9 @@ def normalise_fx_routing(
     unknown_bus_names = set(source_buses) - set(FX_BUSES)
     if unknown_bus_names:
         raise ValueError("unknown FX bus(es): " + ", ".join(sorted(map(str, unknown_bus_names))))
+    sidechains = normalise_sidechain_routes(
+        payload.get("sidechains", ()), stem_names, int(sample_rate)
+    )
     buses: dict[str, Any] = {}
     for bus in FX_BUSES:
         raw = source_buses.get(bus, defaults["buses"][bus])
@@ -599,7 +611,7 @@ def normalise_fx_routing(
         "schema_version": FX_ROUTING_SCHEMA_VERSION,
         "routing_mode": mode,
         "master_wet": _finite(payload.get("master_wet", 1.0), "master_wet", 0.0, 1.0),
-        "stems": stems, "buses": buses,
+        "stems": stems, "buses": buses, "sidechains": sidechains,
     }
 
 
@@ -811,7 +823,7 @@ def render_fx_routing(
         return {}, {
             "schema_version": FX_ROUTING_SCHEMA_VERSION, "buses": {},
             "master_wet": 1.0, "rendered_returns": [],
-            "active_send_stems_by_bus": {}, "meters": {},
+            "active_send_stems_by_bus": {}, "sidechains": [], "meters": {},
         }
     tempo = _finite(bpm, "bpm", 1.0, 1000.0)
     if controls is not None and automation is not None:
@@ -864,6 +876,41 @@ def render_fx_routing(
         if not values["mute"] and (not solo_active or values["solo"])
     }
 
+    # Sidechain detectors read the immutable source stem pre-insert/pre-fader.
+    # Multiple routes to one target are combined by taking the strongest
+    # requested reduction, avoiding surprise cumulative attenuation.
+    sidechain_gains = {
+        name: np.ones(frames, dtype=np.float32) for name in names
+    }
+    sidechain_summaries: list[dict[str, Any]] = []
+    for sidechain in config["sidechains"]:
+        _check_cancel(cancel_event)
+        if sidechain["source_stem"] not in audible:
+            sidechain_summaries.append({
+                **sidechain,
+                "bypassed": True,
+                "bypass_reason": "source muted or excluded by solo",
+                "max_reduction_db": 0.0,
+                "mean_reduction_db": 0.0,
+                "active_fraction": 0.0,
+                "detector_peak_dbfs": -240.0,
+            })
+            continue
+        try:
+            gain_curve, summary = render_sidechain_gain_envelope(
+                np.asarray(dry_stems[sidechain["source_stem"]], dtype=np.float32),
+                frames,
+                int(sample_rate),
+                sidechain,
+                cancel_event=cancel_event,
+            )
+        except InterruptedError as exc:
+            raise FXRenderCancelledError("FX render cancelled") from exc
+        sidechain_gains[sidechain["target_stem"]] = np.minimum(
+            sidechain_gains[sidechain["target_stem"]], gain_curve
+        ).astype(np.float32, copy=False)
+        sidechain_summaries.append({**sidechain, **summary, "bypassed": False})
+
     bus_inputs = {bus: np.zeros((frames, channels), dtype=np.float32) for bus in FX_BUSES}
     active_stems_by_bus: dict[str, list[str]] = {bus: [] for bus in FX_BUSES}
     outputs: dict[str, np.ndarray] = {}
@@ -884,6 +931,7 @@ def render_fx_routing(
         if not np.isfinite(dry).all():
             raise ValueError(f"dry stem {name!r} contains non-finite samples")
         dry = dry.copy()
+        dry *= sidechain_gains[name][:, None]
         direct_audio[name] = dry.copy()
         route = config["stems"][name]
         insert = route["insert"]
@@ -1080,6 +1128,8 @@ def render_fx_routing(
         "bpm": tempo,
         "stems": config["stems"],
         "buses": config["buses"],
+        "sidechains": config["sidechains"],
+        "sidechain_summaries": sidechain_summaries,
         "rendered_returns": list(returns),
         "active_send_stems_by_bus": active_stems_by_bus,
         "automation_lanes": list(controls.target_ids) if controls is not None else list(lanes["lanes"]),
@@ -1099,6 +1149,16 @@ def render_fx_routing(
             "insert": meter_insert,
             "sends": meter_sends,
             "returns": meter_returns,
+            "sidechain": {
+                item["route_id"]: {
+                    key: item[key] for key in (
+                        "source_stem", "target_stem", "max_reduction_db",
+                        "mean_reduction_db", "active_fraction",
+                        "detector_peak_dbfs", "bypassed",
+                    ) if key in item
+                }
+                for item in sidechain_summaries
+            },
             "post_insert_stems": meter_master_input,
         },
     }
@@ -1109,6 +1169,9 @@ def render_fx_routing(
             "insert": inserts,
             "sends": sends_audio,
             "returns": {bus: audio.copy() for bus, audio in returns.items()},
+            "sidechain_gain": {
+                name: curve.copy() for name, curve in sidechain_gains.items()
+            },
         }
     return outputs, metadata
 

@@ -81,6 +81,61 @@ class FXRoutingEditor(QGroupBox):
             bus_form.addRow(bus.upper(), slider)
             bus_form.addRow(f"{bus.upper()} TAP", tap)
         root.addWidget(bus_group)
+
+        sidechain_group = QGroupBox("SIDECHAIN / ENVELOPE ROUTES")
+        sidechain_form = QFormLayout(sidechain_group)
+        self.sidechain_choice = QComboBox()
+        self.sidechain_source = QComboBox()
+        self.sidechain_target = QComboBox()
+        self.sidechain_detector = QComboBox()
+        self.sidechain_detector.addItem("PEAK", "peak")
+        self.sidechain_detector.addItem("RMS", "rms")
+        self.sidechain_threshold = QDoubleSpinBox()
+        self.sidechain_threshold.setRange(-96.0, 0.0)
+        self.sidechain_threshold.setSuffix(" dBFS")
+        self.sidechain_threshold.setValue(-24.0)
+        self.sidechain_threshold.setSingleStep(1.0)
+        self.sidechain_ratio = QDoubleSpinBox()
+        self.sidechain_ratio.setRange(1.0, 20.0)
+        self.sidechain_ratio.setValue(8.0)
+        self.sidechain_ratio.setSingleStep(0.5)
+        self.sidechain_max_reduction = QDoubleSpinBox()
+        self.sidechain_max_reduction.setRange(0.0, 24.0)
+        self.sidechain_max_reduction.setSuffix(" dB")
+        self.sidechain_max_reduction.setValue(9.0)
+        self.sidechain_attack = QDoubleSpinBox()
+        self.sidechain_attack.setRange(0.1, 500.0)
+        self.sidechain_attack.setSuffix(" ms")
+        self.sidechain_attack.setValue(2.0)
+        self.sidechain_release = QDoubleSpinBox()
+        self.sidechain_release.setRange(1.0, 5000.0)
+        self.sidechain_release.setSuffix(" ms")
+        self.sidechain_release.setValue(120.0)
+        self.sidechain_hysteresis = QDoubleSpinBox()
+        self.sidechain_hysteresis.setRange(0.0, 24.0)
+        self.sidechain_hysteresis.setSuffix(" dB")
+        self.sidechain_hysteresis.setValue(1.5)
+        self.sidechain_choice.currentIndexChanged.connect(self._load_sidechain_widgets)
+        sidechain_form.addRow("Saved route", self.sidechain_choice)
+        sidechain_form.addRow("Detector source", self.sidechain_source)
+        sidechain_form.addRow("Duck target", self.sidechain_target)
+        sidechain_form.addRow("Detector", self.sidechain_detector)
+        sidechain_form.addRow("Threshold", self.sidechain_threshold)
+        sidechain_form.addRow("Ratio", self.sidechain_ratio)
+        sidechain_form.addRow("Maximum reduction", self.sidechain_max_reduction)
+        sidechain_form.addRow("Attack", self.sidechain_attack)
+        sidechain_form.addRow("Release", self.sidechain_release)
+        sidechain_form.addRow("Threshold hysteresis", self.sidechain_hysteresis)
+        sidechain_actions = QHBoxLayout()
+        self.sidechain_save_button = QPushButton("ADD / UPDATE ROUTE")
+        self.sidechain_remove_button = QPushButton("REMOVE ROUTE")
+        self.sidechain_save_button.clicked.connect(self._save_sidechain)
+        self.sidechain_remove_button.clicked.connect(self._remove_sidechain)
+        sidechain_actions.addWidget(self.sidechain_save_button)
+        sidechain_actions.addWidget(self.sidechain_remove_button)
+        sidechain_form.addRow(sidechain_actions)
+        root.addWidget(sidechain_group)
+
         return_group = QGroupBox("BUS RETURNS")
         return_form = QFormLayout(return_group)
         self.bus_wet: dict[str, QSlider] = {}
@@ -237,6 +292,7 @@ class FXRoutingEditor(QGroupBox):
         self.stem.setCurrentIndex(index if index >= 0 else 0)
         self._load_selected()
         self._load_buses_into_widgets()
+        self._load_sidechains_into_widgets()
         self._loading = False
         self.status.setText(
             f"{len(names)} stems · effects assigned automatically by role · "
@@ -355,6 +411,7 @@ class FXRoutingEditor(QGroupBox):
         self._routing = routing
         self._load_selected()
         self._load_buses_into_widgets()
+        self._load_sidechains_into_widgets()
         self._loading = False
         self.mixerStateRequested.emit({
             name: {
@@ -386,6 +443,7 @@ class FXRoutingEditor(QGroupBox):
         self._routing = normalise_fx_routing(payload, self._stem_names, self._sample_rate)
         self._load_selected()
         self._load_buses_into_widgets()
+        self._load_sidechains_into_widgets()
         self._loading = False
         self.changed.emit()
 
@@ -408,6 +466,132 @@ class FXRoutingEditor(QGroupBox):
             record["mute"] = bool(values.get("mute", record.get("mute", False)))
             record["solo"] = bool(values.get("solo", record.get("solo", False)))
 
+
+    def _load_sidechains_into_widgets(self, selected_route_id: str | None = None) -> None:
+        """Refresh the sidechain route selector without changing saved routing."""
+        if not hasattr(self, "sidechain_choice"):
+            return
+        if selected_route_id is None:
+            selected_route_id = self.sidechain_choice.currentData()
+        routes = list(self._routing.get("sidechains", ()))
+        self.sidechain_source.blockSignals(True)
+        self.sidechain_target.blockSignals(True)
+        self.sidechain_source.clear()
+        self.sidechain_target.clear()
+        for name in self._stem_names:
+            label = name.replace("_", " ").upper()
+            self.sidechain_source.addItem(label, name)
+            self.sidechain_target.addItem(label, name)
+        self.sidechain_source.blockSignals(False)
+        self.sidechain_target.blockSignals(False)
+
+        self.sidechain_choice.blockSignals(True)
+        self.sidechain_choice.clear()
+        self.sidechain_choice.addItem("NEW SIDECHAIN ROUTE", None)
+        for route in routes:
+            self.sidechain_choice.addItem(
+                f"{route['source_stem']} → {route['target_stem']} · {route['route_id']}",
+                route["route_id"],
+            )
+        index = self.sidechain_choice.findData(selected_route_id)
+        self.sidechain_choice.setCurrentIndex(index if index >= 0 else 0)
+        self.sidechain_choice.blockSignals(False)
+        self._load_sidechain_widgets()
+
+    def _load_sidechain_widgets(self, *_args: Any) -> None:
+        route_id = self.sidechain_choice.currentData()
+        route = next(
+            (item for item in self._routing.get("sidechains", ())
+             if item.get("route_id") == route_id),
+            None,
+        )
+        if route is not None:
+            self.sidechain_source.setCurrentIndex(
+                max(0, self.sidechain_source.findData(route["source_stem"]))
+            )
+            self.sidechain_target.setCurrentIndex(
+                max(0, self.sidechain_target.findData(route["target_stem"]))
+            )
+            self.sidechain_detector.setCurrentIndex(
+                max(0, self.sidechain_detector.findData(route["detector_mode"]))
+            )
+            self.sidechain_threshold.setValue(float(route["threshold_db"]))
+            self.sidechain_ratio.setValue(float(route["ratio"]))
+            self.sidechain_max_reduction.setValue(float(route["max_reduction_db"]))
+            self.sidechain_attack.setValue(float(route["attack_ms"]))
+            self.sidechain_release.setValue(float(route["release_ms"]))
+            self.sidechain_hysteresis.setValue(float(route["hysteresis_db"]))
+        self.sidechain_remove_button.setEnabled(route is not None)
+
+    def _save_sidechain(self) -> None:
+        source = self.sidechain_source.currentData()
+        target = self.sidechain_target.currentData()
+        if not source or not target:
+            return
+        route_id = self.sidechain_choice.currentData()
+        routes = [dict(item) for item in self._routing.get("sidechains", ())]
+        existing = next((item for item in routes if item["route_id"] == route_id), None)
+        if existing is None:
+            stem_id = f"{source}_to_{target}"
+            route_id = stem_id
+            suffix = 2
+            while any(item["route_id"] == route_id for item in routes):
+                route_id = f"{stem_id}_{suffix}"
+                suffix += 1
+        route = {
+            "route_id": str(route_id),
+            "source_stem": str(source),
+            "target_stem": str(target),
+            "detector_mode": str(self.sidechain_detector.currentData()),
+            "threshold_db": self.sidechain_threshold.value(),
+            "ratio": self.sidechain_ratio.value(),
+            "max_reduction_db": self.sidechain_max_reduction.value(),
+            "attack_ms": self.sidechain_attack.value(),
+            "release_ms": self.sidechain_release.value(),
+            "hysteresis_db": self.sidechain_hysteresis.value(),
+            "control_rate_hz": 1_000.0,
+        }
+        if existing is None:
+            routes.append(route)
+        else:
+            routes = [
+                route if item["route_id"] == route_id else item for item in routes
+            ]
+        try:
+            self._routing = normalise_fx_routing(
+                {**self._routing, "sidechains": routes},
+                self._stem_names,
+                self._sample_rate,
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Sidechain routing", str(exc))
+            return
+        self._loading = True
+        self._load_sidechains_into_widgets(str(route_id))
+        self._loading = False
+        self.status.setText(
+            f"Sidechain saved · {source} detects and ducks {target} · pre-insert / pre-fader detector"
+        )
+        self.changed.emit()
+
+    def _remove_sidechain(self) -> None:
+        route_id = self.sidechain_choice.currentData()
+        if not route_id:
+            return
+        routes = [
+            dict(item) for item in self._routing.get("sidechains", ())
+            if item.get("route_id") != route_id
+        ]
+        self._routing = normalise_fx_routing(
+            {**self._routing, "sidechains": routes},
+            self._stem_names,
+            self._sample_rate,
+        )
+        self._loading = True
+        self._load_sidechains_into_widgets()
+        self._loading = False
+        self.status.setText(f"Removed sidechain route {route_id}")
+        self.changed.emit()
 
     def match_audition_level(self) -> bool:
         return bool(self.match_level_checkbox.isChecked())

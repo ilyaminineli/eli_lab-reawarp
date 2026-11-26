@@ -46,7 +46,7 @@ def test_role_aware_defaults_assign_effects_without_manual_per_stem_sends():
     assert routing["stems"]["mystery"]["sends"] == {"space": 0.0, "echo": 0.0}
 
 
-def test_v1_routing_migrates_to_v3_without_changing_manual_values():
+def test_v1_routing_migrates_to_v4_without_changing_manual_values():
     legacy = {
         "schema_version": 1,
         "master_wet": 0.82,
@@ -62,7 +62,7 @@ def test_v1_routing_migrates_to_v3_without_changing_manual_values():
         },
     }
     migrated = normalise_fx_routing(legacy, ("kick",), 48_000)
-    assert migrated["schema_version"] == 3
+    assert migrated["schema_version"] == 4
     assert migrated["routing_mode"] == "manual"
     assert migrated["stems"]["kick"]["sends"] == {"space": 0.12, "echo": 0.04}
     assert migrated["stems"]["kick"]["send_taps"] == {
@@ -295,7 +295,7 @@ def test_v3_schema_defaults_missing_stem_routes_from_role_map():
         ("kick", "snare", "melody", "unknown"),
         48_000,
     )
-    assert route["schema_version"] == 3
+    assert route["schema_version"] == 4
     assert route["stems"]["kick"]["role"] == "kick"
     assert route["stems"]["snare"]["insert"]["kind"] == "preset"
     assert route["stems"]["melody"]["sends"]["space"] > 0
@@ -330,6 +330,6 @@ def test_v2_manual_routing_migrates_without_role_defaults_overwriting_it():
     old["schema_version"] = 2
     old["stems"]["melody"]["sends"]["space"] = 0.123
     normalized = normalise_fx_routing(old, ("kick", "melody"), 48_000)
-    assert normalized["schema_version"] == 3
+    assert normalized["schema_version"] == 4
     assert normalized["routing_mode"] == "manual"
     assert normalized["stems"]["melody"]["sends"]["space"] == pytest.approx(0.123)

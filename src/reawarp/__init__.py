@@ -25,6 +25,9 @@ from reawarp.fx_automation import (
     score_to_fx_automation,
 )
 from reawarp.synthesis.score_voices import build_production_voice_renderers
+from reawarp.sidechain import (
+    SidechainRoute, normalise_sidechain_routes, render_sidechain_gain_envelope,
+)
 from reawarp.synthesis.sound_object import (
     EnvelopeSpec, HybridRenderResult, HybridVoiceRenderer,
     SoundObjectLayer, SoundObjectPatch, SoundObjectSource, TransformationRecord,
@@ -116,5 +119,6 @@ __all__ = [
     "ENDING_STRATEGIES", "EndingDirector", "EndingPlan", "compile_ending_plans",
     "ending_marker_events", "ending_plans_from_score",
     "TransitionActuation", "transition_actuation_at",
+    "SidechainRoute", "normalise_sidechain_routes", "render_sidechain_gain_envelope",
 ]
 __version__ = "0.12.0"

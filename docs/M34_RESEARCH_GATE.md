@@ -8,7 +8,7 @@
 
 M34 remains a conditional research gate. The audit found one plausible missing capability—**time-varying audio features that can condition phrase-level composition macros**—but no supplied real-composition example demonstrating that this is currently blocking the composing workflow. The synthetic baseline below proves an information gap in the current whole-file summary API; it does not prove that an audio-conditioned generator produces better music.
 
-Therefore this review does **not** approve a feature implementation, new DSP routing, a new dependency, or a production UI. The next justified action is to run the same experiment against a real break/stem/reference supplied for a concrete musical task, compare against a static-macro baseline, and record human listening outcomes. M34 should remain deferred until that comparison demonstrates a benefit.
+Therefore this review does **not** approve M34 audio-conditioned composition, a new dependency or a generated-Score mutation path. A separate, narrower M24.5 sidechain use case was subsequently taken forward as offline detector-to-target gain routing (see M24_5_SIDECHAIN.md); that does not resolve or implement the M34 temporal-composition research question. M34 should remain deferred until a real break/stem/reference experiment demonstrates a benefit over a static-macro baseline and human listening confirms it.
 
 ## Repository capability audit
 
@@ -19,9 +19,9 @@ Therefore this review does **not** approve a feature implementation, new DSP rou
 | **M27 CompositionBrief** | Source identity, anchors, mutation contracts, scope-aware bounded config exploration and deterministic seeds | No signal-derived parameter source; macro values are explicit composition intent or bounded mutations |
 | **M28/M32** | Phrase identity, deterministic alternatives, contextual audition, technical diagnostics and human evaluation provenance | No audio-analysis-to-Score mutation path |
 | **M29/M30/M33** | Semantic attention/gesture controls, transition/ending grammar and deliberate phrase arrangement | No imported-reference-following control lane; these are authored from Score/form intent |
-| **M22 FX routing** | Per-stem serial inserts and fixed SPACE/ECHO auxiliary returns; dry stems remain authoritative | No general cross-stem detector/sidechain semantics or arbitrary routing graph |
+| **M22/M24.5 FX routing** | Per-stem serial inserts, fixed SPACE/ECHO returns and optional one-way sidechain gain routes; dry stems remain authoritative | No arbitrary routing graph, post-insert detector network or feedback routing |
 | **M24.1–M24.4** | Separate NumPy reference implementations and CI coverage for convolution, spectral delay, cross-synthesis and nonlinear processing | These are research/reference processors, not automatic production inserts; listening and target profiling remain open |
-| **M24.5** | Planned sidechain/envelope routing | No explicit detector, envelope, smoothing, hysteresis and cross-stem control model |
+| **M24.5** | Implemented as a bounded offline source-envelope to target-gain route | Peak/RMS detection, threshold/ratio, capped reduction, attack/release, hysteresis and mute/solo gating; human listening and target performance remain open |
 | **M24.6** | Planned bounded feedback networks | No fixed-topology feedback network contract with stability, reset, finite-tail and headroom tests |
 | **M24.7** | Research gate for parallel branches | No demonstrated use case that existing inserts and SPACE/ECHO cannot express |
 
@@ -30,7 +30,7 @@ The repository already has substantial analysis and editing capability. The actu
 ## Candidate ranking
 
 1. **Audio-conditioned phrase macros — most plausible, not yet approved.** A reference break/stem may have a meaningful progression in density, energy or spectral character. Whole-file averages erase its order. A future adapter could expose a few explicit normalized controls (initially density, brightness and activity) while keeping musical decisions on phrase boundaries.
-2. **M24.5 sidechain/envelope routing — defer.** The current fixed routing has no cross-stem detector. Before adding it, a concrete musical example must show that a manually authored Score/FX automation lane or existing send/insert setup cannot express the desired ducking or reciprocal movement.
+2. **M24.5 sidechain/envelope routing — subsequently implemented as a narrow, separate milestone.** The chosen use case is transient-responsive ducking of a sustained texture by the actual kick/snare/break stem, especially when transient timing or amplitude changes after edits or regeneration. The detector follows the rendered source buffer rather than a manually drawn approximation; the implementation is deliberately one-way and offline. Its listening benefit remains unverified.
 3. **M24.6 bounded feedback — defer.** Existing delay and spectral-delay effects already expose bounded repeat/feedback parameters. A new network is justified only by a sound or evolving interaction that a single bounded chain cannot produce. Stability, reset and finite-tail contracts would be prerequisites.
 4. **M24.7 parallel branches — do not implement by default.** The existing serial insert and shared wet-return model is intentionally bounded. Parallel processing is not an objective in itself; a failing serial/return baseline is required.
 5. **Search/evolutionary optimisation — defer.** M27 bounded exploration, M28 phrase candidates and M32 human evaluation already establish a safer generate–audition–select pattern. Further search is not justified without a declared constraint that those contracts cannot express.
@@ -92,4 +92,4 @@ A future M34 design should begin with one named source, one musical problem and 
 - Target-machine 30/180-second resource measurements and declared budgets.
 - Explicit human decision on which anchors and structural invariants must remain fixed.
 
-Until that evidence exists, M34 remains a research note and regression baseline. M24.5–M24.7 retain their separate planned/research statuses. No production processor, GUI, routing schema or generated-score mutation has been added by this review.
+Until that evidence exists, M34 remains a research note and regression baseline. M24.5 is delivered separately with its own route model and tests; M24.6 feedback networks and M24.7 parallel processing retain their planned/research statuses. This M34 review itself did not add an audio-feature composition lane or mutate generated Scores.
