@@ -437,6 +437,25 @@ def write_project_manifest(
         "automation": "fx_automation.json" if (root / "fx_automation.json").is_file() else None,
         "mix": "mix.json" if (root / "mix.json").is_file() else None,
     }
+    listening_session = metadata.get("m32_listening_session", {})
+    if not isinstance(listening_session, dict):
+        listening_session = {}
+    critical_listening = {
+        "json_file": (
+            "critical_listening_report.json"
+            if (root / "critical_listening_report.json").is_file() else None
+        ),
+        "markdown_file": (
+            "critical_listening_report.md"
+            if (root / "critical_listening_report.md").is_file() else None
+        ),
+        "session_id": listening_session.get("session_id"),
+        "project_fingerprint": listening_session.get("project_fingerprint"),
+        "project_revision": listening_session.get("project_revision"),
+        "candidate_ids": listening_session.get("candidate_ids", []),
+        "analysis_enabled": listening_session.get("analysis_enabled"),
+        "audition_transform_count": len(listening_session.get("audition_transforms", [])),
+    }
     report = {
         "format": MANIFEST_FORMAT,
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -485,6 +504,7 @@ def write_project_manifest(
         },
         "source_assets": list(assets or []),
         "candidate_ancestry": candidate_ancestry,
+        "critical_listening": critical_listening,
         "fx_files": fx_files,
         "render_environment": _environment_record(),
         "reproducibility": {

@@ -212,6 +212,21 @@ class ReawarpProject:
                 json.dumps(report, indent=2, ensure_ascii=False),
                 encoding="utf-8",
             )
+        m32_session = self.metadata.get("m32_listening_session")
+        if isinstance(m32_session, dict):
+            from reawarp.listening import (
+                listening_report_markdown, validate_listening_session,
+            )
+
+            validated_session = validate_listening_session(m32_session)
+            (output / "critical_listening_report.json").write_text(
+                json.dumps(validated_session, indent=2, ensure_ascii=False, allow_nan=False) + "\n",
+                encoding="utf-8",
+            )
+            (output / "critical_listening_report.md").write_text(
+                listening_report_markdown(validated_session),
+                encoding="utf-8",
+            )
         _check_cancelled(cancel_event, "project export")
         score = self.to_score()
         score.save(output / "score.json")

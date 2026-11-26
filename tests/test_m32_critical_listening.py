@@ -31,7 +31,7 @@ from reawarp.score.time import TempoMap
 
 def _project():
     config = GenerationConfig(
-        duration=4.0, sample_rate=8_000, seed="m32-listening-fixture",
+        duration=5.0, sample_rate=8_000, seed="m32-listening-fixture",
         include_melody=False, include_texture=False, include_ambience=False,
     )
     frames = config.frame_count
@@ -47,7 +47,7 @@ def _project():
             MusicalEvent("c", "melody", 4, 1, kind="note", pitch=67),
             MusicalEvent("d", "kick", 0, 1, kind="hit"),
         ),
-        metadata={"sample_rate": config.sample_rate, "duration_seconds": 4.0},
+        metadata={"sample_rate": config.sample_rate, "duration_seconds": 5.0},
     )
     return ReawarpProject(
         config=config, sample_rate=config.sample_rate,
@@ -207,3 +207,28 @@ def test_context_errors_are_explicit_when_phrase_metadata_is_missing():
         build_contextual_audition_set(project, "solo_phrase", phrase_id="absent")
     with pytest.raises(ValueError, match="select at least one role"):
         build_subtraction_pass(project, (), 20)
+
+
+def test_critical_listening_report_exports_readable_json_markdown_and_manifest(tmp_path):
+    project = _phrased_project()
+    session = new_listening_session(project, candidate_ids=("candidate-export",))
+    session = update_human_notes(session, {
+        "identity": "The opening motif survives the subtraction pass.",
+        "technical_integrity": "No clipping was observed in the selected print.",
+    })
+    session["technical_analysis"] = analyse_project(project)
+    attached = attach_listening_session(project, session)
+
+    exported = attached.export(tmp_path / "m32-report-export")
+    json_path = exported / "critical_listening_report.json"
+    markdown_path = exported / "critical_listening_report.md"
+    manifest_path = exported / "manifest.json"
+    assert json_path.is_file() and markdown_path.is_file() and manifest_path.is_file()
+    report = json.loads(json_path.read_text(encoding="utf-8"))
+    markdown = markdown_path.read_text(encoding="utf-8")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert report["project_fingerprint"] == session["project_fingerprint"]
+    assert "The opening motif survives" in markdown
+    assert "Human listening prompts" in markdown
+    assert manifest["critical_listening"]["json_file"] == "critical_listening_report.json"
+    assert manifest["critical_listening"]["session_id"] == session["session_id"]
