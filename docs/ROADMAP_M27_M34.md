@@ -48,7 +48,7 @@ These principles are the acceptance lens for every milestone below.
 ## M27 — Artistic Intent, Material Vocabulary and Mutation Contracts
 
 **Priority:** P0  
-**Status:** Planned  
+**Status:** Implemented; UI integration and broader Score-native mutation execution remain follow-on work  
 **Depends on:** M15, M18, M20, M21, M23  
 **Primary guide basis:** Field Guide §§9, 12, 14, 17; Composition Atlas §§1–3; Advanced Appendix §§10.2, 13, 16–17.
 
@@ -86,7 +86,7 @@ Give each composition an explicit, inspectable identity before generation. Repla
 ## M28 — Phrase Grammar, Motif Families and Candidate Freeze
 
 **Priority:** P0  
-**Status:** Planned  
+**Status:** In progress — core model and symbolic candidate service implemented; workbench integration, broad transformations and full acceptance remain open  
 **Depends on:** M27; builds on M15, M19, M20, M23  
 **Primary guide basis:** Composition Atlas §§7, 10, 12–14; Advanced Appendix §§2, 10.1, 10.5, 12, 17, 20.
 
