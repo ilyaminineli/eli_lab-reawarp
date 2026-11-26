@@ -2212,6 +2212,11 @@ class MainWindow(QMainWindow):
 
 
     def _attention_plan_changed(self, payload: dict[str, Any]) -> None:
+        if self._worker is not None or self._export_worker is not None:
+            self.attention_map_page.set_error(
+                "Attention map edits are paused during an active render or export."
+            )
+            return
         if self.project is None:
             self.attention_map_page.set_error("Generate or load a composition before editing attention.")
             return
