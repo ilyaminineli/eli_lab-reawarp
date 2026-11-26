@@ -13,7 +13,7 @@ from reawarp.score.attention import (
     attention_conflict_id, apply_attention_gesture,
     apply_attention_gesture_to_event, build_attention_translation_check,
     estimate_attention_descriptors, record_attention_review,
-    remove_attention_gesture,
+    reconcile_attention_gestures, remove_attention_gesture,
 )
 from reawarp.score.render import ScoreRenderer
 
@@ -248,6 +248,25 @@ def test_attention_gestures_are_score_native_reversible_and_rational_span_scoped
             source, role="melody", start_beats=0, end_beats=2,
             action="focus", register_shift_semitones=25,
         )
+
+
+def test_attention_plan_edits_reconcile_orphaned_render_gestures():
+    source = Score(events=(
+        MusicalEvent("lead-a", "melody", 0, 1, kind="note", pitch=60),
+    ))
+    span = AttentionSpan("melody", 0, 2, "foreground", attention_role="motif")
+    focused = apply_attention_gesture(
+        source, role="melody", start_beats=0, end_beats=2, action="focus"
+    )
+    retained, removed = reconcile_attention_gestures(focused, (span,))
+    assert retained is focused
+    assert removed == 0
+
+    edited_span = AttentionSpan("melody", 0, 3, "foreground", attention_role="motif")
+    cleaned, removed = reconcile_attention_gestures(focused, (edited_span,))
+    assert removed == 1
+    assert "m29_attention_gestures" not in cleaned.metadata
+    assert cleaned.events == source.events
 
 
 def test_attention_recede_event_thinning_is_deterministic_and_never_drops_anchor():
